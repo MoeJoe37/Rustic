@@ -242,7 +242,8 @@ fn brute_chain(parsed: &ParsedDocument, leading_child: bool, steps: &[(&str, boo
 fn has_chains_agree_with_brute_force() {
     let page = document(&generated(400));
     // (selector, leading child, [(compound, child combinator after it)])
-    let cases: &[(&str, bool, &[(&str, bool)])] = &[
+    type Case<'a> = (&'a str, bool, &'a [(&'a str, bool)]);
+    let cases: &[Case] = &[
         (":has(.x span)", false, &[(".x", false), ("span", false)]),
         (":has(> .x span)", true, &[(".x", false), ("span", false)]),
         (":has(.x > span)", false, &[(".x", true), ("span", false)]),

@@ -20,6 +20,7 @@ path = "src/main.rs"
 rustic-a11y = { path = "../rustic-a11y" }
 rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
+rustic-devtools = { path = "../rustic-devtools" }
 rustic-dom = { path = "../rustic-dom" }
 rustic-encoding = { path = "../rustic-encoding" }
 rustic-engine = { path = "../rustic-engine" }
@@ -38,9 +39,9 @@ rustic-paint = { path = "../rustic-paint" }
 rustic-raster = { path = "../rustic-raster" }
 rustic-shell = { path = "../rustic-shell" }
 rustic-codecs = { path = "../rustic-codecs" }
+rustic-js = { path = "../rustic-js" }
 
 [dev-dependencies]
-rustic-js = { path = "../rustic-js" }
 
 [lints]
 workspace = true

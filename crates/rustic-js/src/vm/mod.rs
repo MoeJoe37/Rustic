@@ -96,7 +96,17 @@ impl Agent {
                 ParseError::Cancelled => EvalError::Cancelled,
                 other => EvalError::Parse(other),
             })?;
-            self.compile_script(&program).map_err(EvalError::Compile)?
+            // With a debugger attached, the script gets an id and steps
+            // (ADR 0069); the id is cleared again whatever compiling did.
+            let script = if self.debug.is_some() {
+                self.debug_register(source)
+            } else {
+                0
+            };
+            self.set_debug_compiling(script);
+            let compiled = self.compile_script(&program);
+            self.set_debug_compiling(0);
+            compiled.map_err(EvalError::Compile)?
         };
         Ok(self.run_script(code)?)
     }

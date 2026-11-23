@@ -12,6 +12,7 @@ use std::path::Path;
 
 mod broker;
 mod chrome;
+mod devtools;
 mod fonts;
 mod gpuproc;
 mod images;
@@ -366,6 +367,9 @@ pub(crate) fn run_command(engine: &mut Engine, args: &[OsString]) -> Option<u8> 
     if args[0] == "reftest" {
         return Some(reftest_command(engine, &args[1..]));
     }
+    if args[0] == "automate" {
+        return Some(automate_command(engine, &args[1..]));
+    }
     if args[0] == "dump-formatting" {
         return Some(dump_command(
             engine,
@@ -375,6 +379,31 @@ pub(crate) fn run_command(engine: &mut Engine, args: &[OsString]) -> Option<u8> 
         ));
     }
     None
+}
+
+/// `rustic automate`: serve the page to an automation client over the
+/// standard streams (ADR 0069). Scripts always run; the session's grants
+/// default to the read-only set.
+fn automate_command(engine: &mut Engine, args: &[OsString]) -> u8 {
+    let (mut limits, path) = match parse_dump_args(args) {
+        Ok(parsed) => parsed,
+        Err(message) => {
+            eprintln!("rustic automate: {message}\n\n{USAGE}");
+            return 2;
+        }
+    };
+    if limits.clicks[0].is_some() {
+        eprintln!("rustic automate: use input.click instead of --click\n\n{USAGE}");
+        return 2;
+    }
+    limits.run_scripts = true;
+    let grants = *limits
+        .devtools
+        .get_or_insert(rustic_devtools::Grants::DEFAULT);
+    devtools::begin(grants);
+    let status = dump_command_with(engine, "automate", limits, &path, |_, _| Ok(String::new()));
+    devtools::end();
+    status
 }
 
 fn dump_command(
@@ -1059,6 +1088,14 @@ pub(crate) fn parse_dump_args(args: &[OsString]) -> Result<(LoaderLimits, OsStri
                 }
                 Some("--run-scripts") => {
                     limits.run_scripts = true;
+                    continue;
+                }
+                Some("--devtools-allow") => {
+                    let list = iter
+                        .next()
+                        .and_then(|value| value.to_str())
+                        .ok_or("--devtools-allow requires a list of grants")?;
+                    limits.devtools = Some(rustic_devtools::Grants::parse(list)?);
                     continue;
                 }
                 Some("--scroll") => {

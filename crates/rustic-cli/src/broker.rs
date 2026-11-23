@@ -179,6 +179,7 @@ pub fn splits(command: &OsString) -> bool {
                 | "render"
                 | "hit-test"
                 | "reftest"
+                | "automate"
         )
     )
 }
@@ -262,6 +263,7 @@ fn child_args(parent: &[String], scripts: bool) -> Vec<String> {
         "--scroll",
         "--scroll-box",
         "--frames",
+        "--devtools-allow",
     ];
     let mut args = Vec::new();
     let mut iter = parent.iter();
@@ -877,7 +879,9 @@ fn document_argument(
             Some((limits, path, None))
         }
         _ => {
-            let (limits, path) = crate::parse_dump_args(args).ok()?;
+            let (mut limits, path) = crate::parse_dump_args(args).ok()?;
+            // `automate` always runs scripts (ADR 0069).
+            limits.run_scripts |= command == "automate";
             Some((limits, path, None))
         }
     }
@@ -1360,6 +1364,7 @@ fn run_renderer(
     grant: &Grant,
     limits: LoaderLimits,
     context: &FrameContext,
+    automation: Option<rustic_devtools::Grants>,
 ) -> Result<Finished, Ended> {
     let (mut child, stdout, stdin, relay) = spawn().map_err(Ended::NotStarted)?;
     // Watchdog: a renderer that does not finish in time is killed, and the
@@ -1396,6 +1401,23 @@ fn run_renderer(
                     });
                 }
                 RendererMessage::Diagnostic(text) => eprintln!("{}", EscapedText(&text)),
+                // An automation session (ADR 0069): only the top-level
+                // renderer of `automate` has one. Its lines reach the
+                // client only when well-formed, and it receives only the
+                // commands this broker admitted for the session's grants.
+                RendererMessage::AutomationOutput(line) => {
+                    if automation.is_none() || !rustic_devtools::protocol::valid_output(&line) {
+                        return Err(refused());
+                    }
+                    crate::devtools::write_stdout_line(&line);
+                }
+                RendererMessage::AutomationRead { id } => {
+                    let Some(grants) = automation else {
+                        return Err(refused());
+                    };
+                    let line = crate::devtools::next_admitted(grants, &timed_out);
+                    channel.send(&BrokerMessage::AutomationCommand { id, line })?;
+                }
                 RendererMessage::Surface(sent) => {
                     // One surface, or one per frame within the output budget.
                     if context.factor.is_none() || surfaces.len() >= crate::loader::MAX_FRAMES {
@@ -1454,7 +1476,10 @@ fn serve(
     output: Option<&OsString>,
     context: &FrameContext,
 ) -> u8 {
-    let finished = match run_renderer(start, grant, limits, context) {
+    // Only `automate`'s own renderer gets the session's command stream.
+    let automation = (command == "automate")
+        .then(|| limits.devtools.unwrap_or(rustic_devtools::Grants::DEFAULT));
+    let finished = match run_renderer(start, grant, limits, context, automation) {
         Ok(finished) => finished,
         Err(Ended::NotStarted(error)) => {
             if SANDBOX.load(Ordering::Relaxed)
@@ -1748,7 +1773,7 @@ impl<'a> Broker<'a> {
         };
         // A frame renderer that fails costs only its frame (it paints
         // white); the page renders on.
-        let surface = match run_renderer(start, &grant, self.limits, &child) {
+        let surface = match run_renderer(start, &grant, self.limits, &child, None) {
             Ok(Finished {
                 status: 0,
                 mut surfaces,
@@ -1871,7 +1896,7 @@ impl<'a> Broker<'a> {
             document,
             fonts: crate::fonts::granted_bytes().to_vec(),
         };
-        match run_renderer(start, &Grant::Network(popup), self.limits, &child) {
+        match run_renderer(start, &Grant::Network(popup), self.limits, &child, None) {
             Ok(Finished { status: 0, .. }) => true,
             _ => {
                 eprintln!("rustic: popup {shown}: its renderer did not finish");
@@ -2030,6 +2055,8 @@ impl<'a> Broker<'a> {
             | RendererMessage::Painted(_)
             | RendererMessage::Handled
             | RendererMessage::Accessibility(_)
+            | RendererMessage::AutomationOutput(_)
+            | RendererMessage::AutomationRead { .. }
             | RendererMessage::Done { .. } => BrokerMessage::Storage {
                 id: u32::MAX,
                 value: StorageValue::Refused,

@@ -91,6 +91,9 @@ pub struct LoaderLimits {
     /// page and answer the broker's input and frame requests until it
     /// closes the channel.
     pub live: bool,
+    /// `--devtools-allow LIST`: what an automation session may do
+    /// (ADR 0069); `None` unless given.
+    pub devtools: Option<rustic_devtools::Grants>,
 }
 
 /// The manual clock's step between `--frames` (60 per second).
@@ -119,6 +122,7 @@ impl Default for LoaderLimits {
             frames: 1,
             report_scroll: false,
             live: false,
+            devtools: None,
         }
     }
 }
@@ -663,7 +667,7 @@ fn load_scripted_network_document(
     parser_limits: ParserLimits,
     forced: Option<Encoding>,
 ) -> Result<(LoadedDocument, Selected), LoadError> {
-    let session = Rc::clone(&network.session);
+    let session = crate::devtools::observe(Rc::clone(&network.session));
     let url = session.document_url().clone();
     // A brokered local file keeps the local script grant (its directory).
     let mut load = if session.is_local() {
@@ -737,6 +741,12 @@ fn run_scripted_load(
 ) -> Result<LoadedDocument, LoadError> {
     let cancellation = load.cancellation().expect("admitted load").clone();
     let applied_files = applied_snapshot(limits);
+    // An automation session sets up its debugger and breakpoints before
+    // any HTML is parsed (ADR 0069).
+    let devtools = crate::devtools::active();
+    if let Some(session) = &devtools {
+        session.attach(&mut load, &source.url)?;
+    }
     read(&mut |bytes, encoding| {
         if let Some(encoding) = encoding {
             load.set_initial_encoding(encoding)?;
@@ -748,6 +758,9 @@ fn run_scripted_load(
                 applied_files: applied_files.clone(),
                 network: source.network.clone(),
             }))?;
+        }
+        if let Some(session) = &devtools {
+            session.note_document_bytes(bytes);
         }
         load.feed(bytes)?;
         // Service requests at parser barriers and EOF, independent of file chunks.
@@ -827,6 +840,18 @@ fn run_scripted_load(
             continue;
         }
         settle_now(&mut document, &mut queued_turns, &mut turns)?;
+    }
+    // The automation session drives the settled page until it closes.
+    if let Some(session) = &devtools {
+        session.loaded(&mut document);
+        let host = SessionPage {
+            source: &source,
+            limits,
+            applied_files: &applied_files,
+            queued_turns: std::cell::Cell::new(queued_turns),
+            turns: std::cell::Cell::new(turns),
+        };
+        session.serve(&mut document, &host);
     }
     // Popups open in renderers of their own, through the broker (ADR 0062).
     for popup in document.take_popups() {
@@ -1241,6 +1266,109 @@ fn live_page(
     }
 }
 
+/// The loaded page as an automation session drives it, within the
+/// load's task and timer-turn budgets.
+struct SessionPage<'a> {
+    source: &'a ScriptedSource,
+    limits: LoaderLimits,
+    applied_files: &'a AppliedLocalFiles,
+    queued_turns: std::cell::Cell<usize>,
+    turns: std::cell::Cell<usize>,
+}
+
+impl SessionPage<'_> {
+    fn list(
+        &self,
+        document: &rustic_engine::ScriptedDocument<ManualClock>,
+    ) -> Result<rustic_paint::DisplayList, LoadError> {
+        let state = document.scroll_state();
+        let engine_document = document.document();
+        display_list(LayoutInput {
+            scroll: Some(&state),
+            ..LayoutInput::new(
+                &engine_document,
+                &self.source.path,
+                self.limits,
+                self.limits.script_view,
+                Some(self.applied_files),
+                self.source.network.as_ref(),
+            )
+        })
+    }
+
+    fn settle_counted(
+        &self,
+        document: &mut rustic_engine::ScriptedDocument<ManualClock>,
+    ) -> Result<u64, LoadError> {
+        let (mut queued, mut turns) = (self.queued_turns.get(), self.turns.get());
+        let before = queued + turns;
+        let result = settle(document, &mut queued, &mut turns);
+        self.queued_turns.set(queued);
+        self.turns.set(turns);
+        result.map(|()| (queued + turns - before) as u64)
+    }
+}
+
+impl crate::devtools::PageHost for SessionPage<'_> {
+    fn hit_test(
+        &self,
+        document: &rustic_engine::ScriptedDocument<ManualClock>,
+        x: f64,
+        y: f64,
+    ) -> Result<Option<rustic_dom::NodeId>, LoadError> {
+        let list = self.list(document)?;
+        let point = rustic_layout::CssPx::new(x)
+            .and_then(|x| Ok((x, rustic_layout::CssPx::new(y)?)))
+            .map(|(x, y)| rustic_layout::CssPoint { x, y });
+        Ok(point
+            .ok()
+            .and_then(|point| list.hit_test(point))
+            .map(|hit| hit.node))
+    }
+
+    fn screenshot(
+        &self,
+        document: &rustic_engine::ScriptedDocument<ManualClock>,
+    ) -> Result<(u32, u32, Vec<u8>), LoadError> {
+        let state = document.scroll_state();
+        let engine_document = document.document();
+        let (_, surface) = rasterize_list(LayoutInput {
+            scroll: Some(&state),
+            ..LayoutInput::new(
+                &engine_document,
+                &self.source.path,
+                self.limits,
+                self.limits.script_view,
+                Some(self.applied_files),
+                self.source.network.as_ref(),
+            )
+        })?;
+        let png = rustic_raster::encode_png(&surface, self.limits.max_dump_bytes)
+            .map_err(LoadError::Png)?;
+        Ok((surface.width(), surface.height(), png))
+    }
+
+    fn settle(
+        &self,
+        document: &mut rustic_engine::ScriptedDocument<ManualClock>,
+    ) -> Result<u64, LoadError> {
+        self.settle_counted(document)
+    }
+
+    fn advance(
+        &self,
+        document: &mut rustic_engine::ScriptedDocument<ManualClock>,
+        by: Duration,
+    ) -> Result<u64, LoadError> {
+        document
+            .clock()
+            .advance(by)
+            .map_err(LoadError::ScriptClock)?;
+        self.queued_turns.set(0);
+        self.settle_counted(document)
+    }
+}
+
 /// Run the tasks that are ready now, without advancing the clock.
 fn run_ready(
     document: &mut rustic_engine::ScriptedDocument<ManualClock>,
@@ -1513,6 +1641,9 @@ fn complete_next_script_request(
         Err(FetchError::Failed) => Err(ClassicFetchError::Failed),
         Err(FetchError::Cancelled) => return Err(LoadError::Cancelled),
     };
+    if let (Some(session), Ok(bytes)) = (crate::devtools::active(), &source) {
+        session.note_script(&request.url, bytes);
+    }
     let charset = fetch
         .network()
         .and_then(|session| session.charset_of(&request.url))

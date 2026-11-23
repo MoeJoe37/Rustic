@@ -490,8 +490,14 @@ pub enum Op {
     /// A loop's back edge: poll for cancellation and collection, then
     /// jump to `target`.
     Loop { target: u32 },
-    /// No operation (`debugger`).
+    /// No operation (`debugger` without a debugger attached).
     Nop,
+    /// A statement starts: entry `point` of the code's debug points. Only
+    /// code compiled with a debugger attached has these (ADR 0069).
+    Step { point: u32 },
+    /// A `debugger` statement compiled with a debugger attached: always
+    /// pauses while one is attached.
+    DebuggerStep { point: u32 },
 }
 
 /// Declaration kinds for global script instantiation.
@@ -603,7 +609,16 @@ pub struct FunctionCode {
     /// environment slot of each parameter; [`UNMAPPED_PARAMETER`] for a
     /// parameter that a later one of the same name hides.
     pub arguments_map: Option<Box<[u16]>>,
+    /// The debugger's script id for this code, or 0 (ADR 0069).
+    pub script: u32,
+    /// Statement starts, indexed by [`Op::Step`] operands.
+    pub(crate) debug_points: Box<[crate::debug::DebugPoint]>,
+    /// Register-allocated bindings visible at each debug point, by name.
+    pub(crate) debug_locals: Box<[DebugLocals]>,
 }
+
+/// Register-allocated bindings visible at one debug point: name and register.
+pub(crate) type DebugLocals = Rc<[(StringId, Reg)]>;
 
 /// An entry of [`FunctionCode::arguments_map`] that maps nothing.
 pub(crate) const UNMAPPED_PARAMETER: u16 = u16::MAX;
@@ -689,6 +704,27 @@ impl FunctionCode {
             + self.handlers.len() * std::mem::size_of::<Handler>()
             + self.sites.len() * std::mem::size_of::<NamedSite>()
             + self.templates.len() * std::mem::size_of::<TemplateSite>()
+            + self.debug_points.len() * std::mem::size_of::<crate::debug::DebugPoint>()
+            + self
+                .debug_locals
+                .iter()
+                .map(|l| 16 + l.len() * 8)
+                .sum::<usize>()
+    }
+
+    /// The debug point of the last statement step at or before the op
+    /// that ran before `pc`, if the code has steps.
+    pub(crate) fn debug_point_before(&self, pc: u32) -> Option<crate::debug::DebugPoint> {
+        if self.debug_points.is_empty() {
+            return None;
+        }
+        let end = (pc as usize).min(self.ops.len());
+        self.ops[..end].iter().rev().find_map(|op| match op {
+            Op::Step { point } | Op::DebuggerStep { point } => {
+                self.debug_points.get(*point as usize).copied()
+            }
+            _ => None,
+        })
     }
 
     /// Report every heap reference the code holds. Shapes remembered by
@@ -712,6 +748,11 @@ impl FunctionCode {
         }
         for site in self.templates.iter() {
             tracer.value(site.object.get());
+        }
+        for table in self.debug_locals.iter() {
+            for &(name, _) in table.iter() {
+                tracer.string(name);
+            }
         }
     }
 }

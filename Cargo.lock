@@ -1530,6 +1530,7 @@ dependencies = [
  "rustic-base",
  "rustic-codecs",
  "rustic-css",
+ "rustic-devtools",
  "rustic-dom",
  "rustic-encoding",
  "rustic-engine",
@@ -1563,6 +1564,10 @@ dependencies = [
  "rustic-base",
  "rustic-encoding",
 ]
+
+[[package]]
+name = "rustic-devtools"
+version = "0.1.0"
 
 [[package]]
 name = "rustic-dom"

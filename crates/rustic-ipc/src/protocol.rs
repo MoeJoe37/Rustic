@@ -413,6 +413,15 @@ pub enum BrokerMessage {
     },
     /// Input or a frame request for a long-lived page (`render --live`).
     Page(PageInput),
+    /// The reply to [`RendererMessage::AutomationRead`] number `id`: the
+    /// next automation command the broker admitted (ADR 0069), or `None`
+    /// when the client closed the session.
+    AutomationCommand {
+        /// The request number.
+        id: u32,
+        /// One protocol line, without its line break.
+        line: Option<String>,
+    },
 }
 
 /// Renderer to broker.
@@ -477,6 +486,14 @@ pub enum RendererMessage {
     /// answering [`PageInput::Accessibility`]; the broker decodes it as
     /// hostile input.
     Accessibility(Vec<u8>),
+    /// An automation protocol line for the client (ADR 0069); the broker
+    /// forwards it only when it is one well-formed response or event.
+    AutomationOutput(String),
+    /// Ask for the next automation command.
+    AutomationRead {
+        /// The request number.
+        id: u32,
+    },
     /// The job finished: an exit status and the command's output.
     Done {
         /// 0 success, 1 load failure, 2 usage error.
@@ -848,6 +865,11 @@ impl Message for BrokerMessage {
                 writer.u16(7);
                 put_page_input(writer, input);
             }
+            Self::AutomationCommand { id, line } => {
+                writer.u16(32);
+                writer.u32(*id);
+                writer.opt_str(line.as_deref());
+            }
         }
     }
 
@@ -948,6 +970,10 @@ impl Message for BrokerMessage {
                 opened: reader.bool()?,
             }),
             7 => Ok(Self::Page(get_page_input(reader)?)),
+            32 => Ok(Self::AutomationCommand {
+                id: reader.u32()?,
+                line: reader.opt_string()?,
+            }),
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }
@@ -1102,6 +1128,14 @@ impl Message for RendererMessage {
                 writer.bool(*noopener);
                 writer.bool(*noreferrer);
             }
+            Self::AutomationOutput(line) => {
+                writer.u16(32);
+                writer.str(line);
+            }
+            Self::AutomationRead { id } => {
+                writer.u16(33);
+                writer.u32(*id);
+            }
         }
     }
 
@@ -1205,6 +1239,8 @@ impl Message for RendererMessage {
                 noopener: reader.bool()?,
                 noreferrer: reader.bool()?,
             }),
+            32 => Ok(Self::AutomationOutput(reader.string()?)),
+            33 => Ok(Self::AutomationRead { id: reader.u32()? }),
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }

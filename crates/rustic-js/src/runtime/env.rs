@@ -287,6 +287,32 @@ pub struct Reference {
 }
 
 impl Agent {
+    /// Debugger: the bindings `env` itself holds (for the global
+    /// environment only its lexical declarations), its outer environment,
+    /// and whether it is the global environment.
+    pub(crate) fn debug_env_bindings(
+        &self,
+        env: EnvId,
+    ) -> (Vec<(StringId, Value)>, Option<EnvId>, bool) {
+        let record = self.env(env);
+        let bindings = record
+            .declarative()
+            .map(|record| {
+                record
+                    .names
+                    .iter()
+                    .zip(&record.values)
+                    .map(|(&(name, _), &value)| (name, value))
+                    .collect()
+            })
+            .unwrap_or_default();
+        (
+            bindings,
+            record.outer(),
+            matches!(record, Environment::Global { .. }),
+        )
+    }
+
     fn alloc_env(&mut self, env: Environment) -> JsResult<EnvId> {
         Ok(self.heap.alloc_env(env)?)
     }

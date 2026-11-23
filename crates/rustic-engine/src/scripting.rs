@@ -405,6 +405,19 @@ impl PageTree for ScriptTree {
 ///
 /// The host explicitly queues scripts and pumps turns. The document and agent
 /// move together, with the document's existing token shared by the VM.
+/// An element's layout as developer tools show it ([`ScriptedDocument::node_layout`]).
+#[derive(Clone, Debug, Default)]
+pub struct NodeLayout {
+    /// Computed style, for a styled element.
+    pub style: Option<ComputedStyleSnapshot>,
+    /// Border-box bounds `[x, y, width, height]` in CSS pixels, for an
+    /// element with a box and a projectable transform.
+    pub client_rect: Option<[f64; 4]>,
+    /// Content and border box sizes, for an element with a block or
+    /// atomic box.
+    pub box_sizes: Option<page::BoxSizes>,
+}
+
 pub struct ScriptedDocument<C = SystemClock> {
     document: Rc<ScriptTree>,
     cancellation: CancellationToken,
@@ -819,6 +832,53 @@ impl<C: Clock> ScriptedDocument<C> {
         self.agent
             .as_ref()
             .map_or(0, page::take_listener_error_count)
+    }
+
+    /// The page's script agent, for developer tools (ADR 0069): attaching
+    /// a debugger, setting breakpoints, reading a stopped stack. Running
+    /// script through it bypasses the turn bookkeeping; use
+    /// [`Self::evaluate_for_devtools`] for that.
+    pub fn devtools_agent(&mut self) -> Result<&mut Agent, ScriptStop> {
+        self.agent.as_mut().map_err(|reason| *reason)
+    }
+
+    /// Run `source` as a host script turn for developer tools and describe
+    /// its completion value (`Ok`) or what it threw or why it did not parse
+    /// (`Err`), without running page code to describe either. A throw is
+    /// the tool's result, not an uncaught page error: no `error` event.
+    pub fn evaluate_for_devtools(
+        &mut self,
+        source: &Source,
+    ) -> Result<Result<String, String>, ScriptStop> {
+        self.check_live()?;
+        self.begin_turn()?;
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        let outcome = match agent.evaluate_source(source) {
+            Ok(value) => Ok(agent.describe_value(value)),
+            Err(EvalError::Throw(value)) => Err(agent.describe_value(value)),
+            Err(EvalError::Parse(error)) => Err(format!("SyntaxError: {error}")),
+            Err(EvalError::Compile(error)) => Err(format!("SyntaxError: {error:?}")),
+            Err(stop) => {
+                self.finish_script_turn(Err(stop))?;
+                return Err(ScriptStop::DocumentCancelled);
+            }
+        };
+        self.finish_script_turn(Ok(()))?;
+        Ok(outcome)
+    }
+
+    /// One element's computed style, client rectangle and box sizes from
+    /// the current layout, for developer tools; laid out first if stale.
+    pub fn node_layout(&mut self, node: NodeId) -> Result<NodeLayout, LayoutReadError> {
+        self.document.layout.borrow_mut().begin_turn();
+        self.document
+            .read_layout(NodeLayout::default(), |geometry| {
+                Ok(NodeLayout {
+                    style: geometry.computed_styles.get(&node).cloned(),
+                    client_rect: geometry.client_rects.get(&node).copied().flatten(),
+                    box_sizes: geometry.box_sizes.get(&node).copied(),
+                })
+            })
     }
 
     /// Take the page's console messages and the count dropped because the

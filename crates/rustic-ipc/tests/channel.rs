@@ -147,6 +147,11 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             request: AssistiveRequest::Click,
         }),
         BrokerMessage::Page(PageInput::Accessibility),
+        BrokerMessage::AutomationCommand {
+            id: 17,
+            line: Some("{\"id\":1,\"method\":\"page.info\"}".into()),
+        },
+        BrokerMessage::AutomationCommand { id: 18, line: None },
     ];
     let renderer = vec![
         RendererMessage::Resource {
@@ -204,6 +209,8 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             noopener: true,
             noreferrer: false,
         },
+        RendererMessage::AutomationOutput("{\"id\":1,\"result\":null}".into()),
+        RendererMessage::AutomationRead { id: 8 },
         RendererMessage::Surface(Surface {
             width: 2,
             height: 1,

@@ -30,8 +30,8 @@ pub use rustic_bindings::page::{
     QuotaExceeded, ScriptRequest, ScriptResponse, StorageHost, StorageKind,
 };
 pub use scripting::{
-    DocumentTurn, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument,
-    ScrollState, TaskLimits,
+    DocumentTurn, NodeLayout, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn,
+    ScriptedDocument, ScrollState, TaskLimits,
 };
 pub use tasks::TimerId;
 

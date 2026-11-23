@@ -140,6 +140,33 @@ impl crate::loader::FrameHost for BrokerLink {
     }
 }
 
+/// The next automation command the broker admitted (ADR 0069); `None`
+/// when the session ended or this is not a renderer.
+pub(crate) fn automation_read() -> Option<String> {
+    let link = FRAMES.with(|frames| frames.borrow().clone())?;
+    match link
+        .request(|id| RendererMessage::AutomationRead { id })
+        .unwrap_or_else(|error| lost(&error))
+    {
+        BrokerMessage::AutomationCommand { line, .. } => line,
+        _ => None,
+    }
+}
+
+/// Send one automation protocol line to the broker, which forwards it to
+/// the client (ADR 0069).
+pub(crate) fn automation_write(line: &str) {
+    if let Some(link) = FRAMES.with(|frames| frames.borrow().clone()) {
+        let sent = link
+            .channel
+            .borrow_mut()
+            .send(&RendererMessage::AutomationOutput(line.to_owned()));
+        if let Err(error) = sent {
+            lost(&error);
+        }
+    }
+}
+
 /// Write command output: to standard output, or, in a renderer, to the
 /// buffer the broker receives.
 pub fn emit_stdout(bytes: &[u8]) -> io::Result<()> {
@@ -364,6 +391,20 @@ fn compromised(mut channel: Link, document: &str, mode: &std::ffi::OsStr) -> u8 
     if mode == "escape" {
         return escape(channel);
     }
+    if mode == "automation" {
+        // Pull an automation command without being granted a session, then
+        // try to forge extra protocol lines for the client (ADR 0069).
+        let pulled = channel
+            .send(&RendererMessage::AutomationRead { id: 0 })
+            .and_then(|()| channel.recv::<BrokerMessage>());
+        if pulled.is_ok() {
+            let _ = channel.send(&RendererMessage::AutomationOutput(
+                "{\"id\":1,\"result\":null}\n{\"id\":2,\"result\":\"forged\"}".to_owned(),
+            ));
+            let _ = channel.recv::<BrokerMessage>();
+        }
+        return 1;
+    }
     if mode == "garbage" {
         let mut stdout = io::stdout().lock();
         let _ = stdout.write_all(&[3, 0, 0, 0, 0xEE, 0xEE, 0xEE]);
@@ -576,7 +617,8 @@ impl BrokerLink {
             | BrokerMessage::Fetch { id, .. }
             | BrokerMessage::Storage { id, .. }
             | BrokerMessage::Frame { id, .. }
-            | BrokerMessage::Popup { id, .. } => Some(*id),
+            | BrokerMessage::Popup { id, .. }
+            | BrokerMessage::AutomationCommand { id, .. } => Some(*id),
             BrokerMessage::Start(_) | BrokerMessage::Page(_) => None,
         };
         if reply_id != Some(id) {

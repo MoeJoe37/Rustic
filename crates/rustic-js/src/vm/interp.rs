@@ -215,6 +215,33 @@ enum Flow {
 const INLINE_ARGS: usize = 8;
 
 impl Agent {
+    /// The running frames' code and next op, innermost first.
+    pub(crate) fn vm_frames(&self) -> impl Iterator<Item = (&FunctionCode, u32)> {
+        self.vm
+            .frames
+            .iter()
+            .rev()
+            .map(|frame| (&*frame.code, frame.pc))
+    }
+
+    /// Frame `index` (innermost first): its register locals visible at its
+    /// current statement, and its running environment.
+    pub(crate) fn debug_frame_view(&self, index: usize) -> Option<(Vec<(StringId, Value)>, EnvId)> {
+        let frame = self.vm.frames.iter().rev().nth(index)?;
+        let mut locals = Vec::new();
+        if let Some(point) = frame.code.debug_point_before(frame.pc) {
+            if let Some(table) = frame.code.debug_locals.get(point.locals as usize) {
+                for &(name, register) in table.iter() {
+                    let slot = frame.base as usize + usize::from(register);
+                    if let Some(&value) = self.vm.stack.get(slot) {
+                        locals.push((name, value));
+                    }
+                }
+            }
+        }
+        Some((locals, frame.env))
+    }
+
     // ---- embedder API -------------------------------------------------
 
     /// Let `token` stop running script: loops and calls poll it, and a
@@ -2223,6 +2250,19 @@ impl Agent {
                     jump!(target);
                 }
                 Op::Nop => {}
+                Op::Step { point } | Op::DebuggerStep { point } => {
+                    if self.debug.is_some() {
+                        frame!().pc = pc as u32;
+                        let point = point as usize;
+                        let offset = code.debug_points[point].offset;
+                        let previous = point
+                            .checked_sub(1)
+                            .map(|previous| code.debug_points[previous].offset);
+                        let depth = self.vm.frames.len();
+                        let statement = matches!(op, Op::DebuggerStep { .. });
+                        t!(self.debug_step(code.script, offset, previous, depth, statement));
+                    }
+                }
             }
         }
     }

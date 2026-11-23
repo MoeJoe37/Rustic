@@ -383,6 +383,8 @@ pub struct Agent {
     /// Recently compiled patterns, most recent last, so a pattern built
     /// in a loop is parsed and compiled once.
     pub(crate) regexp_cache: Vec<RegExpCacheEntry>,
+    /// The attached debugger (ADR 0069).
+    pub(crate) debug: Option<Box<crate::debug::DebugState>>,
 }
 
 impl Agent {
@@ -463,6 +465,7 @@ impl Agent {
             realms: Vec::new(),
             vm: VmState::default(),
             regexp_cache: Vec::new(),
+            debug: None,
         };
         agent.realms.push(RealmRecord {
             intrinsics: agent.intrinsics,

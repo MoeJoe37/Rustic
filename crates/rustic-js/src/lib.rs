@@ -16,6 +16,7 @@
 #![warn(missing_docs)]
 
 pub mod ast;
+pub mod debug;
 mod error;
 mod lexer;
 pub mod module;

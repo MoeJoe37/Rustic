@@ -306,6 +306,21 @@ impl<C: Clock> ClassicScriptLoad<C> {
         })
     }
 
+    /// Attach a debugger to the document's agent (ADR 0069); call before
+    /// feeding HTML so every script gets statement steps.
+    pub fn set_debug_hook(
+        &mut self,
+        hook: std::rc::Rc<dyn rustic_js::debug::DebugHook>,
+    ) -> Result<(), ScriptLoadError> {
+        self.inner.with_pending(|pending| {
+            pending
+                .document
+                .devtools_agent()?
+                .set_debug_hook(Some(hook));
+            Ok(())
+        })
+    }
+
     /// Apply the document's Content Security Policy to inline scripts.
     /// Call before feeding HTML.
     pub fn set_script_policy(

@@ -329,6 +329,14 @@ struct Gen<'a, 't> {
     generator: bool,
     /// Compiling an async function's body.
     is_async: bool,
+    /// The debugger's script id when compiling with steps, or 0.
+    debug_script: u32,
+    /// See [`FunctionCode::debug_points`].
+    debug_points: Vec<crate::debug::DebugPoint>,
+    /// See [`FunctionCode::debug_locals`].
+    debug_locals: Vec<Rc<[(StringId, Reg)]>>,
+    /// The `debug_locals` entry already built for a scope.
+    debug_tables: HashMap<ScopeId, u32>,
 }
 
 impl<'a, 't> Gen<'a, 't> {
@@ -341,6 +349,7 @@ impl<'a, 't> Gen<'a, 't> {
         name: StringId,
         stack_base: usize,
     ) -> Self {
+        let debug_script = agent.debug_compiling();
         Self {
             agent,
             tree,
@@ -377,6 +386,10 @@ impl<'a, 't> Gen<'a, 't> {
             eval: None,
             generator: false,
             is_async: false,
+            debug_script,
+            debug_points: Vec::new(),
+            debug_locals: Vec::new(),
+            debug_tables: HashMap::new(),
         }
     }
 
@@ -434,8 +447,52 @@ impl<'a, 't> Gen<'a, 't> {
             sites: self.sites.into_boxed_slice(),
             templates: self.templates.into_boxed_slice(),
             arguments_map: self.arguments_map,
+            script: self.debug_script,
+            debug_points: self.debug_points.into_boxed_slice(),
+            debug_locals: self.debug_locals.into_boxed_slice(),
         };
         Ok(self.agent.heap.alloc_code(code)?)
+    }
+
+    // ---- debugging (ADR 0069) ----------------------------------------
+
+    /// Record a statement start at source `offset` with the register
+    /// bindings visible in the current scope; returns its point index.
+    fn debug_point(&mut self, offset: u32) -> CResult<u32> {
+        let locals = match self.debug_tables.get(&self.scope) {
+            Some(&index) => index,
+            None => {
+                let mut table: Vec<(StringId, Reg)> = Vec::new();
+                let mut names: Vec<&str> = Vec::new();
+                let mut at = Some(self.scope);
+                while let Some(scope) = at {
+                    let s = &self.tree.scopes[scope];
+                    if s.function != self.function_scope {
+                        break;
+                    }
+                    for (index, binding) in s.bindings.iter().enumerate() {
+                        let name: &str = &binding.name;
+                        if !crate::debug::visible_name(name) || names.contains(&name) {
+                            continue;
+                        }
+                        if let Some(&register) = self.locals.get(&(scope, index)) {
+                            names.push(name);
+                            table.push((self.agent.heap.intern_str(name)?, register));
+                        }
+                    }
+                    at = s.parent;
+                }
+                let index =
+                    u32::try_from(self.debug_locals.len()).map_err(|_| CompileError::TooLarge)?;
+                self.debug_locals.push(table.into());
+                self.debug_tables.insert(self.scope, index);
+                index
+            }
+        };
+        let point = u32::try_from(self.debug_points.len()).map_err(|_| CompileError::TooLarge)?;
+        self.debug_points
+            .push(crate::debug::DebugPoint { offset, locals });
+        Ok(point)
     }
 
     // ---- emission ----------------------------------------------------
@@ -2294,6 +2351,22 @@ impl<'a, 't> Gen<'a, 't> {
 
     fn statement(&mut self, s: &Statement) -> CResult<()> {
         self.guard()?;
+        if self.debug_script != 0
+            && !matches!(
+                s.kind,
+                StatementKind::Block(_)
+                    | StatementKind::Empty
+                    | StatementKind::Function(_)
+                    | StatementKind::Labeled { .. }
+            )
+        {
+            let point = self.debug_point(s.span.start)?;
+            if matches!(s.kind, StatementKind::Debugger) {
+                self.emit(Op::DebuggerStep { point });
+            } else {
+                self.emit(Op::Step { point });
+            }
+        }
         let mark = self.mark();
         let labels = std::mem::take(&mut self.labels);
         match &s.kind {
@@ -2312,7 +2385,9 @@ impl<'a, 't> Gen<'a, 't> {
             }
             StatementKind::Empty => {}
             StatementKind::Debugger => {
-                self.emit(Op::Nop);
+                if self.debug_script == 0 {
+                    self.emit(Op::Nop);
+                }
             }
             StatementKind::Variable(d) => self.variable_declaration(d)?,
             StatementKind::Function(_) => {} // hoisted

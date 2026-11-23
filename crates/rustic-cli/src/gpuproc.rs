@@ -308,7 +308,9 @@ fn spawn_confined(exe: &std::path::Path) -> io::Result<Started> {
 }
 
 fn start() -> io::Result<Running> {
-    let exe = std::env::current_exe()?;
+    // On macOS the windowless build, so no AppKit initializer runs before
+    // the Seatbelt profile (TD-183); elsewhere this executable.
+    let exe = crate::broker::child_exe()?;
     let (mut process, stdout, stdin, stderr) = if crate::broker::sandboxed() {
         spawn_confined(&exe)?
     } else {

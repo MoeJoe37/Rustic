@@ -253,6 +253,10 @@ pub struct Painted {
     /// Find in page: the match count, the active match and its top and
     /// bottom in CSS pixels of the document (when the frame asked).
     pub found: Option<(u32, u32, f64, f64)>,
+    /// The focused editable text field's border box (left, top, width,
+    /// height in CSS pixels of the viewport; all zero when it has no box),
+    /// so the host enables its input method there (ADR 0074).
+    pub editing: Option<(f64, f64, f64, f64)>,
 }
 
 /// What a resource request is for (decides the broker's policy checks).
@@ -1274,6 +1278,15 @@ impl Message for RendererMessage {
                     }
                     None => writer.u8(0),
                 }
+                match painted.editing {
+                    Some((x, y, width, height)) => {
+                        writer.u8(1);
+                        for value in [x, y, width, height] {
+                            put_f64(writer, value);
+                        }
+                    }
+                    None => writer.u8(0),
+                }
             }
             Self::Popup {
                 id,
@@ -1387,6 +1400,16 @@ impl Message for RendererMessage {
                     1 => Some((
                         reader.u32()?,
                         reader.u32()?,
+                        get_f64(reader)?,
+                        get_f64(reader)?,
+                    )),
+                    _ => return Err(DecodeError::InvalidFlag),
+                },
+                editing: match reader.u8()? {
+                    0 => None,
+                    1 => Some((
+                        get_f64(reader)?,
+                        get_f64(reader)?,
                         get_f64(reader)?,
                         get_f64(reader)?,
                     )),

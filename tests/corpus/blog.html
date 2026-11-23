@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: blog</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+.wrap { padding: 16px; }
+.sidebar { float: right; width: 180px; margin-left: 16px; background: #eef; padding: 8px; }
+.post { overflow: hidden; }
+.post h2 { margin: 0 0 6px; font-size: 20px; }
+.thumb { float: left; width: 64px; height: 48px; margin: 0 10px 6px 0; }
+.meta { font-size: 12px; color: #777; }
+footer { clear: both; border-top: 1px solid #ccc; padding: 8px 16px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="sidebar" id="sidebar"><b>About</b><br>Notes on gardening, cooking and the odd bicycle repair.</div>
+<div class="post" id="post">
+<h2>Planting garlic in the autumn</h2>
+<div class="meta">Posted on a cold Tuesday</div>
+<img class="thumb" id="thumb" src="images/purple-8x6.png" alt="">
+<p id="body">Break the bulbs into cloves the day you plant them. Push each one into loose soil with the pointed end up, about two finger widths deep, and a hand apart. Cover with straw and forget about them until spring, when the first green shoots appear.</p>
+</div>
+</div>
+<footer id="footer">Comments are closed.</footer>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+var side = corpus.box('sidebar'), post = corpus.box('post'), thumb = corpus.box('thumb'), body = corpus.box('body'), foot = corpus.box('footer');
+corpus.check(Math.round(side.width) === 196, 'sidebar width ' + side.width);
+corpus.check(side.left > post.left, 'sidebar floats right');
+corpus.check(post.right <= side.left + 1, 'post sits beside the sidebar ' + post.right + ' ' + side.left);
+corpus.check(Math.abs(thumb.left - post.left) < 1, 'thumbnail floats left');
+corpus.check(body.left < thumb.right, 'text box spans the float');
+corpus.check(foot.top >= side.bottom && foot.top >= post.bottom, 'footer clears the floats');
+corpus.pass();
+</script>
+</body>
+</html>

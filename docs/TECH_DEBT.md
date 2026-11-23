@@ -56,12 +56,13 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166, TD-196 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
+| M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-199, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M8 (hosts, GPU and platform services) | TD-173, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-199, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M10 (beta) | TD-197 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI |
 | M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162, TD-193, TD-198 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | M14 (Android and iOS devices, ADR 0067) | None yet; the device and simulator half of the hosted-CI row's mobile entry is paid here | Device, simulator and Apple-entitlement work deferred to the last milestone; mobile compile checks and the Android emulator job stay in CI meanwhile |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
@@ -247,7 +248,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
 | TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M8 (compositor.parity) |
 | TD-182 | Deliberate | Desktop host | Paid 2026-11-23: `rustic view` renders through one long-lived renderer per page with clicks and keys routed to it, the UI-01 browser strip, and window tests on native Windows, macOS and Linux (ADR 0069, ADR 0074); IME composition into pages moved to TD-197 | Paid |
-| TD-183 | Deliberate | Isolation | The macOS Seatbelt profiles allow reading every `sysctl` value, and initializers that run before `main` (AppKit is linked for `rustic view`) run before the profile applies | Open, M8 (macOS packaging) |
+| TD-183 | Deliberate | Isolation | Paid 2026-11-23: macOS children start from the windowless `rustic-renderer` (no AppKit before the profile applies), and the profiles hide the machine's names and the process and network `sysctl` families (ADR 0074) | Paid |
 | TD-184 | Deliberate | Compositor / IPC | The GPU process receives the page and frame pixels over its pipe and returns the composited page for every composited frame (two full copies), because there is no shared memory yet | Open, M8 (compositor.backend) |
 | TD-185 | Deliberate | Compositor / desktop host | `rustic view` presents frames composited in the broker; the GPU process does not own the window surface yet | Open, M8 (platform.linux) |
 | TD-186 | Deliberate | Compositor / isolation | On Windows and macOS the confined GPU process uses the renderer AppContainer and Seatbelt profiles, which grant no GPU driver services, so the hardware compositor (ADR 0071) may only open there with `--no-sandbox`; confined runs composite on the CPU | Open, M8 (compositor.backend) |
@@ -255,13 +256,13 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-188 | Deliberate | DevTools | Inline script lines are mapped to document lines by finding the script text in the document bytes, which works only for UTF-8-compatible documents; others report script-relative lines | Open, M9 (language and web APIs) |
 | TD-189 | Deliberate | DevTools / network | `network.requests` lists only requests of network documents (`--allow-origin`); local-file loads and frames' requests are not logged, and the log keeps no timing or bodies | Open, M9 (language and web APIs) |
 | TD-190 | Deliberate | DevTools | Automation protocol 1 has no CSS matched-rule or cascade inspection, no key or pointer-move input (only clicks), no DOM editing and no event timeline (profiling gives statement counts and turn metrics) | Open, M9 (CSS, layout and paint) |
-| TD-191 | Deliberate | Accessibility / desktop host | **Partly paid 2026-11-23 (ADR 0074):** `rustic view` drives a live page and passes assistive actions (focus, click, set value, set selection) to it. Remaining: `rustic view` exposes each frame's accessibility tree to the platform bridge, but does not route platform IME events into the page (TD-197); the browser chrome (address strip, permission prompt) is not in the tree. The live renderer already accepts both (ADR 0073, `rustic drive`) | Partly paid, M8 (UI-01) |
+| TD-191 | Deliberate | Accessibility / desktop host | **Partly paid 2026-11-23 (ADR 0074):** `rustic view` drives a live page and passes assistive actions (focus, click, set value, set selection) to it. Remaining: `rustic view` exposes each frame's accessibility tree to the platform bridge and routes IME composition into the focused page field (TD-197), but the browser chrome (address strip, permission prompt) is not in the tree. The live renderer already accepts both (ADR 0073, `rustic drive`) | Partly paid, M8 (UI-01) |
 | TD-192 | Deliberate | Accessibility / layout | Pages with form controls cannot be laid out yet (form controls are special elements the block reference does not support), so their accessibility tree comes from the box tree without bounds, and `rustic view` cannot show them | Open, M9 CSS, layout and paint |
 | TD-193 | Deliberate | Accessibility | The whole tree is rebuilt, encoded and sent for every request and, while an assistive technology listens, for every `rustic view` frame (since 2026-11-23, ADR 0074, none while nobody listens); there are no incremental updates | Open, M12 (performance leadership) |
 | TD-194 | Deliberate | Editing | Text controls move the caret by code point (no grapheme or word movement, no Ctrl+Arrow), have no undo/redo or clipboard, fire no `select`/`selectionchange` events, and `contenteditable` is not editable | Open, M9 language and web APIs |
 | TD-195 | Deliberate | Browser shell | Find in page searches within one text fragment (a phrase across lines or elements is not found) and estimates a match's horizontal extent from its share of the fragment's characters | Open, M9 (editing and selection) |
-| TD-196 | Deliberate | Browser shell | Only the active tab has a live page: background tabs keep their last frame and load again when shown (scripts restart), because a profile is opened per thread | Open, M8 browser shell (before the M10 beta) |
-| TD-197 | Deliberate | Desktop host | IME composition reaches the browser's own fields only, and CI exercises it with synthetic events through the host's handler, not with the platforms' input methods; text and composition events are not sent to pages | Open, M8 (a11y.editing) / M10 |
+| TD-196 | Deliberate | Browser shell | Paid 2026-11-23: every tab keeps a live page (up to six, least recently shown discarded first), background pages get at most one frame a second, and one opened profile serves every page thread (ADR 0074) | Paid |
+| TD-197 | Deliberate | Desktop host | **Partly paid 2026-11-23 (ADR 0074):** composition reaches the focused page field as well as the browser's own. Remaining: CI exercises it with synthetic events through the host's handler, not with the platforms' input methods (IBus, TSF, macOS text input) | Partly paid, M10 (beta input-method runs) |
 | TD-198 | Deliberate | Network / CLI | Frame and popup documents are read whole in the broker before their renderer parses them; only top-level documents stream | Open, M12 |
 | TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M8 (a11y.bridges) |
 
@@ -3044,6 +3045,13 @@ pages would contend for its lock.
 **Pay:** a profile shared by the broker's page threads (or a storage
 process) and one live renderer per tab with background throttling.
 **Trigger:** M10 embedding and beta, or tab-switch state loss reports.
+**Paid 2026-11-23 (ADR 0074):** `view.rs` keeps a worker and live page
+per tab (`MAX_LIVE_PAGES`, six; the least recently shown is discarded and
+loads again when shown) and asks background pages for at most one frame
+a second (`BACKGROUND_FRAME`), so their timers and scripts keep running.
+Storage opens the profile once per process and shares it between page
+threads (`storage.rs`). Test: `background_tabs_keep_their_live_page`
+(a clicked page keeps its state across a tab switch).
 
 ### TD-197 — IME composition stops at the browser's own fields
 
@@ -3055,6 +3063,14 @@ the platforms' input methods (IBus, TSF, macOS text input).
 **Pay:** route text and composition to the focused page element
 (a11y.editing) and add an input-method run per platform.
 **Trigger:** a11y.editing, or the M10 beta.
+**Partly paid 2026-11-23 (ADR 0074):** each frame reports the focused
+editable field's box (`Painted.editing`, from the accessibility tree's
+editable test); while it has focus the window enables the input method
+there, preedit and commit become the page's composition (start, update,
+end) and keys go to the page. Test:
+`input_methods_compose_into_the_focused_page_field`. Remaining: an
+input-method run per platform (IBus or Fcitx, TSF, macOS text input) in
+CI, with the M10 beta.
 
 ### TD-198 — Frame and popup documents are not streamed
 
@@ -3091,6 +3107,18 @@ input but may open Mach connections that stay usable.
 **Pay:** narrow the `sysctl` list from logged reads on native runners,
 and give renderers a binary or launch path without the window stack.
 **Trigger:** M8 macOS packaging, or a finding against either.
+**Paid 2026-11-23 (ADR 0074):** `rustic-cli`'s window stack is the
+`window` feature; `crates/rustic-renderer` builds the same commands
+without it, and on macOS the broker starts renderers and the network
+process from that executable when it sits beside `rustic` and is not
+older (`broker::child_exe`). CI builds it on its own, checks with
+`otool -L` that it links no AppKit, and runs the isolation and live
+tests with it (`RUSTIC_TEST_WINDOWLESS_CHILDREN`). The profiles now
+hide `kern.hostname`, `kern.uuid`, the other machine identifiers and the
+`kern.proc.`, `kern.procargs` and `net.` families instead of allowing
+every read; an allowlist stays impractical because the system
+libraries' reads are undocumented. Escape probes `read-host-name` and
+`list-processes` are denied confined on the native macOS runners.
 
 ### TD-175 — The Linux sandbox sees all of `/usr` and needs bubblewrap
 

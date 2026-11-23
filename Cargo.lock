@@ -2186,6 +2186,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustic-renderer"
+version = "0.1.0"
+dependencies = [
+ "rustic-cli",
+]
+
+[[package]]
 name = "rustic-sandbox"
 version = "0.1.0"
 dependencies = [

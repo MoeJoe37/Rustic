@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: gallery</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+.grid { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; }
+.tile { width: 80px; }
+.tile img { display: block; }
+.big { width: 64px; height: 48px; }
+</style>
+</head>
+<body>
+<div class="grid">
+<div class="tile"><img id="jpeg" src="images/teal-8x6.jpg" alt="JPEG"></div>
+<div class="tile"><img id="gif" src="images/navy-8x6.gif" alt="GIF"></div>
+<div class="tile"><img id="webp" src="images/orange-8x6.webp" alt="WebP"></div>
+<div class="tile"><img id="png" src="images/purple-8x6.png" alt="PNG"></div>
+<div class="tile"><img class="big" id="scaled" src="images/orange-8x6.webp" alt="scaled"></div>
+</div>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+window.addEventListener('load', function () {
+  ['jpeg', 'gif', 'webp', 'png'].forEach(function (id) {
+    var b = corpus.box(id);
+    corpus.check(Math.round(b.width) === 8 && Math.round(b.height) === 6, id + ' decoded at its size ' + b.width + 'x' + b.height);
+  });
+  var s = corpus.box('scaled');
+  corpus.check(Math.round(s.width) === 64 && Math.round(s.height) === 48, 'scaled image');
+  corpus.pass();
+});
+</script>
+</body>
+</html>

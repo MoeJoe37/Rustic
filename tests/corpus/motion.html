@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: motion</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+.track { position: relative; height: 40px; margin: 16px; background: #eee; }
+.ball { position: absolute; left: 0; top: 0; width: 40px; height: 40px; background: #36c; border-radius: 20px; }
+</style>
+</head>
+<body>
+<div class="track"><div class="ball" id="ball"></div></div>
+<p id="note">Waiting for the timer.</p>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+var frames = 0, last = -1, timer = false;
+function step(time) {
+  corpus.check(time >= last, 'frame times move forward');
+  last = time;
+  frames++;
+  document.getElementById('ball').setAttribute('style', 'left: ' + (frames * 20) + 'px');
+  if (frames < 3) {
+    requestAnimationFrame(step);
+  } else {
+    done();
+  }
+}
+function done() {
+  if (frames < 3 || !timer) return;
+  corpus.check(Math.round(corpus.box('ball').left) === 16 + 60, 'ball moved ' + corpus.box('ball').left);
+  corpus.pass();
+}
+requestAnimationFrame(step);
+setTimeout(function () {
+  timer = true;
+  document.getElementById('note').textContent = 'Timer fired.';
+  done();
+}, 50);
+</script>
+</body>
+</html>

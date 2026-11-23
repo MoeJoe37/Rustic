@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: docs</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+.bar { position: sticky; top: 0; height: 32px; background: #036; color: #fff; padding: 0 12px; line-height: 32px; }
+.section { height: 400px; padding: 12px; border-bottom: 1px solid #ccc; }
+.foot { position: sticky; bottom: 0; height: 24px; background: rgb(0, 51, 102); }
+.badge { position: absolute; top: 40px; right: 8px; width: 40px; height: 20px; background: #fc0; }
+</style>
+</head>
+<body>
+<div class="bar" id="bar">Manual</div>
+<div class="badge" id="badge"></div>
+<div class="section" id="s1">Installing</div>
+<div class="section" id="s2">Configuring</div>
+<div class="section" id="s3">Troubleshooting</div>
+<div class="foot" id="foot"></div>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+corpus.check(corpus.box('bar').top === 0, 'bar starts at the top');
+var scrolled = false;
+window.addEventListener('scroll', function () {
+  if (scrolled) return;
+  var s1 = corpus.box('s1'), badge = corpus.box('badge');
+  if (s1.top > -100) return;
+  scrolled = true;
+  // Script rectangles do not re-solve sticky boxes yet (TD-180); the
+  // window test reads the sticky footer from the presented frame instead.
+  corpus.check(badge.top < 40, 'absolute badge scrolls away ' + badge.top);
+  corpus.pass();
+});
+</script>
+</body>
+</html>

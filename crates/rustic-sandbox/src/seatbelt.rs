@@ -11,7 +11,8 @@
 //! process needs to start and run on its inherited pipes: executing the
 //! renderer binary itself, reading the dynamic loader, system libraries
 //! and the dyld shared cache (with the Preboot volume it is found through),
-//! reading (not setting) system parameters,
+//! reading (not setting) system parameters other than the machine's
+//! names and those about other processes and the network,
 //! and signalling itself. No network, no file writes, no reads of user
 //! files, no other processes, no Mach services (so no window server,
 //! pasteboard, keychain or launch services).
@@ -37,6 +38,21 @@ const SYSTEM_READS: &[&str] = &[
     "/private/preboot",
     "/private/var/db/dyld",
 ];
+
+/// System parameters a confined process may not read (TD-183): the
+/// machine's names and identifiers.
+pub const HIDDEN_SYSCTLS: &[&str] = &[
+    "kern.hostname",
+    "kern.nisdomainname",
+    "kern.hostid",
+    "kern.uuid",
+    "kern.bootsessionuuid",
+];
+
+/// Parameter families a confined process may not read (TD-183): other
+/// processes (`kern.proc.*` lists them, `kern.procargs*` their arguments
+/// and environments) and the network (routes, interfaces, addresses).
+pub const HIDDEN_SYSCTL_PREFIXES: &[&str] = &["kern.proc.", "kern.procargs", "net."];
 
 /// Why a profile could not be built.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -215,11 +231,27 @@ fn base_profile(exe: &Path, title: &str) -> Result<String, ProfileError> {
          (literal \"/System\")\n    (literal \"/System/Volumes\")\n    \
          (literal \"/System/Library\")\n    (literal \"/Library\")\n    (literal \"/usr\"))\n",
     );
-    // Reading system parameters is allowed in full: dyld's libignition
-    // reads boot parameters whose names are not documented (the first
-    // native run aborted in it with a name list). Nothing can be set.
-    // Narrowing this to logged names is TD-183.
-    profile.push_str("(allow sysctl-read)\n(allow signal (target self))\n");
+    // System parameters are readable except those that identify the
+    // machine or reveal other processes and the network (TD-183). The
+    // libraries' own reads are open-ended (dyld's libignition reads boot
+    // parameters whose names are not documented), so the profile denies
+    // what matters instead of listing what is needed. Nothing can be set.
+    profile.push_str("(allow sysctl-read\n    (require-all\n");
+    for name in HIDDEN_SYSCTLS {
+        let _ = writeln!(
+            profile,
+            "        (require-not (sysctl-name {}))",
+            literal(name)
+        );
+    }
+    for prefix in HIDDEN_SYSCTL_PREFIXES {
+        let _ = writeln!(
+            profile,
+            "        (require-not (sysctl-name-prefix {}))",
+            literal(prefix)
+        );
+    }
+    profile.push_str("    ))\n(allow signal (target self))\n");
     Ok(profile)
 }
 
@@ -248,6 +280,21 @@ mod tests {
         ] {
             assert!(!profile.contains(forbidden), "{forbidden} in\n{profile}");
         }
+        // System parameters that identify the machine or reveal other
+        // processes and the network stay hidden (TD-183).
+        for name in ["kern.hostname", "kern.uuid"] {
+            assert!(
+                profile.contains(&format!("(require-not (sysctl-name \"{name}\"))")),
+                "{profile}"
+            );
+        }
+        for prefix in ["kern.proc.", "kern.procargs", "net."] {
+            assert!(
+                profile.contains(&format!("(require-not (sysctl-name-prefix \"{prefix}\"))")),
+                "{profile}"
+            );
+        }
+        assert!(!profile.contains("(allow sysctl-read)"), "{profile}");
         // Balanced parentheses: one form per allow or deny.
         let open = profile.matches('(').count();
         assert_eq!(open, profile.matches(')').count());

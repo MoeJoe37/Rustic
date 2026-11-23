@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: app</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+.tabs { display: flex; background: #ddd; }
+.tab { width: 120px; height: 40px; line-height: 40px; text-align: center; cursor: pointer; }
+.tab.on { background: #fff; font-weight: bold; }
+.panel { padding: 16px; display: none; }
+.panel.on { display: block; }
+</style>
+</head>
+<body>
+<div class="tabs"><div class="tab on" id="t1">Inbox</div><div class="tab" id="t2">Settings</div></div>
+<div class="panel on" id="p1">No new messages.</div>
+<div class="panel" id="p2"><span id="saved">Saved</span></div>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+// The window test clicks the second tab (at 180,20 in the page).
+var clicks = 0;
+function show(n) {
+  ['1', '2'].forEach(function (k) {
+    document.getElementById('t' + k).setAttribute('class', k === n ? 'tab on' : 'tab');
+    document.getElementById('p' + k).setAttribute('class', k === n ? 'panel on' : 'panel');
+  });
+}
+document.getElementById('t1').addEventListener('click', function () { show('1'); });
+document.getElementById('t2').addEventListener('click', function (event) {
+  clicks++;
+  show('2');
+  corpus.check(event.target.id === 't2', 'click target');
+  corpus.check(corpus.box('p1').height === 0, 'first panel hidden');
+  corpus.check(corpus.box('saved').width > 0, 'second panel shown');
+  corpus.check(clicks === 1, 'one click');
+  corpus.pass();
+});
+</script>
+</body>
+</html>

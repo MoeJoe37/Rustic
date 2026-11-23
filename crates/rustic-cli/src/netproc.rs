@@ -290,7 +290,7 @@ fn spawn_seatbelt(exe: &std::path::Path) -> io::Result<Pipes> {
 
 impl Link {
     fn start(ca_pem: Option<Vec<u8>>) -> io::Result<Arc<Self>> {
-        let exe = std::env::current_exe()?;
+        let exe = crate::broker::child_exe()?;
         // Under the sandbox the network process is confined like a
         // renderer, but keeps Internet sockets (TD-176): bubblewrap and a
         // seccomp filter on Linux, the Seatbelt network profile on macOS
@@ -826,6 +826,14 @@ fn escape_probes() {
         );
     };
     let var = |name| std::env::var_os(name).unwrap_or_default();
+    // Which executable the child is (TD-183: on macOS, the windowless one
+    // when it is built).
+    if let Some(name) = std::env::current_exe().ok().and_then(|exe| {
+        exe.file_stem()
+            .map(|stem| stem.to_string_lossy().into_owned())
+    }) {
+        eprintln!("network-escape executable: {name}");
+    }
     report(
         "read-user-file",
         std::fs::read(var("RUSTIC_TEST_ESCAPE_FILE")).is_ok(),
@@ -864,7 +872,15 @@ fn escape_probes() {
     {
         let reached =
             std::os::unix::net::UnixStream::connect(var("RUSTIC_TEST_ESCAPE_UNIX")).is_ok();
-        report("connect-unix-socket", reached);
+        report("connect-unix-socket", reached); // The machine's name and the process list (TD-183).
+        report(
+            "read-host-name",
+            rustic_sandbox::sysctl_readable("kern.hostname"),
+        );
+        report(
+            "list-processes",
+            rustic_sandbox::sysctl_readable("kern.proc.all"),
+        );
     }
 }
 

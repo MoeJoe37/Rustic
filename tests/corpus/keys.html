@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: keys</title>
+<link rel="stylesheet" href="corpus.css">
+</head>
+<body>
+<p id="log" style="margin: 16px">Press a, then shift+B, then Enter.</p>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+// The window test presses a, shift+B and Enter.
+var seen = [];
+document.addEventListener('keydown', function (event) {
+  seen.push(event.key + (event.shiftKey ? '+shift' : ''));
+  document.getElementById('log').textContent = seen.join(' ');
+  if (event.key === 'Enter') {
+    corpus.check(seen.join(' ') === 'a B+shift Enter', 'keys ' + seen.join(' '));
+    corpus.pass();
+  }
+});
+</script>
+</body>
+</html>

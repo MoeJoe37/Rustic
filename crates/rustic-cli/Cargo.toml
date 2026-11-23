@@ -38,9 +38,16 @@ rustic-native = { path = "../rustic-native" }
 rustic-text = { path = "../rustic-text" }
 rustic-paint = { path = "../rustic-paint" }
 rustic-raster = { path = "../rustic-raster" }
-rustic-shell = { path = "../rustic-shell" }
+# The desktop window stack (winit, AppKit on macOS). Off for the
+# windowless `rustic-renderer` binary (TD-183, ADR 0074).
+rustic-shell = { path = "../rustic-shell", optional = true }
 rustic-codecs = { path = "../rustic-codecs" }
 rustic-js = { path = "../rustic-js" }
+
+[features]
+default = ["window"]
+# `rustic view`: the native window and browser shell.
+window = ["dep:rustic-shell"]
 
 [dev-dependencies]
 

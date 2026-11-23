@@ -255,6 +255,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             scroll: (0.0, 40.0),
             next_frame_us: Some(16_667),
             found: Some((3, 1, 40.0, 56.0)),
+            editing: Some((8.0, 30.0, 200.0, 22.0)),
         }),
         RendererMessage::Handled,
         RendererMessage::Accessibility(vec![1, 2, 3]),

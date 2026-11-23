@@ -1272,6 +1272,7 @@ fn live_page(
                         }
                     }
                     let state = document.scroll_state();
+                    let live = document.accessibility_state();
                     let engine_document = document.document();
                     let input = LayoutInput {
                         scroll: Some(&state),
@@ -1284,6 +1285,28 @@ fn live_page(
                             source.network.as_ref(),
                         )
                     };
+                    // A focused text field: the host's input method opens
+                    // at its box (TD-197).
+                    let editing =
+                        match live.focused {
+                            Some(focused)
+                                if rustic_a11y::editable(
+                                    engine_document.parsed().document(),
+                                    focused,
+                                ) =>
+                            {
+                                let tree = tree_of(input, &live)?;
+                                let bounds = tree
+                                    .nodes
+                                    .iter()
+                                    .find(|node| node.id.names(focused))
+                                    .and_then(|node| node.bounds);
+                                Some(bounds.map_or((0.0, 0.0, 0.0, 0.0), |r| {
+                                    (r.x, r.y, r.width, r.height)
+                                }))
+                            }
+                            _ => None,
+                        };
                     let surface = match render_scene(input, &mut scene)? {
                         Some((surface, _)) => {
                             painter = rustic_raster::Frames::new(view.scale(), raster);
@@ -1338,6 +1361,7 @@ fn live_page(
                         scroll: state.viewport,
                         next_frame_us,
                         found,
+                        editing,
                     }))
                     .map_err(LoadError::Broker)?;
                 }

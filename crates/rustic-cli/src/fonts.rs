@@ -256,6 +256,12 @@ fn find_native(roots: &[PathBuf], name: &str) -> Option<PathBuf> {
         .find(|path| std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file()) || path.is_file())
 }
 
+/// Languages whose writing systems get a fontconfig fallback face, most
+/// widely used first so the budget keeps them.
+const FALLBACK_LANGUAGES: [&str; 13] = [
+    "ar", "he", "ru", "el", "hi", "bn", "th", "zh-cn", "ja", "ko", "hy", "ka", "am",
+];
+
 /// Ask fontconfig for the file it would use for `pattern`: the platform's
 /// own answer on Linux and the BSDs. `None` without fontconfig.
 fn fontconfig(pattern: &str) -> Option<PathBuf> {
@@ -421,6 +427,14 @@ pub fn system_fonts() -> (Vec<Vec<u8>>, Vec<String>) {
     }
     for name in native.fallbacks {
         if let Some(path) = find_native(&roots, name) {
+            take(&path, 1, &mut files);
+        }
+    }
+    // fontconfig names a face per writing system, so text the generic
+    // families do not cover (Hebrew beside a Latin-only sans-serif) falls
+    // back to a face the platform chose for it.
+    for language in FALLBACK_LANGUAGES {
+        if let Some(path) = fontconfig(&format!("sans-serif:lang={language}")) {
             take(&path, 1, &mut files);
         }
     }

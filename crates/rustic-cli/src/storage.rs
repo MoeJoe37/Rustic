@@ -13,7 +13,7 @@ use std::cell::RefCell;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 use rustic_base::EscapedText;
 use rustic_engine::{QuotaExceeded, StorageHost, StorageKind};
@@ -31,8 +31,15 @@ enum ProfileChoice {
 
 static CHOICE: OnceLock<ProfileChoice> = OnceLock::new();
 
-thread_local! {
-    static PROFILE: RefCell<Option<Rc<RefCell<Profile>>>> = const { RefCell::new(None) };
+/// The open profile, shared by every page of the run: the window's tabs
+/// each keep a live page on their own thread (TD-196), and one profile
+/// lock and one set of Web Storage areas serve them all.
+static PROFILE: Mutex<Option<Arc<Mutex<Profile>>>> = Mutex::new(None);
+
+/// Lock `mutex`, also after a thread panicked while holding it (the
+/// profile stays consistent: each operation completes or fails whole).
+fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// Remove `--profile DIR` and `--private` from `args`.
@@ -69,6 +76,10 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
 
 /// The profile's label for the browser shell: its directory's name, or
 /// what kind it is.
+#[cfg_attr(
+    not(feature = "window"),
+    expect(dead_code, reason = "read by the window shell")
+)]
 pub fn label() -> String {
     match CHOICE.get_or_init(ProfileChoice::default) {
         ProfileChoice::Ephemeral => "Temporary profile".to_owned(),
@@ -81,10 +92,11 @@ pub fn label() -> String {
 }
 
 /// The run's profile, opened on first use.
-fn profile() -> Result<Rc<RefCell<Profile>>, ProfileError> {
-    PROFILE.with(|cell| {
-        if let Some(profile) = cell.borrow().as_ref() {
-            return Ok(Rc::clone(profile));
+fn profile() -> Result<Arc<Mutex<Profile>>, ProfileError> {
+    {
+        let mut cell = locked(&PROFILE);
+        if let Some(profile) = cell.as_ref() {
+            return Ok(Arc::clone(profile));
         }
         let quotas = Quotas::default();
         let profile = match CHOICE.get_or_init(ProfileChoice::default) {
@@ -103,10 +115,10 @@ fn profile() -> Result<Rc<RefCell<Profile>>, ProfileError> {
                 profile
             }
         };
-        let profile = Rc::new(RefCell::new(profile));
-        *cell.borrow_mut() = Some(Rc::clone(&profile));
+        let profile = Arc::new(Mutex::new(profile));
+        *cell = Some(Arc::clone(&profile));
         Ok(profile)
-    })
+    }
 }
 
 /// The profile record holding the cookie jar's persistent cookies.
@@ -115,18 +127,14 @@ const COOKIE_RECORD: &str = "cookies";
 /// The saved persistent cookies, if any.
 pub(crate) fn saved_cookies() -> Result<Option<Vec<u8>>, ProfileError> {
     let profile = profile()?;
-    let saved = profile.borrow().record(COOKIE_RECORD).map(<[u8]>::to_vec);
+    let saved = locked(&profile).record(COOKIE_RECORD).map(<[u8]>::to_vec);
     Ok(saved)
 }
 
 /// Keep the jar's persistent cookies in the profile, then flush it.
 pub(crate) fn save_cookies(bytes: Vec<u8>) -> Result<(), ProfileError> {
     let profile = profile()?;
-    if profile
-        .borrow_mut()
-        .set_record(COOKIE_RECORD, bytes)
-        .is_err()
-    {
+    if locked(&profile).set_record(COOKIE_RECORD, bytes).is_err() {
         eprintln!("rustic: profile: the cookie jar is over the profile quota; not saved");
     }
     flush()
@@ -134,9 +142,9 @@ pub(crate) fn save_cookies(bytes: Vec<u8>) -> Result<(), ProfileError> {
 
 /// Write the profile's changes, if it is persistent.
 pub fn flush() -> Result<(), ProfileError> {
-    let profile = PROFILE.with(|cell| cell.borrow().clone());
+    let profile = locked(&PROFILE).clone();
     match profile {
-        Some(profile) => profile.borrow_mut().flush(),
+        Some(profile) => locked(&profile).flush(),
         None => Ok(()),
     }
 }
@@ -150,7 +158,7 @@ pub(crate) fn host_for(url: &Url) -> Result<Option<Rc<dyn StorageHost>>, Profile
         return Ok(None);
     };
     let profile = profile()?;
-    let quotas = profile.borrow().quotas();
+    let quotas = locked(&profile).quotas();
     Ok(Some(Rc::new(DocumentStorage {
         profile,
         session: RefCell::new(SessionStorage::new(quotas)),
@@ -161,7 +169,7 @@ pub(crate) fn host_for(url: &Url) -> Result<Option<Rc<dyn StorageHost>>, Profile
 /// One document's view of its local and session storage.
 #[derive(Debug)]
 struct DocumentStorage {
-    profile: Rc<RefCell<Profile>>,
+    profile: Arc<Mutex<Profile>>,
     session: RefCell<SessionStorage>,
     key: StorageKey,
 }
@@ -173,7 +181,7 @@ impl DocumentStorage {
         f: impl FnOnce(&rustic_storage::StorageArea) -> T,
     ) -> Option<T> {
         match kind {
-            StorageKind::Local => self.profile.borrow().local_storage(&self.key).map(f),
+            StorageKind::Local => locked(&self.profile).local_storage(&self.key).map(f),
             StorageKind::Session => self.session.borrow().area(&self.key).map(f),
         }
     }
@@ -197,7 +205,7 @@ impl StorageHost for DocumentStorage {
 
     fn set(&self, kind: StorageKind, key: &[u16], value: &[u16]) -> Result<(), QuotaExceeded> {
         let result = match kind {
-            StorageKind::Local => self.profile.borrow_mut().set_local(&self.key, key, value),
+            StorageKind::Local => locked(&self.profile).set_local(&self.key, key, value),
             StorageKind::Session => self.session.borrow_mut().set(&self.key, key, value),
         };
         result.map(|_| ()).map_err(|_| QuotaExceeded)
@@ -206,7 +214,7 @@ impl StorageHost for DocumentStorage {
     fn remove(&self, kind: StorageKind, key: &[u16]) {
         match kind {
             StorageKind::Local => {
-                self.profile.borrow_mut().remove_local(&self.key, key);
+                locked(&self.profile).remove_local(&self.key, key);
             }
             StorageKind::Session => {
                 self.session.borrow_mut().remove(&self.key, key);
@@ -217,7 +225,7 @@ impl StorageHost for DocumentStorage {
     fn clear(&self, kind: StorageKind) {
         match kind {
             StorageKind::Local => {
-                self.profile.borrow_mut().clear_local(&self.key);
+                locked(&self.profile).clear_local(&self.key);
             }
             StorageKind::Session => {
                 self.session.borrow_mut().clear(&self.key);

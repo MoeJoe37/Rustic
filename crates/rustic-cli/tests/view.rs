@@ -6,6 +6,8 @@
 //! address entry, find and zoom; the browser logs its state after each
 //! frame. `render --report-scroll` reports where it painted.
 
+#![cfg(feature = "window")]
+
 use std::process::{Command, Output};
 
 fn rustic(args: &[&str], display: bool) -> Output {
@@ -317,4 +319,188 @@ fn fractional_scales_size_the_page_in_device_pixels() {
         "{lines:?}"
     );
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A page whose focused field turns the page green once it holds the
+/// composed text and a typed key. The field is not rendered (form controls
+/// are not laid out yet), but focus, keys and composition reach it all the
+/// same.
+const COMPOSE: &str = "<!doctype html><body style=\"margin:0;background:rgb(255,0,0)\">\
+    <input id=f style=\"display:none\"><script>\
+    const f = document.getElementById('f'); f.focus();\
+    f.addEventListener('input', () => { if (f.value == '日本x')\
+      document.body.setAttribute('style', 'margin:0;background:rgb(0,128,0)'); });\
+    </script>";
+
+#[test]
+fn input_methods_compose_into_the_focused_page_field() {
+    if !has_window_system() {
+        return;
+    }
+    let (dir, page) = page("compose", COMPOSE);
+    let capture = dir.join("frames");
+    std::fs::create_dir_all(&capture).unwrap();
+    let (output, lines) = scripted(
+        "frame; ime-on; preedit にほ; commit 日本; ime-off; key x; frame",
+        &page,
+        &[("RUSTIC_TEST_WINDOW_CAPTURE", &capture.to_string_lossy())],
+    );
+    assert!(
+        output.status.success(),
+        "{lines:?}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let states = states(&lines);
+    // The renderer reports the focused field, so the window enables its
+    // input method there; the preedit is a composition in the page.
+    assert!(states[0].contains("page-edit=field"), "{states:#?}");
+    assert!(
+        states.iter().any(|s| s.contains("page-edit=composing")),
+        "{states:#?}"
+    );
+    assert!(states.last().unwrap().contains("page-edit=field"));
+    // The last captured frame shows the page after `input` saw "日本x".
+    assert_eq!(last_captured_pixel(&capture), [0, 128, 0, 255]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Red until clicked, then green: a page that keeps what happened to it.
+const CLICKED: &str = "<!doctype html><body style=\"margin:0;background:rgb(255,0,0)\"><script>\
+    document.addEventListener('click', () =>\
+      document.body.setAttribute('style', 'margin:0;background:rgb(0,128,0)'));\
+    </script>";
+
+/// The pixel near the bottom-left corner of the last captured frame.
+fn last_captured_pixel(capture: &std::path::Path) -> [u8; 4] {
+    last_captured_corners(capture).0
+}
+
+/// The pixels near the bottom-left and bottom-right corners of the last
+/// captured frame.
+fn last_captured_corners(capture: &std::path::Path) -> ([u8; 4], [u8; 4]) {
+    let mut frames: Vec<_> = std::fs::read_dir(capture)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    frames.sort_by_key(|path| {
+        path.file_stem()
+            .and_then(|stem| stem.to_str()?.strip_prefix("frame-")?.parse::<u32>().ok())
+    });
+    let bytes = std::fs::read(frames.last().unwrap()).unwrap();
+    let image = rustic_codecs::decode_png(
+        &bytes,
+        rustic_codecs::PngLimits::default(),
+        &rustic_base::CancellationToken::default(),
+    )
+    .unwrap();
+    let row = (image.height as usize - 4) * image.width as usize;
+    let pixel = |x: usize| -> [u8; 4] {
+        let at = (row + x) * 4;
+        image.pixels[at..at + 4].try_into().unwrap()
+    };
+    (pixel(4), pixel(image.width as usize - 4))
+}
+
+#[test]
+fn background_tabs_keep_their_live_page() {
+    if !has_window_system() {
+        return;
+    }
+    let (dir, first) = page("background", CLICKED);
+    let second = dir.join("second.html");
+    std::fs::write(&second, "<!doctype html><p>second page").unwrap();
+    let capture = dir.join("frames");
+    std::fs::create_dir_all(&capture).unwrap();
+    let script = format!(
+        "click 100,180; frame; key mod+t; text {}; key Enter; frame; key mod+1; frame",
+        second.to_string_lossy()
+    );
+    let (output, lines) = scripted(
+        &script,
+        &first,
+        &[("RUSTIC_TEST_WINDOW_CAPTURE", &capture.to_string_lossy())],
+    );
+    assert!(
+        output.status.success(),
+        "{lines:?}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let states = states(&lines);
+    // Both tabs' pages are live while the second is shown.
+    assert!(
+        states
+            .iter()
+            .any(|s| s.starts_with("tabs=2 active=1") && s.ends_with("live-pages=2")),
+        "{states:#?}"
+    );
+    // Back on the first tab, the page still has its click: it was not
+    // loaded again.
+    let last = *states.last().unwrap();
+    assert!(last.starts_with("tabs=2 active=0"), "{last}");
+    assert_eq!(last_captured_pixel(&capture), [0, 128, 0, 255]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The curated site corpus (`tests/corpus`, ADR 0074): each page checks
+/// its own layout, images, events or timers and turns its bottom-left
+/// square from red to green when they hold. Every page runs in the
+/// desktop alpha's window, driven by the real window system, on each
+/// desktop platform CI covers.
+#[test]
+fn the_curated_site_corpus_runs_in_the_desktop_window() {
+    if !has_window_system() {
+        return;
+    }
+    let corpus = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/corpus");
+    // The browser strip is two 28px rows above the page.
+    let pages = [
+        ("article", "frame"),
+        ("blog", "frame"),
+        ("landing", "frame"),
+        ("gallery", "frame; frame"),
+        ("docs", "frame; wheel 0,-5; frame"),
+        ("app", "frame; click 180,76; frame"),
+        (
+            "motion",
+            "frame; frame; frame; frame; frame; frame; frame; frame",
+        ),
+        ("world", "frame"),
+        ("keys", "frame; key a; key shift+B; key Enter; frame"),
+    ];
+    let scratch = std::env::temp_dir().join(format!("rustic-corpus-{}", std::process::id()));
+    let mut failures = Vec::new();
+    for (name, script) in pages {
+        let capture = scratch.join(name);
+        std::fs::create_dir_all(&capture).unwrap();
+        let page = corpus.join(format!("{name}.html"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_rustic"));
+        command
+            .args(["view", "--window", "800x600"])
+            .arg(&page)
+            .env("RUSTIC_TEST_WINDOW_SCRIPT", script)
+            .env("RUSTIC_TEST_WINDOW_CAPTURE", &capture);
+        let output = command.output().expect("run rustic");
+        if !output.status.success() {
+            failures.push(format!(
+                "{name}: exit {:?}\n{}",
+                output.status.code(),
+                String::from_utf8_lossy(&output.stderr)
+            ));
+            continue;
+        }
+        let (status, corner) = last_captured_corners(&capture);
+        if status != [0, 128, 0, 255] {
+            failures.push(format!(
+                "{name}: status {status:?}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        // The sticky footer is read from the frame: script rectangles do
+        // not re-solve sticky boxes yet (TD-180).
+        if name == "docs" && corner != [0, 51, 102, 255] {
+            failures.push(format!("docs: sticky footer {corner:?}"));
+        }
+    }
+    let _ = std::fs::remove_dir_all(&scratch);
+    assert!(failures.is_empty(), "{failures:#?}");
 }

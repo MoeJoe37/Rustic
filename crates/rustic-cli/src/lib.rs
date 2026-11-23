@@ -11,7 +11,9 @@ use rustic_engine::{Engine, Viewport};
 use std::path::Path;
 
 mod broker;
+#[cfg(feature = "window")]
 mod browser;
+#[cfg(feature = "window")]
 mod chrome;
 mod devtools;
 mod find;
@@ -26,6 +28,7 @@ mod reftest;
 mod renderer;
 mod storage;
 mod stylesheets;
+#[cfg(feature = "window")]
 mod view;
 
 use loader::{LoadError, LoadedDocument, LoaderLimits};
@@ -308,7 +311,13 @@ pub fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     if args[0] == "view" {
+        #[cfg(feature = "window")]
         return ExitCode::from(view::view_command(&args[1..]));
+        #[cfg(not(feature = "window"))]
+        {
+            eprintln!("rustic: this build has no window (use the rustic binary)");
+            return ExitCode::from(2);
+        }
     }
     if args[0] == "drive" {
         return ExitCode::from(live::drive_command(&args[1..]));

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: world</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+p { margin: 8px 16px; font-size: 18px; }
+.rtl { direction: rtl; }
+</style>
+</head>
+<body>
+<p id="en">Hello, world.</p>
+<p id="fr" lang="fr">Bonjour à tous, ça va très bien.</p>
+<p id="de" lang="de">Grüße aus München über die Straße.</p>
+<p id="el" lang="el">Καλημέρα κόσμε.</p>
+<p id="ru" lang="ru">Привет, мир.</p>
+<p id="he" class="rtl" dir="rtl" lang="he"><span id="hes">שלום עולם</span></p>
+<p id="ar" class="rtl" dir="rtl" lang="ar"><span id="ars">مرحبا بالعالم</span></p>
+<p id="mixed">Order 42 ships to <span id="city">תל אביב</span> today.</p>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+['en', 'fr', 'de', 'el', 'ru', 'he', 'ar', 'mixed'].forEach(function (id) {
+  var b = corpus.box(id);
+  corpus.check(b.height > 10 && b.height < 40, id + ' is one line ' + b.height);
+});
+var he = corpus.box('he'), hes = corpus.box('hes'), ars = corpus.box('ars'), ar = corpus.box('ar');
+corpus.check(Math.abs(hes.right - he.right) < 1 && hes.left > he.left + 50, 'Hebrew starts at the right');
+corpus.check(Math.abs(ars.right - ar.right) < 1 && ars.width > 20, 'Arabic starts at the right');
+corpus.check(corpus.box('city').width > 20, 'embedded Hebrew has width');
+corpus.check(document.getElementById('fr').textContent.length === 32, 'UTF-8 text length');
+corpus.pass();
+</script>
+</body>
+</html>

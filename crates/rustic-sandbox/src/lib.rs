@@ -26,7 +26,7 @@ mod seatbelt_enter;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub use seatbelt_enter::enter;
+pub use seatbelt_enter::{enter, sysctl_readable};
 
 #[cfg(windows)]
 pub use windows::{Confined, Container, Pipes, spawn_app_container};

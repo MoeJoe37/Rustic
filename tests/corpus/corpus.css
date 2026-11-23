@@ -1,0 +1,4 @@
+/* Shared by the M8 desktop corpus pages (ADR 0074). */
+body { margin: 0; font-family: sans-serif; color: #222; background: #fff; line-height: 1.4; }
+#status { position: fixed; left: 0; bottom: 0; width: 24px; height: 24px; background: rgb(255, 0, 0); }
+#status.pass { background: rgb(0, 128, 0); }

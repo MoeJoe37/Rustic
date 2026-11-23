@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: landing</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+nav { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: #123; color: #fff; }
+nav .links { display: flex; gap: 12px; }
+.hero { display: flex; flex-direction: column; align-items: center; padding: 32px 16px; background: #fd7; }
+.hero h1 { margin: 0; font-size: 28px; }
+.cta { display: inline-block; margin-top: 12px; padding: 8px 16px; background: #c30; color: #fff; border-radius: 4px; }
+.cards { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px; }
+.card { flex: 1 1 200px; min-height: 80px; background: #eee; padding: 8px; }
+</style>
+</head>
+<body>
+<nav id="nav"><b id="brand">Orchard</b><span class="links"><span id="l1">Pricing</span><span id="l2">Docs</span><span id="l3">Sign in</span></span></nav>
+<section class="hero" id="hero"><h1 id="headline">Grow anything</h1><span class="cta" id="cta">Start now</span></section>
+<section class="cards" id="cards"><div class="card" id="c1">Fast</div><div class="card" id="c2">Simple</div><div class="card" id="c3">Friendly</div></section>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+var nav = corpus.box('nav'), brand = corpus.box('brand'), l1 = corpus.box('l1'), l2 = corpus.box('l2'), l3 = corpus.box('l3');
+var hero = corpus.box('hero'), head = corpus.box('headline'), cta = corpus.box('cta');
+var c1 = corpus.box('c1'), c2 = corpus.box('c2'), c3 = corpus.box('c3');
+corpus.check(Math.abs(l3.right - (nav.right - 16)) < 1, 'links pushed to the end');
+corpus.check(Math.abs(brand.left - 16) < 1, 'brand at the start');
+corpus.check(Math.abs((l2.left - l1.right) - 12) < 1, 'gap between links');
+corpus.check(Math.abs((head.left + head.right) / 2 - (hero.left + hero.right) / 2) < 1, 'headline centred');
+corpus.check(cta.top > head.bottom, 'call to action below headline');
+corpus.check(Math.abs(c1.height - c2.height) < 1, 'cards stretch to one height');
+if (corpus.box('cards').width >= 660) {
+  corpus.check(Math.abs(c1.top - c3.top) < 1, 'cards share a row');
+} else {
+  corpus.check(c3.top > c1.top, 'cards wrap');
+}
+corpus.pass();
+</script>
+</body>
+</html>

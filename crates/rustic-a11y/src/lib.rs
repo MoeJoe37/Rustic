@@ -26,7 +26,7 @@ use std::collections::{HashMap, HashSet};
 use rustic_dom::NodeId;
 
 pub use role::{Live, Role};
-pub use tree::build;
+pub use tree::{build, editable};
 
 /// A node's identity in an [`AxTree`]: derived from its DOM node so that a
 /// tree rebuilt from the same document keeps the same ids.

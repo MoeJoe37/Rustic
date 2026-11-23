@@ -56,6 +56,14 @@ pub fn build(
     }
 }
 
+/// Whether `node` is an editable text field (the tree's `editable`
+/// state): a host enables its input method while such an element has
+/// focus (ADR 0074).
+pub fn editable(document: &Document, node: NodeId) -> bool {
+    let live = LiveState::default();
+    Context::new(document, None, &live, TreeLimits::default()).editable(node)
+}
+
 struct Out {
     nodes: Vec<AxNode>,
     truncated: bool,
@@ -134,6 +142,21 @@ impl<'a> Context<'a> {
 
     pub(crate) fn local(&self, node: NodeId) -> &'a str {
         self.html_element(node).map_or("", |e| e.name().local())
+    }
+
+    /// A text-like `input`, a `textarea` or a `contenteditable` element.
+    pub(crate) fn editable(&self, node: NodeId) -> bool {
+        let local = self.local(node);
+        let text_field = local == "textarea"
+            || (local == "input"
+                && matches!(
+                    self.input_type(node).as_str(),
+                    "text" | "search" | "tel" | "url" | "email" | "password" | "number"
+                ));
+        text_field
+            || self
+                .attr(node, "contenteditable")
+                .is_some_and(|v| v.is_empty() || v.eq_ignore_ascii_case("true"))
     }
 
     pub(crate) fn attr(&self, node: NodeId, name: &str) -> Option<String> {
@@ -683,16 +706,7 @@ impl<'a> Context<'a> {
         if local == "option" {
             s.selected = Some(self.option_selected(node));
         }
-        let text_field = matches!(local, "textarea")
-            || (local == "input"
-                && matches!(
-                    self.input_type(node).as_str(),
-                    "text" | "search" | "tel" | "url" | "email" | "password" | "number"
-                ));
-        s.editable = text_field
-            || self
-                .attr(node, "contenteditable")
-                .is_some_and(|v| v.is_empty() || v.eq_ignore_ascii_case("true"));
+        s.editable = self.editable(node);
         s.multiline = local == "textarea" || self.aria_bool(node, "aria-multiline") == Some(true);
         s.multiselectable = (local == "select" && self.has_attr(node, "multiple"))
             || self.aria_bool(node, "aria-multiselectable") == Some(true);

@@ -150,6 +150,20 @@ jobs:
           for _ in $(seq 50); do [ -S "$XDG_RUNTIME_DIR/rustic-wl" ] && break; sleep 0.2; done
           env -u DISPLAY WAYLAND_DISPLAY=rustic-wl \
             cargo test --locked -p rustic-cli --test view --no-fail-fast
+      - name: Confine children from the windowless executable (TD-183)
+        # `rustic` links AppKit for `rustic view`; built on its own (no
+        # feature unification), `rustic-renderer` links no window stack,
+        # and the broker starts renderers and the network process from it.
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --locked -p rustic-renderer
+          otool -L target/debug/rustic | grep -q AppKit
+          if otool -L target/debug/rustic-renderer | grep -E 'AppKit|Carbon'; then
+            echo "rustic-renderer links the window stack" >&2
+            exit 1
+          fi
+          RUSTIC_TEST_WINDOWLESS_CHILDREN=1 \
+            cargo test --locked -p rustic-cli --test isolation --test live --no-fail-fast
       - name: Show sandbox denials (ADR 0063)
         if: failure() && runner.os == 'macOS'
         run: |

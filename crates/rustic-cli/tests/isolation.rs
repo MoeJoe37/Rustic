@@ -647,8 +647,9 @@ fn the_windows_network_process_is_confined_for_remote_origins() {
 
 /// TD-176 on macOS (ADR 0063): under the sandbox the network
 /// process's Seatbelt profile keeps loopback TCP (its job) but denies
-/// reading files, listing directories, starting programs and connecting
-/// to a Unix-domain socket.
+/// reading files, listing directories, starting programs, connecting
+/// to a Unix-domain socket and reading the host name or the process list
+/// (TD-183, the renderer's rules too).
 #[cfg(target_os = "macos")]
 #[test]
 fn the_seatbelt_network_process_reaches_only_internet_sockets() {
@@ -684,6 +685,8 @@ fn the_seatbelt_network_process_reaches_only_internet_sockets() {
         "list-home",
         "spawn-shell",
         "connect-unix-socket",
+        "read-host-name",
+        "list-processes",
     ];
     let open = probe(Some("--no-sandbox"));
     for name in probes {
@@ -699,6 +702,15 @@ fn the_seatbelt_network_process_reaches_only_internet_sockets() {
             assert!(
                 confined.contains(&format!("network-escape {name}: denied")),
                 "{mode:?}: {confined}"
+            );
+        }
+        // CI builds `rustic-renderer` on its own and then sets this: the
+        // child must be the windowless executable, which loads no AppKit
+        // before it confines itself (TD-183).
+        if std::env::var_os("RUSTIC_TEST_WINDOWLESS_CHILDREN").is_some() {
+            assert!(
+                confined.contains("network-escape executable: rustic-renderer"),
+                "{confined}"
             );
         }
     }

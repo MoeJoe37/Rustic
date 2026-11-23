@@ -87,6 +87,30 @@ pub fn confine_self(kind: &std::ffi::OsStr) -> Result<(), String> {
     rustic_sandbox::enter(&profile)
 }
 
+/// The executable renderers and the network process start from. On macOS
+/// that is the windowless `rustic-renderer` beside this executable when it
+/// is there and not older than it (TD-183): `rustic` links AppKit, whose
+/// initializers would run before the child confines itself. An older one
+/// is a stale build and is passed over. Elsewhere the window stack loads
+/// only when a window opens, and children run this executable.
+pub(crate) fn child_exe() -> io::Result<PathBuf> {
+    let exe = std::env::current_exe()?;
+    if cfg!(target_os = "macos") {
+        let windowless = exe.with_file_name(WINDOWLESS_EXECUTABLE);
+        let modified = |path: &Path| std::fs::metadata(path).and_then(|m| m.modified()).ok();
+        if windowless != exe
+            && windowless.is_file()
+            && modified(&windowless).is_some_and(|w| modified(&exe).is_some_and(|e| w >= e))
+        {
+            return Ok(windowless);
+        }
+    }
+    Ok(exe)
+}
+
+/// The windowless child executable's file name (`crates/rustic-renderer`).
+pub(crate) const WINDOWLESS_EXECUTABLE: &str = "rustic-renderer";
+
 /// Environment variables a sandboxed renderer may keep (test hooks and
 /// backtraces; nothing that names a user, a home or a display).
 const SANDBOX_ENV: &[&str] = &[
@@ -301,6 +325,10 @@ thread_local! {
 
 /// The URL of the document the last brokered command committed, for the
 /// trusted address display. The broker decides it; a renderer cannot.
+#[cfg_attr(
+    not(feature = "window"),
+    expect(dead_code, reason = "read by the window shell")
+)]
 pub fn committed_url() -> Option<Url> {
     COMMITTED.with(|committed| committed.borrow().clone())
 }
@@ -349,6 +377,10 @@ thread_local! {
 
 /// Why the last brokered command on this thread could not load its
 /// document, if it could not.
+#[cfg_attr(
+    not(feature = "window"),
+    expect(dead_code, reason = "read by the window shell")
+)]
 pub fn last_failure() -> Option<Failure> {
     FAILURE.with(|failure| failure.borrow().clone())
 }
@@ -528,6 +560,10 @@ const LIVE_ANSWER_LIMIT: std::time::Duration = std::time::Duration::from_secs(10
 
 /// One frame of a live page, composited and checked by the broker.
 #[derive(Debug)]
+#[cfg_attr(
+    not(feature = "window"),
+    expect(dead_code, reason = "find and editing are read by the window shell")
+)]
 pub struct LiveFrame {
     /// The page at the asked size and scale.
     pub surface: rustic_raster::Surface,
@@ -538,6 +574,9 @@ pub struct LiveFrame {
     /// Find in page: match count, active match, and its top and bottom in
     /// CSS pixels of the document, when the frame asked for a search.
     pub found: Option<(u32, u32, f64, f64)>,
+    /// The focused editable field's box in CSS pixels of the viewport
+    /// (left, top, width, height), when one has focus (ADR 0074).
+    pub editing: Option<(f64, f64, f64, f64)>,
 }
 
 /// A page loaded once in a long-lived renderer (TD-182): input and frame
@@ -732,11 +771,17 @@ impl<'a> LivePage<'a> {
                 && top >= 0.0
                 && bottom >= top
         });
+        // So is the editing box: finite, a non-negative size, else none
+        // at all; it only places the input method's candidate window.
+        let editing = painted.editing.filter(|&(x, y, width, height)| {
+            [x, y, width, height].iter().all(|v| v.is_finite()) && width >= 0.0 && height >= 0.0
+        });
         Ok(LiveFrame {
             surface,
             scroll,
             next_frame: painted.next_frame_us.map(std::time::Duration::from_micros),
             found,
+            editing,
         })
     }
 
@@ -1125,7 +1170,7 @@ fn spawn_process() -> io::Result<Started> {
             "the host provides one renderer per command",
         ));
     }
-    let exe = std::env::current_exe()?;
+    let exe = child_exe()?;
     if SANDBOX.load(Ordering::Relaxed) {
         return spawn_confined(&exe);
     }

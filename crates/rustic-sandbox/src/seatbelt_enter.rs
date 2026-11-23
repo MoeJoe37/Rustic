@@ -22,6 +22,29 @@ unsafe extern "C" {
     // `flags` is 0) to the calling process, irrevocably.
     fn sandbox_init(profile: *const c_char, flags: u64, errorbuf: *mut *mut c_char) -> c_int;
     fn sandbox_free_error(errorbuf: *mut c_char);
+    // libSystem: read the system parameter `name` into `oldp` (or, with a
+    // null `oldp`, its size into `oldlenp`).
+    fn sysctlbyname(
+        name: *const c_char,
+        oldp: *mut std::ffi::c_void,
+        oldlenp: *mut usize,
+        newp: *mut std::ffi::c_void,
+        newlen: usize,
+    ) -> c_int;
+}
+
+/// Whether this process may read the system parameter `name` (TD-183
+/// escape probes): its size is asked for, nothing is read or set.
+pub fn sysctl_readable(name: &str) -> bool {
+    let Ok(name) = CString::new(name) else {
+        return false;
+    };
+    let mut size = 0usize;
+    // SAFETY: `name` is NUL-terminated and outlives the call; a null
+    // `oldp` asks only for the size, written to the valid `size`; nothing
+    // is set (null `newp`, length 0).
+    let result = unsafe { sysctlbyname(name.as_ptr(), null_mut(), &mut size, null_mut(), 0) };
+    result == 0
 }
 
 /// Apply the SBPL `profile` to this process. It cannot be undone; every

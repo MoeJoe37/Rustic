@@ -15,13 +15,14 @@ use std::collections::{HashMap, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError, channel};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use rustic_base::EscapedText;
 use rustic_ipc::protocol::{
-    AssistiveRequest, FrameAsk, MODIFIER_ALT, MODIFIER_CONTROL, MODIFIER_META, MODIFIER_SHIFT,
+    AssistiveRequest, CompositionPhase, FrameAsk, MODIFIER_ALT, MODIFIER_CONTROL, MODIFIER_META,
+    MODIFIER_SHIFT,
 };
-use rustic_shell::{Input, Key, Lifecycle, Modifiers, Painted, Response};
+use rustic_shell::{Ime, Input, Key, Lifecycle, Modifiers, Painted, Response};
 
 use crate::browser::{Browser, Focus, Load, Target};
 use crate::{broker, chrome};
@@ -77,6 +78,11 @@ enum Job {
     Assist {
         node: u64,
         request: AssistiveRequest,
+    },
+    /// An input method composition step for the focused field (TD-197).
+    Compose {
+        phase: CompositionPhase,
+        text: String,
     },
 }
 
@@ -190,6 +196,12 @@ fn page_thread(mut inbox: Inbox, events: &Sender<Event>) {
                     }
                     Job::Assist { node, request } => {
                         if let Err(error) = page.assistive(node, request) {
+                            eprintln!("rustic view: {}", EscapedText(&error));
+                        }
+                        Event::Handled
+                    }
+                    Job::Compose { phase, text } => {
+                        if let Err(error) = page.composition(phase, &text) {
                             eprintln!("rustic view: {}", EscapedText(&error));
                         }
                         Event::Handled
@@ -323,14 +335,20 @@ struct Shown {
     surface: rustic_raster::Surface,
 }
 
-/// The window's content.
-pub struct ViewPage {
-    browser: Browser,
-    /// Document options for every page (the path removed).
-    options: Vec<OsString>,
+/// How many tabs keep a live page. Beyond this, the page of the tab shown
+/// least recently is discarded and loads again when its tab is shown
+/// (as browsers discard background tabs under memory pressure).
+const MAX_LIVE_PAGES: usize = 6;
+/// A background page that wants frames (timers, animation) gets one at
+/// most this often: hidden pages are throttled, not frozen (TD-196).
+const BACKGROUND_FRAME: Duration = Duration::from_secs(1);
+
+/// One tab's live page: the worker thread that holds it and what it
+/// last reported.
+struct Slot {
     worker: Worker,
-    /// The page the worker holds: tab and generation.
-    open: Option<(u64, u64)>,
+    /// The generation of the tab's page the worker holds.
+    open: Option<u64>,
     /// Whether that page committed and takes frames.
     live: bool,
     /// The frame request on the worker, if any.
@@ -344,7 +362,73 @@ pub struct ViewPage {
     next_frame: Option<Instant>,
     /// When the last frame was asked for (the page clock's step).
     last_ask: Option<Instant>,
+    /// Bumped when the page handled input or asked for a frame (timers,
+    /// animation): the same view, new pixels.
     serial: u64,
+    /// The last frame asked for, repeated (with a new serial) for
+    /// throttled background frames.
+    last_key: Option<FrameKey>,
+    /// The page's accessibility tree from its last frame, in CSS pixels of
+    /// the page area (ADR 0073).
+    tree: Option<rustic_a11y::AxTree>,
+    /// The focused page field's box in CSS pixels of the viewport, when a
+    /// text field has focus (the input method opens there, TD-197).
+    editing: Option<(f64, f64, f64, f64)>,
+    /// An input method composition into the page is in progress.
+    composing: bool,
+    /// When the tab was last shown (for discarding).
+    used: u64,
+}
+
+impl Slot {
+    fn new(worker: Worker) -> Self {
+        Self {
+            worker,
+            open: None,
+            live: false,
+            pending: None,
+            handling: 0,
+            reported: (0.0, 0.0),
+            next_frame: None,
+            last_ask: None,
+            serial: 0,
+            last_key: None,
+            tree: None,
+            editing: None,
+            composing: false,
+            used: 0,
+        }
+    }
+
+    /// Forget the page (a new one is loading, or none is).
+    fn reset(&mut self) {
+        self.live = false;
+        self.pending = None;
+        self.handling = 0;
+        self.reported = (0.0, 0.0);
+        self.next_frame = None;
+        self.last_ask = None;
+        self.last_key = None;
+        self.tree = None;
+        self.editing = None;
+        self.composing = false;
+    }
+
+    fn busy(&self) -> bool {
+        self.open.is_some() && (!self.live || self.pending.is_some() || self.handling > 0)
+    }
+}
+
+/// The window's content.
+pub struct ViewPage {
+    browser: Browser,
+    /// Document options for every page (the path removed).
+    options: Vec<OsString>,
+    /// Live pages by tab: every tab shown recently keeps its page, so
+    /// switching back does not load it again (TD-196).
+    slots: HashMap<u64, Slot>,
+    /// Counts tab switches (for discarding the least recently shown).
+    uses: u64,
     shown: HashMap<u64, Shown>,
     /// The last strip drawn: its document, width and scale.
     strip: Option<(String, u32, u64, rustic_raster::Surface)>,
@@ -355,9 +439,6 @@ pub struct ViewPage {
     strip_width: f64,
     /// Whether the window is shown (hidden windows ask for no frames).
     visible: bool,
-    /// The active page's accessibility tree from its last frame, in CSS
-    /// pixels of the page area (ADR 0073).
-    tree: Option<rustic_a11y::AxTree>,
     /// An assistive technology asked for the tree: frames fetch it.
     accessible: bool,
     /// It asked before any tree arrived: paint a frame to fetch one.
@@ -365,6 +446,20 @@ pub struct ViewPage {
 }
 
 impl ViewPage {
+    fn active(&self) -> Option<&Slot> {
+        self.slots.get(&self.browser.tab().id)
+    }
+
+    fn active_mut(&mut self) -> Option<&mut Slot> {
+        let id = self.browser.tab().id;
+        self.slots.get_mut(&id)
+    }
+
+    /// Whether the active tab's page is live.
+    fn live(&self) -> bool {
+        self.active().is_some_and(|slot| slot.live)
+    }
+
     fn key(&self, css: (u32, u32), scale: f64) -> FrameKey {
         let tab = self.browser.tab();
         FrameKey {
@@ -379,53 +474,102 @@ impl ViewPage {
                 .as_ref()
                 .filter(|find| !find.field.text().is_empty())
                 .map(|find| (find.field.text().to_owned(), find.index)),
-            serial: self.serial,
+            serial: self.active().map_or(0, |slot| slot.serial),
         }
     }
 
-    /// Make sure the worker holds the active tab's current page.
+    /// Make sure the active tab's current page is live, drop the pages of
+    /// closed tabs and discard the least recently shown beyond
+    /// [`MAX_LIVE_PAGES`].
     fn ensure_open(&mut self) {
-        let tab = self.browser.tab();
-        let wanted = (tab.id, tab.generation);
-        if self.open == Some(wanted) || tab.load == Load::Stopped {
-            return;
+        let ids: Vec<u64> = self.slots.keys().copied().collect();
+        for id in ids {
+            if self.browser.tab_by_id(id).is_none() {
+                // Dropping the worker's channel closes its page.
+                self.slots.remove(&id);
+                self.shown.remove(&id);
+            }
         }
+        let tab = self.browser.tab();
+        let (id, generation) = (tab.id, tab.generation);
+        let stopped = tab.load == Load::Stopped;
         let target = match &tab.entry().target {
-            Target::Blank => {
-                self.tree = None;
-                if self.open.take().is_some() {
-                    let _ = self.worker.jobs.send(Job::Close);
-                }
+            Target::Blank => None,
+            Target::File(path) => Some(path.clone().into_os_string()),
+            Target::Url(url) => Some(OsString::from(url)),
+        };
+        self.uses += 1;
+        let uses = self.uses;
+        if let Some(slot) = self.slots.get_mut(&id) {
+            slot.used = uses;
+            if slot.open == Some(generation) || stopped {
                 return;
             }
-            Target::File(path) => path.clone().into_os_string(),
-            Target::Url(url) => OsString::from(url),
+        } else if stopped {
+            return;
+        }
+        let Some(target) = target else {
+            if let Some(slot) = self.slots.get_mut(&id) {
+                if slot.open.take().is_some() {
+                    let _ = slot.worker.jobs.send(Job::Close);
+                }
+                slot.reset();
+            }
+            return;
         };
+        if !self.slots.contains_key(&id) {
+            match Worker::start() {
+                Ok(worker) => {
+                    let mut slot = Slot::new(worker);
+                    slot.used = uses;
+                    self.slots.insert(id, slot);
+                }
+                Err(why) => {
+                    self.browser.tab_mut().load = Load::Failed(why);
+                    return;
+                }
+            }
+        }
         let mut args = self.options.clone();
         args.extend(["--output".into(), "view.png".into(), "--".into(), target]);
         let job = Job::Open {
-            tab: wanted.0,
-            generation: wanted.1,
+            tab: id,
+            generation,
             args,
         };
-        if self.worker.jobs.send(job).is_ok() {
-            self.open = Some(wanted);
-            self.live = false;
-            self.tree = None;
-            self.pending = None;
-            self.handling = 0;
-            self.reported = (0.0, 0.0);
-            self.next_frame = None;
-            self.last_ask = None;
-            // A page loaded again (switching back to a tab, back and
-            // forward) starts where its entry was scrolled.
+        let Some(slot) = self.slots.get_mut(&id) else {
+            return;
+        };
+        if slot.worker.jobs.send(job).is_ok() {
+            slot.open = Some(generation);
+            slot.reset();
+            // A page loaded again (back and forward, a discarded tab)
+            // starts where its entry was scrolled.
             self.browser.tab_mut().load = Load::Loading;
+        }
+        // Discard the least recently shown pages beyond the limit.
+        while self.slots.len() > MAX_LIVE_PAGES {
+            let Some(oldest) = self
+                .slots
+                .iter()
+                .filter(|(slot_id, _)| **slot_id != id)
+                .min_by_key(|(_, slot)| slot.used)
+                .map(|(slot_id, _)| *slot_id)
+            else {
+                break;
+            };
+            self.slots.remove(&oldest);
         }
     }
 
-    fn request(&mut self, key: FrameKey) {
+    /// Ask tab `id`'s page for the frame `key`.
+    fn request(&mut self, id: u64, key: FrameKey) {
+        let tree = self.accessible && id == self.browser.tab().id;
+        let Some(slot) = self.slots.get_mut(&id) else {
+            return;
+        };
         let now = Instant::now();
-        let elapsed = self
+        let elapsed = slot
             .last_ask
             .map_or(0, |at| now.saturating_duration_since(at).as_micros());
         let ask = FrameAsk {
@@ -433,25 +577,26 @@ impl ViewPage {
             height: key.css.1,
             scale: key.scale,
             zoom: key.zoom,
-            scroll: (key.scroll != self.reported).then_some(key.scroll),
+            scroll: (key.scroll != slot.reported).then_some(key.scroll),
             elapsed_us: u64::try_from(elapsed).unwrap_or(u64::MAX),
             find: key
                 .find
                 .as_ref()
                 .map(|(text, index)| (text.clone(), u32::try_from(*index).unwrap_or(u32::MAX))),
         };
-        if self
+        if slot
             .worker
             .jobs
             .send(Job::Frame {
                 key: key.clone(),
                 ask,
-                tree: self.accessible,
+                tree,
             })
             .is_ok()
         {
-            self.pending = Some(key);
-            self.last_ask = Some(now);
+            slot.pending = Some(key.clone());
+            slot.last_key = Some(key);
+            slot.last_ask = Some(now);
         }
     }
 
@@ -471,20 +616,23 @@ impl ViewPage {
         )
     }
 
-    /// Take one report of the page thread into the browser's state.
-    fn take(&mut self, event: Event) {
+    /// Take one report of tab `id`'s page thread into the browser's state.
+    fn take(&mut self, id: u64, event: Event) {
         match event {
             Event::Opened {
                 tab,
                 generation,
                 committed,
             } => {
-                if self.open != Some((tab, generation)) {
+                let Some(slot) = self.slots.get_mut(&id) else {
+                    return;
+                };
+                if tab != id || slot.open != Some(generation) {
                     return;
                 }
-                self.live = true;
+                slot.live = true;
                 // A page loaded again needs its own first frame.
-                self.serial += 1;
+                slot.serial += 1;
                 if let Some(tab) = self.browser.tab_by_id(tab) {
                     if tab.generation == generation {
                         tab.committed = committed;
@@ -497,10 +645,11 @@ impl ViewPage {
                 status,
                 failure,
             } => {
-                if self.open == Some((tab, generation)) {
-                    self.open = None;
-                    self.live = false;
-                    self.tree = None;
+                if let Some(slot) = self.slots.get_mut(&id) {
+                    if tab == id && slot.open == Some(generation) {
+                        slot.open = None;
+                        slot.reset();
+                    }
                 }
                 let current = self
                     .browser
@@ -532,8 +681,10 @@ impl ViewPage {
                 }
             }
             Event::Handled => {
-                self.handling = self.handling.saturating_sub(1);
-                self.serial += 1;
+                if let Some(slot) = self.slots.get_mut(&id) {
+                    slot.handling = slot.handling.saturating_sub(1);
+                    slot.serial += 1;
+                }
             }
             Event::Frame {
                 key,
@@ -541,16 +692,28 @@ impl ViewPage {
                 notes,
                 tree,
             } => {
-                if self.pending.as_ref() == Some(&key) {
-                    self.pending = None;
-                }
-                if let Some(tree) = tree {
-                    if self.open == Some((key.tab, key.generation)) {
-                        self.tree = tree;
-                    }
-                }
                 for note in notes {
                     eprintln!("rustic view: {}", EscapedText(&note));
+                }
+                let Some(slot) = self.slots.get_mut(&id) else {
+                    return;
+                };
+                if slot.pending.as_ref() == Some(&key) {
+                    slot.pending = None;
+                }
+                if key.tab != id || slot.open != Some(key.generation) {
+                    return;
+                }
+                if let Some(tree) = tree {
+                    slot.tree = tree;
+                }
+                if let Ok(frame) = &frame {
+                    slot.editing = frame.editing;
+                    if slot.editing.is_none() {
+                        slot.composing = false;
+                    }
+                    slot.reported = frame.scroll;
+                    slot.next_frame = frame.next_frame.map(|delay| Instant::now() + delay);
                 }
                 let page_height = self.page_height;
                 let Some(tab) = self.browser.tab_by_id(key.tab) else {
@@ -573,7 +736,6 @@ impl ViewPage {
                     tab.entry_mut().scroll = frame.scroll;
                 }
                 key.scroll = frame.scroll;
-                self.reported = frame.scroll;
                 if let Some(find) = &mut tab.find {
                     let asked = key
                         .find
@@ -596,7 +758,6 @@ impl ViewPage {
                 if tab.load == Load::Loading {
                     tab.load = Load::Idle;
                 }
-                self.next_frame = frame.next_frame.map(|delay| Instant::now() + delay);
                 self.shown.insert(
                     key.tab,
                     Shown {
@@ -608,10 +769,53 @@ impl ViewPage {
         }
     }
 
-    /// Hand a click or key the browser left to the page.
+    /// Turn the host's input method events into the page's composition
+    /// steps: start on the first preedit or a direct commit, update with
+    /// each preedit, end with the committed text (or nothing when the
+    /// input method is turned off mid-composition).
+    fn compose(&mut self, ime: &Ime) {
+        let composing = self.active().is_some_and(|slot| slot.composing);
+        let mut steps: Vec<(CompositionPhase, String)> = Vec::new();
+        let now_composing = match ime {
+            Ime::Enabled => composing,
+            Ime::Preedit(text, _) => {
+                if !composing && text.is_empty() {
+                    return;
+                }
+                if !composing {
+                    steps.push((CompositionPhase::Start, String::new()));
+                }
+                steps.push((CompositionPhase::Update, text.clone()));
+                true
+            }
+            Ime::Commit(text) => {
+                if !composing {
+                    steps.push((CompositionPhase::Start, String::new()));
+                }
+                steps.push((CompositionPhase::End, text.clone()));
+                false
+            }
+            Ime::Disabled => {
+                if composing {
+                    steps.push((CompositionPhase::End, String::new()));
+                }
+                false
+            }
+        };
+        for (phase, text) in steps {
+            self.send_to_page(Job::Compose { phase, text });
+        }
+        if let Some(slot) = self.active_mut() {
+            slot.composing = now_composing;
+        }
+    }
+
+    /// Hand a click or key the browser left to the active page.
     fn send_to_page(&mut self, job: Job) {
-        if self.live && self.worker.jobs.send(job).is_ok() {
-            self.handling += 1;
+        if let Some(slot) = self.active_mut() {
+            if slot.live && slot.worker.jobs.send(job).is_ok() {
+                slot.handling += 1;
+            }
         }
     }
 }
@@ -652,14 +856,15 @@ impl rustic_shell::Content for ViewPage {
             .get(&key.tab)
             .is_some_and(|shown| shown.key == key);
         let stopped = tab.load == Load::Stopped;
-        if self.live && !current && !stopped && self.pending.is_none() {
-            self.request(key.clone());
+        let (live, pending, handling) = self.active().map_or((false, false, 0), |slot| {
+            (slot.live, slot.pending.is_some(), slot.handling)
+        });
+        if live && !current && !stopped && !pending {
+            self.request(key.tab, key.clone());
         }
+        let pending = self.active().is_some_and(|slot| slot.pending.is_some());
         let settled = stopped
-            || (current
-                && self.pending.is_none()
-                && self.handling == 0
-                && self.browser.tab().load == Load::Idle);
+            || (current && !pending && handling == 0 && self.browser.tab().load == Load::Idle);
         let surface = match self.shown.get(&key.tab) {
             Some(shown) => shown.surface.clone(),
             None if stopped => {
@@ -710,6 +915,9 @@ impl rustic_shell::Content for ViewPage {
             return response;
         }
         // What the browser left goes to the page (TD-182 input routing).
+        let editing = self
+            .active()
+            .is_some_and(|slot| slot.live && slot.editing.is_some());
         match input {
             Input::PageClick(x, y, modifiers) => {
                 self.send_to_page(Job::Click {
@@ -725,7 +933,18 @@ impl rustic_shell::Content for ViewPage {
                         code,
                         modifiers: modifier_bits(*modifiers),
                     });
+                    // Keys typed into a page field edit it; they do not
+                    // also scroll the page.
+                    if editing {
+                        return Response::HANDLED;
+                    }
                 }
+            }
+            // An input method composes into the focused page field
+            // (TD-197); typed text arrives as key presses instead.
+            Input::Ime(ime) if editing => {
+                self.compose(ime);
+                return Response::HANDLED;
             }
             _ => {}
         }
@@ -749,37 +968,86 @@ impl rustic_shell::Content for ViewPage {
     }
 
     fn busy(&self) -> bool {
-        self.open.is_some() && (!self.live || self.pending.is_some() || self.handling > 0)
-            || (self.visible && self.next_frame.is_some())
-            || (self.tree_wanted && self.live)
+        let active = self.browser.tab().id;
+        self.active().is_some_and(Slot::busy)
+            || (self.visible && self.slots.values().any(|slot| slot.next_frame.is_some()))
+            || self
+                .slots
+                .iter()
+                .any(|(id, slot)| *id != active && slot.busy())
+            || (self.tree_wanted && self.live())
     }
 
     fn poll(&mut self) -> bool {
+        let active = self.browser.tab().id;
         let mut changed = false;
-        loop {
-            match self.worker.events.try_recv() {
-                Ok(event) => {
-                    self.take(event);
-                    changed = true;
-                }
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => {
-                    self.pending = None;
-                    self.open = None;
-                    break;
+        let mut events = Vec::new();
+        for (id, slot) in &mut self.slots {
+            loop {
+                match slot.worker.events.try_recv() {
+                    Ok(event) => events.push((*id, event)),
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        slot.pending = None;
+                        slot.open = None;
+                        break;
+                    }
                 }
             }
         }
+        for (id, event) in events {
+            // A background page's reports change what its tab shows, not
+            // the window.
+            changed |= id == active;
+            self.take(id, event);
+        }
         // The first tree comes with a new frame of the page.
-        if self.tree_wanted && self.live {
+        if self.tree_wanted && self.live() {
             self.tree_wanted = false;
-            self.serial += 1;
+            if let Some(slot) = self.active_mut() {
+                slot.serial += 1;
+            }
             changed = true;
         }
-        if self.visible && self.next_frame.is_some_and(|at| Instant::now() >= at) {
-            self.next_frame = None;
-            self.serial += 1;
-            changed = true;
+        if !self.visible {
+            return changed;
+        }
+        let now = Instant::now();
+        if let Some(slot) = self.active_mut() {
+            if slot.next_frame.is_some_and(|at| now >= at) {
+                slot.next_frame = None;
+                slot.serial += 1;
+                changed = true;
+            }
+        }
+        // Background pages run their timers and animations throttled.
+        let due: Vec<(u64, FrameKey)> = self
+            .slots
+            .iter_mut()
+            .filter(|(id, slot)| {
+                **id != active
+                    && slot.live
+                    && slot.pending.is_none()
+                    && slot.next_frame.is_some_and(|at| now >= at)
+                    && slot
+                        .last_ask
+                        .is_none_or(|at| now.saturating_duration_since(at) >= BACKGROUND_FRAME)
+            })
+            .filter_map(|(id, slot)| {
+                slot.next_frame = None;
+                slot.serial += 1;
+                let key = slot.last_key.clone()?;
+                Some((
+                    *id,
+                    FrameKey {
+                        serial: slot.serial,
+                        ..key
+                    },
+                ))
+            })
+            .collect();
+        for (id, key) in due {
+            self.request(id, key);
         }
         changed
     }
@@ -796,24 +1064,51 @@ impl rustic_shell::Content for ViewPage {
     }
 
     fn text_entry(&self) -> Option<(f64, f64, f64, f64)> {
-        self.browser.text_entry(self.strip_width)
+        if let Some(field) = self.browser.text_entry(self.strip_width) {
+            return Some(field);
+        }
+        if self.browser.focus() != Focus::Page {
+            return None;
+        }
+        // A focused page field: its box below the strip, at the tab's zoom.
+        let (x, y, width, height) = self.active().filter(|slot| slot.live)?.editing?;
+        let zoom = self.browser.tab().zoom;
+        let window = |v: f64| (v * zoom).max(0.0);
+        Some((
+            window(x),
+            window(y) + self.chrome_height(),
+            window(width).max(1.0),
+            window(height).max(16.0),
+        ))
     }
 
     fn describe(&self) -> Option<String> {
-        Some(self.browser.describe())
+        let editing = match self
+            .active()
+            .map(|slot| (slot.editing.is_some(), slot.composing))
+        {
+            Some((true, true)) => "composing",
+            Some((true, false)) => "field",
+            _ => "none",
+        };
+        let live = self.slots.values().filter(|slot| slot.live).count();
+        Some(format!(
+            "{} page-edit={editing} live-pages={live}",
+            self.browser.describe()
+        ))
     }
 
     fn accessibility(&mut self) -> Option<rustic_a11y::AxTree> {
         if !self.accessible {
             self.accessible = true;
-            self.tree_wanted = self.tree.is_none();
+            self.tree_wanted = self.active().is_none_or(|slot| slot.tree.is_none());
         }
         let tab = self.browser.tab();
         let failed = matches!(tab.load, Load::Failed(_));
         if failed || matches!(tab.entry().target, Target::Blank) {
             return None;
         }
-        self.tree.clone()
+        self.active().and_then(|slot| slot.tree.clone())
     }
 
     fn accessibility_action(
@@ -832,7 +1127,7 @@ impl rustic_shell::Content for ViewPage {
             // has no page input yet.
             rustic_a11y::ActionRequest::ScrollIntoView => return false,
         };
-        let live = self.live;
+        let live = self.live();
         self.send_to_page(Job::Assist {
             node: node.0,
             request,
@@ -918,32 +1213,17 @@ pub fn view_command(args: &[OsString]) -> u8 {
         Target::File(PathBuf::from(&path))
     };
     let title = format!("{} — Rustic", Path::new(&path).to_string_lossy());
-    let worker = match Worker::start() {
-        Ok(worker) => worker,
-        Err(error) => {
-            eprintln!("rustic view: {error}");
-            return 1;
-        }
-    };
     let page = ViewPage {
         browser: Browser::new(first, crate::storage::label(), base),
         options: rest,
-        worker,
-        open: None,
-        live: false,
-        pending: None,
-        handling: 0,
-        reported: (0.0, 0.0),
-        next_frame: None,
-        last_ask: None,
-        serial: 0,
+        slots: HashMap::new(),
+        uses: 0,
         shown: HashMap::new(),
         strip: None,
         page_height: f64::from(size.1),
         scale: 1.0,
         strip_width: f64::from(size.0),
         visible: true,
-        tree: None,
         accessible: false,
         tree_wanted: false,
     };

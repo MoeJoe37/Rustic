@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Corpus: article</title>
+<link rel="stylesheet" href="corpus.css">
+<style>
+header { background: #234; color: #fff; padding: 12px 24px; }
+article { max-width: 560px; margin: 16px auto; padding: 0 16px; }
+figure { margin: 12px 0; }
+figure img { display: block; width: 160px; height: 120px; }
+figcaption { font-size: 13px; color: #555; }
+p { margin: 8px 0; }
+</style>
+</head>
+<body>
+<header><h1 id="title">A day by the river</h1></header>
+<article id="article">
+<p id="lead">The river runs slowly past the old mill. Families walk along its banks on Sunday afternoons, and the cafes stay open late into the summer evenings.</p>
+<figure><img id="photo" src="images/teal-8x6.jpg" alt="Teal water"><figcaption>The water at noon.</figcaption></figure>
+<p>Later the light turns gold and the swifts come out over the water, wheeling and calling until it is too dark to see them.</p>
+</article>
+<div id="status"></div>
+<script src="corpus.js"></script>
+<script>
+var a = corpus.box('article'), p = corpus.box('photo'), lead = corpus.box('lead');
+corpus.check(a.width <= 592 && a.width > 400, 'article width ' + a.width);
+corpus.check(Math.round(p.width) === 160 && Math.round(p.height) === 120, 'figure image size ' + p.width + 'x' + p.height);
+corpus.check(p.top > lead.bottom, 'figure follows the lead paragraph');
+corpus.check(lead.height > 20, 'lead paragraph wraps');
+corpus.pass();
+</script>
+</body>
+</html>

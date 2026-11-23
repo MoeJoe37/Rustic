@@ -40,11 +40,19 @@ page.
    notice, drawn by the broker from escaped printable ASCII with scripts
    off, from one layout that both drawing and hit testing use. Error,
    stopped and new-tab pages are trusted documents drawn the same way.
-4. **Pages (`view.rs`).** One worker thread holds the active tab's live
-   page (`broker::live`); frames, clicks and keys go to it, so the window
-   keeps answering while a page loads. Stop and navigation drop stale
-   results by generation. Background tabs keep their last frame and load
-   again when shown (TD-196). Find-in-page is part of the frame request
+4. **Pages (`view.rs`).** Each tab has a worker thread holding its live
+   page (`broker::live`); frames, clicks and keys go to the active tab's,
+   so the window keeps answering while a page loads. Stop and navigation
+   drop stale results by generation. Background tabs stay live (scripts
+   and state survive a tab switch) and get at most one frame a second;
+   beyond six live pages the least recently shown is discarded and loads
+   again when shown. All page threads share one opened profile, so one
+   profile lock serves every tab. Each frame reports the focused editable
+   field's box (`Painted.editing`); while a page field has focus the
+   window enables the input method at that box and preedit and commit
+   reach the page as composition (`compositionstart`/`update`/`end` and
+   `input`), keys go to the page instead of the browser's shortcuts, and
+   turning the input method off ends a composition. Find-in-page is part of the frame request
    (`FrameAsk.find`, `Painted.found`): the renderer marks matches and
    reports the active one, which the browser scrolls into view (TD-195).
    Load failures and downloads come from the broker (`broker::Failure`),
@@ -70,7 +78,19 @@ page.
    state; `RUSTIC_TEST_WINDOW_CAPTURE` saves the presented frames. CI runs
    these tests on native Windows and macOS (x64 and ARM64) desktops and on
    Linux under Xvfb (X11, including a 1.5 scale) and headless Weston
-   (Wayland).
+   (Wayland). A curated site corpus (`tests/corpus`: an article, a
+   floated blog, a flex landing page, sticky and fixed documentation, an
+   image gallery in every decoded format, a clicked tab app, timers and
+   animation frames, international and right-to-left text, keyboard
+   events) checks itself in each window and turns a corner square green;
+   the test reads it from the presented frame.
+7. **Windowless children (TD-183).** `rustic-cli`'s window stack is the
+   `window` feature, on by default. `rustic-renderer` is the same commands
+   without it; on macOS the broker starts renderers and the network
+   process from it when it sits beside `rustic` and is not older, so
+   AppKit's initializers never run before a child's Seatbelt profile
+   applies. The profiles also hide the machine's names and identifiers
+   and the `kern.proc`, `kern.procargs` and `net` parameter families.
 
 ## Alternatives considered
 
@@ -79,26 +99,37 @@ page.
 - Platform font APIs (DirectWrite, Core Text) through FFI: they need
   `unsafe` outside `rustic-sandbox`; file tables plus fontconfig cover the
   generic families now, and a reviewed adapter can replace them (TD-85).
-- One renderer per tab kept alive: needs per-tab profile sharing across
-  threads; deferred (TD-196).
+- Only the active tab live, others reloading when shown: lost script
+  state on every tab switch; replaced by per-tab live pages (TD-196).
+- An allowlist of `sysctl` names for the Seatbelt profiles: the system
+  libraries' reads are open-ended and undocumented (the first native run
+  aborted in dyld), so the profiles hide what identifies the machine or
+  reveals other processes instead.
 
 ## Consequences
 
 `rustic view` is a small browser: real fonts, tabs, history, find and
-zoom, with page input through the long-lived renderer. Real system input
-methods are not exercised in CI (synthetic IME events use the same path,
-TD-197). Find marks are estimated within a text fragment (TD-195).
+zoom, with page input and composition through the long-lived renderer.
+Real system input methods are not exercised in CI (synthetic IME events
+use the same path, TD-197). Find marks are estimated within a text
+fragment (TD-195). Six live pages bound memory; a seventh tab discards
+the least recently shown. Packaging must build `rustic-renderer` on its
+own (built with the workspace, Cargo unifies features and links the
+window stack in).
 
 ## Validation
 
 `crates/rustic-cli/tests/view.rs` (window lifecycle, browser shell,
-fractional scale), unit tests in `rustic-shell` (scripts, fallbacks, strip
+fractional scale, page composition, background tabs, the site corpus),
+the macOS escape probes and the CI step that builds `rustic-renderer`
+alone, checks it links no AppKit and runs the isolation tests from it, unit tests in `rustic-shell` (scripts, fallbacks, strip
 rows), `browser.rs`, `chrome.rs`, `find.rs`, `fonts`/`native`/collection
 tests in `rustic-text`, IPC round trips for `FrameAsk.find`,
 `Painted.found` and `Start.families`.
 
 ## Revisit
 
-When a GPU backend presents the window (TD-185), when page-level editing
-and IME composition land (a11y.editing), or when a reviewed native font
+When a GPU backend presents the window (TD-185), when platform input
+methods run in CI (TD-197), when macOS packaging bundles the executables,
+or when a reviewed native font
 adapter is proposed.

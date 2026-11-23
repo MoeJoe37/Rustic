@@ -284,3 +284,36 @@ fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device() {
     );
     assert_eq!(err.matches("composited on ").count(), 6, "{err}");
 }
+
+/// TD-186 evidence: which adapter the GPU process reaches on this machine
+/// with and without its sandbox. Prints a report line for CI logs; the
+/// confined case must match the unconfined one only where
+/// `RUSTIC_REQUIRE_CONFINED_GPU=1` says the profile grants the driver.
+#[test]
+fn the_gpu_adapter_report_with_and_without_the_sandbox() {
+    let dir = Dir::new("adapters");
+    let adapter = |extra: &[&str]| {
+        let (output, _) = dir.render(
+            extra,
+            &[("RUSTIC_GPU", "any"), ("RUSTIC_TEST_GPU_DEVICE", "report")],
+        );
+        let err = text(&output.stderr);
+        err.lines()
+            .find_map(|line| line.split_once("GPU process: composited on "))
+            .map(|(_, adapter)| adapter.trim_end_matches('"').to_owned())
+            .unwrap_or_else(|| {
+                err.lines()
+                    .filter(|line| line.contains("GPU"))
+                    .last()
+                    .map_or_else(|| "cpu".to_owned(), |line| format!("cpu ({line})"))
+            })
+    };
+    let open = adapter(&["--no-sandbox"]);
+    let confined = adapter(&[]);
+    println!("gpu adapter unconfined: {open}");
+    println!("gpu adapter confined: {confined}");
+    if std::env::var_os("RUSTIC_REQUIRE_CONFINED_GPU").is_some() {
+        assert!(!open.starts_with("cpu"), "no adapter at all: {open}");
+        assert_eq!(confined, open, "the sandbox hides the adapter");
+    }
+}

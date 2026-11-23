@@ -303,8 +303,7 @@ fn the_gpu_adapter_report_with_and_without_the_sandbox() {
             .map(|(_, adapter)| adapter.trim_end_matches('"').to_owned())
             .unwrap_or_else(|| {
                 err.lines()
-                    .filter(|line| line.contains("GPU"))
-                    .last()
+                    .rfind(|line| line.contains("GPU"))
                     .map_or_else(|| "cpu".to_owned(), |line| format!("cpu ({line})"))
             })
     };

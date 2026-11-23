@@ -197,10 +197,26 @@ pub fn gpu_profile(exe: &Path) -> Result<String, ProfileError> {
     for path in GPU_READS {
         let _ = writeln!(profile, "    (subpath {})", literal(path));
     }
-    profile.push_str(
-        ")
-",
-    );
+    profile.push_str(")\n");
+    // IOSurface reads the GPU policies of the process's main bundle
+    // (`IOSurfaceClientCopyGPUPolicies`), and CoreFoundation finds that
+    // bundle by examining the executable's directory and its parents;
+    // without it the bundle is null and IOSurface crashes. Metadata only:
+    // names and attributes of those directories and the bundle files next
+    // to the binary, not their contents elsewhere.
+    if let Some(directory) = exe.parent() {
+        let directory = directory.to_str().ok_or(ProfileError::UnsafePath)?;
+        profile.push_str("(allow file-read-metadata\n");
+        let _ = writeln!(profile, "    (subpath {})", literal(directory));
+        let mut ancestor = Path::new(directory).parent();
+        while let Some(path) = ancestor {
+            if let Some(text) = path.to_str() {
+                let _ = writeln!(profile, "    (literal {})", literal(text));
+            }
+            ancestor = path.parent();
+        }
+        profile.push_str(")\n");
+    }
     Ok(profile)
 }
 
@@ -315,6 +331,7 @@ mod tests {
             "(iokit-user-client-class \"AGXDeviceUserClient\")",
             "(global-name \"com.apple.MTLCompilerService\")",
             "(subpath \"/System/Library/Extensions\")",
+            "(subpath \"/Applications/Rustic.app\")",
         ] {
             assert!(added.contains(expected), "{expected} missing in\n{added}");
         }

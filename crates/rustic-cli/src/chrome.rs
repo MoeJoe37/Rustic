@@ -899,7 +899,7 @@ pub fn paint_trusted(
             url,
             csp: CspList::default(),
         }),
-        bytes: html.into_bytes(),
+        bytes: std::cell::RefCell::new(html.into_bytes()),
         transport_encoding: None,
     };
     let limits = LoaderLimits::default();

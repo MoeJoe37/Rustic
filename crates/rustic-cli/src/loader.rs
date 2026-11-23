@@ -466,7 +466,7 @@ pub fn load_session_document(
     if limits.max_file_bytes == 0 || limits.read_chunk_bytes == 0 || limits.max_dump_bytes == 0 {
         return Err(LoadError::InvalidLimits);
     }
-    if network.bytes.len() > limits.max_file_bytes {
+    if network.bytes.borrow().len() > limits.max_file_bytes {
         return Err(LoadError::FileTooLarge {
             limit: limits.max_file_bytes,
         });
@@ -585,47 +585,94 @@ fn feed_network_document(
     mut feed: impl FnMut(&[u8], Option<Encoding>) -> Result<(), LoadError>,
 ) -> Result<Selected, LoadError> {
     check_cancelled(cancellation)?;
-    let bytes = &network.bytes;
-    let has_bom = rustic_encoding::bom_sniff(bytes).is_some();
-    let prefix = &bytes[..bytes.len().min(LOCAL_ENCODING_PREFIX_BYTES)];
-    if network.session.is_local() {
+    // A byte order mark needs three bytes; the `<meta>` prescan, needed
+    // unless the encoding is already certain, waits for 1024 bytes or the
+    // end of the body.
+    let wanted = if network.session.is_local()
+        || (forced.is_none() && network.transport_encoding.is_none())
+    {
+        LOCAL_ENCODING_PREFIX_BYTES
+    } else {
+        3
+    };
+    while network.bytes.borrow().len() < wanted
+        && pull_document_chunk(network, limits, cancellation)?
+    {}
+    let (has_bom, prefix) = {
+        let bytes = network.bytes.borrow();
+        let prefix = bytes[..bytes.len().min(LOCAL_ENCODING_PREFIX_BYTES)].to_vec();
+        (rustic_encoding::bom_sniff(&bytes).is_some(), prefix)
+    };
+    let (encoding, selected) = if network.session.is_local() {
         // A local file: BOM or `<meta>` in the prefix, else UTF-8, as
         // `read_document_file` decides; there is no reload.
-        let encoding = select_local_encoding(prefix, scripting, cancellation.clone())?;
-        let mut encoding = Some(encoding);
-        if bytes.is_empty() {
-            feed(&[], encoding.take())?;
+        let encoding = select_local_encoding(&prefix, scripting, cancellation.clone())?;
+        (encoding, Selected::Certain)
+    } else {
+        match (forced, network.transport_encoding) {
+            (Some(forced), _) if !has_bom => (forced, Selected::Certain),
+            (_, Some(transport)) if !has_bom => (transport, Selected::Certain),
+            _ => match sniff_declared_encoding(&prefix, scripting, cancellation.clone())? {
+                Some(encoding) if has_bom => (encoding, Selected::Certain),
+                Some(encoding) => (encoding, Selected::Tentative(encoding)),
+                None => {
+                    let fallback =
+                        rustic_html::locale_fallback_encoding(crate::network::fallback_locale());
+                    (fallback, Selected::Tentative(fallback))
+                }
+            },
         }
-        for chunk in bytes.chunks(limits.read_chunk_bytes.max(1)) {
-            check_cancelled(cancellation)?;
-            feed(chunk, encoding.take())?;
-        }
-        check_cancelled(cancellation)?;
-        return Ok(Selected::Certain);
-    }
-    let (encoding, selected) = match (forced, network.transport_encoding) {
-        (Some(forced), _) if !has_bom => (forced, Selected::Certain),
-        (_, Some(transport)) if !has_bom => (transport, Selected::Certain),
-        _ => match sniff_declared_encoding(prefix, scripting, cancellation.clone())? {
-            Some(encoding) if has_bom => (encoding, Selected::Certain),
-            Some(encoding) => (encoding, Selected::Tentative(encoding)),
-            None => {
-                let fallback =
-                    rustic_html::locale_fallback_encoding(crate::network::fallback_locale());
-                (fallback, Selected::Tentative(fallback))
-            }
-        },
     };
+    // Feed what has arrived, then each piece as it arrives (TD-165). A
+    // reload after a late `<meta>` feeds the bytes kept from this pass.
     let mut encoding = Some(encoding);
-    if bytes.is_empty() {
-        feed(&[], encoding.take())?;
-    }
-    for chunk in bytes.chunks(limits.read_chunk_bytes.max(1)) {
+    let chunk_bytes = limits.read_chunk_bytes.max(1);
+    let mut fed = 0usize;
+    loop {
+        let chunk = {
+            let bytes = network.bytes.borrow();
+            let end = bytes.len().min(fed.saturating_add(chunk_bytes));
+            bytes[fed..end].to_vec()
+        };
+        if chunk.is_empty() {
+            if pull_document_chunk(network, limits, cancellation)? {
+                continue;
+            }
+            if fed == 0 {
+                feed(&[], encoding.take())?;
+            }
+            break;
+        }
         check_cancelled(cancellation)?;
-        feed(chunk, encoding.take())?;
+        fed += chunk.len();
+        feed(&chunk, encoding.take())?;
     }
     check_cancelled(cancellation)?;
     Ok(selected)
+}
+
+/// Append the next piece of a streamed document body; `false` at its end.
+fn pull_document_chunk(
+    network: &SessionDocument,
+    limits: LoaderLimits,
+    cancellation: &CancellationToken,
+) -> Result<bool, LoadError> {
+    check_cancelled(cancellation)?;
+    let too_large = || LoadError::FileTooLarge {
+        limit: limits.max_file_bytes,
+    };
+    let chunk = match network.session.next_document_chunk() {
+        Ok(Some(chunk)) => chunk,
+        Ok(None) => return Ok(false),
+        Err(NetworkLoadError::TooLarge(_)) => return Err(too_large()),
+        Err(error) => return Err(LoadError::Network(error)),
+    };
+    let mut bytes = network.bytes.borrow_mut();
+    if chunk.len() > limits.max_file_bytes.saturating_sub(bytes.len()) {
+        return Err(too_large());
+    }
+    bytes.extend_from_slice(&chunk);
+    Ok(true)
 }
 
 fn load_scripted_document(

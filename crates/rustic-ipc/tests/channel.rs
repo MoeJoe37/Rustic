@@ -5,10 +5,10 @@ use std::io::{Cursor, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 
 use rustic_ipc::protocol::{
-    AssistiveRequest, BrokerMessage, CompositionPhase, DocumentGrant, FetchRequest, FetchResponse,
-    FrameAsk, FrameLayer, FrameRequest, MODIFIER_SHIFT, PageInput, Painted, RendererMessage,
-    ResourceBody, ResourceFailure, ResourceKind, Start, StorageArea, StorageOp, StorageValue,
-    Surface,
+    AssistiveRequest, BrokerMessage, CompositionPhase, DocumentFailure, DocumentGrant,
+    FetchRequest, FetchResponse, FrameAsk, FrameLayer, FrameRequest, MODIFIER_SHIFT, PageInput,
+    Painted, RendererMessage, ResourceBody, ResourceFailure, ResourceKind, Start, StorageArea,
+    StorageOp, StorageValue, Surface,
 };
 use rustic_ipc::{
     Channel, DecodeError, IpcError, Limits, MAGIC, PROTOCOL_VERSION, Role, decode_frame,
@@ -41,10 +41,27 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
                 csp_report_only: vec![],
                 referrer_policy: "no-referrer".into(),
                 storage: true,
+                streamed: true,
             },
             fonts: vec![b"OTTO".to_vec()],
             families: vec!["sans-serif=Arial".into()],
         }),
+        BrokerMessage::DocumentChunk {
+            id: 3,
+            result: Ok(Some(b"<p>more".to_vec())),
+        },
+        BrokerMessage::DocumentChunk {
+            id: 4,
+            result: Ok(None),
+        },
+        BrokerMessage::DocumentChunk {
+            id: 5,
+            result: Err(DocumentFailure::TooLarge),
+        },
+        BrokerMessage::DocumentChunk {
+            id: 6,
+            result: Err(DocumentFailure::Failed("reset".into())),
+        },
         BrokerMessage::Resource {
             id: 7,
             result: Ok(ResourceBody {
@@ -157,6 +174,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
         BrokerMessage::AutomationCommand { id: 18, line: None },
     ];
     let renderer = vec![
+        RendererMessage::DocumentChunk { id: 3 },
         RendererMessage::Resource {
             id: 1,
             url: "https://a.test/s.css".into(),

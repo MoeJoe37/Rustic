@@ -79,8 +79,9 @@ pub(crate) fn granted_local_document(
             local: true,
             storage: false,
             charsets: RefCell::new(HashMap::new()),
+            streamed: std::cell::Cell::new(false),
         }),
-        bytes,
+        bytes: RefCell::new(bytes),
         transport_encoding: None,
     }))
 }
@@ -301,6 +302,7 @@ pub fn run_over(reader: Box<dyn Read>, writer: Box<dyn Write>) -> u8 {
         local: document.local,
         storage: document.storage,
         charsets: RefCell::new(HashMap::new()),
+        streamed: std::cell::Cell::new(document.streamed),
     });
     let transport_encoding = document
         .transport_charset
@@ -310,7 +312,7 @@ pub fn run_over(reader: Box<dyn Read>, writer: Box<dyn Write>) -> u8 {
     GRANTED.with(|granted| {
         *granted.borrow_mut() = Some(SessionDocument {
             session,
-            bytes: document.bytes,
+            bytes: RefCell::new(document.bytes),
             transport_encoding,
         })
     });
@@ -634,6 +636,7 @@ impl BrokerLink {
         let reply_id = match &reply {
             BrokerMessage::Resource { id, .. }
             | BrokerMessage::Prefetched { id }
+            | BrokerMessage::DocumentChunk { id, .. }
             | BrokerMessage::Fetch { id, .. }
             | BrokerMessage::Storage { id, .. }
             | BrokerMessage::Frame { id, .. }
@@ -663,6 +666,8 @@ struct BrokeredSession {
     local: bool,
     storage: bool,
     charsets: RefCell<HashMap<String, String>>,
+    /// The broker still has more of the document body (TD-165).
+    streamed: std::cell::Cell<bool>,
 }
 
 impl std::fmt::Debug for BrokeredSession {
@@ -677,6 +682,38 @@ impl std::fmt::Debug for BrokeredSession {
 impl Session for BrokeredSession {
     fn document_url(&self) -> &Url {
         &self.url
+    }
+
+    fn next_document_chunk(&self) -> Result<Option<Vec<u8>>, crate::network::NetworkLoadError> {
+        use crate::network::NetworkLoadError;
+        use rustic_ipc::protocol::DocumentFailure;
+        if !self.streamed.get() {
+            return Ok(None);
+        }
+        let reply = self
+            .link
+            .request(|id| RendererMessage::DocumentChunk { id })
+            .unwrap_or_else(|error| lost(&error));
+        let BrokerMessage::DocumentChunk { result, .. } = reply else {
+            self.streamed.set(false);
+            return Err(NetworkLoadError::BodyFailed(
+                "the broker answered out of order".into(),
+            ));
+        };
+        match result {
+            Ok(Some(bytes)) => Ok(Some(bytes)),
+            Ok(None) => {
+                self.streamed.set(false);
+                Ok(None)
+            }
+            Err(failure) => {
+                self.streamed.set(false);
+                Err(match failure {
+                    DocumentFailure::TooLarge => NetworkLoadError::TooLarge(0),
+                    DocumentFailure::Failed(why) => NetworkLoadError::BodyFailed(why),
+                })
+            }
+        }
     }
 
     fn prefetch(&self, requests: &[(Url, ResourceKind)]) {

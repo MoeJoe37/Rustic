@@ -15,7 +15,7 @@
 //! [`NetworkPolicy`](crate::NetworkPolicy) is checked for each URL.
 
 use std::fmt;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use rustic_url::{Origin, Url};
@@ -351,6 +351,19 @@ pub struct Fetcher {
     head_timeout: Duration,
     clock: Box<dyn Fn() -> i64 + Send>,
     accept_language: String,
+    /// Bodies that finished streaming to their consumer, for the HTTP
+    /// cache to store at the next chance (TD-165).
+    fills: Arc<Mutex<Vec<CompletedFill>>>,
+}
+
+/// A storable response whose body has been read to the end.
+struct CompletedFill {
+    partition: String,
+    url: Url,
+    request: Headers,
+    head: ResponseHead,
+    body: Vec<u8>,
+    now: i64,
 }
 
 impl fmt::Debug for Fetcher {
@@ -395,6 +408,25 @@ impl Fetcher {
             head_timeout,
             clock: Box::new(system_seconds),
             accept_language: "en-US,en".to_owned(),
+            fills: Arc::default(),
+        }
+    }
+
+    /// Store the bodies that finished streaming since the last call.
+    fn store_fills(&mut self) {
+        let fills = match self.fills.lock() {
+            Ok(mut fills) => std::mem::take(&mut *fills),
+            Err(_) => return,
+        };
+        for fill in fills {
+            self.cache.store(
+                &fill.partition,
+                &fill.url,
+                &fill.request,
+                fill.head,
+                fill.body,
+                fill.now,
+            );
         }
     }
 
@@ -420,13 +452,15 @@ impl Fetcher {
         &mut self.cookies
     }
 
-    /// The HTTP cache.
-    pub fn http_cache(&self) -> &crate::http_cache::HttpCache {
+    /// The HTTP cache, with every body read to the end so far stored.
+    pub fn http_cache(&mut self) -> &crate::http_cache::HttpCache {
+        self.store_fills();
         &self.cache
     }
 
     /// The HTTP cache, to clear it.
     pub fn http_cache_mut(&mut self) -> &mut crate::http_cache::HttpCache {
+        self.store_fills();
         &mut self.cache
     }
 
@@ -484,6 +518,7 @@ impl Fetcher {
         request: FetchRequest,
         allow: impl Into<Allow<'a>>,
     ) -> Result<PendingFetch<'a>, NetworkError> {
+        self.store_fills();
         let method = normalize_method(&request.method);
         if is_forbidden_method(&method) {
             return Err(NetworkError::ForbiddenMethod);
@@ -918,8 +953,32 @@ impl Fetcher {
         {
             self.cache.invalidate(current);
         }
-        if sent.cacheable && self.cache.may_store(&hop.headers, &head).is_some() {
-            return Ok(HeadOutcome::Fill(head, exchange));
+        if sent.cacheable {
+            if let Some(max_bytes) = self.cache.may_store(&hop.headers, &head) {
+                // A redirect is read whole before it is followed; any
+                // other body streams to its consumer, and the cache keeps
+                // a copy once it has all been read.
+                if (300..400).contains(&head.status()) {
+                    return Ok(HeadOutcome::Fill(head, exchange));
+                }
+                let fills = Arc::clone(&self.fills);
+                let fill = CompletedFill {
+                    partition: sent.partition.clone(),
+                    url: current.clone(),
+                    request: hop.headers.clone(),
+                    head: head.clone(),
+                    body: Vec::new(),
+                    now,
+                };
+                *exchange.tee.borrow_mut() = Some(crate::transport::Tee::new(
+                    max_bytes,
+                    Box::new(move |body| {
+                        if let Ok(mut fills) = fills.lock() {
+                            fills.push(CompletedFill { body, ..fill });
+                        }
+                    }),
+                ));
+            }
         }
         Ok(HeadOutcome::Ready(head, exchange))
     }
@@ -1166,7 +1225,7 @@ enum Prepared {
 enum HeadOutcome {
     /// The response, to check and deliver or redirect.
     Ready(ResponseHead, Exchange),
-    /// A storable response: its body is read into the cache first.
+    /// A storable redirect: its body is read into the cache first.
     Fill(ResponseHead, Exchange),
 }
 

@@ -166,6 +166,7 @@ pub fn remote_exchange(window: usize, hooks: Arc<dyn ExchangeHooks>) -> (RemoteF
         consumer,
         ended: Cell::new(false),
         hooks: Some(hooks),
+        tee: std::cell::RefCell::new(None),
     };
     (feed, exchange)
 }

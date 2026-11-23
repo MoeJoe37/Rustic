@@ -37,6 +37,9 @@ pub struct DocumentGrant {
     pub referrer_policy: String,
     /// Whether the origin has Web Storage (not opaque).
     pub storage: bool,
+    /// `bytes` is only what has arrived so far: the renderer asks for the
+    /// rest with [`RendererMessage::DocumentChunk`] (TD-165).
+    pub streamed: bool,
 }
 
 /// The renderer's job.
@@ -383,6 +386,15 @@ pub enum StorageValue {
     Refused,
 }
 
+/// Why a streamed document body stopped.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DocumentFailure {
+    /// It passed the document byte limit.
+    TooLarge,
+    /// The transfer failed, with the broker's description.
+    Failed(String),
+}
+
 /// Broker to renderer.
 #[derive(Clone, Debug, PartialEq)]
 pub enum BrokerMessage {
@@ -393,6 +405,14 @@ pub enum BrokerMessage {
     Prefetched {
         /// The request number.
         id: u32,
+    },
+    /// The reply to [`RendererMessage::DocumentChunk`] number `id`: the
+    /// next piece of the document body, `None` at its end.
+    DocumentChunk {
+        /// The request number.
+        id: u32,
+        /// The piece, or why the body stopped.
+        result: Result<Option<Vec<u8>>, DocumentFailure>,
     },
     /// The reply to [`RendererMessage::Resource`] number `id`.
     Resource {
@@ -456,6 +476,11 @@ pub enum RendererMessage {
         id: u32,
         /// URLs and what each is for.
         requests: Vec<(String, ResourceKind)>,
+    },
+    /// Ask for the next piece of a streamed document body (TD-165).
+    DocumentChunk {
+        /// The request number.
+        id: u32,
     },
     /// Ask for a subresource.
     Resource {
@@ -821,6 +846,22 @@ impl Message for BrokerMessage {
                 writer.u16(8);
                 writer.u32(*id);
             }
+            Self::DocumentChunk { id, result } => {
+                writer.u16(9);
+                writer.u32(*id);
+                match result {
+                    Ok(Some(bytes)) => {
+                        writer.u8(0);
+                        writer.bytes(bytes);
+                    }
+                    Ok(None) => writer.u8(1),
+                    Err(DocumentFailure::TooLarge) => writer.u8(2),
+                    Err(DocumentFailure::Failed(why)) => {
+                        writer.u8(3);
+                        writer.str(why);
+                    }
+                }
+            }
             Self::Start(start) => {
                 writer.u16(1);
                 writer.str(&start.command);
@@ -834,6 +875,7 @@ impl Message for BrokerMessage {
                 writer.strs(&document.csp_report_only);
                 writer.str(&document.referrer_policy);
                 writer.bool(document.storage);
+                writer.bool(document.streamed);
                 writer.u32(u32::try_from(start.fonts.len()).unwrap_or(u32::MAX));
                 for font in &start.fonts {
                     writer.bytes(font);
@@ -941,6 +983,7 @@ impl Message for BrokerMessage {
                     csp_report_only: reader.strings(MAX_STRINGS)?,
                     referrer_policy: reader.string()?,
                     storage: reader.bool()?,
+                    streamed: reader.bool()?,
                 };
                 let count = reader.u32()? as usize;
                 if count > MAX_FONTS {
@@ -1027,6 +1070,17 @@ impl Message for BrokerMessage {
             }),
             7 => Ok(Self::Page(get_page_input(reader)?)),
             8 => Ok(Self::Prefetched { id: reader.u32()? }),
+            9 => {
+                let id = reader.u32()?;
+                let result = match reader.u8()? {
+                    0 => Ok(Some(reader.bytes()?)),
+                    1 => Ok(None),
+                    2 => Err(DocumentFailure::TooLarge),
+                    3 => Err(DocumentFailure::Failed(reader.string()?)),
+                    tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
+                };
+                Ok(Self::DocumentChunk { id, result })
+            }
             32 => Ok(Self::AutomationCommand {
                 id: reader.u32()?,
                 line: reader.opt_string()?,
@@ -1098,6 +1152,10 @@ fn get_resource_kind(reader: &mut Reader<'_>) -> Result<ResourceKind, DecodeErro
 impl Message for RendererMessage {
     fn encode(&self, writer: &mut Writer) {
         match self {
+            Self::DocumentChunk { id } => {
+                writer.u16(13);
+                writer.u32(*id);
+            }
             Self::Prefetch { id, requests } => {
                 writer.u16(12);
                 writer.u32(*id);
@@ -1354,6 +1412,7 @@ impl Message for RendererMessage {
                 }
                 Ok(Self::Prefetch { id, requests })
             }
+            13 => Ok(Self::DocumentChunk { id: reader.u32()? }),
             32 => Ok(Self::AutomationOutput(reader.string()?)),
             33 => Ok(Self::AutomationRead { id: reader.u32()? }),
             tag => Err(DecodeError::UnknownTag(tag)),

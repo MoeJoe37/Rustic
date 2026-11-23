@@ -232,6 +232,8 @@ pub enum NetworkLoadError {
     NotHtml(String),
     /// The body exceeded `--max-input-bytes`.
     TooLarge(usize),
+    /// A streamed body stopped part way (TD-165).
+    BodyFailed(String),
     /// The profile could not be read.
     Profile(String),
 }
@@ -263,6 +265,7 @@ impl fmt::Display for NetworkLoadError {
                 EscapedText(mime)
             ),
             Self::TooLarge(limit) => write!(formatter, "the response exceeds {limit} bytes"),
+            Self::BodyFailed(error) => write!(formatter, "reading the response failed: {error}"),
             Self::Profile(error) => write!(formatter, "profile: {error}"),
         }
     }
@@ -286,7 +289,9 @@ pub struct NetworkDocument {
 #[derive(Debug)]
 pub(crate) struct SessionDocument {
     pub(crate) session: Rc<dyn Session>,
-    pub(crate) bytes: Vec<u8>,
+    /// The body so far: a streamed document grows as the parser reads it
+    /// ([`Session::next_document_chunk`]).
+    pub(crate) bytes: RefCell<Vec<u8>>,
     /// The transport-layer encoding (response `charset`).
     pub(crate) transport_encoding: Option<Encoding>,
 }
@@ -295,7 +300,7 @@ impl From<NetworkDocument> for SessionDocument {
     fn from(document: NetworkDocument) -> Self {
         Self {
             session: document.session,
-            bytes: document.bytes,
+            bytes: RefCell::new(document.bytes),
             transport_encoding: document.transport_encoding,
         }
     }
@@ -335,6 +340,9 @@ pub(crate) struct NetworkSession {
     frame: Option<(Site, Origin)>,
     /// Subresource fetches started ahead of use (TD-165).
     inflight: RefCell<Inflight>,
+    /// The rest of a navigated document's body, read as the parser asks
+    /// for it (TD-165), and how many more bytes it may have.
+    document_rest: RefCell<Option<DocumentRest>>,
 }
 
 impl fmt::Debug for NetworkSession {
@@ -386,6 +394,11 @@ pub(crate) trait Session: fmt::Debug {
     fn storage_host(&self) -> Result<Option<Rc<dyn rustic_engine::StorageHost>>, String>;
     /// Persist what the load changed (cookies, the profile).
     fn finish(&self) -> Result<(), String>;
+    /// The next piece of the document body, `None` at its end (TD-165):
+    /// a navigated document streams into the parser as it arrives.
+    fn next_document_chunk(&self) -> Result<Option<Vec<u8>>, NetworkLoadError> {
+        Ok(None)
+    }
     /// Open a popup the page asked for (ADR 0062): only a split run's
     /// broker can, in a renderer of its own.
     fn open_popup(&self, _popup: &rustic_engine::PopupRequest) -> Result<(), String> {
@@ -413,6 +426,10 @@ impl Session for NetworkSession {
 
     fn prefetch(&self, requests: &[(Url, ResourceKind)]) {
         self.prefetch_resources(requests);
+    }
+
+    fn next_document_chunk(&self) -> Result<Option<Vec<u8>>, NetworkLoadError> {
+        self.read_document_chunk()
     }
 
     fn charset_of(&self, url: &Url) -> Option<String> {
@@ -498,15 +515,23 @@ pub fn navigate(
         &committed.headers,
         mixed_content::is_secure_context(&origin, None),
     );
-    let bytes = committed
-        .body
-        .read_all(NETWORK_TIMEOUT)
-        .map_err(NetworkLoadError::Body)?;
+    // The parser reads the rest of the body as it arrives (TD-165).
+    let (bytes, rest) = match committed.body {
+        rustic_net::navigation::DocumentBody::Bytes(bytes) => (bytes, None),
+        rustic_net::navigation::DocumentBody::Network { prefix, exchange } => {
+            (prefix, Some(exchange))
+        }
+    };
     if bytes.len() > max_bytes {
         return Err(NetworkLoadError::TooLarge(max_bytes));
     }
     let mut session = NetworkSession::new(fetcher, document_url, origin, &policy, cancellation);
     session.isolation = isolation;
+    session.document_rest = RefCell::new(rest.map(|exchange| DocumentRest {
+        exchange,
+        left: max_bytes - bytes.len(),
+        max_bytes,
+    }));
     Ok(NetworkDocument {
         session: Rc::new(session),
         bytes,
@@ -649,6 +674,7 @@ impl NetworkSession {
             isolation: rustic_net::isolation::IsolationPolicy::default(),
             frame: None,
             inflight: RefCell::default(),
+            document_rest: RefCell::new(None),
         }
     }
 
@@ -738,6 +764,7 @@ impl NetworkSession {
             isolation,
             frame: None,
             inflight: RefCell::default(),
+            document_rest: RefCell::new(None),
             origin,
         };
         Ok(NetworkDocument {
@@ -889,6 +916,7 @@ impl NetworkSession {
             isolation,
             frame: Some((top_level_site, for_cookies)),
             inflight: RefCell::default(),
+            document_rest: RefCell::new(None),
             origin,
         };
         Ok(NetworkDocument {
@@ -937,6 +965,57 @@ impl NetworkSession {
             }
         };
         self.finish_resource(url, kind, max_bytes, result)
+    }
+
+    /// The next piece of the navigated document's body (see
+    /// [`Session::next_document_chunk`]), waiting at most
+    /// [`NETWORK_TIMEOUT`] and checking for cancellation as it waits.
+    fn read_document_chunk(&self) -> Result<Option<Vec<u8>>, NetworkLoadError> {
+        let mut slot = self.document_rest.borrow_mut();
+        let Some(rest) = slot.as_mut() else {
+            return Ok(None);
+        };
+        let deadline = std::time::Instant::now() + NETWORK_TIMEOUT;
+        let event = loop {
+            if self.cancellation.check().is_err() {
+                *slot = None;
+                return Err(NetworkLoadError::BodyFailed("cancelled".to_owned()));
+            }
+            let now = std::time::Instant::now();
+            if now >= deadline {
+                *slot = None;
+                return Err(NetworkLoadError::Body(NetworkError::BodyTimeout));
+            }
+            let wait = (deadline - now).min(Duration::from_millis(100));
+            if let Some(event) = rest.exchange.next_event(Some(wait)) {
+                break event;
+            }
+        };
+        match event {
+            rustic_net::NetEvent::Body(bytes) => {
+                if bytes.len() > rest.left {
+                    let max_bytes = rest.max_bytes;
+                    *slot = None;
+                    return Err(NetworkLoadError::TooLarge(max_bytes));
+                }
+                rest.left -= bytes.len();
+                Ok(Some(bytes))
+            }
+            rustic_net::NetEvent::Finished => {
+                *slot = None;
+                Ok(None)
+            }
+            rustic_net::NetEvent::Failed(error) => {
+                *slot = None;
+                Err(NetworkLoadError::Body(NetworkError::Transport(error)))
+            }
+            rustic_net::NetEvent::Response(_) => {
+                *slot = None;
+                Err(NetworkLoadError::BodyFailed(
+                    "a second response head".to_owned(),
+                ))
+            }
+        }
     }
 
     /// Start fetching `requests` side by side (TD-165), for
@@ -1175,6 +1254,15 @@ impl NetworkSession {
 
 /// The client policy asked before each hop of a subresource fetch.
 type HopPolicy = dyn FnMut(&Url, usize) -> bool;
+
+/// The unread rest of a navigated document's body.
+struct DocumentRest {
+    exchange: rustic_net::Exchange,
+    /// Bytes it may still have.
+    left: usize,
+    /// The whole document's limit, for the error.
+    max_bytes: usize,
+}
 
 /// Most subresource fetches one document starts ahead of use: each holds
 /// a transfer thread and up to one body, so the rest load on request.

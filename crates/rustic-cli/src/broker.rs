@@ -439,6 +439,7 @@ fn prepare(command: &str, args: &[OsString]) -> Result<Prepared, u8> {
             csp_report_only: navigated.policy.csp_report_only.clone(),
             referrer_policy: navigated.policy.referrer_policy.as_str().to_owned(),
             storage: !session.document_url().origin().is_opaque(),
+            streamed: true,
         };
         (Grant::Network(session), document)
     } else {
@@ -1922,6 +1923,7 @@ impl<'a> Broker<'a> {
             csp_report_only: navigated.policy.csp_report_only.clone(),
             referrer_policy: navigated.policy.referrer_policy.as_str().to_owned(),
             storage: !popup.origin().is_opaque(),
+            streamed: false,
         };
         let child = FrameContext {
             depth: 0,
@@ -2050,6 +2052,7 @@ impl<'a> Broker<'a> {
                     csp_report_only: navigated.policy.csp_report_only.clone(),
                     referrer_policy: navigated.policy.referrer_policy.as_str().to_owned(),
                     storage: !frame.origin().is_opaque(),
+                    streamed: false,
                 };
                 Ok(Some((Grant::Network(frame), document)))
             }
@@ -2072,6 +2075,10 @@ impl<'a> Broker<'a> {
                 self.prefetch(requests);
                 BrokerMessage::Prefetched { id }
             }
+            RendererMessage::DocumentChunk { id } => BrokerMessage::DocumentChunk {
+                id,
+                result: self.document_chunk(),
+            },
             RendererMessage::Resource {
                 id,
                 url,
@@ -2116,6 +2123,19 @@ impl<'a> Broker<'a> {
                 value: StorageValue::Refused,
             },
         }
+    }
+
+    /// The next piece of a streamed network document (TD-165).
+    fn document_chunk(&self) -> Result<Option<Vec<u8>>, rustic_ipc::protocol::DocumentFailure> {
+        let Grant::Network(session) = &self.grant else {
+            return Ok(None);
+        };
+        session.next_document_chunk().map_err(|error| match error {
+            crate::network::NetworkLoadError::TooLarge(_) => {
+                rustic_ipc::protocol::DocumentFailure::TooLarge
+            }
+            error => rustic_ipc::protocol::DocumentFailure::Failed(error.to_string()),
+        })
     }
 
     /// Start a network document's subresource fetches side by side

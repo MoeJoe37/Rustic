@@ -236,3 +236,35 @@ fn the_cache_evicts_least_recently_used_entries_at_its_limits() {
     get(&mut fetcher, "/a", "http://a.test");
     assert_eq!(hits(&server, "/a"), 2);
 }
+
+#[test]
+fn storable_bodies_stream_and_are_stored_once_read_to_the_end() {
+    let pause = Duration::from_millis(600);
+    let head =
+        b"HTTP/1.1 200 OK\r\nCache-Control: max-age=60\r\nContent-Length: 6\r\n\r\nfirst".to_vec();
+    let server = FixtureServer::start([(
+        "/slow",
+        Reply::new().send(head).pause(pause).send(&b"!"[..]),
+    )])
+    .unwrap();
+    let (mut fetcher, _) = fetcher(&server);
+    let request = FetchRequest {
+        mode: RequestMode::NoCors,
+        ..FetchRequest::new(url("http://a.test/slow"), url("http://a.test").origin())
+    };
+    let started = std::time::Instant::now();
+    let response = fetcher.fetch(request).unwrap().into_internal();
+    // The first piece arrives before the rest of the body exists.
+    match response.exchange.next_event(Some(Duration::from_secs(5))) {
+        Some(rustic_net::NetEvent::Body(bytes)) => assert_eq!(bytes, b"first"),
+        other => panic!("{other:?}"),
+    }
+    assert!(started.elapsed() < pause, "{:?}", started.elapsed());
+    // Nothing is stored until the body has been read to the end.
+    assert!(fetcher.http_cache().is_empty());
+    let rest = rustic_net::fetch::read_all(&response.exchange, Duration::from_secs(5)).unwrap();
+    assert_eq!(rest, b"!");
+    assert_eq!(fetcher.http_cache().len(), 1);
+    assert_eq!(get(&mut fetcher, "/slow", "http://a.test").1, b"first!");
+    assert_eq!(hits(&server, "/slow"), 1);
+}

@@ -706,3 +706,49 @@ fn scripts_wait_for_earlier_stylesheets_and_timers_run_while_they_load() {
         );
     }
 }
+
+#[test]
+fn documents_stream_into_the_parser_as_they_arrive() {
+    let pause = std::time::Duration::from_millis(900);
+    let first = b"<!doctype html><script src=/a.js></script>".to_vec();
+    let second = b"<p id=t>text</p>".to_vec();
+    let mut head = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\n\r\n",
+        first.len() + second.len()
+    )
+    .into_bytes();
+    head.extend_from_slice(&first);
+    let script = b"document.documentElement.setAttribute('data-ran', 'yes');";
+    let mut slow_script = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/javascript\r\nContent-Length: {}\r\n\r\n",
+        script.len()
+    )
+    .into_bytes();
+    slow_script.extend_from_slice(script);
+    let server = FixtureServer::start([
+        ("/", Reply::new().send(head).pause(pause).send(second)),
+        ("/a.js", Reply::new().pause(pause).send(slow_script)),
+    ])
+    .unwrap();
+    let [a, _] = grants(&server);
+    for single in [true, false] {
+        let mut args = vec!["dump-dom", "--run-scripts"];
+        if single {
+            args.push("--single-process");
+        }
+        args.extend(["--allow-origin", &a, "http://a.test/"]);
+        let started = std::time::Instant::now();
+        let output = rustic(&args);
+        let elapsed = started.elapsed();
+        assert!(output.status.success(), "{}", stderr(&output));
+        let dump = stdout(&output);
+        assert!(dump.contains("local=\"data-ran\" value=\"yes\""), "{dump}");
+        assert!(dump.contains("text \"text\""), "{dump}");
+        // The script starts loading while the rest of the document is
+        // still on its way.
+        assert!(
+            elapsed < pause * 2,
+            "single process {single}: {elapsed:?} for a {pause:?} document and script"
+        );
+    }
+}

@@ -56,23 +56,22 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-165 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166, TD-196 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
-| M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162, TD-193 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162, TD-193, TD-198 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | M14 (Android and iOS devices, ADR 0067) | None yet; the device and simulator half of the hosted-CI row's mobile entry is paid here | Device, simulator and Apple-entitlement work deferred to the last milestone; mobile compile checks and the Android emulator job stay in CI meanwhile |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
 The largest risks in that list are not the long M9 rows, which are honest
-scope limits, but the short ones before them: the "before remote browsing is on by default" row
+scope limits, but the short ones before them. The "before remote browsing is on by default" row
 (formerly "M7 entry"), whose entries were meant to be paid before hostile
-remote content and are still open now that remote origins can be granted
-(ADR 0066, 2026-11-22); TD-111 (exponential regular expressions) was paid
-on 2026-11-23 with a linear-time fallback; and TD-12 (hosted jobs have stopped twice on billing; the
+remote content, is empty since 2026-11-23: its last entries (TD-161,
+TD-165, TD-134, and TD-111's exponential regular expressions) were paid by
+M8 workstream 5 and the row was removed. TD-12 (hosted jobs have stopped twice on billing; the
 Android and iOS device runs are deliberately deferred to M14).
 
 ## Ledger
@@ -230,7 +229,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-161 | Deliberate | Network | `Fetcher` blocks per hop, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*`, `Accept-Language` and the HTTP cache paid 2026-11-20) | Paid |
 | TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
 | TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Paid 2026-11-20 |
-| TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Open, M7 entry |
+| TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Paid |
 | TD-166 | Deliberate | Storage | A persistent profile's `LOCK` file is not checked for a dead owner; after a crash the user removes it | Open, M7 browser shell |
 | TD-167 | Deliberate | Storage / web APIs | Web Storage changes fire no `storage` event in other documents with the same storage key | Open, M9 web APIs |
 | TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
@@ -263,6 +262,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-195 | Deliberate | Browser shell | Find in page searches within one text fragment (a phrase across lines or elements is not found) and estimates a match's horizontal extent from its share of the fragment's characters | Open, M9 (editing and selection) |
 | TD-196 | Deliberate | Browser shell | Only the active tab has a live page: background tabs keep their last frame and load again when shown (scripts restart), because a profile is opened per thread | Open, M8 browser shell (before the M10 beta) |
 | TD-197 | Deliberate | Desktop host | IME composition reaches the browser's own fields only, and CI exercises it with synthetic events through the host's handler, not with the platforms' input methods; text and composition events are not sent to pages | Open, M8 (a11y.editing) / M10 |
+| TD-198 | Deliberate | Network / CLI | Frame and popup documents are read whole in the broker before their renderer parses them; only top-level documents stream | Open, M12 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2746,7 +2746,7 @@ attribute path and event-handler compilation, with tests that a
 `style-src 'nonce-…'` page drops the unnonced sheet.
 **Trigger:** the M6 network policy gate (`network.policy`).
 
-### TD-165 — CLI network loads are sequential and buffered
+### TD-165 — CLI network loads are sequential and buffered (Paid)
 
 `rustic-cli`'s `NetworkSession` reads a document's body completely before
 the parser sees it, and fetches each stylesheet, script and image one at
@@ -2761,6 +2761,8 @@ mode to the stylesheet check.
 **Trigger:** the M7 browser shell's network process, or a page-load
 measurement over HTTP.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): A navigated document's body now streams into the parser as it arrives: `navigate` keeps the body's `Exchange` in the session, `Session::next_document_chunk` reads each piece (through the broker with the new `DocumentChunk` IPC messages in split mode), and the loader feeds it, keeping the bytes for a reload after a late `<meta>` and waiting for 1024 bytes only when the encoding is not already certain. The HTTP cache no longer reads a storable body whole before returning it: the exchange keeps a copy as the consumer reads it and the fetcher stores it once complete (redirects are still read whole). Stylesheets, images and scripts load side by side through TD-161's controller (TD-134 orders them), and stylesheet requests carry the document's quirks mode so a same-origin sheet of any type applies there unless `nosniff`. Frame and popup documents are still read whole: TD-198. Tests: `documents_stream_into_the_parser_as_they_arrive`, `subresources_load_concurrently`, `quirks_mode_takes_same_origin_stylesheets_of_any_type` (rustic-cli `tests/network.rs`, both process modes), `storable_bodies_stream_and_are_stored_once_read_to_the_end` (rustic-net `tests/http_cache.rs`).
 
 ### TD-166 — Profile locks are not checked for a dead owner
 
@@ -3038,6 +3040,17 @@ the platforms' input methods (IBus, TSF, macOS text input).
 **Pay:** route text and composition to the focused page element
 (a11y.editing) and add an input-method run per platform.
 **Trigger:** a11y.editing, or the M10 beta.
+
+### TD-198 — Frame and popup documents are not streamed
+
+TD-165 streams a top-level network document into its parser. A frame's or
+popup's document is fetched by the broker (`NetworkSession::open_frame`,
+the popup navigation) and read whole before its renderer starts, so a slow
+frame body delays its first parse and the broker holds the whole body.
+**Pay:** keep the body's exchange in the frame's session and grant the
+document as streamed, as `navigate` does, then read it through
+`DocumentChunk` in the frame's renderer.
+**Trigger:** M12 page-load work, or frames measured in `perf.harness`.
 ### TD-183 — macOS profile breadth: sysctl reads and pre-main code
 
 The Seatbelt profiles (ADR 0063) allow `sysctl-read` of every name,

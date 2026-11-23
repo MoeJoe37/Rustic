@@ -140,6 +140,7 @@ impl Transport {
             consumer,
             ended: Cell::new(false),
             hooks: None,
+            tee: std::cell::RefCell::new(None),
         })
     }
 }
@@ -167,6 +168,27 @@ pub struct Exchange {
     /// Told about consumption and cancellation when the exchange runs in
     /// another process.
     pub(crate) hooks: Option<Arc<dyn ExchangeHooks>>,
+    /// A copy of the body kept as the consumer reads it, handed on once
+    /// the body is complete (the HTTP cache fills this way, TD-165).
+    pub(crate) tee: std::cell::RefCell<Option<Tee>>,
+}
+
+/// The body copy of [`Exchange::tee`].
+pub(crate) struct Tee {
+    body: Vec<u8>,
+    max_bytes: usize,
+    done: Box<dyn FnOnce(Vec<u8>) + Send>,
+}
+
+impl Tee {
+    /// Keep at most `max_bytes` and give the body to `done` once it ends.
+    pub(crate) fn new(max_bytes: usize, done: Box<dyn FnOnce(Vec<u8>) + Send>) -> Self {
+        Self {
+            body: Vec::new(),
+            max_bytes,
+            done,
+        }
+    }
 }
 
 impl Exchange {
@@ -192,10 +214,28 @@ impl Exchange {
             .consumer
             .next(timeout.map(|timeout| Instant::now() + timeout))?;
         match &event {
-            NetEvent::Finished | NetEvent::Failed(_) => self.ended.set(true),
+            NetEvent::Finished => {
+                self.ended.set(true);
+                if let Some(tee) = self.tee.borrow_mut().take() {
+                    (tee.done)(tee.body);
+                }
+            }
+            NetEvent::Failed(_) => {
+                self.ended.set(true);
+                self.tee.borrow_mut().take();
+            }
             NetEvent::Body(bytes) => {
                 if let Some(hooks) = &self.hooks {
                     hooks.consumed(bytes.len());
+                }
+                let mut tee = self.tee.borrow_mut();
+                if let Some(copy) = tee.as_mut() {
+                    if bytes.len() > copy.max_bytes - copy.body.len() {
+                        // Too large to keep: nothing is handed on.
+                        *tee = None;
+                    } else {
+                        copy.body.extend_from_slice(bytes);
+                    }
                 }
             }
             NetEvent::Response(_) => {}
@@ -224,6 +264,7 @@ impl Exchange {
             consumer,
             ended: Cell::new(false),
             hooks: None,
+            tee: std::cell::RefCell::new(None),
         }
     }
 

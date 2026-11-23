@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-30, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -112,7 +112,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
 | TD-28 | Deliberate | Style / CLI | External stylesheets decode as UTF-8 only; no `@charset` or legacy encodings | Paid |
 | TD-29 | Deliberate | Style / URL | `:dir()` reads Bidi_Class from the IDNA tables in `rustic-url` | Paid |
-| TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Open |
+| TD-30 | Watch | Style | `:has()` with multi-compound arguments walks the subtree per anchor | Paid |
 | TD-31 | Deliberate | Style | Form owners ignore the parser's form element pointer | Paid |
 | TD-32 | Watch | Style | `:has()` and element states make related mutations restyle the whole document | Paid |
 | TD-33 | Bad | Style | `var()` substitution budget is per element, so a tiny sheet costs budget × elements | Paid |
@@ -674,7 +674,7 @@ wrong crate. **Pay:** move the Bidi_Class table to a shared Unicode data crate
 (or `rustic-base`) and point both users at it. **Trigger:** the bidi algorithm
 or text shaping in M3, or any second user of Unicode properties.
 
-### TD-30 — Multi-compound `:has()` arguments walk the subtree per anchor
+### TD-30 — Multi-compound `:has()` arguments walk the subtree per anchor (Paid)
 
 `:has()` arguments with a single compound (`:has(.x)`, `:has(> img)`,
 `:has(+ p)`) are memoized per (compound, element), so a restyle costs time
@@ -689,6 +689,8 @@ per-element ancestor/sibling bloom filters or the invalidation-time `:has()`
 indexes that engines use. **Trigger:** CSS-06 invalidation work on `:has()`, or
 a measured slow page.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): a `:has()` argument whose inner combinators are child or descendant combinators (`:has(> a b)`, `:has(a > b c)`, `:has(~ section em)`) is matched suffix by suffix: whether an element starts the rest of the chain, and whether some descendant does, are memoized per (compound, element) in `MatchCache`, so styling a whole tree costs time linear in the tree per compound instead of O(*d*²). Tests: `has_chains_agree_with_brute_force` and `multi_compound_has_stays_linear_on_deep_trees` (3,000-deep chain; the old walk took 7.6 s in a debug build) in `crates/rustic-style/tests/selectors_level4.rs`. Arguments with a sibling combinator *inside* them (`:has(+ a ~ b)`) still try each candidate; they are bounded by the per-restyle memo, rare in practice, and covered by M12 `perf.style`.
 
 ### TD-31 — Form owners ignore the parser's form element pointer (Paid)
 

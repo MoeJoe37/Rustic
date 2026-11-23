@@ -352,7 +352,10 @@ fn many_floats_cost_work_per_row_not_per_earlier_float() {
     // TD-44: 4,000 floats in rows of 30. Scanning every earlier float would
     // spend about 8 × 10⁶ units; the live-row scan stays far below 10⁶.
     let html = format!("<main>{}</main>", "<i></i>".repeat(4_000));
-    let t = tree(&html, "i { display: block; float: left; width: 10px; height: 5px }");
+    let t = tree(
+        &html,
+        "i { display: block; float: left; width: 10px; height: 5px }",
+    );
     let viewport = CssSize::new(300.0, 200.0).unwrap();
     let limits = LayoutLimits::default().with_max_flow_work(1_000_000);
     let result = BlockLayout::compute(&t, viewport, limits, &CancellationToken::default())

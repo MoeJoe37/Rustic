@@ -135,6 +135,11 @@ pub(crate) struct MatchCache<E> {
     lists: RefCell<HashMap<(usize, E), bool>>,
     positions: RefCell<HashMap<(NthKey, E), u64>>,
     subtrees: RefCell<HashMap<(usize, E), bool>>,
+    /// Multi-compound `:has()` chains (TD-30): whether an element starts a
+    /// match of the chain suffix from a compound, and whether some
+    /// descendant does, keyed by the compound's address.
+    chain_starts: RefCell<HashMap<(usize, E), bool>>,
+    chain_subtrees: RefCell<HashMap<(usize, E), bool>>,
     pub(crate) directions: RefCell<HashMap<E, StrongDirection>>,
     pub(crate) tree: RefCell<Option<Rc<TreeFacts<E>>>>,
     /// Shared custom property and `var()` results (TD-33).
@@ -147,6 +152,8 @@ impl<E> Default for MatchCache<E> {
             lists: RefCell::new(HashMap::new()),
             positions: RefCell::new(HashMap::new()),
             subtrees: RefCell::new(HashMap::new()),
+            chain_starts: RefCell::new(HashMap::new()),
+            chain_subtrees: RefCell::new(HashMap::new()),
             directions: RefCell::new(HashMap::new()),
             tree: RefCell::new(None),
             substitution: RefCell::new(SubstitutionCache::default()),
@@ -214,7 +221,35 @@ impl<E: ElementView> Matcher<'_, E> {
                 }
             };
         }
-        // Otherwise try every element the subject could be (TD-30).
+        // Child and descendant chains match suffix by suffix, each memoized
+        // per (compound, element), so a restyle stays linear (TD-30).
+        if inner
+            .iter()
+            .all(|c| matches!(c, Combinator::Child | Combinator::Descendant))
+        {
+            let chain = Chain {
+                compounds: &compounds[1..],
+                combinators: inner,
+            };
+            return match relative.leading_combinator() {
+                Combinator::Child => std::iter::successors(anchor.first_child_element(), |c| {
+                    c.next_sibling_element()
+                })
+                .any(|c| self.chain_starts(&chain, 0, c)),
+                Combinator::Descendant => self.chain_below(&chain, 0, anchor),
+                Combinator::NextSibling => anchor
+                    .next_sibling_element()
+                    .is_some_and(|s| self.chain_starts(&chain, 0, s)),
+                Combinator::SubsequentSibling => {
+                    let mut siblings = std::iter::successors(anchor.next_sibling_element(), |s| {
+                        s.next_sibling_element()
+                    });
+                    siblings.any(|s| self.chain_starts(&chain, 0, s))
+                }
+            };
+        }
+        // Otherwise (sibling combinators inside the argument) try every
+        // element the subject could be.
         let anchored = Matcher {
             cx: self.cx,
             cache: self.cache,
@@ -236,6 +271,71 @@ impl<E: ElementView> Matcher<'_, E> {
                     s.next_sibling_element()
                 });
                 siblings.any(|s| test(s) || (descends && Descendants::new(s).any(test)))
+            }
+        }
+    }
+
+    /// Whether `e` matches `chain.compounds[k]` and the rest of the chain
+    /// below it, memoized per (compound, element). Recursion is bounded by
+    /// the number of compounds in the selector.
+    fn chain_starts(&self, chain: &Chain<'_>, k: usize, e: E) -> bool {
+        let compound = &chain.compounds[k];
+        let key = (std::ptr::from_ref(compound) as usize, e);
+        if let Some(&known) = self.cache.chain_starts.borrow().get(&key) {
+            return known;
+        }
+        let result = compound_matches(compound, e, self)
+            && match chain.combinators.get(k) {
+                None => true,
+                Some(Combinator::Child) => {
+                    std::iter::successors(e.first_child_element(), |c| c.next_sibling_element())
+                        .any(|c| self.chain_starts(chain, k + 1, c))
+                }
+                Some(_) => self.chain_below(chain, k + 1, e),
+            };
+        self.cache.chain_starts.borrow_mut().insert(key, result);
+        result
+    }
+
+    /// Whether some descendant of `root` starts the chain at compound `k`,
+    /// memoized per (compound, element) like [`Self::subtree_any`].
+    fn chain_below(&self, chain: &Chain<'_>, k: usize, root: E) -> bool {
+        let address = std::ptr::from_ref(&chain.compounds[k]) as usize;
+        if let Some(&known) = self.cache.chain_subtrees.borrow().get(&(address, root)) {
+            return known;
+        }
+        let mut stack = vec![(root, root.first_child_element(), false)];
+        loop {
+            let top = stack.last_mut().expect("nonempty stack");
+            if let Some(child) = top.1 {
+                top.1 = child.next_sibling_element();
+                if top.2 {
+                    continue;
+                }
+                if self.chain_starts(chain, k, child) {
+                    stack.last_mut().expect("nonempty stack").2 = true;
+                    continue;
+                }
+                let known = self
+                    .cache
+                    .chain_subtrees
+                    .borrow()
+                    .get(&(address, child))
+                    .copied();
+                match known {
+                    Some(found) => stack.last_mut().expect("nonempty stack").2 |= found,
+                    None => stack.push((child, child.first_child_element(), false)),
+                }
+            } else {
+                let (element, _, found) = stack.pop().expect("nonempty stack");
+                self.cache
+                    .chain_subtrees
+                    .borrow_mut()
+                    .insert((address, element), found);
+                match stack.last_mut() {
+                    Some(parent) => parent.2 |= found,
+                    None => return found,
+                }
             }
         }
     }
@@ -279,6 +379,13 @@ impl<E: ElementView> Matcher<'_, E> {
             }
         }
     }
+}
+
+/// The written compounds of a `:has()` argument after its anchor, left to
+/// right, and the child or descendant combinators between them.
+struct Chain<'s> {
+    compounds: &'s [Compound],
+    combinators: &'s [Combinator],
 }
 
 fn complex<E: ElementView>(selector: &ComplexSelector, element: E, m: &Matcher<'_, E>) -> bool {

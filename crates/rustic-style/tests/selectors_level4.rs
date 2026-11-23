@@ -170,6 +170,129 @@ fn has_stays_linear_on_deep_trees() {
     assert!(start.elapsed().as_secs() < 5, "took {:?}", start.elapsed());
 }
 
+/// Elements `a` with a descendant chain `x0 c0 x1 c1 ... xn` below them (or
+/// starting at a child for a leading `>`), checked by brute force over parent
+/// links, for comparing with the memoized `:has()` chain matcher (TD-30).
+fn brute_chain(parsed: &ParsedDocument, leading_child: bool, steps: &[(&str, bool)]) -> String {
+    let doc = parsed.document();
+    let all = |source: &str| {
+        query_selector_all(doc, doc.root(), &selectors(source), &MatchContext::html()).unwrap()
+    };
+    let sets: Vec<Vec<NodeId>> = steps.iter().map(|(s, _)| all(s)).collect();
+    let parent = |id: NodeId| doc.node(id).unwrap().parent();
+    // Can `y` end a chain whose compound `k` is matched at or above `y`,
+    // with compound 0 hanging off `anchor` through the leading combinator?
+    fn ends(
+        k: usize,
+        e: NodeId,
+        anchor: NodeId,
+        leading_child: bool,
+        steps: &[(&str, bool)],
+        sets: &[Vec<NodeId>],
+        parent: &dyn Fn(NodeId) -> Option<NodeId>,
+    ) -> bool {
+        if !sets[k].contains(&e) {
+            return false;
+        }
+        let Some(up) = parent(e) else { return false };
+        if k == 0 {
+            if leading_child {
+                return up == anchor;
+            }
+            let mut cursor = Some(up);
+            while let Some(c) = cursor {
+                if c == anchor {
+                    return true;
+                }
+                cursor = parent(c);
+            }
+            return false;
+        }
+        // steps[k - 1].1: is the combinator before compound k a child one?
+        if steps[k - 1].1 {
+            return up != anchor && ends(k - 1, up, anchor, leading_child, steps, sets, parent);
+        }
+        let mut cursor = Some(up);
+        while let Some(c) = cursor {
+            if c == anchor {
+                return false;
+            }
+            if ends(k - 1, c, anchor, leading_child, steps, sets, parent) {
+                return true;
+            }
+            cursor = parent(c);
+        }
+        false
+    }
+    let last = steps.len() - 1;
+    all("*")
+        .into_iter()
+        .filter(|&a| {
+            sets[last]
+                .iter()
+                .any(|&y| ends(last, y, a, leading_child, steps, &sets, &parent))
+        })
+        .map(|id| id_of(doc, id))
+        .filter(|s| s.starts_with('_'))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+#[test]
+fn has_chains_agree_with_brute_force() {
+    let page = document(&generated(400));
+    // (selector, leading child, [(compound, child combinator after it)])
+    let cases: &[(&str, bool, &[(&str, bool)])] = &[
+        (":has(.x span)", false, &[(".x", false), ("span", false)]),
+        (":has(> .x span)", true, &[(".x", false), ("span", false)]),
+        (":has(.x > span)", false, &[(".x", true), ("span", false)]),
+        (":has(> span > .x)", true, &[("span", true), (".x", false)]),
+        (
+            ":has(.x span > .x)",
+            false,
+            &[(".x", false), ("span", true), (".x", false)],
+        ),
+    ];
+    for &(selector, leading_child, steps) in cases {
+        let fast = select_ids(&page, selector);
+        assert!(!fast.is_empty(), "{selector:?} selects nothing");
+        assert_eq!(
+            fast,
+            brute_chain(&page, leading_child, steps),
+            "{selector:?}"
+        );
+    }
+}
+
+#[test]
+fn multi_compound_has_stays_linear_on_deep_trees() {
+    // TD-30: `:has()` with a combinator inside its argument used to match
+    // every candidate in each anchor's subtree, O(depth²) for a chain.
+    let depth = 3000;
+    let html = format!(
+        "<!doctype html>{}<b><i class=leaf></i></b>",
+        "<div>".repeat(depth)
+    );
+    let mut limits = ParserLimits::default();
+    limits.document.max_depth = depth + 16;
+    let mut parser = HtmlDocumentParser::new(limits, CancellationToken::default()).unwrap();
+    parser.feed(html.as_bytes()).unwrap();
+    let page = parser.finish().unwrap();
+    let doc = page.document();
+    let start = Instant::now();
+    for (selector, count) in [
+        ("div:has(div b > .leaf)", depth - 1),
+        ("div:has(> div .leaf)", depth - 1),
+        ("div:has(b .leaf)", depth),
+    ] {
+        let found =
+            query_selector_all(doc, doc.root(), &selectors(selector), &MatchContext::html())
+                .unwrap();
+        assert_eq!(found.len(), count, "{selector}");
+    }
+    assert!(start.elapsed().as_secs() < 5, "took {:?}", start.elapsed());
+}
+
 const FORM_PAGE: &str = r#"<!doctype html>
 <form id=f1>
   <input id=t1 required placeholder=Name>

@@ -4100,6 +4100,16 @@
               "marker": "pub fn scan_module"
             },
             {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/sections.rs",
+              "marker": "pub fn decode_module"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/sections.rs",
+              "marker": "fn declarations_keep_module_order_and_borrow_names_and_data"
+            },
+            {
               "kind": "test",
               "path": "crates/rustic-wasm/tests/binary.rs",
               "marker": "fn framing_reports_bad_lengths_ordering_and_mismatched_counts"
@@ -4121,8 +4131,24 @@
           "label": "Complete selected type/instruction/module validation",
           "size": 3,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/validate.rs",
+              "marker": "pub fn validate_module"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/validation.rs",
+              "marker": "fn multi_value_loops_ifs_and_calls_use_their_declared_signatures"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/validation.rs",
+              "marker": "fn validation_rejects_incompatible_declarations_and_memory_immediates"
+            }
+          ]
         },
         {
           "id": "wasm.execute",

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "cc467e61fa9e1c31416d1bb745b8d85bf14f907e419333441a94deeb7b89c159",
+  "source_fingerprint": "3bea3b6e83626f4bb7e6333178d789bda21e05385b70e65ddba83ef0c894e1a8",
   "percent": "48.66",
   "verified_percent": "44.77",
   "partial_percent": "3.89",
   "completed": 108,
-  "in_progress": 15,
+  "in_progress": 16,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -4446,6 +4446,16 @@
               "marker": "pub fn scan_module"
             },
             {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/sections.rs",
+              "marker": "pub fn decode_module"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/sections.rs",
+              "marker": "fn declarations_keep_module_order_and_borrow_names_and_data"
+            },
+            {
               "kind": "test",
               "path": "crates/rustic-wasm/tests/binary.rs",
               "marker": "fn framing_reports_bad_lengths_ordering_and_mismatched_counts"
@@ -4469,8 +4479,24 @@
           "label": "Complete selected type/instruction/module validation",
           "size": 3,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/validate.rs",
+              "marker": "pub fn validate_module"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/validation.rs",
+              "marker": "fn multi_value_loops_ifs_and_calls_use_their_declared_signatures"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/validation.rs",
+              "marker": "fn validation_rejects_incompatible_declarations_and_memory_immediates"
+            }
+          ],
           "credit": "0.00",
           "engine_share": "0.26"
         },
@@ -4537,7 +4563,7 @@
       ],
       "points": 34,
       "completed": 0,
-      "in_progress": 1,
+      "in_progress": 2,
       "total": 8,
       "contribution": "0.00",
       "percent": "0.00",

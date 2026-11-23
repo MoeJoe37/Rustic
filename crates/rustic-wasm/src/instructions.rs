@@ -118,27 +118,39 @@ pub fn decode_instructions(
     if body.offset.checked_add(body.instructions.len()).is_none() {
         return Err(source.error(Fault::LimitExceeded));
     }
+    let mut budget = limits;
+    let result = expression(&mut source, &mut budget, cancellation)?;
+    source.finish()?;
+    Ok(result)
+}
+
+/// Read through the outer end. The caller delimits any following content.
+pub(crate) fn expression(
+    source: &mut Reader<'_>,
+    budget: &mut InstructionLimits,
+    cancellation: &CancellationToken,
+) -> Result<Vec<Instruction>, BinaryError> {
     let mut controls = Vec::new();
     let mut result = Vec::new();
-    let mut vector_entries = limits.vector_entries;
     loop {
-        poll(&source, cancellation)?;
+        poll(source, cancellation)?;
         if source.remaining().is_empty() {
             return Err(source.error(Fault::MissingEnd));
         }
-        if result.len() >= limits.instructions {
+        if budget.instructions == 0 {
             return Err(source.error(Fault::LimitExceeded));
         }
+        budget.instructions -= 1;
         let offset = source.position();
         let code = source.byte()?;
         let mut opcode = Opcode::Core(code);
         let mut end = false;
         let immediate = match code {
             0x02..=0x04 => {
-                if controls.len() >= limits.nesting {
+                if controls.len() >= budget.nesting {
                     return Err(source.error(Fault::LimitExceeded));
                 }
-                let signature = block_type(&mut source)?;
+                let signature = block_type(source)?;
                 controls
                     .try_reserve(1)
                     .map_err(|_| source.error(Fault::LimitExceeded))?;
@@ -167,9 +179,9 @@ pub fn decode_instructions(
             }
             0x0e => {
                 let count = source.u32()? as usize;
-                let mut targets = take_vector(&source, count, &mut vector_entries)?;
+                let mut targets = take_vector(source, count, &mut budget.vector_entries)?;
                 for _ in 0..count {
-                    poll(&source, cancellation)?;
+                    poll(source, cancellation)?;
                     targets.push(source.u32()?);
                 }
                 Immediate::BranchTable {
@@ -179,10 +191,10 @@ pub fn decode_instructions(
             }
             0x1c => {
                 let count = source.u32()? as usize;
-                let mut types = take_vector(&source, count, &mut vector_entries)?;
+                let mut types = take_vector(source, count, &mut budget.vector_entries)?;
                 for _ in 0..count {
-                    poll(&source, cancellation)?;
-                    types.push(value_type(&mut source)?);
+                    poll(source, cancellation)?;
+                    types.push(value_type(source)?);
                 }
                 Immediate::Select(types)
             }
@@ -199,7 +211,7 @@ pub fn decode_instructions(
             | 0xd5
             | 0xd6 => Immediate::Index(source.u32()?),
             0x11 | 0x13 => Immediate::Indices(source.u32()?, source.u32()?),
-            0x28..=0x3e => memory_arg(&mut source)?,
+            0x28..=0x3e => memory_arg(source)?,
             0x41 => Immediate::I32(source.s32()?),
             0x42 => Immediate::I64(source.s64()?),
             0x43 => Immediate::F32(u32::from_le_bytes(
@@ -208,7 +220,7 @@ pub fn decode_instructions(
             0x44 => Immediate::F64(u64::from_le_bytes(
                 source.take(8)?.try_into().expect("eight bytes"),
             )),
-            0xd0 => Immediate::HeapType(heap_type(&mut source)?),
+            0xd0 => Immediate::HeapType(heap_type(source)?),
             0xfc => {
                 let subcode = source.u32()?;
                 opcode = Opcode::Misc(subcode);
@@ -247,7 +259,6 @@ pub fn decode_instructions(
             immediate,
         });
         if end {
-            source.finish()?;
             return Ok(result);
         }
     }

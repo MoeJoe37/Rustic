@@ -1,7 +1,7 @@
 # ADR 0077 — WebAssembly decoding and execution boundaries
 
 Date: 2026-11-23
-Status: Accepted for M9 WASM-01 foundations
+Status: Accepted for M9 WASM-01/02 foundations
 
 ## Context
 
@@ -16,15 +16,19 @@ evidence.
 Start `rustic-wasm` with a bounded reader over untrusted bytes. Borrow section
 and function instruction bytes from the input. Decode framing, local
 declarations and function type indexes before handing them to subsequent
-syntax and validation passes. None of these operations instantiate anything.
-Use absolute byte offsets for diagnostics and enforce resource limits before
-allocating metadata or traversing length-prefixed records.
+syntax and validation passes. Module decoding produces typed declarations and
+flat instruction sequences, with names and data payloads borrowed from the
+input. Absolute byte offsets identify syntax and validation errors. Bound
+metadata allocation and traversal of length-prefixed records.
 
-Keep binary decoding and type validation as execution-independent stages.
-An interpreter will consume validated instructions under explicit stack,
-memory and execution limits. Host imports will be supplied through an
-embedding adapter. A later compilation tier requires its own executable
-memory and platform review, with the interpreter available on every host.
+Keep binary decoding and type validation as execution-independent stages. The
+validator builds import-first index spaces and checks bodies with explicit
+operand and control stacks. It budgets work across the module, including
+multi-value branches and initializer expressions. The validated module type
+can only be created by this pass. An interpreter will consume that type under
+separate stack, memory and execution limits, with host imports supplied through
+an embedding adapter. A later compilation tier requires its own executable
+memory and platform review. Every host retains the interpreter.
 
 ## Alternatives and consequences
 
@@ -37,11 +41,16 @@ module will need an owned validated representation or retained input bytes.
 
 ## Validation and revisit trigger
 
-Tests check integer overflow and permitted padding, section ordering,
-metadata budgets, cancellation, custom-section names, function-body
-boundaries, and structured control delimiters. The separate instruction
-decoder handles core numeric, control, reference, memory and bulk operations.
-The `wasm-binary` fuzz target checks offsets and read boundaries on mutated
-modules. Further syntax coverage and type validation precede instantiation.
-Revisit the representation if validation or debug mappings need different
-ownership or data layout.
+The core profile follows the [WebAssembly core specification](https://webassembly.github.io/spec/core/)
+for numeric and multi-value control flow, direct and indirect calls, abstract
+function and external references, and 32-bit memories and tables. GC and
+concrete reference types, SIMD, shared memory, 64-bit addressing, and exception
+instructions need further coverage before the selected product profile is
+complete.
+
+Tests check framing and declaration encodings, initializer visibility, operand
+types, branch targets, index spaces, cancellation and cumulative budgets. The
+`wasm-binary` fuzz target checks offsets and read boundaries through decoding and
+validation on mutated modules. Revisit the representation when the interpreter
+needs a different ownership or instruction layout, or when concrete reference
+types need subtype and canonical identity information.

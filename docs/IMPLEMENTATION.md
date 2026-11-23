@@ -3234,3 +3234,27 @@ href>` and `<link href>`, and `dump-style`/`render` pass the document's
 selected encoding. Evidence: `crates/rustic-url/tests/query_encoding.rs`
 (Shift_JIS, ISO-2022-JP escapes, ws/wss and non-special URLs, base queries)
 and `link_and_base_urls_use_the_document_encoding_for_queries`.
+
+## WASM-01/02 — Module decoding and core validation
+
+`rustic-wasm` now decodes module sections into typed function signatures,
+imports, exports, tables, memories, globals, tags, start, element and data
+declarations. Names and data bytes borrow the input. Instruction and operand
+vector budgets are cumulative across function bodies and initializer
+expressions. The decoder checks all eight element and three data encodings.
+
+`validate_module` builds import-first index spaces and checks declaration
+limits, export names, start and tag signatures, constant expressions and
+function references. The iterative body pass checks the numeric instruction
+set, multi-value blocks and branches, locals, globals, direct and indirect
+calls, abstract function and external references, and 32-bit memory and table
+instructions including bulk operations. Stack, local and work limits apply
+before producing a `ValidatedModule`.
+
+The integration suites in `crates/rustic-wasm/tests/sections.rs` and
+`validation.rs` cover positive and malformed modules, unreachable stack
+polymorphism, initializer visibility, and cancellation and resource limits.
+The `wasm-binary` fuzz target exercises both passes. GC and concrete reference
+types, SIMD, exception instructions, shared memory, and 64-bit addressing
+remain outside the supported profile. Instantiation and execution are pending.
+[ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)

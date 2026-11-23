@@ -21,8 +21,14 @@ pub enum BinaryErrorKind {
     FunctionCountMismatch,
     /// The declared data count and segment count differ.
     DataCountMismatch,
-    /// A local declaration uses an invalid binary type code.
+    /// A declaration uses an invalid binary type code or flag.
     InvalidType,
+    /// A type belongs to a feature the module decoder has yet to implement.
+    UnsupportedType,
+    /// An import or export has an invalid descriptor.
+    InvalidDescriptor,
+    /// A data or element segment has an invalid mode or kind.
+    InvalidSegment,
     /// A function body lacks its outer end byte.
     MissingEnd,
     /// An instruction byte or reserved field is invalid.

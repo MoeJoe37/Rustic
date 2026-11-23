@@ -6466,11 +6466,38 @@
               ]
             },
             {
-              "label": "Frame-time and energy gates for GPU compositing on hardware",
+              "label": "Frame-time gate for GPU compositing: software-adapter (lavapipe) regression gate required in CI, hardware budgets and GPU-to-CPU ratio in the reference-device harness",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-gpu/examples/gpu_frame_bench.rs",
+                  "marker": "const SCENES: &[Scene]"
+                },
+                {
+                  "kind": "source",
+                  "path": ".github/workflows/ci.yml",
+                  "marker": "name: GPU frame-time gate (lavapipe)"
+                },
+                {
+                  "kind": "source",
+                  "path": "tools/cross_engine_bench.py",
+                  "marker": "def check_gpu_budgets"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/tests/test_cross_engine_bench.py",
+                  "marker": "def test_a_gpu_slower_than_twice_the_cpu_reference_misses"
+                }
+              ]
+            },
+            {
+              "label": "Frame-time and energy-per-frame measurements on hardware GPUs within the hardware budgets",
               "status": "planned",
               "evidence": []
             }
-          ]
+          ],
+          "external": "Needs a machine with a hardware GPU and power counters (self-hosted runner or contributor hardware): no GitHub-hosted runner has either; the benchmark and budgets are ready (docs/PERFORMANCE.md, \"GPU frame budgets\")"
         }
       ]
     },

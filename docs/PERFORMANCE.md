@@ -229,6 +229,42 @@ records it per device, as the ratchet requires; closing the gap is the M12
 interpreter and JIT work (`perf.interpreter`, `perf.baseline_jit`), which an
 interpreter-only alpha cannot reach.
 
+### GPU frame budgets
+
+`compositor.parity` gates the GPU compositor's frame time as well as its
+byte-exact parity. The GPU frame benchmark
+(`crates/rustic-gpu/examples/gpu_frame_bench.rs`) composites two generated
+scenes the way the GPU process does: it uploads the page and frame layers,
+dispatches, and reads the result back. The CPU reference
+(`Surface::add_frame`) composites the same scene on the same device. A
+GPU sample counts only if its pixels match the reference. Scenes:
+`frames_720p` is a 1280×720 page with an ad-sized frame and a video-sized
+one; `frames_1440p` is a 2560×1440 backing store (device scale 2) with four
+frames, two of them overlapping. `tools/cross_engine_bench.py --gpu` measures
+11 runs and applies the budgets (`GPU_*_BUDGETS_MS`, `GPU_CPU_RATIO`).
+
+| Metric | Hardware adapter | Software adapter (lavapipe, WARP) | First measurement (sandbox lavapipe, x86-64, 2026-11-23) |
+| --- | --- | --- | --- |
+| `frames_720p.gpu` median | 16.7 ms (one 60 Hz frame) | 33.4 ms | 5.7 ms |
+| `frames_1440p.gpu` median | 16.7 ms | 200 ms | 49.4 ms |
+| GPU ÷ CPU reference, each scene | at most 2.0 | at most 2.0 | 0.68 and 1.01 |
+
+The required CI job **GPU frame-time gate (lavapipe)** runs the software
+column on every push, with `--enforce-gpu`. It is the regression gate: the
+software budgets are about four times the first measurement, so the job
+tolerates shared-runner noise. The ratio row is independent of how fast the
+runner is. The Performance workflow adds the same measurement to every
+reference device's report but does not block on it.
+
+The hardware column and energy per frame need a machine with a hardware GPU
+and power counters. No GitHub-hosted runner has either: the Linux runners
+have no GPU, Windows composites on WARP, and the macOS virtual machines have
+no power-metrics access. Hardware frame times and energy are therefore an
+external dependency of `compositor.parity`, recorded as such in the progress
+catalog. They are measured with the same benchmark on a self-hosted or
+contributor machine (`gpu_frame_bench` prints the adapter it ran on), and
+energy with the platform's counters (RAPL or `powermetrics`).
+
 ## Optimization order
 
 1. Build a correct, observable full-recompute/CPU reference path.

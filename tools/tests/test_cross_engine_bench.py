@@ -60,8 +60,8 @@ class DeviceReportTest(unittest.TestCase):
 
     def test_merged_report_lists_every_device_with_its_ratio(self):
         text = bench.merge_reports([self.report("Linux x64", 3.0), self.report("macOS ARM64", 30.0)])
-        self.assertIn("| Linux x64 | 1/2 | 2.0 |", text)
-        self.assertIn("| macOS ARM64 | 0/2 | 2.0 |", text)
+        self.assertIn("| Linux x64 | 1/2 | not measured | 2.0 |", text)
+        self.assertIn("| macOS ARM64 | 0/2 | not measured | 2.0 |", text)
         self.assertIn("### macOS ARM64", text)
         self.assertIn("| `calls` | 4.00 [4.00, 4.00] | 2.00 [2.00, 2.00] | 2.0 | yes |", text)
 
@@ -80,3 +80,42 @@ class DeviceReportTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GpuBudgetTest(unittest.TestCase):
+    def gpu(self, software, gpu_ms, cpu_ms):
+        results = {}
+        for scene in bench.GPU_SCENES:
+            results[f"{scene}.gpu"] = bench.summarize([(gpu_ms, "5")] * 3)
+            results[f"{scene}.cpu"] = bench.summarize([(cpu_ms, "5")] * 3)
+        adapter = {"backend": "vulkan", "software": software, "name": "test"}
+        return {"adapter": adapter, "results": results}
+
+    def test_software_adapters_get_the_regression_budget_and_hardware_one_frame(self):
+        rows = bench.check_gpu_budgets(self.gpu(True, 30.0, 40.0))
+        self.assertEqual({row["metric"]: row["within"] for row in rows}["frames_720p.gpu"], True)
+        rows = bench.check_gpu_budgets(self.gpu(False, 30.0, 40.0))
+        self.assertEqual({row["metric"]: row["within"] for row in rows}["frames_720p.gpu"], False)
+
+    def test_a_gpu_slower_than_twice_the_cpu_reference_misses(self):
+        rows = bench.check_gpu_budgets(self.gpu(True, 10.0, 4.0))
+        ratio = {row["metric"]: row for row in rows}["frames_720p.gpu ÷ cpu"]
+        self.assertAlmostEqual(ratio["median_ms"], 2.5)
+        self.assertFalse(ratio["within"])
+
+    def test_no_adapter_misses_every_gpu_row(self):
+        results = {f"{scene}.{kind}": {"status": "not runnable: no adapter"}
+                   for scene in bench.GPU_SCENES for kind in ("gpu", "cpu")}
+        rows = bench.check_gpu_budgets({"adapter": None, "results": results})
+        self.assertTrue(rows and not any(row["within"] for row in rows))
+
+    def test_the_device_report_lists_the_adapter_and_gpu_budgets(self):
+        gpu = self.gpu(True, 5.0, 8.0)
+        gpu["budgets"] = bench.check_gpu_budgets(gpu)
+        report = {"device": {"label": "Linux x64", "system": "Linux", "machine": "x86_64", "cpu": "cpu",
+                             "logical_cores": 4, "memory": "16 GiB"}, "runs": 3, "gpu": gpu}
+        text = "\n".join(bench.render_device(report))
+        self.assertIn("test (vulkan, software)", text)
+        self.assertIn("| `frames_1440p.gpu ÷ cpu` | 2.0 | 0.62 | yes |", text)
+        merged = bench.merge_reports([report])
+        self.assertIn("| Linux x64 | 0/0 | 4/4 |", merged)

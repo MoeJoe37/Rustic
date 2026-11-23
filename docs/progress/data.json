@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "b3c47c481fffb50a67fb3646976118feaf33cb60f8a3b4098e0bf62011ab8427",
-  "percent": "48.81",
+  "source_fingerprint": "9d5e6b2d71ad8aebb5d2aa654499a6aef2cd199e8460ad11151b56493d4bc1a2",
+  "percent": "48.93",
   "verified_percent": "45.24",
-  "partial_percent": "3.57",
+  "partial_percent": "3.69",
   "completed": 109,
   "in_progress": 17,
   "total": 228,
@@ -87,9 +87,9 @@
       "share": "8.12",
       "completed": 10,
       "total": 18,
-      "percent": "79.49",
+      "percent": "80.91",
       "verified_percent": "46.93",
-      "partial_percent": "32.56"
+      "partial_percent": "33.98"
     },
     {
       "id": "M9",
@@ -7028,12 +7028,39 @@
               ]
             },
             {
-              "label": "Frame-time and energy gates for GPU compositing on hardware",
+              "label": "Frame-time gate for GPU compositing: software-adapter (lavapipe) regression gate required in CI, hardware budgets and GPU-to-CPU ratio in the reference-device harness",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-gpu/examples/gpu_frame_bench.rs",
+                  "marker": "const SCENES: &[Scene]"
+                },
+                {
+                  "kind": "source",
+                  "path": ".github/workflows/ci.yml",
+                  "marker": "name: GPU frame-time gate (lavapipe)"
+                },
+                {
+                  "kind": "source",
+                  "path": "tools/cross_engine_bench.py",
+                  "marker": "def check_gpu_budgets"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/tests/test_cross_engine_bench.py",
+                  "marker": "def test_a_gpu_slower_than_twice_the_cpu_reference_misses"
+                }
+              ]
+            },
+            {
+              "label": "Frame-time and energy-per-frame measurements on hardware GPUs within the hardware budgets",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "50.00",
+          "external": "Needs a machine with a hardware GPU and power counters (self-hosted runner or contributor hardware): no GitHub-hosted runner has either; the benchmark and budgets are ready (docs/PERFORMANCE.md, \"GPU frame budgets\")",
+          "credit": "66.66",
           "engine_share": "0.69"
         }
       ],
@@ -7041,10 +7068,10 @@
       "completed": 2,
       "in_progress": 2,
       "total": 5,
-      "contribution": "1.96",
-      "percent": "65.38",
+      "contribution": "2.07",
+      "percent": "69.23",
       "verified_percent": "38.46",
-      "partial_percent": "26.92"
+      "partial_percent": "30.77"
     },
     {
       "id": "platform",

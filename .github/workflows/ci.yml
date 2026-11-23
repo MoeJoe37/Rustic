@@ -355,6 +355,33 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  gpu-frames:
+    # compositor.parity frame-time gate (docs/PERFORMANCE.md, "GPU frame
+    # budgets"): the GPU compositor composites the gpu_frame_bench scenes on
+    # lavapipe, byte-identical to the CPU reference, within the software
+    # budget and within twice the CPU reference's time on the same runner.
+    # Hardware budgets and energy are measured outside hosted CI.
+    name: GPU frame-time gate (lavapipe)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal
+      - name: Install lavapipe
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends mesa-vulkan-drivers libvulkan1
+      - name: Build the GPU frame benchmark in release mode
+        run: cargo build --locked --release -p rustic-gpu --example gpu_frame_bench
+      - name: Enforce the GPU frame budgets
+        run: |
+          python3 tools/cross_engine_bench.py --gpu target/release/examples/gpu_frame_bench \
+            --runs 11 --device "CI lavapipe (ubuntu-24.04)" --enforce-gpu --output gpu-frames.md
+          cat gpu-frames.md >> "$GITHUB_STEP_SUMMARY"
+
   compatibility:
     name: Compatibility (${{ matrix.toolchain }})
     runs-on: ubuntu-24.04
@@ -567,7 +594,7 @@ jobs:
   ci:
     name: CI
     if: ${{ always() }}
-    needs: [quality, test, emulated, cross, fuzz, compatibility, repository, mobile, android-emulator]
+    needs: [quality, test, emulated, cross, fuzz, gpu-frames, compatibility, repository, mobile, android-emulator]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -578,12 +605,13 @@ jobs:
           EMULATED_RESULT: ${{ needs.emulated.result }}
           CROSS_RESULT: ${{ needs.cross.result }}
           FUZZ_RESULT: ${{ needs.fuzz.result }}
+          GPU_FRAMES_RESULT: ${{ needs.gpu-frames.result }}
           COMPATIBILITY_RESULT: ${{ needs.compatibility.result }}
           REPOSITORY_RESULT: ${{ needs.repository.result }}
           MOBILE_RESULT: ${{ needs.mobile.result }}
           ANDROID_RESULT: ${{ needs.android-emulator.result }}
         run: |
-          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$EMULATED_RESULT" "$CROSS_RESULT" "$FUZZ_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT" "$MOBILE_RESULT" "$ANDROID_RESULT"; do
+          for result in "$QUALITY_RESULT" "$TEST_RESULT" "$EMULATED_RESULT" "$CROSS_RESULT" "$FUZZ_RESULT" "$GPU_FRAMES_RESULT" "$COMPATIBILITY_RESULT" "$REPOSITORY_RESULT" "$MOBILE_RESULT" "$ANDROID_RESULT"; do
             if [ "$result" != success ]; then
               echo "A required job did not succeed: $result"
               exit 1

@@ -17,6 +17,7 @@ on:
       - .github/workflows/perf.yml
       - tools/cross_engine_bench.py
       - crates/rustic-raster/examples/page_bench.rs
+      - crates/rustic-gpu/examples/gpu_frame_bench.rs
   schedule:
     - cron: "41 4 * * 1"
   workflow_dispatch:
@@ -110,7 +111,8 @@ jobs:
       - name: Build the benchmarks in release mode
         run: |
           cargo build --locked --release -p rustic-js --example js_bench \
-            -p rustic-engine --example dom_bench -p rustic-raster --example page_bench
+            -p rustic-engine --example dom_bench -p rustic-raster --example page_bench \
+            -p rustic-gpu --example gpu_frame_bench
       - name: Measure this reference device
         env:
           DEVICE: ${{ matrix.name }} (${{ matrix.os }})
@@ -134,6 +136,7 @@ jobs:
             --rustic "target/release/examples/js_bench$exe" \
             --dom "target/release/examples/dom_bench$exe" \
             --page "target/release/examples/page_bench$exe" \
+            --gpu "target/release/examples/gpu_frame_bench$exe" \
             "${engines[@]}" --runs "$RUNS" --device "$DEVICE" --commit "$GITHUB_SHA" \
             --json "perf-report/$SLUG.json" --output "perf-report/$SLUG.md" --enforce-budgets
       - name: Show the device report

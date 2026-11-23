@@ -155,6 +155,59 @@ M8_PAGE_BUDGETS_MS = {
 }
 
 
+# compositor.parity frame-time gates (docs/PERFORMANCE.md, "GPU frame
+# budgets"): the median time of one composited frame of `gpu_frame_bench`,
+# upload to readback, in milliseconds. A hardware adapter gets one 60 Hz
+# frame; a software adapter (lavapipe, WARP) is CI's regression gate, with
+# room for shared runners. The GPU must also stay within GPU_CPU_RATIO of the
+# CPU reference on the same device, which does not depend on its speed.
+GPU_SCENES = ["frames_720p", "frames_1440p"]
+GPU_HARDWARE_BUDGETS_MS = {"frames_720p.gpu": 16.7, "frames_1440p.gpu": 16.7}
+GPU_SOFTWARE_BUDGETS_MS = {"frames_720p.gpu": 33.4, "frames_1440p.gpu": 200.0}
+GPU_CPU_RATIO = 2.0
+
+
+def run_gpu(binary: Path, runs: int) -> dict:
+    """`gpu_frame_bench` results: the adapter and each scene's samples."""
+    keys = [f"{scene}.{kind}" for scene in GPU_SCENES for kind in ("gpu", "cpu")]
+    try:
+        result = subprocess.run([str(binary), "--runs", str(runs)], capture_output=True,
+                                encoding="utf-8", timeout=3600, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return {"adapter": None, "results": {key: {"status": f"{NOT_RUNNABLE}: {error}"} for key in keys}}
+    adapter = None
+    for line in result.stdout.splitlines():
+        parts = line.split(maxsplit=3)
+        if parts[:1] == ["adapter"] and len(parts) == 4:
+            adapter = {"backend": parts[1], "software": parts[2] == "software", "name": parts[3]}
+    reason = result.stderr.strip().splitlines()
+    results = {}
+    for key in keys:
+        samples = parse_samples(result.stdout, key)
+        if len(samples) == runs:
+            results[key] = summarize(samples)
+        else:
+            why = next((line for line in reason if line.startswith(key)), reason[-1] if reason else "missing samples")
+            results[key] = {"status": f"{NOT_RUNNABLE}: {why}"}
+    return {"adapter": adapter, "results": results}
+
+
+def check_gpu_budgets(gpu: dict) -> list[dict]:
+    """Frame-time rows for one device: the adapter kind's budget and the
+    ratio to the CPU reference. Without an adapter every row misses."""
+    adapter = gpu.get("adapter")
+    budgets = GPU_SOFTWARE_BUDGETS_MS if adapter is None or adapter["software"] else GPU_HARDWARE_BUDGETS_MS
+    results = gpu.get("results", {})
+    rows = check_budgets(results, budgets)
+    for scene in GPU_SCENES:
+        gpu_ms = results.get(f"{scene}.gpu", {}).get("median_ms")
+        cpu_ms = results.get(f"{scene}.cpu", {}).get("median_ms")
+        ratio = gpu_ms / cpu_ms if gpu_ms is not None and cpu_ms else None
+        rows.append({"metric": f"{scene}.gpu ÷ cpu", "budget_ms": GPU_CPU_RATIO, "median_ms": ratio,
+                     "within": ratio is not None and ratio <= GPU_CPU_RATIO})
+    return rows
+
+
 def _run_text(argv: list[str]) -> str:
     try:
         result = subprocess.run(argv, capture_output=True, encoding="utf-8", timeout=60, check=False)
@@ -282,6 +335,28 @@ def render_device(report: dict) -> list[str]:
             cells = [summary_cell(page.get(f"{fixture}.{stage}", {"status": NOT_RUNNABLE})) for stage in PAGE_STAGES]
             lines.append(f"| `{fixture}` | " + " | ".join(cells) + " |")
         lines.append("")
+    gpu = report.get("gpu")
+    if gpu:
+        adapter = gpu.get("adapter")
+        name = (f"{adapter['name']} ({adapter['backend']}, {'software' if adapter['software'] else 'hardware'})"
+                if adapter else "no adapter")
+        lines += [
+            f"GPU compositor frames on {name}, median ms [95% CI], upload to readback; the CPU reference "
+            "composites the same scene (byte-identical results):",
+            "",
+            "| Scene | GPU | CPU reference |",
+            "| --- | --- | --- |",
+        ]
+        results = gpu.get("results", {})
+        for scene in GPU_SCENES:
+            cells = [summary_cell(results.get(f"{scene}.{kind}", {"status": NOT_RUNNABLE})) for kind in ("gpu", "cpu")]
+            lines.append(f"| `{scene}` | " + " | ".join(cells) + " |")
+        lines += ["", "GPU frame budgets (ratio rows are GPU ÷ CPU, not ms):", "",
+                  "| Metric | Budget | Median | Within |", "| --- | --- | --- | --- |"]
+        for row in gpu.get("budgets", []):
+            median = "not measured" if row["median_ms"] is None else f"{row['median_ms']:.2f}"
+            lines.append(f"| `{row['metric']}` | {row['budget_ms']} | {median} | {'yes' if row['within'] else 'no'} |")
+        lines.append("")
     budgets = report.get("budgets", [])
     if budgets:
         lines += ["M8 page budgets:", "", "| Metric | Budget ms | Median ms | Within |", "| --- | --- | --- | --- |"]
@@ -298,7 +373,8 @@ def merge_reports(reports: list[dict]) -> str:
     if reports:
         commits = sorted({report.get("commit", "unknown") for report in reports})
         lines += [f"Commit(s): {', '.join(f'`{c}`' for c in commits)}. {len(reports)} reference devices.", ""]
-        lines += ["| Device | Page budgets within | Slowest JS ratio |", "| --- | --- | --- |"]
+        lines += ["| Device | Page budgets within | GPU frame budgets within | Slowest JS ratio |",
+                  "| --- | --- | --- | --- |"]
         for report in reports:
             budgets = report.get("budgets", [])
             within = sum(1 for row in budgets if row["within"])
@@ -311,7 +387,10 @@ def merge_reports(reports: list[dict]) -> str:
                 if rustic and others:
                     ratios.append(rustic / min(others))
             slowest = f"{max(ratios):.1f}" if ratios else "not compared"
-            lines.append(f"| {report['device']['label']} | {within}/{len(budgets)} | {slowest} |")
+            gpu_rows = report.get("gpu", {}).get("budgets", [])
+            gpu_within = (f"{sum(1 for row in gpu_rows if row['within'])}/{len(gpu_rows)}"
+                          if gpu_rows else "not measured")
+            lines.append(f"| {report['device']['label']} | {within}/{len(budgets)} | {gpu_within} | {slowest} |")
         lines.append("")
     for report in reports:
         lines += render_device(report)
@@ -331,6 +410,9 @@ def main() -> int:
     parser.add_argument("--commit", default=None, help="Rustic commit measured")
     parser.add_argument("--json", type=Path, help="also write the per-device report as JSON")
     parser.add_argument("--enforce-budgets", action="store_true", help="exit 1 when a page budget is missed")
+    parser.add_argument("--gpu", type=Path, help="gpu_frame_bench built in release mode")
+    parser.add_argument("--enforce-gpu", action="store_true",
+                        help="exit 1 when a GPU frame budget is missed or no adapter opens")
     parser.add_argument("--merge", type=Path, nargs="+", help="merge per-device JSON reports into --output")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -341,8 +423,8 @@ def main() -> int:
         args.output.write_text(merge_reports(reports), encoding="utf-8")
         print(f"wrote {args.output}")
         return 0
-    if not args.rustic and not args.page:
-        parser.error("--rustic or --page is required")
+    if not args.rustic and not args.page and not args.gpu:
+        parser.error("--rustic, --page or --gpu is required")
 
     engines = []
     for spec in args.engine:
@@ -374,17 +456,26 @@ def main() -> int:
         page = run_rustic(args.page, keys, args.size, args.runs, [])
         report["page"] = {key: summarize(s) for key, s in page.items()}
         report["budgets"] = check_budgets(report["page"], M8_PAGE_BUDGETS_MS)
+    if args.gpu:
+        report["gpu"] = run_gpu(args.gpu, args.runs)
+        report["gpu"]["budgets"] = check_gpu_budgets(report["gpu"])
 
     args.output.write_text("\n".join(render_device(report)) + "\n", encoding="utf-8")
     if args.json:
         args.json.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"wrote {args.output}")
+    status = 0
     missed = [row["metric"] for row in report.get("budgets", []) if not row["within"]]
     if missed:
         print(f"M8 page budgets missed: {', '.join(missed)}", file=sys.stderr)
         if args.enforce_budgets:
-            return 1
-    return 0
+            status = 1
+    missed = [row["metric"] for row in report.get("gpu", {}).get("budgets", []) if not row["within"]]
+    if missed:
+        print(f"GPU frame budgets missed: {', '.join(missed)}", file=sys.stderr)
+        if args.enforce_gpu:
+            status = 1
+    return status
 
 
 if __name__ == "__main__":

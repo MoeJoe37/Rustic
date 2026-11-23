@@ -304,8 +304,9 @@ impl From<NetworkDocument> for SessionDocument {
 /// What a subresource request is for.
 #[derive(Clone, Debug)]
 pub(crate) enum ResourceKind {
-    /// A `<link rel=stylesheet>` or `@import`.
-    Stylesheet,
+    /// A `<link rel=stylesheet>` or `@import`; in a quirks-mode document
+    /// a same-origin sheet may have any MIME type.
+    Stylesheet { quirks: bool },
     /// An `<img>`.
     Image,
     /// A classic or module script.
@@ -999,7 +1000,7 @@ impl NetworkSession {
         kind: &ResourceKind,
     ) -> Result<(FetchRequest, Box<HopPolicy>), FetchError> {
         let (destination, directive) = match kind {
-            ResourceKind::Stylesheet => (Destination::Style, FetchDirective::StyleElement),
+            ResourceKind::Stylesheet { .. } => (Destination::Style, FetchDirective::StyleElement),
             ResourceKind::Image => (Destination::Image, FetchDirective::Image),
             ResourceKind::Script { .. } => (Destination::Script, FetchDirective::ScriptElement),
         };
@@ -1084,7 +1085,7 @@ impl NetworkSession {
         result: Result<FetchResponse, NetworkError>,
     ) -> Result<Vec<u8>, FetchError> {
         let destination = match kind {
-            ResourceKind::Stylesheet => Destination::Style,
+            ResourceKind::Stylesheet { .. } => Destination::Style,
             ResourceKind::Image => Destination::Image,
             ResourceKind::Script { .. } => Destination::Script,
         };
@@ -1099,6 +1100,10 @@ impl NetworkSession {
         })?;
         // Opaque responses (status 0) carry a body the renderer may use
         // (images, classic scripts and stylesheets loaded no-cors).
+        let same_origin = matches!(
+            response.response_type(),
+            rustic_net::fetch::ResponseType::Basic | rustic_net::fetch::ResponseType::Cors
+        );
         let internal = response.into_internal();
         let status = internal.head.status();
         if status == 404 || status == 410 {
@@ -1115,7 +1120,7 @@ impl NetworkSession {
                 .next()
                 .is_some_and(|first| first.trim_ascii().eq_ignore_ascii_case(b"nosniff"))
         });
-        check_mime(kind, mime.as_ref(), nosniff)?;
+        check_mime(kind, mime.as_ref(), nosniff, same_origin)?;
         let final_url = internal
             .url_list
             .last()
@@ -1154,7 +1159,10 @@ impl NetworkSession {
             );
             return Err(FetchError::Blocked);
         }
-        if matches!(kind, ResourceKind::Stylesheet | ResourceKind::Script { .. }) {
+        if matches!(
+            kind,
+            ResourceKind::Stylesheet { .. } | ResourceKind::Script { .. }
+        ) {
             let label = mime.as_ref().and_then(|mime| mime.parameter("charset"));
             let mut charsets = self.charsets.borrow_mut();
             if let Some(label) = label.filter(|_| charsets.len() < MAX_REMEMBERED_CHARSETS) {
@@ -1184,7 +1192,7 @@ struct Inflight {
 /// What identifies a subresource request: its URL and how it is fetched.
 fn resource_key(url: &Url, kind: &ResourceKind) -> String {
     let kind = match kind {
-        ResourceKind::Stylesheet => "style".to_owned(),
+        ResourceKind::Stylesheet { .. } => "style".to_owned(),
         ResourceKind::Image => "image".to_owned(),
         ResourceKind::Script {
             nonce,
@@ -1206,6 +1214,7 @@ fn check_mime(
     kind: &ResourceKind,
     mime: Option<&MimeType>,
     nosniff: bool,
+    same_origin: bool,
 ) -> Result<(), FetchError> {
     match kind {
         ResourceKind::Script { .. } => {
@@ -1216,8 +1225,12 @@ fn check_mime(
                 return Err(FetchError::Blocked);
             }
         }
-        ResourceKind::Stylesheet => {
-            if !mime.is_some_and(|mime| mime.essence() == "text/css") {
+        ResourceKind::Stylesheet { quirks } => {
+            // A quirks-mode document takes a CORS-same-origin sheet of any
+            // type as CSS (HTML's link processing, CSSOM's style resource
+            // fetch), unless `nosniff` blocks it first (Fetch).
+            let css = mime.is_some_and(|mime| mime.essence() == "text/css");
+            if !css && !(*quirks && same_origin && !nosniff) {
                 eprintln!("rustic: skipped a stylesheet whose MIME type is not text/css");
                 return Err(FetchError::Blocked);
             }
@@ -1442,15 +1455,26 @@ mod tests {
             parser_inserted: true,
             module: false,
         };
-        let mime = |input: &str| MimeType::parse(input).unwrap();
-        assert!(check_mime(&script, Some(&mime("text/javascript")), true).is_ok());
-        assert!(check_mime(&script, Some(&mime("text/plain")), false).is_ok());
-        assert!(check_mime(&script, Some(&mime("text/plain")), true).is_err());
-        assert!(check_mime(&script, Some(&mime("image/png")), false).is_err());
-        assert!(check_mime(&script, None, true).is_err());
-        let style = ResourceKind::Stylesheet;
-        assert!(check_mime(&style, Some(&mime("text/css; charset=utf-8")), false).is_ok());
-        assert!(check_mime(&style, Some(&mime("text/plain")), false).is_err());
-        assert!(check_mime(&ResourceKind::Image, None, true).is_ok());
+        let check = |kind, mime: Option<&str>, nosniff, same_origin| {
+            let mime = mime.map(|input| MimeType::parse(input).unwrap());
+            check_mime(kind, mime.as_ref(), nosniff, same_origin).is_ok()
+        };
+        assert!(check(&script, Some("text/javascript"), true, true));
+        assert!(check(&script, Some("text/plain"), false, true));
+        assert!(!check(&script, Some("text/plain"), true, true));
+        assert!(!check(&script, Some("image/png"), false, true));
+        assert!(!check(&script, None, true, true));
+        let style = ResourceKind::Stylesheet { quirks: false };
+        assert!(check(&style, Some("text/css; charset=utf-8"), false, true));
+        assert!(!check(&style, Some("text/plain"), false, true));
+        // Quirks mode takes a same-origin sheet of any type, unless
+        // nosniff; a cross-origin one still needs text/css.
+        let quirks = ResourceKind::Stylesheet { quirks: true };
+        assert!(check(&quirks, Some("text/plain"), false, true));
+        assert!(check(&quirks, None, false, true));
+        assert!(!check(&quirks, Some("text/plain"), true, true));
+        assert!(!check(&quirks, Some("text/plain"), false, false));
+        assert!(check(&quirks, Some("text/css"), true, false));
+        assert!(check(&ResourceKind::Image, None, true, true));
     }
 }

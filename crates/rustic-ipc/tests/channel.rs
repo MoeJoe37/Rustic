@@ -160,7 +160,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
         RendererMessage::Resource {
             id: 1,
             url: "https://a.test/s.css".into(),
-            kind: ResourceKind::Stylesheet,
+            kind: ResourceKind::Stylesheet { quirks: true },
             max_bytes: 100,
         },
         RendererMessage::Resource {

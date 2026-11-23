@@ -13,7 +13,7 @@
 //! style loader offers, so a file that grows while being read still cannot
 //! exceed it.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, Read};
@@ -385,6 +385,9 @@ pub struct LocalStylesheetFetcher {
     applied: Option<AppliedLocalFiles>,
     /// Set for a network document: every read goes through the session.
     network: Option<Rc<dyn Session>>,
+    /// The document is in quirks mode (known once its doctype is parsed),
+    /// so a same-origin network sheet of any MIME type is CSS.
+    quirks: Cell<bool>,
 }
 
 impl LocalStylesheetFetcher {
@@ -400,6 +403,7 @@ impl LocalStylesheetFetcher {
             environment_encoding: Encoding::Utf8,
             applied: None,
             network: None,
+            quirks: Cell::new(false),
         })
     }
 
@@ -417,12 +421,25 @@ impl LocalStylesheetFetcher {
             environment_encoding: Encoding::Utf8,
             applied: None,
             network: Some(session),
+            quirks: Cell::new(false),
         }
     }
 
     /// The network session, for a network document.
     pub(crate) fn network(&self) -> Option<&dyn Session> {
         self.network.as_deref()
+    }
+
+    /// Record whether the document is in quirks mode.
+    pub(crate) fn set_quirks(&self, quirks: bool) {
+        self.quirks.set(quirks);
+    }
+
+    /// How this fetcher's stylesheet requests are made.
+    fn stylesheet_kind(&self) -> ResourceKind {
+        ResourceKind::Stylesheet {
+            quirks: self.quirks.get(),
+        }
     }
 
     pub(crate) fn with_environment_encoding(mut self, encoding: Encoding) -> Self {
@@ -444,7 +461,7 @@ impl LocalStylesheetFetcher {
         url: &Url,
         max_bytes: usize,
     ) -> Result<StagedLocalFile, FetchError> {
-        self.stage_completion_as(snapshot, url, max_bytes, &ResourceKind::Stylesheet)
+        self.stage_completion_as(snapshot, url, max_bytes, &self.stylesheet_kind())
     }
 
     /// [`Self::stage_completion`] for a resource of `kind` (it decides a
@@ -518,7 +535,8 @@ impl LocalStylesheetFetcher {
             return Err(FetchError::Cancelled);
         }
         if let Some(session) = &self.network {
-            let fetch = || session.fetch(url, &ResourceKind::Stylesheet, max_bytes);
+            let kind = self.stylesheet_kind();
+            let fetch = || session.fetch(url, &kind, max_bytes);
             return match &self.applied {
                 Some(applied) => applied.read(url, max_bytes, fetch).map(|b| b.to_vec()),
                 None => fetch(),

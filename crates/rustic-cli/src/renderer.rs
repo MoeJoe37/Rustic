@@ -70,7 +70,7 @@ pub(crate) fn granted_local_document(
     if !parent.local {
         return None;
     }
-    let bytes = parent.fetch(url, &ResourceKind::Stylesheet, max_bytes);
+    let bytes = parent.fetch(url, &ResourceKind::Stylesheet { quirks: false }, max_bytes);
     Some(bytes.map(|bytes| SessionDocument {
         session: Rc::new(BrokeredSession {
             link: Rc::clone(&parent.link),
@@ -894,7 +894,9 @@ impl StorageHost for BrokeredStorage {
 /// A resource kind as the broker protocol names it.
 fn ipc_kind(kind: &ResourceKind) -> rustic_ipc::protocol::ResourceKind {
     match kind {
-        ResourceKind::Stylesheet => rustic_ipc::protocol::ResourceKind::Stylesheet,
+        ResourceKind::Stylesheet { quirks } => {
+            rustic_ipc::protocol::ResourceKind::Stylesheet { quirks: *quirks }
+        }
         ResourceKind::Image => rustic_ipc::protocol::ResourceKind::Image,
         ResourceKind::Script {
             nonce,

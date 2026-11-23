@@ -593,3 +593,53 @@ fn subresources_load_concurrently() {
         );
     }
 }
+
+#[test]
+fn quirks_mode_takes_same_origin_stylesheets_of_any_type() {
+    let plain = |body: &[u8], extra: &[(&str, &str)]| {
+        let mut headers = vec![("Content-Type", "text/plain")];
+        headers.extend_from_slice(extra);
+        Reply::response(200, &headers, body)
+    };
+    let page = |doctype: &str| {
+        let html = format!(
+            "{doctype}<link rel=stylesheet href=/same.css>\
+             <link rel=stylesheet href=/nosniff.css>\
+             <link rel=stylesheet href=http://b.test/other.css><p id=t>text</p>"
+        );
+        Reply::response(200, &[("Content-Type", "text/html")], html.as_bytes())
+    };
+    let server = FixtureServer::start([
+        ("/quirks", page("")),
+        ("/standards", page("<!doctype html>")),
+        ("/same.css", plain(b"#t { margin-left: 3px }", &[])),
+        (
+            "/nosniff.css",
+            plain(
+                b"#t { margin-right: 4px }",
+                &[("X-Content-Type-Options", "nosniff")],
+            ),
+        ),
+        ("/other.css", plain(b"#t { margin-top: 5px }", &[])),
+    ])
+    .unwrap();
+    let [a, b] = grants(&server);
+    for (path, quirks) in [("/quirks", true), ("/standards", false)] {
+        for single in [false, true] {
+            let url = format!("http://a.test{path}");
+            let mut args = vec!["dump-style", "--allow-origin", &a, "--allow-origin", &b];
+            if single {
+                args.push("--single-process");
+            }
+            args.push(&url);
+            let output = rustic(&args);
+            assert!(output.status.success(), "{}", stderr(&output));
+            let dump = stdout(&output);
+            // Only quirks mode takes the same-origin text/plain sheet;
+            // nosniff and a cross-origin sheet always need text/css.
+            assert_eq!(dump.contains("margin-left: 3px"), quirks, "{path}: {dump}");
+            assert!(!dump.contains("margin-right: 4px"), "{path}: {dump}");
+            assert!(!dump.contains("margin-top: 5px"), "{path}: {dump}");
+        }
+    }
+}

@@ -1477,6 +1477,7 @@ fn queue_discovered_local_resources(
 ) -> Result<usize, LoadError> {
     let requests = {
         let parsed = document.document();
+        fetch.set_quirks(parsed.parsed().mode() == DocumentMode::Quirks);
         discover_local_resources(parsed.parsed().document(), document_url, limits)
     };
     if let Some(session) = fetch.network() {
@@ -1557,7 +1558,9 @@ fn prefetch_resources(
         .iter()
         .map(|(url, kind)| {
             let kind = match kind {
-                LocalResourceKind::Stylesheet => ResourceKind::Stylesheet,
+                // Prefetches are keyed without the mode; the MIME check
+                // uses the kind the loader asks for.
+                LocalResourceKind::Stylesheet => ResourceKind::Stylesheet { quirks: false },
                 LocalResourceKind::Image => ResourceKind::Image,
             };
             (url.clone(), kind)
@@ -1939,6 +1942,7 @@ fn compute_styles(
     };
     let mut local = fetcher.map(|fetcher| {
         let fetcher = fetcher.with_environment_encoding(encoding);
+        fetcher.set_quirks(mode == DocumentMode::Quirks);
         match applied_files {
             Some(applied) => fetcher.with_applied_files(applied.clone()),
             None => fetcher,

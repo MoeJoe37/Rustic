@@ -2257,7 +2257,9 @@ fn kill_process(pid: u32) {
 /// A resource kind from the renderer, as the network session names it.
 fn resource_kind(kind: rustic_ipc::protocol::ResourceKind) -> ResourceKind {
     match kind {
-        rustic_ipc::protocol::ResourceKind::Stylesheet => ResourceKind::Stylesheet,
+        rustic_ipc::protocol::ResourceKind::Stylesheet { quirks } => {
+            ResourceKind::Stylesheet { quirks }
+        }
         rustic_ipc::protocol::ResourceKind::Image => ResourceKind::Image,
         rustic_ipc::protocol::ResourceKind::Script {
             nonce,

@@ -255,8 +255,12 @@ pub struct Painted {
 /// What a resource request is for (decides the broker's policy checks).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResourceKind {
-    /// A stylesheet or `@import`.
-    Stylesheet,
+    /// A stylesheet or `@import`, for a document in quirks mode or not
+    /// (a same-origin sheet there may have any MIME type).
+    Stylesheet {
+        /// The document is in quirks mode.
+        quirks: bool,
+    },
     /// An image.
     Image,
     /// A script, with the element's nonce and parser state.
@@ -1058,7 +1062,10 @@ pub const MAX_PREFETCH_REQUESTS: usize = 4096;
 
 fn put_resource_kind(writer: &mut Writer, kind: &ResourceKind) {
     match kind {
-        ResourceKind::Stylesheet => writer.u8(0),
+        ResourceKind::Stylesheet { quirks } => {
+            writer.u8(0);
+            writer.bool(*quirks);
+        }
         ResourceKind::Image => writer.u8(1),
         ResourceKind::Script {
             nonce,
@@ -1075,7 +1082,9 @@ fn put_resource_kind(writer: &mut Writer, kind: &ResourceKind) {
 
 fn get_resource_kind(reader: &mut Reader<'_>) -> Result<ResourceKind, DecodeError> {
     Ok(match reader.u8()? {
-        0 => ResourceKind::Stylesheet,
+        0 => ResourceKind::Stylesheet {
+            quirks: reader.bool()?,
+        },
         1 => ResourceKind::Image,
         2 => ResourceKind::Script {
             nonce: reader.opt_string()?,

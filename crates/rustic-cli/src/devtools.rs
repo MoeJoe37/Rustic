@@ -1429,7 +1429,7 @@ pub(crate) fn observe(session: Rc<dyn NetworkSession>) -> Rc<dyn NetworkSession>
 
 fn kind_name(kind: &ResourceKind) -> &'static str {
     match kind {
-        ResourceKind::Stylesheet => "stylesheet",
+        ResourceKind::Stylesheet { .. } => "stylesheet",
         ResourceKind::Image => "image",
         ResourceKind::Script { module: true, .. } => "module",
         ResourceKind::Script { .. } => "script",

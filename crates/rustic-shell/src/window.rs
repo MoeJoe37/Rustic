@@ -22,6 +22,12 @@ const POLL: Duration = Duration::from_millis(15);
 /// How long a scripted resize, minimize or restore waits for the window
 /// system to report it.
 const WINDOW_WAIT: Duration = Duration::from_secs(3);
+/// Times in a row a lost window surface is recreated before the window
+/// gives up (`compositor.recovery`): a surface that fails again right
+/// after recreation will not come back.
+pub const MAX_SURFACE_RECREATIONS: u32 = 3;
+
+type DrawSurface = softbuffer::Surface<Rc<Window>, Rc<Window>>;
 
 /// What a script step waits for before the next frame.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -46,7 +52,9 @@ struct Shell<C: Content> {
     config: WindowConfig,
     content: C,
     window: Option<Rc<Window>>,
-    surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    surface: Option<DrawSurface>,
+    /// Surface recreations since the last frame presented.
+    recreations: u32,
     /// Settled frames presented.
     presented: u32,
     error: Option<String>,
@@ -160,11 +168,39 @@ impl<C: Content> Shell<C> {
         usable_scale(self.window.as_ref().map_or(1.0, |w| w.scale_factor()))
     }
 
+    /// The window's surface failed: drop it and draw again into a new
+    /// one, at most [`MAX_SURFACE_RECREATIONS`] times in a row.
+    fn surface_lost(&mut self, event_loop: &ActiveEventLoop, error: String) {
+        self.surface = None;
+        if self.recreations >= MAX_SURFACE_RECREATIONS {
+            let message = format!(
+                "{error}; the window surface was recreated {MAX_SURFACE_RECREATIONS} times and still fails"
+            );
+            return self.fail(event_loop, message);
+        }
+        self.recreations += 1;
+        self.log(&format!("surface lost: {error}"));
+        eprintln!("rustic: {error}; recreating the window surface");
+        self.request_redraw();
+    }
+
     fn redraw(&mut self, event_loop: &ActiveEventLoop) {
         if !self.visible {
             return;
         }
-        let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
+        let Some(window) = self.window.clone() else {
+            return;
+        };
+        if self.surface.is_none() {
+            match new_surface(&window) {
+                Ok(surface) => {
+                    self.surface = Some(surface);
+                    self.log("surface recreated");
+                }
+                Err(error) => return self.surface_lost(event_loop, error),
+            }
+        }
+        let Some(surface) = self.surface.as_mut() else {
             return;
         };
         let size = window.inner_size();
@@ -174,8 +210,8 @@ impl<C: Content> Shell<C> {
             return;
         };
         if let Err(error) = surface.resize(width, height) {
-            let message = format!("cannot size the window buffer: {error}");
-            return self.fail(event_loop, message);
+            let error = format!("cannot size the window buffer: {error}");
+            return self.surface_lost(event_loop, error);
         }
         // The page gets the rows below the trusted strip; the strip is
         // drawn after the page, so it shows the document just committed.
@@ -192,11 +228,14 @@ impl<C: Content> Shell<C> {
             Ok(chrome) => chrome,
             Err(error) => return self.fail(event_loop, error),
         };
+        let Some(surface) = self.surface.as_mut() else {
+            return;
+        };
         let mut buffer = match surface.buffer_mut() {
             Ok(buffer) => buffer,
             Err(error) => {
-                let message = format!("cannot map the window buffer: {error}");
-                return self.fail(event_loop, message);
+                let error = format!("cannot map the window buffer: {error}");
+                return self.surface_lost(event_loop, error);
             }
         };
         self.strip = present(
@@ -218,9 +257,10 @@ impl<C: Content> Shell<C> {
             _ => None,
         };
         if let Err(error) = buffer.present() {
-            let message = format!("cannot present the frame: {error}");
-            return self.fail(event_loop, message);
+            let error = format!("cannot present the frame: {error}");
+            return self.surface_lost(event_loop, error);
         }
+        self.recreations = 0;
         self.sync_window_state();
         if self.accessible {
             self.update_accessibility();
@@ -368,6 +408,12 @@ impl<C: Content> Shell<C> {
                     self.awaiting_frame = true;
                     self.request_redraw();
                 }
+                Step::LoseSurface => {
+                    self.surface = None;
+                    self.log("surface dropped");
+                    self.awaiting_frame = true;
+                    window.request_redraw();
+                }
             }
             if !self.visible && self.awaiting_frame {
                 // A hidden window presents nothing; the step is done.
@@ -486,6 +532,8 @@ impl<C: Content> ApplicationHandler<accesskit_winit::Event> for Shell<C> {
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
+            // Back from a suspend: the next frame makes a new surface.
+            self.request_redraw();
             return;
         }
         // The accessibility adapter must exist before the window is first
@@ -504,13 +552,9 @@ impl<C: Content> ApplicationHandler<accesskit_winit::Event> for Shell<C> {
             self.proxy.clone(),
         ));
         window.set_visible(true);
-        let surface = softbuffer::Context::new(Rc::clone(&window))
-            .and_then(|context| softbuffer::Surface::new(&context, Rc::clone(&window)));
-        match surface {
+        match new_surface(&window) {
             Ok(surface) => self.surface = Some(surface),
-            Err(error) => {
-                return self.fail(event_loop, format!("cannot draw into the window: {error}"));
-            }
+            Err(error) => return self.fail(event_loop, error),
         }
         let size = window.inner_size();
         let scale = usable_scale(window.scale_factor());
@@ -529,6 +573,12 @@ impl<C: Content> ApplicationHandler<accesskit_winit::Event> for Shell<C> {
             self.awaiting_frame = true;
         }
         window.request_redraw();
+    }
+
+    fn suspended(&mut self, _: &ActiveEventLoop) {
+        // Android and iOS take the native surface away while suspended;
+        // on desktop this does not happen. Either way it is made again.
+        self.surface = None;
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -677,6 +727,7 @@ pub fn run(config: WindowConfig, content: impl Content) -> Result<(), String> {
         content,
         window: None,
         surface: None,
+        recreations: 0,
         presented: 0,
         error: None,
         cursor: (0.0, 0.0),
@@ -695,4 +746,11 @@ pub fn run(config: WindowConfig, content: impl Content) -> Result<(), String> {
         .run_app(&mut shell)
         .map_err(|error| format!("the window system failed: {error}"))?;
     shell.error.map_or(Ok(()), Err)
+}
+
+/// A drawing surface for `window`.
+fn new_surface(window: &Rc<Window>) -> Result<DrawSurface, String> {
+    softbuffer::Context::new(Rc::clone(window))
+        .and_then(|context| softbuffer::Surface::new(&context, Rc::clone(window)))
+        .map_err(|error| format!("cannot draw into the window: {error}"))
 }

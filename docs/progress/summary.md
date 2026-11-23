@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 48.66%** = 44.77% verified complete + 3.89% partial credit. 108/228 capabilities complete, 18 in progress.
+**Overall completion: 48.81%** = 45.24% verified complete + 3.57% partial credit. 109/228 capabilities complete, 17 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `dfe236bb27e3f3e208a55ba4e809e0bed862fa009f0c538b276adc16231cadf8`.
+Catalog: `engine-v4`. Source fingerprint: `b3c47c481fffb50a67fb3646976118feaf33cb60f8a3b4098e0bf62011ab8427`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `dfe236bb27e3f3e208a55ba4e809e0bed862f
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.60% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 9/18 | 77.60% | 41.25% | 8.12% |
+| M8 Desktop alpha | 10/18 | 79.49% | 46.93% | 8.12% |
 | M9 Compatibility expansion | 3/54 | 5.19% | 2.63% | 22.35% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.83% | 0.00% | 14.74% |
@@ -46,7 +46,7 @@ Catalog: `engine-v4`. Source fingerprint: `dfe236bb27e3f3e208a55ba4e809e0bed862f
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 7/11 | 1 | 67.44% | 62.79% | 5% | 3.37 |
-| Compositor & GPU | 1/5 | 3 | 60.25% | 23.07% | 3% | 1.80 |
+| Compositor & GPU | 2/5 | 2 | 65.38% | 38.46% | 3% | 1.96 |
 | Platform hosts | 1/9 | 5 | 44.79% | 4.16% | 4% | 1.79 |
 | Accessibility | 3/5 | 1 | 75.00% | 64.28% | 2% | 1.50 |
 | DevTools | 4/4 | 0 | 100.00% | 100.00% | 1% | 1.00 |
@@ -304,10 +304,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Driver access for the confined GPU process: Linux profile ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-sandbox/src/seccomp.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
   - [ ] Driver access for the confined GPU process: Windows AppContainer and macOS Seatbelt GPU profiles, verified on GPU hardware (TD-186)
 - **planned** `compositor.mobile` — Android and iOS GPU adapters verified on devices · size 2 · M14 · 0.46% of engine
-- **in progress 66.66%** `compositor.recovery` — Surface/device loss, GPU process crash/restart and resource recovery · size 2 · M8 · 0.46% of engine
-  - [x] GPU process: crashes, hangs and protocol violations recovered without stale authority, with CPU fallback (ADR 0068) ([source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
-  - [ ] Window surface loss and recreation in the desktop host
-  - [x] GPU device loss and resource recovery in the hardware backend ([source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-gpu/tests/parity.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
+- **complete** `compositor.recovery` — Surface/device loss, GPU process crash/restart and resource recovery · size 2 · M8 · 0.46% of engine ([source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-gpu/tests/parity.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
 - **in progress 50.00%** `compositor.parity` — GPU/reference parity, performance and energy gates · size 3 · M8 · 0.69% of engine
   - [x] Byte-exact GPU/reference parity gate, required in Linux CI on lavapipe ([test](../../crates/rustic-gpu/tests/parity.rs), [source](../../.github/workflows/ci.yml))
   - [ ] Frame-time and energy gates for GPU compositing on hardware

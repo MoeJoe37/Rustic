@@ -2952,9 +2952,15 @@ keeps it from being faster than the CPU path end to end.
 
 `rustic view` composites its frames through the GPU process like
 `render`, but the window's surface (softbuffer, ADR 0065) is still
-written by the broker. **Pay:** hand the window surface to the GPU
-process when the hardware backend presents it. **Trigger:** the backend
-record, or TD-182's long-lived renderer.
+written by the broker. A lost window surface is recreated in place (at
+most `MAX_SURFACE_RECREATIONS` times in a row, 2026-11-23,
+`compositor.recovery`). Presenting from the GPU process needs the window
+handle (HWND, X11 window, `CAMetalLayer` through a Mach port, a Wayland
+subsurface) passed to another process and wgpu's `create_surface_unsafe`,
+an `unsafe` boundary no reviewed crate covers yet. **Pay:** a reviewed
+cross-process presentation record per platform, then hand the surface to
+the GPU process. **Trigger:** a frame-time profile showing the broker's
+copy, or GPU rasterization of page content.
 
 ### TD-186 — Windows and macOS GPU processes have no driver access
 

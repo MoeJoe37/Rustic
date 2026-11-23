@@ -22,6 +22,9 @@ pub enum Step {
     Click(f64, f64),
     /// An input as the platform would report it.
     Input(Input),
+    /// Drop the window's drawing surface as a lost one is dropped (driver
+    /// reset, display change, an Android/iOS suspend) and present again.
+    LoseSurface,
 }
 
 /// A parsed script: `;`-separated steps, run one after another, each after
@@ -31,7 +34,8 @@ pub enum Step {
 /// `wheel DX,DY` (lines), `key [ctrl+][shift+][alt+][meta+]NAME` (NAME is
 /// a single character or Enter, Escape, Backspace, Delete, Tab, Left,
 /// Right, Up, Down, Home, End, PageUp, PageDown, Space or F1-F24),
-/// `text TEXT`, `ime-on`, `preedit TEXT`, `commit TEXT` and `ime-off`.
+/// `text TEXT`, `ime-on`, `preedit TEXT`, `commit TEXT`, `ime-off` and
+/// `lose-surface`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Script {
     steps: Vec<Step>,
@@ -92,6 +96,7 @@ impl Script {
                 }
                 "commit" => Step::Input(Input::Ime(Ime::Commit(rest.to_owned()))),
                 "ime-off" => Step::Input(Input::Ime(Ime::Disabled)),
+                "lose-surface" => Step::LoseSurface,
                 _ => return Err(bad()),
             });
         }

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "dfe236bb27e3f3e208a55ba4e809e0bed862fa009f0c538b276adc16231cadf8",
-  "percent": "48.66",
-  "verified_percent": "44.77",
-  "partial_percent": "3.89",
-  "completed": 108,
-  "in_progress": 18,
+  "source_fingerprint": "b3c47c481fffb50a67fb3646976118feaf33cb60f8a3b4098e0bf62011ab8427",
+  "percent": "48.81",
+  "verified_percent": "45.24",
+  "partial_percent": "3.57",
+  "completed": 109,
+  "in_progress": 17,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -85,11 +85,11 @@
       "id": "M8",
       "label": "Desktop alpha",
       "share": "8.12",
-      "completed": 9,
+      "completed": 10,
       "total": 18,
-      "percent": "77.60",
-      "verified_percent": "41.25",
-      "partial_percent": "36.35"
+      "percent": "79.49",
+      "verified_percent": "46.93",
+      "partial_percent": "32.56"
     },
     {
       "id": "M9",
@@ -6957,58 +6957,50 @@
           "label": "Surface/device loss, GPU process crash/restart and resource recovery",
           "size": 2,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "GPU process: crashes, hangs and protocol violations recovered without stale authority, with CPU fallback (ADR 0068)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/gpuproc.rs",
-                  "marker": "pub const MAX_GPU_STARTS"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/gpu.rs",
-                  "marker": "fn a_crashed_gpu_process_is_replaced_for_the_next_frame"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/gpu.rs",
-                  "marker": "fn a_lying_or_hung_gpu_process_is_cut_off_and_the_page_is_unchanged"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-cli/src/gpuproc.rs",
+              "marker": "pub const MAX_GPU_STARTS"
             },
             {
-              "label": "Window surface loss and recreation in the desktop host",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn a_crashed_gpu_process_is_replaced_for_the_next_frame"
             },
             {
-              "label": "GPU device loss and resource recovery in the hardware backend",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/gpuproc.rs",
-                  "marker": "pub const MAX_DEVICE_OPENS"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-gpu/tests/parity.rs",
-                  "marker": "fn bad_layers_are_refused_and_a_lost_device_reopens"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/gpu.rs",
-                  "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn a_lying_or_hung_gpu_process_is_cut_off_and_the_page_is_unchanged"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-shell/src/window.rs",
+              "marker": "pub const MAX_SURFACE_RECREATIONS"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn a_lost_window_surface_is_recreated_and_the_page_keeps_presenting"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/gpuproc.rs",
+              "marker": "pub const MAX_DEVICE_OPENS"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-gpu/tests/parity.rs",
+              "marker": "fn bad_layers_are_refused_and_a_lost_device_reopens"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.46"
         },
         {
@@ -7046,13 +7038,13 @@
         }
       ],
       "points": 13,
-      "completed": 1,
-      "in_progress": 3,
+      "completed": 2,
+      "in_progress": 2,
       "total": 5,
-      "contribution": "1.80",
-      "percent": "60.25",
-      "verified_percent": "23.07",
-      "partial_percent": "37.18"
+      "contribution": "1.96",
+      "percent": "65.38",
+      "verified_percent": "38.46",
+      "partial_percent": "26.92"
     },
     {
       "id": "platform",

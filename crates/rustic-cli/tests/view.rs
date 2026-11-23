@@ -192,6 +192,50 @@ fn the_window_follows_resizes_and_survives_minimize_and_restore() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// `compositor.recovery`: a lost window surface is made again and the
+/// page keeps presenting into it with its state intact.
+#[test]
+fn a_lost_window_surface_is_recreated_and_the_page_keeps_presenting() {
+    if !has_window_system() {
+        return;
+    }
+    let (dir, page) = page("surface", FINDABLE);
+    let (output, lines) = scripted("lose-surface; key End; lose-surface; frame", &page, &[]);
+    assert!(
+        output.status.success(),
+        "{lines:?}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        lines.iter().filter(|l| *l == "surface dropped").count(),
+        2,
+        "{lines:?}"
+    );
+    assert_eq!(
+        lines.iter().filter(|l| *l == "surface recreated").count(),
+        2,
+        "{lines:?}"
+    );
+    // Every drop is followed by a recreated surface, then a frame.
+    for (at, _) in lines
+        .iter()
+        .enumerate()
+        .filter(|(_, l)| *l == "surface dropped")
+    {
+        let rest = &lines[at..];
+        let made = rest.iter().position(|l| l == "surface recreated").unwrap();
+        assert!(
+            rest[made..].iter().any(|l| l.starts_with("frame ")),
+            "{lines:?}"
+        );
+    }
+    // The page kept its state across the second loss: still scrolled.
+    let last = *states(&lines).last().unwrap();
+    assert!(!last.contains("scroll=0,0 "), "{last}");
+    assert!(lines.last().is_some_and(|l| l == "done"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_browser_shell_drives_tabs_history_find_and_zoom() {
     if !has_window_system() {

@@ -52,18 +52,16 @@ applies and wins if it fires earlier. An entry that reaches its row unpaid is
 either paid then or moved to a later row in the same change, with the reason
 added to the entry. Entries are never left on a row whose milestone has closed.
 
-Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completion review, and the M7 rows moved to M8 on 2026-11-22 when M7 closed and Android/iOS device work became M14 ([ADR 0067](adr/0067-mobile-devices-last.md)).
+Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completion review, and the M7 rows moved to M8 on 2026-11-22 when M7 closed and Android/iOS device work became M14 ([ADR 0067](adr/0067-mobile-devices-last.md)). The M8 rows moved to M9, M10 and M12 on 2026-11-23 when M8 closed ([M8 completion review](reviews/2026-11-23-m8-completion.md)).
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M8 (hosts, GPU and platform services) | TD-173, TD-184, TD-185, TD-175, TD-177, TD-178, TD-181, TD-191, TD-199, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
-| M9, CSS, layout and paint | TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
-| M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
-| M10 (beta) | TD-197 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI |
-| M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162, TD-193, TD-198 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
+| M9, CSS, layout and paint | TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
+| M9, language and web APIs | TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
+| M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162, TD-193, TD-198, TD-184, TD-185, TD-181 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms; GPU shared memory, presentation from the GPU process and finer compositor layers |
 | M14 (Android and iOS devices, ADR 0067) | None yet; the device and simulator half of the hosted-CI row's mobile entry is paid here | Device, simulator and Apple-entitlement work deferred to the last milestone; mobile compile checks and the Android emulator job stay in CI meanwhile |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
 
@@ -96,7 +94,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-12 | Deliberate | CI / platforms | Native x64/ARM64 CI ran green on 2026-11-22 (jobs stopped again later that day on a billing limit); mobile is check-only and two cross-checks skip the crates that use ring | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
-| TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, M7 browser shell (DevTools) |
+| TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, M10 |
 | TD-16 | Deliberate | DOM | Adoption reissues node IDs instead of keeping node identity | Paid with wrapper retargeting |
 | TD-17 | Deliberate | DOM / JS | DOM/JS collection was bound to one document and adoption discarded wrapper identity | Paid |
 | TD-18 | Bad | DOM | Tree dumps grew quadratically with nested template contents | Paid |
@@ -123,34 +121,34 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-39 | Deliberate | Layout | Normal flow normalization before other formatting contexts and line layout | Open, REN-01c |
 | TD-40 | Bad | Layout | Every text box copied a full computed style (about 5 KB each) | Paid |
 | TD-41 | Deliberate | Paint | First paint slice: gamut clipping, stored-only PNG, conflated corner joins | Open |
-| TD-42 | Deliberate | Text | CFF/WOFF and discovery paid; advanced fonts/native services remain (TD-85) | Partly paid, REN-03 |
+| TD-42 | Deliberate | Text | CFF/WOFF and discovery paid; advanced fonts/native services remain (TD-85) | Partly paid, REN-03, M9 |
 | TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Paid |
 | TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Paid |
 | TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
-| TD-46 | Deliberate | Paint | Opacity groups allocate a full surface each instead of their bounds | Open |
+| TD-46 | Deliberate | Paint | Opacity groups allocate a full surface each instead of their bounds | Open, M9 |
 | TD-47 | Deliberate | Text | CSS policies and bidi scopes paid; locale resources/full text conformance remain (TD-87) | Partly paid |
 | TD-48 | Deliberate | Style | Children of a `display:contents` child of a flex container are not blockified | Open, REN-08 |
 | TD-49 | Deliberate | Layout | Flex and replaced sizing approximations pending text baselines and layout WPT | Open, REN-02c/REN-08 |
 | TD-50 | Deliberate | Layout | OpenType/complex scripts paid; cross-source ligatures/break reshaping remain (TD-86) | Partly paid |
-| TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open |
-| TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting or exact nonzero fill (`--font` paid) | Partly paid |
-| TD-53 | Deliberate | Paint | First image painting: fill-only fit, bilinear only, no alt text (inline images and formats paid) | Partly paid |
+| TD-51 | Deliberate | Codecs | PNG ignores color management; inflate decodes Huffman codes bit by bit | Open, M9 |
+| TD-52 | Deliberate | Paint | First text painting: approximate decoration metrics, no hinting or exact nonzero fill (`--font` paid) | Partly paid, M9 |
+| TD-53 | Deliberate | Paint | First image painting: fill-only fit, bilinear only, no alt text (inline images and formats paid) | Partly paid, M9 |
 | TD-54 | Deliberate | Paint | First outline painting: solid/double only, `auto` as solid, per-fragment inline outlines | Open, REN-04e |
 | TD-55 | Deliberate | Paint | First `border-radius`: single-axis overflow ignores radii, per-fragment inline curves, unsnapped side joins | Open, REN-04f |
 | TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
 | TD-57 | Deliberate | Paint | First transforms: `preserve-3d` flattened, layout unaware of transformed containing blocks, approximate projected curves | Open, REN-04h |
 | TD-58 | Deliberate | Paint | First shadows, blending and filters: sRGB filters, full-surface groups, no ink overflow, approximate blur under transforms | Open, REN-04i |
-| TD-59 | Deliberate | Paint | First tiled raster, damage and resize: each tile scans the whole list, no CI frame-time gate, a new filter margin repaints everything, list diff by common prefix and suffix, relayout from scratch | Open, REN-04j |
+| TD-59 | Deliberate | Paint | First tiled raster, damage and resize: each tile scans the whole list, no CI frame-time gate, a new filter margin repaints everything, list diff by common prefix and suffix, relayout from scratch | Open, REN-04j, M9 |
 | TD-70 | Deliberate | Layout | Atomic inlines and block-in-inline splitting: baseline, relative-offset and paint-order approximations | Open, M3 layout |
 | TD-71 | Deliberate | Layout | Sticky positioning: no overflow adjustment, no nested sticky composition, inline sticky boxes stay static | Open, M3 layout |
 | TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 53 of 91 static pages fail (writing modes, images, tables, 6 undiagnosed) | Open, REN-08 |
 | TD-73 | Watch | Base | Layout keeps its own `CssPx`/`CssRect` beside the unit-typed `rustic-base` geometry | Guarded |
 | TD-80 | Deliberate | Codecs | JPEG: no arithmetic coding, lossless, hierarchical, 12-bit or `DNL`; color management ignored | Open, paint.images |
-| TD-81 | Deliberate | Codecs | WebP and PNG ignore ICC/EXIF metadata; only JPEG applies EXIF orientation | Open, paint.images |
+| TD-81 | Deliberate | Codecs | WebP and PNG ignore ICC/EXIF metadata; only JPEG applies EXIF orientation | Open, paint.images, M9 |
 | TD-82 | Deliberate | Paint | Animated GIF/WebP decode every frame but paint only the first | Open, paint.images |
 | TD-83 | Watch | Codecs | Image store budget bounds retained pixels, not outstanding `Arc` copies or the transient decode peak | Paid |
 | TD-84 | Deliberate | Codecs | Decoder speed: bit-serial VP8L/JPEG slow paths, per-pixel loops; simple VP8 filter and multi-partition frames lack reference images | Open, paint.images |
-| TD-85 | Deliberate | Fonts | Backend caches and temporary memory and handle-based traversal. System fonts by fontconfig, DirectWrite and Core Text (ADR 0078), per-OS tables and collection members are in (2026-11-23, ADR 0074) | Partly paid, M9 |
+| TD-85 | Deliberate | Fonts | Backend caches and temporary memory and handle-based traversal. System fonts by fontconfig, DirectWrite and Core Text (ADR 0078), per-OS tables and collection members are in (2026-11-23, ADR 0074) | Partly paid, M9, M9 |
 | TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
 | TD-87 | Deliberate | Text | English-only auto resources, SA segmentation and Level 4 phrases | Open, M9 |
 | TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Paid |
@@ -195,7 +193,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
 | TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
 | TD-129 | Deliberate | Web bindings | Descendant and named collection reads scan live nodes and attributes | Open, DOM collection performance |
-| TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, M7 (ISO-01 browsing contexts) |
+| TD-130 | Deliberate | Web bindings | Window is scoped to one top-level document, with named properties, navigation and origin checks deferred | Open, M9 |
 | TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, M9 |
 | TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, M9 |
 | TD-133 | Deliberate | HTML scripting | Adoption of subtrees containing retained parser or script nodes and dynamic document markup have explicit exceptions | Open, M9 HTML lifecycle |
@@ -217,7 +215,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, M9 CSS, layout and paint |
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Paid |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
-| TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M7 browser shell (DevTools) |
+| TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M9 |
 | TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled (their compilation must apply CSP `script-src-attr`, see TD-164), body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
@@ -231,32 +229,32 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
 | TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Paid 2026-11-20 |
 | TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Paid |
-| TD-166 | Deliberate | Storage | A persistent profile's `LOCK` file is not checked for a dead owner; after a crash the user removes it | Open, M7 browser shell |
+| TD-166 | Deliberate | Storage | A persistent profile's `LOCK` file is not checked for a dead owner; after a crash the user removes it | Open, M10 |
 | TD-167 | Deliberate | Storage / web APIs | Web Storage changes fire no `storage` event in other documents with the same storage key | Open, M9 web APIs |
 | TD-168 | Deliberate | Network / storage | The HTTP cache is in memory only: persistent profiles do not keep it, and there is no `Cache-Control: immutable`, `stale-while-revalidate` or range caching | Open, M12 |
 | TD-169 | Deliberate | Web bindings / network | `fetch()` blocks the script thread until the whole response arrives. Bodies remain buffered. `ReadableStream`, `formData()` and `AbortSignal` are pending. The CLI's API base URL ignores `<base>`. | Partly paid, M9 web APIs |
 | TD-170 | Deliberate | IPC | Broker/renderer IPC copies every body through a pipe: no shared memory, one outstanding request per renderer | Open, M12 |
 | TD-171 | Deliberate | Isolation | The renderer was split but not confined, and `reftest` ran single-process | Paid 2026-11-22 (watchdog 2026-11-20, Linux and Windows sandboxes 2026-11-21, macOS and `reftest` 2026-11-22) |
 | TD-172 | Deliberate | Isolation | The Linux sandbox had no seccomp-bpf syscall filter | Paid |
-| TD-173 | Deliberate | Permissions | The browser strip (tabs, address, find, permission prompt, download notice; ADR 0074) and the permission and clipboard rules exist, but no page API (Notifications, Geolocation, async Clipboard) asks them yet; downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M8 browser shell |
+| TD-173 | Deliberate | Permissions | The browser strip (tabs, address, find, permission prompt, download notice; ADR 0074) and the permission and clipboard rules exist, but no page API (Notifications, Geolocation, async Clipboard) asks them yet; downloads are buffered whole and get no quarantine attribute or Mark of the Web | Open, M9 |
 | TD-174 | Deliberate | Isolation | macOS renderers were not confined by default | Paid 2026-11-22 (ADR 0063 Accepted, verified on native macOS x64 and ARM64; follow-ups TD-183) |
-| TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M8 packaging |
+| TD-175 | Deliberate | Isolation | The Linux sandbox binds all of `/usr` read-only and needs bubblewrap on `PATH` | Open, M10 |
 | TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) was not OS-confined | Paid 2026-11-22 (Linux 2026-11-21, macOS and Windows 2026-11-22; Windows loopback fixture runs stay unconfined, ADR 0066) |
-| TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M8 (compositor) |
-| TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M8 browser shell |
+| TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M9 |
+| TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M9 |
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
 | TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
-| TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M8 (compositor.parity) |
+| TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M12 |
 | TD-182 | Deliberate | Desktop host | Paid 2026-11-23: `rustic view` renders through one long-lived renderer per page with clicks and keys routed to it, the UI-01 browser strip, and window tests on native Windows, macOS and Linux (ADR 0069, ADR 0074); IME composition into pages moved to TD-197 | Paid |
 | TD-183 | Deliberate | Isolation | Paid 2026-11-23: macOS children start from the windowless `rustic-renderer` (no AppKit before the profile applies), and the profiles hide the machine's names and the process and network `sysctl` families (ADR 0074) | Paid |
-| TD-184 | Deliberate | Compositor / IPC | The GPU process receives the page and frame pixels over its pipe and returns the composited page for every composited frame (two full copies), because there is no shared memory yet | Open, M8 (compositor.backend) |
-| TD-185 | Deliberate | Compositor / desktop host | `rustic view` presents frames composited in the broker; the GPU process does not own the window surface yet | Open, M8 (platform.linux) |
+| TD-184 | Deliberate | Compositor / IPC | The GPU process receives the page and frame pixels over its pipe and returns the composited page for every composited frame (two full copies), because there is no shared memory yet | Open, M12 |
+| TD-185 | Deliberate | Compositor / desktop host | `rustic view` presents frames composited in the broker; the GPU process does not own the window surface yet | Open, M12 |
 | TD-186 | Deliberate | Compositor / isolation | On Windows and macOS the confined GPU process uses the renderer AppContainer and Seatbelt profiles, which grant no GPU driver services, so the hardware compositor (ADR 0071) may only open there with `--no-sandbox`; confined runs composite on the CPU | Paid 2026-11-23 (`Rustic.Gpu` AppContainer, Seatbelt GPU profile, CI requires the confined adapter) |
 | TD-187 | Deliberate | JS debugger | Code from `eval`, `new Function`, class field initializers, generated constructor bodies and module scripts carries no debugger steps, and code compiled before a hook attaches has none, so breakpoints there never hit (ADR 0072) | Open, M9 (language and web APIs) |
 | TD-188 | Deliberate | DevTools | Inline script lines are mapped to document lines by finding the script text in the document bytes, which works only for UTF-8-compatible documents; others report script-relative lines | Open, M9 (language and web APIs) |
 | TD-189 | Deliberate | DevTools / network | `network.requests` lists only requests of network documents (`--allow-origin`); local-file loads and frames' requests are not logged, and the log keeps no timing or bodies | Open, M9 (language and web APIs) |
 | TD-190 | Deliberate | DevTools | Automation protocol 1 has no CSS matched-rule or cascade inspection, no key or pointer-move input (only clicks), no DOM editing and no event timeline (profiling gives statement counts and turn metrics) | Open, M9 (CSS, layout and paint) |
-| TD-191 | Deliberate | Accessibility / desktop host | **Partly paid 2026-11-23 (ADR 0074):** `rustic view` drives a live page and passes assistive actions (focus, click, set value, set selection) to it. Remaining: `rustic view` exposes each frame's accessibility tree to the platform bridge and routes IME composition into the focused page field (TD-197), but the browser chrome (address strip, permission prompt) is not in the tree. The live renderer already accepts both (ADR 0073, `rustic drive`) | Partly paid, M8 (UI-01) |
+| TD-191 | Deliberate | Accessibility / desktop host | **Partly paid 2026-11-23 (ADR 0074):** `rustic view` drives a live page and passes assistive actions (focus, click, set value, set selection) to it. Remaining: `rustic view` exposes each frame's accessibility tree to the platform bridge and routes IME composition into the focused page field (TD-197), but the browser chrome (address strip, permission prompt) is not in the tree. The live renderer already accepts both (ADR 0073, `rustic drive`) **Rescheduled 2026-11-23 (M8 completion):** moved to the M10 (beta) row: per-frame accessibility trees and IME routing ship with the M10 beta, together with the screen-reader acceptance moved there. | Partly paid, M10 |
 | TD-192 | Deliberate | Accessibility / layout | Pages with form controls cannot be laid out yet (form controls are special elements the block reference does not support), so their accessibility tree comes from the box tree without bounds, and `rustic view` cannot show them | Open, M9 CSS, layout and paint |
 | TD-193 | Deliberate | Accessibility | The whole tree is rebuilt, encoded and sent for every request and, while an assistive technology listens, for every `rustic view` frame (since 2026-11-23, ADR 0074, none while nobody listens); there are no incremental updates | Open, M12 (performance leadership) |
 | TD-194 | Deliberate | Editing | Text controls move the caret by code point (no grapheme or word movement, no Ctrl+Arrow), have no undo/redo or clipboard, fire no `select`/`selectionchange` events, and `contenteditable` is not editable | Open, M9 language and web APIs |
@@ -264,7 +262,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-196 | Deliberate | Browser shell | Paid 2026-11-23: every tab keeps a live page (up to six, least recently shown discarded first), background pages get at most one frame a second, and one opened profile serves every page thread (ADR 0074) | Paid |
 | TD-197 | Deliberate | Desktop host | **Partly paid 2026-11-23 (ADR 0074):** composition reaches the focused page field as well as the browser's own. Remaining: CI exercises it with synthetic events through the host's handler, not with the platforms' input methods (IBus, TSF, macOS text input) | Partly paid, M10 (beta input-method runs) |
 | TD-198 | Deliberate | Network / CLI | Frame and popup documents are read whole in the broker before their renderer parses them; only top-level documents stream | Open, M12 |
-| TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M8 (a11y.bridges) |
+| TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M10 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -475,6 +473,7 @@ byte offsets, but a URL string has no `SourceId`/revision of its own, so the
 conversion belongs to the caller that knows which document attribute or
 script string the URL came from. Pay at the same trigger.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M10 (beta) row: the DevTools console (ADR 0072) reports script errors through the automation protocol, not HTML parser diagnostics; byte-span conversion is due when DevTools shows parse diagnostics in the M10 beta.
 
 ### TD-16 — Adoption reissues node IDs instead of keeping node identity (Paid)
 
@@ -939,6 +938,7 @@ WOFF2 decoding behind the same limits, platform discovery in
 `rustic-platform`, and shaping/line layout in REN-03b+. **Trigger:** loading
 real pages' web fonts, shaping text, or desktop/mobile hosts needing system
 fonts.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 text and codecs row: the native font services part is in (ADR 0078); variable and color fonts are M9 text work.
 
 ### TD-43 — Query font units ignore loaded fonts (Paid)
 
@@ -1019,6 +1019,7 @@ so the cost is bounded but proportional to the surface, not the group.
 **Pay:** size groups to the union of their items' clipped device bounds, and
 skip groups whose content is a single opaque-free fill (fold opacity into its
 color). **Trigger:** pages with many small translucent boxes, or tiled raster.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 CSS, layout and paint row: bounded opacity surfaces are paint work for the M9 paint row.
 
 ### TD-47 — Untailored segmentation and bidi
 
@@ -1108,6 +1109,7 @@ which is linear but several times slower than table lookup. **Pay:** color
 management with the paint pipeline's working space; table-driven Huffman
 decoding with the same tests and fuzz target. **Trigger:** real pages with
 tagged images, or decode time showing in render profiles.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 text and codecs row: PNG color management and table-driven inflate are M9 codec work.
 
 ### TD-52 — First text painting slice
 
@@ -1133,6 +1135,7 @@ the remaining decoration styles and properties; an exact nonzero winding accumul
 winding with a separate coverage buffer); a `--font` option and system font
 discovery per platform behind the same `FontDatabase`; text-node hit regions.
 **Trigger:** the first real-page renders or text WPT reftests.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 CSS, layout and paint row: hinting and exact decoration metrics are paint work for the M9 paint row.
 
 ### TD-53 — First image painting slice
 
@@ -1153,6 +1156,7 @@ apply `object-fit`/`object-position`/`image-rendering`; area-averaged
 downscaling; alt text rendering; an image cache in the resource lifecycle
 work (`paint.images` lifecycle). **Trigger:** the first real-page renders or
 image WPT reftests.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 CSS, layout and paint row: image fit modes, filtering and alt text are paint work for the M9 paint row.
 
 ### TD-54 — First outline painting slice
 
@@ -1269,6 +1273,7 @@ margins per tile instead of per list; a retained tile cache with GPU
 upload in M5; restyle only what viewport-dependent values touch and
 incremental relayout. **Trigger:** frame-budget measurements in the paint
 performance gate, scrolling, animation, or the shell's window resizing.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 CSS, layout and paint row: per-tile display-list culling and incremental relayout are raster work for the M9 paint row; the GPU frame-time gate now runs in CI.
 
 ### TD-70 — Atomic inline and block-in-inline approximations
 
@@ -1364,6 +1369,7 @@ supported for JPEG either: the decoder always orients. **Pay:** a shared
 EXIF reader for the three containers and an orientation flag on decoding
 that paint chooses from the computed `image-orientation`. **Trigger:** the
 `image-orientation` property in style, or real photos from phones.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 text and codecs row: ICC and EXIF handling for WebP and PNG are M9 codec work.
 
 ### TD-82 — Animated images paint their first frame
 
@@ -1436,6 +1442,7 @@ Pay before loading arbitrary remote fonts or native platform font integration:
 add global temporary/cache accounting, native service adapters and native device
 acceptance. The current host grants local files explicitly; neither shaping nor
 layout performs I/O or downloads fonts.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 text and codecs row: backend caches and handle-based traversal are M9 text work.
 
 ### TD-86 — Shaping across source boundaries and selected breaks
 
@@ -2168,6 +2175,7 @@ access. Test context identity across navigation and cross-origin property
 descriptors with the corresponding Web Platform Tests.
 [ADR 0032](adr/0032-top-level-window-realm.md)
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 language and web APIs row: named access and related browsing contexts need cross-renderer WindowProxy forwarding (TD-178); both are web-API work in M9.
 
 ### TD-131 — Extended input and event delivery
 
@@ -2559,6 +2567,7 @@ through `report_exception`, add `location` with navigation, and implement
 the Console Standard's formatter with side-effect-free previews.
 **Trigger:** M6 navigation, or the DevTools work in M10.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 language and web APIs row: script URLs and throw positions belong to the VM work of the M9 language row (`js.conformance`), and console formatting to the same bindings.
 
 ### TD-153 — Event handler content attributes and remaining handler names
 
@@ -2785,6 +2794,7 @@ reviewed platform call) held for the profile's life, with the `LOCK` file
 kept only as a hint.
 **Trigger:** the M7 browser shell, which opens the user's real profile.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M10 (beta) row: an OS file lock needs `File::try_lock` (Rust 1.89) or a reviewed platform call; the MSRV is still 1.85 and a shell that ends normally releases the lock (a8b81be). Due before the M10 beta opens real user profiles by default.
 
 ### TD-167 — No `storage` events
 
@@ -2915,6 +2925,7 @@ focus, reads need focus and the permission. Remaining: page APIs
 (Notifications, Permissions, Geolocation, async Clipboard) reaching these
 rules once renderers are long-lived (TD-178), streamed downloads, and
 quarantine metadata.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 language and web APIs row: the page APIs that would ask the permission prompt (Notifications, Geolocation, async Clipboard) are M9 web APIs; download quarantine ships with M10 packaging.
 
 ### TD-174 — macOS has no renderer sandbox
 
@@ -2956,6 +2967,7 @@ texture sharing) under the backend record. **Trigger:** the hardware
 backend (`compositor.backend`), or a profile showing the copies. The
 backend exists since ADR 0071 (2026-11-23); these copies are now what
 keeps it from being faster than the CPU path end to end.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M12 (performance leadership) row: shared-memory surfaces are the frame-time and energy work of M12; the GPU process is correct without them.
 
 ### TD-185 — The window is not presented by the GPU process
 
@@ -2970,6 +2982,7 @@ an `unsafe` boundary no reviewed crate covers yet. **Pay:** a reviewed
 cross-process presentation record per platform, then hand the surface to
 the GPU process. **Trigger:** a frame-time profile showing the broker's
 copy, or GPU rasterization of page content.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M12 (performance leadership) row: presenting from the GPU process needs an `unsafe` window-handle boundary (ADR 0071) and pays off as latency, which M12 measures.
 
 ### TD-186 — Windows and macOS GPU processes have no driver access
 
@@ -3109,6 +3122,8 @@ reasons. **Pay:** move to an AccessKit release whose Unix adapter drops
 zbus-lockstep and the unmaintained crates (with the winit upgrade it needs),
 then remove the ignores. **Trigger:** such a release, a vulnerability in
 the zvariant family, or any run-time XML parsing in this graph.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M10 (beta) row: no AccessKit release drops the AT-SPI graph yet; due with the AccessKit upgrade before the M10 beta.
+
 ### TD-183 — macOS profile breadth: sysctl reads and pre-main code
 
 The Seatbelt profiles (ADR 0063) allow `sysctl-read` of every name,
@@ -3143,6 +3158,7 @@ could replace.
 renderer), and launch a packaged, path-pinned bubblewrap or Rustic's
 own namespace setup.
 **Trigger:** M8 packaging, or a library-disclosure finding.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M10 (beta) row: packaging (installers that ship bubblewrap or a bundled launcher and narrower binds) is M10 beta work.
 
 ### TD-176 — The network process is not OS-confined
 
@@ -3216,6 +3232,7 @@ without a background transparent.
 surfaces with their transforms, blend modes and filters, and give frame
 canvases HTML's transparent default; keep the coverage path as the CPU
 reference.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 CSS, layout and paint row: blend modes, filters and transforms across frame boundaries are paint work for the M9 CSS/paint row and its WPT reftests.
 
 ### TD-178 — Frames have no script relationships and need a split run
 
@@ -3237,6 +3254,7 @@ retargeting and cross-origin property access (TD-130) and cross-renderer
 `postMessage` through the broker, give popups and openers WindowProxies
 across renderers and show popups in the shell, and load frames in
 single-process runs for `reftest`.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M9 language and web APIs row: frame scripting across renderers (`contentWindow`, `postMessage`, `window.open`) is HTML browsing-context work in M9, together with TD-130.
 
 ### TD-179 — HTML presentational hints are not mapped
 
@@ -3282,6 +3300,7 @@ positioned box above a fixed one) is painted in one pass.
 the layer) and rounded scrollports with the M8 GPU compositor
 (`compositor.parity`), damage-based overlay repaints, frame layers inside
 scenes, and the same snapping for dumps and hit testing.
+**Rescheduled 2026-11-23 (M8 completion):** moved to the M12 (performance leadership) row: finer scene layering is compositor performance, measured in M12.
 
 ### TD-182 — The first window re-renders every frame
 

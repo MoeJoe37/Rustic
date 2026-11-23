@@ -6447,7 +6447,7 @@
           "id": "compositor.parity",
           "label": "GPU/reference parity, performance and energy gates",
           "size": 3,
-          "milestone": "M8",
+          "milestone": "M10",
           "status": "in_progress",
           "evidence": [],
           "steps": [
@@ -7092,7 +7092,7 @@
           "id": "a11y.acceptance",
           "label": "Assistive-technology and accessibility acceptance",
           "size": 3,
-          "milestone": "M8",
+          "milestone": "M10",
           "status": "in_progress",
           "evidence": [],
           "external": "Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI",

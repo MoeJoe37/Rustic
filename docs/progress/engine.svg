@@ -225,14 +225,13 @@
 <text x="434.00" y="458" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
 <text x="488.00" y="458" fill="#8b949e" font-size="11" text-anchor="end">3.13%</text>
 </g>
-<g><title>M8 Desktop alpha: 94.52% (16/18 capabilities, 8.12% of engine)</title>
+<g><title>M8 Desktop alpha: 100.00% (16/16 capabilities, 7.00% of engine)</title>
 <text x="512.00" y="278" fill="#8b949e" font-size="12" font-weight="600">M8</text>
 <text x="548.00" y="278" fill="#c9d1d9" font-size="12">Desktop alpha</text>
 <rect x="712.00" y="269" width="150.00" height="10" rx="3" fill="#21262d"/>
-<rect x="712.00" y="269" width="141.78" height="10" rx="3" fill="#388bfd"/>
-<rect x="712.00" y="269" width="129.30" height="10" rx="3" fill="#2ea043"/>
-<text x="922.00" y="278" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">94.52%</text>
-<text x="976.00" y="278" fill="#8b949e" font-size="11" text-anchor="end">8.12%</text>
+<rect x="712.00" y="269" width="150.00" height="10" rx="3" fill="#2ea043"/>
+<text x="922.00" y="278" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
+<text x="976.00" y="278" fill="#8b949e" font-size="11" text-anchor="end">7.00%</text>
 </g>
 <g><title>M9 Compatibility expansion: 5.19% (3/54 capabilities, 22.35% of engine)</title>
 <text x="512.00" y="308" fill="#8b949e" font-size="12" font-weight="600">M9</text>
@@ -243,12 +242,13 @@
 <text x="922.00" y="308" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">5.19%</text>
 <text x="976.00" y="308" fill="#8b949e" font-size="11" text-anchor="end">22.35%</text>
 </g>
-<g><title>M10 Embedding &amp; beta release: 0.00% (0/7 capabilities, 2.55% of engine)</title>
+<g><title>M10 Embedding &amp; beta release: 18.40% (0/9 capabilities, 3.67% of engine)</title>
 <text x="512.00" y="338" fill="#8b949e" font-size="12" font-weight="600">M10</text>
 <text x="548.00" y="338" fill="#c9d1d9" font-size="12">Embedding &amp; beta release</text>
 <rect x="712.00" y="329" width="150.00" height="10" rx="3" fill="#21262d"/>
-<text x="922.00" y="338" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<text x="976.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">2.55%</text>
+<rect x="712.00" y="329" width="27.60" height="10" rx="3" fill="#388bfd"/>
+<text x="922.00" y="338" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">18.40%</text>
+<text x="976.00" y="338" fill="#8b949e" font-size="11" text-anchor="end">3.67%</text>
 </g>
 <g><title>M11 Web platform parity: 0.83% (0/30 capabilities, 14.74% of engine)</title>
 <text x="512.00" y="368" fill="#8b949e" font-size="12" font-weight="600">M11</text>
@@ -955,7 +955,7 @@
 <g><title>Surface/device loss, GPU process crash/restart and resource recovery: complete, size 2, M8</title>
 <rect x="753.85" y="1056" width="56.46" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>GPU/reference parity, performance and energy gates: in progress, size 3, M8, 66.66% verified, external dependency: Needs a machine with a hardware GPU and power counters (self-hosted runner or contributor hardware): no GitHub-hosted runner has either; the benchmark and budgets are ready (docs/PERFORMANCE.md, &quot;GPU frame budgets&quot;)</title>
+<g><title>GPU/reference parity, performance and energy gates: in progress, size 3, M10, 66.66% verified, external dependency: Needs a machine with a hardware GPU and power counters (self-hosted runner or contributor hardware): no GitHub-hosted runner has either; the benchmark and budgets are ready (docs/PERFORMANCE.md, &quot;GPU frame budgets&quot;)</title>
 <rect x="812.31" y="1056" width="85.69" height="14" rx="2" fill="#30363d"/>
 <rect x="812.31" y="1056" width="57.12" height="14" rx="2" fill="#388bfd"/>
 <rect x="812.81" y="1056.5" width="84.69" height="13" rx="2" fill="none" stroke="#388bfd"/>
@@ -1017,7 +1017,7 @@
 <g><title>Keyboard/IME, focus and assistive editing flows: complete, size 3, M8</title>
 <rect x="737.14" y="1116" width="79.43" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Assistive-technology and accessibility acceptance: in progress, size 3, M8, 50.00% verified, external dependency: Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI</title>
+<g><title>Assistive-technology and accessibility acceptance: in progress, size 3, M10, 50.00% verified, external dependency: Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI</title>
 <rect x="818.57" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
 <rect x="818.57" y="1116" width="39.71" height="14" rx="2" fill="#388bfd"/>
 <rect x="819.07" y="1116.5" width="78.43" height="13" rx="2" fill="none" stroke="#388bfd"/>
@@ -1210,6 +1210,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 259259f40668</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot f68577a2ac55</text>
 </g>
 </svg>

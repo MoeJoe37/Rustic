@@ -2,7 +2,7 @@
 
 **Overall completion: 50.03%** = 48.43% verified complete + 1.60% partial credit. 115/228 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `259259f40668d09a544eff0d769ab80cda5449df8d255ec2958c8f6605b6ed58`.
+Catalog: `engine-v4`. Source fingerprint: `f68577a2ac55a8200d95fc954ae4689042551d6f69628765fc736e200a65e8e6`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,9 +17,9 @@ Catalog: `engine-v4`. Source fingerprint: `259259f40668d09a544eff0d769ab80cda544
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.60% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 16/18 | 94.52% | 86.20% | 8.12% |
+| M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
 | M9 Compatibility expansion | 3/54 | 5.19% | 2.63% | 22.35% |
-| M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
+| M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 0/30 | 0.83% | 0.00% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
 | M13 Desktop engine 1.0 | 0/1 | 0.00% | 0.00% | 0.45% |
@@ -302,7 +302,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `compositor.backend` — Desktop GPU adapters and CPU fallback · size 3 · M8 · 0.69% of engine ([source](../../crates/rustic-gpu/src/lib.rs), [source](../../crates/rustic-gpu/src/lib.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-sandbox/src/seccomp.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [source](../../crates/rustic-sandbox/src/windows.rs), [source](../../crates/rustic-sandbox/src/seatbelt.rs), [test](../../crates/rustic-sandbox/src/seatbelt.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
 - **planned** `compositor.mobile` — Android and iOS GPU adapters verified on devices · size 2 · M14 · 0.46% of engine
 - **complete** `compositor.recovery` — Surface/device loss, GPU process crash/restart and resource recovery · size 2 · M8 · 0.46% of engine ([source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-gpu/tests/parity.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
-- **in progress 66.66%** `compositor.parity` — GPU/reference parity, performance and energy gates · size 3 · M8 · 0.69% of engine · **external dependency:** Needs a machine with a hardware GPU and power counters (self-hosted runner or contributor hardware): no GitHub-hosted runner has either; the benchmark and budgets are ready (docs/PERFORMANCE.md, "GPU frame budgets")
+- **in progress 66.66%** `compositor.parity` — GPU/reference parity, performance and energy gates · size 3 · M10 · 0.69% of engine · **external dependency:** Needs a machine with a hardware GPU and power counters (self-hosted runner or contributor hardware): no GitHub-hosted runner has either; the benchmark and budgets are ready (docs/PERFORMANCE.md, "GPU frame budgets")
   - [x] Byte-exact GPU/reference parity gate, required in Linux CI on lavapipe ([test](../../crates/rustic-gpu/tests/parity.rs), [source](../../.github/workflows/ci.yml))
   - [x] Frame-time gate for GPU compositing: software-adapter (lavapipe) regression gate required in CI, hardware budgets and GPU-to-CPU ratio in the reference-device harness ([source](../../crates/rustic-gpu/examples/gpu_frame_bench.rs), [source](../../.github/workflows/ci.yml), [source](../../tools/cross_engine_bench.py), [test](../../tools/tests/test_cross_engine_bench.py))
   - [ ] Frame-time and energy-per-frame measurements on hardware GPUs within the hardware budgets
@@ -325,7 +325,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `a11y.bridges` — Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI) · size 3 · M8 · 0.42% of engine ([source](../../crates/rustic-shell/src/accessibility.rs), [source](../../crates/rustic-shell/src/window.rs), [source](../../third_party/rust-dependencies.json), [test](../../crates/rustic-shell/src/accessibility.rs), [test](../../crates/rustic-shell/src/accessibility.rs), [test](../../crates/rustic-cli/tests/a11y.rs), [test](../../tools/a11y_probe_linux.py), [test](../../tools/a11y_probe_windows.ps1), [test](../../tools/a11y_probe_macos.py))
 - **planned** `a11y.mobile` — Android TalkBack and iOS VoiceOver bridges verified on devices · size 2 · M14 · 0.28% of engine
 - **complete** `a11y.editing` — Keyboard/IME, focus and assistive editing flows · size 3 · M8 · 0.42% of engine ([source](../../crates/rustic-bindings/src/page/events/editing.rs), [source](../../crates/rustic-bindings/src/page/events/editing.rs), [source](../../crates/rustic-ipc/src/protocol.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-cli/tests/a11y.rs))
-- **in progress 50.00%** `a11y.acceptance` — Assistive-technology and accessibility acceptance · size 3 · M8 · 0.42% of engine · **external dependency:** Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI
+- **in progress 50.00%** `a11y.acceptance` — Assistive-technology and accessibility acceptance · size 3 · M10 · 0.42% of engine · **external dependency:** Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI
   - [x] Automated checks of a running window through AT-SPI, UI Automation and NSAccessibility in CI on Linux, Windows and macOS (x64 and ARM64) ([source](../../.github/workflows/ci.yml), [source](../../tests/a11y/probe.html), [test](../../tools/a11y_probe_linux.py), [test](../../tools/a11y_probe_windows.ps1), [test](../../tools/a11y_probe_macos.py))
   - [ ] Acceptance sessions with real screen-reader users on each desktop platform (external)
 

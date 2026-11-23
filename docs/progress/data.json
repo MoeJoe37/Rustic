@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "259259f40668d09a544eff0d769ab80cda5449df8d255ec2958c8f6605b6ed58",
+  "source_fingerprint": "f68577a2ac55a8200d95fc954ae4689042551d6f69628765fc736e200a65e8e6",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
@@ -84,12 +84,12 @@
     {
       "id": "M8",
       "label": "Desktop alpha",
-      "share": "8.12",
+      "share": "7.00",
       "completed": 16,
-      "total": 18,
-      "percent": "94.52",
-      "verified_percent": "86.20",
-      "partial_percent": "8.32"
+      "total": 16,
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "M9",
@@ -104,12 +104,12 @@
     {
       "id": "M10",
       "label": "Embedding & beta release",
-      "share": "2.55",
+      "share": "3.67",
       "completed": 0,
-      "total": 7,
-      "percent": "0.00",
+      "total": 9,
+      "percent": "18.40",
       "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "partial_percent": "18.40"
     },
     {
       "id": "M11",
@@ -7009,7 +7009,7 @@
           "id": "compositor.parity",
           "label": "GPU/reference parity, performance and energy gates",
           "size": 3,
-          "milestone": "M8",
+          "milestone": "M10",
           "status": "in_progress",
           "evidence": [],
           "steps": [
@@ -7698,7 +7698,7 @@
           "id": "a11y.acceptance",
           "label": "Assistive-technology and accessibility acceptance",
           "size": 3,
-          "milestone": "M8",
+          "milestone": "M10",
           "status": "in_progress",
           "evidence": [],
           "external": "Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI",

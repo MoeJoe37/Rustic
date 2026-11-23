@@ -747,6 +747,12 @@ scales, minimize and IME handled by the host, and text drawn with the
 platform's own fonts. Remaining: TD-183 (macOS pre-main sandbox), TD-196,
 TD-197 and the curated site corpus for the demo.
 
+**Complete 2026-11-23** ([M8 completion review](reviews/2026-11-23-m8-completion.md),
+main `25028db`): all 16 M8 capabilities are complete. Hardware GPU energy
+(`compositor.parity`) and screen-reader user acceptance (`a11y.acceptance`)
+moved to M10 as external dependencies. The open M8 debt moved to the M9,
+M10 and M12 rows.
+
 **Gate:** critical accessibility flows, crash recovery, profile separation,
 supported-platform safety gates, and agreed performance budgets pass. Do not
 declare broad site compatibility from a small handpicked demo collection.
@@ -968,9 +974,9 @@ acceptance, and overall progress cannot reach 100% without it.
 ## 18. Current implementation queue
 
 Work in order unless a row says it runs in parallel. Status is as of
-2026-11-22; [implementation progress](IMPLEMENTATION.md) records each finished
+2026-11-23; [implementation progress](IMPLEMENTATION.md) records each finished
 contract, [§11](#11-m8--reference-desktop-alpha) has the M8 tasks and the
-[progress summary](progress/summary.md) the measured state. M1 to M7 are
+[progress summary](progress/summary.md) the measured state. M1 to M8 are
 complete; their queues (DOC-, CSS-, REN-, JS-, WEB-, NET- and ISO- tasks) are
 in the milestone sections above.
 
@@ -990,7 +996,8 @@ in the milestone sections above.
 | — | Hosted CI | The full matrix green on every commit; then require the `CI` check on `main` (M0 follow-up) | Green on `moejoe873/Rustic` at `e150a22` |
 | — | External security review (`security.brave`, external dependency) | Outside reviewers return findings on the [packet](reviews/2026-11-22-m7-external-review-packet.md); findings fixed or recorded | Waiting for reviewers; due before the M10 beta |
 | — | Android and iOS devices | M14 ([§17](#17-m14--mobile-devices-and-five-platform-10)) | Deferred by ADR 0067; compile checks and the Android emulator job stay in CI |
-| — | Debt due now | The M8 rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule), first "before remote browsing is on by default" | With the tasks above |
+| done | M8 completion review | Every M8 gate with recorded evidence; M8 debt rows moved | Done 2026-11-23 ([review](reviews/2026-11-23-m8-completion.md)); GPU energy and screen-reader acceptance moved to M10 as external dependencies |
+| — | Debt due now | The M9 rows of the [payoff schedule](TECH_DEBT.md#payoff-schedule) | With the M9 workstreams |
 
 Update this table in the same change that finishes a task. When it and the
 [progress summary](progress/summary.md) disagree, the summary is the measured

@@ -538,6 +538,18 @@ impl<C: Clock> ScriptedDocument<C> {
 
     /// HostEnsureCanCompileStrings for this document's agent (CSP
     /// `'unsafe-eval'`).
+    /// The tree parsed so far (the whole tree once parsing has ended), for
+    /// a host discovering resources ahead of the parser. `None` while a
+    /// script holds the tree.
+    pub fn live_document(&self) -> Option<Ref<'_, Document>> {
+        self.document.read()
+    }
+
+    /// The document's mode, once the parser has decided it.
+    pub fn live_document_mode(&self) -> Option<DocumentMode> {
+        self.document.mode()
+    }
+
     pub fn set_string_compilation_allowed(&mut self, allowed: bool) -> Result<(), ScriptStop> {
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         agent.set_string_compilation_allowed(allowed);

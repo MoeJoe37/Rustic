@@ -283,6 +283,13 @@ impl AppliedLocalFiles {
         Ok(())
     }
 
+    /// Whether `url` already has an applied result (bytes or a failure).
+    pub(crate) fn contains(&self, url: &Url) -> bool {
+        self.state
+            .try_borrow()
+            .is_ok_and(|state| state.entries.contains_key(&url.serialize()))
+    }
+
     /// Resolve once without exposing a partly fetched resource. The caller
     /// checks the URL security policy before returning bytes from `read`.
     /// Later reads still respect their own per-request size limits.

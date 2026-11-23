@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-165, TD-134 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-165 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166, TD-196 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -199,7 +199,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-131 | Deliberate | DOM events | Initial click and keyboard delivery leaves extended input events, signal-driven removal, shadow retargeting and HTML error reporting | Open, M9 |
 | TD-132 | Deliberate | Window scheduling | Headless timers bind at the turn boundary and frame callbacks use host time and exception counts | Open, M9 |
 | TD-133 | Deliberate | HTML scripting | Adoption of subtrees containing retained parser or script nodes and dynamic document markup have explicit exceptions | Open, M9 HTML lifecycle |
-| TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Open, M7 entry |
+| TD-134 | Deliberate | HTML scripting | External classics follow explicit host completion order. Stylesheet dependencies and task interleaving remain open. | Paid |
 | TD-135 | Deliberate | HTML modules | Static local JavaScript modules share a map. Dynamic imports, import maps and data module types are pending. | Open, M9 language and web APIs |
 | TD-136 | Bad | JS | The four URI functions and the omitted standard globals are covered by the pinned Test262 gate | Paid |
 | TD-137 | Deliberate | JS | Web-legacy library surface is missing: Annex B `escape`/`unescape` and String HTML methods, `__defineGetter__` and its siblings, legacy RegExp statics and `Error.prototype.stack`; `test/annexB` is not run | Open, M9 language and web APIs (`js.conformance`) |
@@ -2219,7 +2219,7 @@ identity-preserving adoption of parser-held nodes, nested insertion and
 reentry limits, and the lifetime of a document replaced by `document.open`.
 [ADR 0038](adr/0038-parser-inserted-inline-classics.md)
 
-### TD-134 — Classic completion and the page event loop
+### TD-134 — Classic completion and the page event loop (Paid)
 
 **Rescheduled 2026-11-20 (M6 completion):** The CLI now loads subresources over HTTP one at a time (TD-165); stylesheet-blocking scripts and task interleaving matter once loads run concurrently on the network process, which M7 introduces.
 
@@ -2234,6 +2234,8 @@ stylesheet, script or timer becomes ready while the parser is suspended.
 
 **Rescheduled 2026-11-19 (M5 completion review):** Stylesheet-blocking scripts and task interleaving depend on asynchronous resource loading, which arrives with NET-01; moved to the M6 entry row.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): The CLI's scripted load now services script requests through `ScriptRequests` (`crates/rustic-cli/src/loader.rs`). A network document starts every requested script, and the stylesheets parsed before them, side by side (TD-165's fetch controller, in process and through the broker). Before a parser-blocking or deferred script runs, the stylesheets in the tree parsed so far are loaded into the applied snapshot (HTML's script-blocking style sheets; the engine exposes the partial tree as `ClassicScriptLoad::live_document`). Timers that fall due while a request is outstanding run before its completion: a network document's clock moves by the time spent waiting, a local file's only runs timers already due. Test: `scripts_wait_for_earlier_stylesheets_and_timers_run_while_they_load` (rustic-cli `tests/network.rs`, both process modes).
 
 ### TD-135 — Dynamic page imports, import maps and data modules
 

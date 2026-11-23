@@ -400,6 +400,17 @@ impl<C: Clock> ClassicScriptLoad<C> {
             .next_request()
     }
 
+    /// The tree parsed so far, for a host discovering resources ahead of
+    /// the parser (stylesheets that block scripts, TD-134).
+    pub fn live_document(&self) -> Option<std::cell::Ref<'_, Document>> {
+        self.inner.pending.as_ref()?.document.live_document()
+    }
+
+    /// The document's mode, once the parser has decided it.
+    pub fn live_document_mode(&self) -> Option<rustic_html::DocumentMode> {
+        self.inner.pending.as_ref()?.document.live_document_mode()
+    }
+
     /// Whether a blocking classic is holding the parser at its insertion point.
     pub fn is_parser_blocked(&self) -> bool {
         self.inner

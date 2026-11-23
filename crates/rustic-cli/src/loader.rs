@@ -752,6 +752,8 @@ fn run_scripted_load(
     if let Some(session) = &devtools {
         session.attach(&mut load, &source.url)?;
     }
+    let mut requests = ScriptRequests::new(source.url.clone());
+    let mut turns = 0;
     read(&mut |bytes, encoding| {
         if let Some(encoding) = encoding {
             load.set_initial_encoding(encoding)?;
@@ -769,13 +771,15 @@ fn run_scripted_load(
         }
         load.feed(bytes)?;
         // Service requests at parser barriers and EOF, independent of file chunks.
-        while load.is_parser_blocked() && complete_next_script_request(&mut load, &fetch)? {}
+        while load.is_parser_blocked()
+            && requests.complete_next(&mut load, &fetch, &applied_files, limits, &mut turns)?
+        {
+        }
         Ok(())
     })?;
     load.close_input()?;
-    let mut turns = 0;
     let mut document = loop {
-        while complete_next_script_request(&mut load, &fetch)? {}
+        while requests.complete_next(&mut load, &fetch, &applied_files, limits, &mut turns)? {}
         if let Some(document) = load.take_document()? {
             break document;
         }
@@ -1475,12 +1479,15 @@ fn queue_discovered_local_resources(
     cancellation: &CancellationToken,
     timer_turns: &mut usize,
 ) -> Result<usize, LoadError> {
-    let requests = {
+    let mut requests = {
         let parsed = document.document();
         fetch.set_quirks(parsed.parsed().mode() == DocumentMode::Quirks);
         discover_local_resources(parsed.parsed().document(), document_url, limits)
     };
     if let Some(session) = fetch.network() {
+        // Sheets a script waited for are already applied; a network
+        // resource is fetched once per load.
+        requests.retain(|(url, _)| !applied.contains(url));
         prefetch_resources(session, &requests);
     }
     let mut delivered = 0usize;
@@ -1672,46 +1679,164 @@ fn advance_script_timer(
     Ok(())
 }
 
-fn complete_next_script_request(
-    load: &mut ClassicScriptLoad<ManualClock>,
-    fetch: &LocalStylesheetFetcher,
-) -> Result<bool, LoadError> {
-    let Some(request) = load.next_request() else {
-        return Ok(false);
-    };
-    let fetched = match fetch.network() {
-        Some(session) => session.fetch(
-            &request.url,
-            &ResourceKind::Script {
-                nonce: request.nonce.clone(),
-                parser_inserted: request.parser_inserted,
-                module: request.kind == rustic_engine::ScriptResourceKind::JavaScriptModule,
-            },
-            request.max_bytes,
-        ),
-        None => fetch.fetch_bytes(&request.url, request.max_bytes),
-    };
-    let source = match fetched {
-        Ok(source) => Ok(source),
-        Err(FetchError::Blocked) => Err(ClassicFetchError::Blocked),
-        Err(FetchError::NotFound) => Err(ClassicFetchError::NotFound),
-        Err(FetchError::TooLarge) => Err(ClassicFetchError::TooLarge),
-        Err(FetchError::Failed) => Err(ClassicFetchError::Failed),
-        Err(FetchError::Cancelled) => return Err(LoadError::Cancelled),
-    };
-    if let (Some(session), Ok(bytes)) = (crate::devtools::active(), &source) {
-        session.note_script(&request.url, bytes);
+/// The script requests of a scripted load (TD-134). A network document
+/// starts every requested script, and the stylesheets parsed before them,
+/// side by side; the load still completes requests in the order the
+/// engine asked for them. Before a parser-blocking or deferred script
+/// runs, the stylesheets parsed before it are loaded (HTML's "script-
+/// blocking style sheets"), and timers that fall due while a request is
+/// outstanding run first, as the event loop would run them.
+struct ScriptRequests {
+    document_url: rustic_url::Url,
+    queue: std::collections::VecDeque<rustic_engine::ClassicScriptRequest>,
+    /// Stylesheets already started ahead of the parser.
+    started: std::collections::HashSet<String>,
+    /// Stylesheets already loaded for a script.
+    loaded: std::collections::HashSet<String>,
+}
+
+impl ScriptRequests {
+    fn new(document_url: rustic_url::Url) -> Self {
+        Self {
+            document_url,
+            queue: std::collections::VecDeque::new(),
+            started: std::collections::HashSet::new(),
+            loaded: std::collections::HashSet::new(),
+        }
     }
-    let charset = fetch
-        .network()
-        .and_then(|session| session.charset_of(&request.url))
-        .and_then(|label| Encoding::for_label(&label));
-    load.complete_script_with_charset(
-        request.id,
-        source.as_deref().map_err(|error| *error),
-        charset,
-    )?;
-    Ok(true)
+
+    /// The stylesheets in the tree parsed so far.
+    fn parsed_sheets(
+        &self,
+        load: &ClassicScriptLoad<ManualClock>,
+        limits: LoaderLimits,
+    ) -> Vec<rustic_url::Url> {
+        let Some(document) = load.live_document() else {
+            return Vec::new();
+        };
+        discover_local_resources(&document, &self.document_url, limits)
+            .into_iter()
+            .filter(|(_, kind)| *kind == LocalResourceKind::Stylesheet)
+            .map(|(url, _)| url)
+            .collect()
+    }
+
+    /// Complete the next requested script; `false` when none is waiting.
+    fn complete_next(
+        &mut self,
+        load: &mut ClassicScriptLoad<ManualClock>,
+        fetch: &LocalStylesheetFetcher,
+        applied: &AppliedLocalFiles,
+        limits: LoaderLimits,
+        turns: &mut usize,
+    ) -> Result<bool, LoadError> {
+        let mut fresh = Vec::new();
+        while let Some(request) = load.next_request() {
+            fresh.push(request);
+        }
+        if let (Some(session), false) = (fetch.network(), fresh.is_empty()) {
+            let mut ahead: Vec<_> = fresh
+                .iter()
+                .map(|request| (request.url.clone(), script_kind(request)))
+                .collect();
+            for url in self.parsed_sheets(load, limits) {
+                if self.started.insert(url.serialize()) {
+                    ahead.push((url, ResourceKind::Stylesheet { quirks: false }));
+                }
+            }
+            session.prefetch(&ahead);
+        }
+        self.queue.extend(fresh);
+        let Some(request) = self.queue.pop_front() else {
+            return Ok(false);
+        };
+        let started = std::time::Instant::now();
+        if request.mode != rustic_engine::ClassicScriptMode::Async {
+            fetch.set_quirks(load.live_document_mode() == Some(DocumentMode::Quirks));
+            let max_bytes = limits.stylesheets.max_total_bytes;
+            for url in self.parsed_sheets(load, limits) {
+                if self.loaded.insert(url.serialize()) {
+                    // A failed sheet is recorded too: it no longer blocks.
+                    let _ = applied.read(&url, max_bytes, || fetch.fetch_bytes(&url, max_bytes));
+                }
+            }
+        }
+        let fetched = match fetch.network() {
+            Some(session) => session.fetch(&request.url, &script_kind(&request), request.max_bytes),
+            None => fetch.fetch_bytes(&request.url, request.max_bytes),
+        };
+        let source = match fetched {
+            Ok(source) => Ok(source),
+            Err(FetchError::Blocked) => Err(ClassicFetchError::Blocked),
+            Err(FetchError::NotFound) => Err(ClassicFetchError::NotFound),
+            Err(FetchError::TooLarge) => Err(ClassicFetchError::TooLarge),
+            Err(FetchError::Failed) => Err(ClassicFetchError::Failed),
+            Err(FetchError::Cancelled) => return Err(LoadError::Cancelled),
+        };
+        // A network document's clock moves with the time spent waiting; a
+        // local file arrives at once, so only timers already due run.
+        let waited = if fetch.network().is_some() {
+            started.elapsed()
+        } else {
+            Duration::ZERO
+        };
+        run_timers_within(load, waited, turns)?;
+        if let (Some(session), Ok(bytes)) = (crate::devtools::active(), &source) {
+            session.note_script(&request.url, bytes);
+        }
+        let charset = fetch
+            .network()
+            .and_then(|session| session.charset_of(&request.url))
+            .and_then(|label| Encoding::for_label(&label));
+        load.complete_script_with_charset(
+            request.id,
+            source.as_deref().map_err(|error| *error),
+            charset,
+        )?;
+        Ok(true)
+    }
+}
+
+/// How a script request is fetched.
+fn script_kind(request: &rustic_engine::ClassicScriptRequest) -> ResourceKind {
+    ResourceKind::Script {
+        nonce: request.nonce.clone(),
+        parser_inserted: request.parser_inserted,
+        module: request.kind == rustic_engine::ScriptResourceKind::JavaScriptModule,
+    }
+}
+
+/// Run the timers that fall due within `budget` of the load's clock while
+/// a request is outstanding, then move the clock past the rest of it. The
+/// timer-turn ceiling stops the interleaving early; the load's own timer
+/// loop reports it if the page keeps going.
+fn run_timers_within(
+    load: &mut ClassicScriptLoad<ManualClock>,
+    mut budget: Duration,
+    turns: &mut usize,
+) -> Result<(), LoadError> {
+    while *turns < MAX_SCRIPT_TIMER_TURNS {
+        let Some(delay) = load.time_until_next_timer()? else {
+            break;
+        };
+        if delay > budget {
+            break;
+        }
+        load.clock()
+            .expect("active load")
+            .advance(delay)
+            .map_err(LoadError::ScriptClock)?;
+        budget -= delay;
+        *turns += 1;
+        load.run_next()?;
+    }
+    if !budget.is_zero() {
+        load.clock()
+            .expect("active load")
+            .advance(budget)
+            .map_err(LoadError::ScriptClock)?;
+    }
+    Ok(())
 }
 
 fn read_document_file(

@@ -643,3 +643,66 @@ fn quirks_mode_takes_same_origin_stylesheets_of_any_type() {
         }
     }
 }
+
+#[test]
+fn scripts_wait_for_earlier_stylesheets_and_timers_run_while_they_load() {
+    let pause = std::time::Duration::from_millis(900);
+    let slow = |body: &[u8], kind: &str| {
+        let mut bytes = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n\r\n",
+            body.len()
+        )
+        .into_bytes();
+        bytes.extend_from_slice(body);
+        Reply::new().pause(pause).send(bytes)
+    };
+    let server = FixtureServer::start([
+        (
+            "/",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/html")],
+                b"<!doctype html><script>\
+                  var order = [];\
+                  setTimeout(function () { order.push('soon'); }, 0);\
+                  setTimeout(function () { order.push('late'); \
+                    document.documentElement.setAttribute('data-order', order.join(' ')); }, 60000);\
+                  </script>\
+                  <link rel=stylesheet href=/a.css><script src=/a.js></script><p>text</p>",
+            ),
+        ),
+        ("/a.css", slow(b"html { margin-left: 3px }", "text/css")),
+        (
+            "/a.js",
+            slow(
+                b"order.push('script:' + getComputedStyle(document.documentElement).marginLeft);",
+                "text/javascript",
+            ),
+        ),
+    ])
+    .unwrap();
+    let [a, _] = grants(&server);
+    for single in [false, true] {
+        let mut args = vec!["dump-dom", "--run-scripts"];
+        if single {
+            args.push("--single-process");
+        }
+        args.extend(["--allow-origin", &a, "http://a.test/"]);
+        let started = std::time::Instant::now();
+        let output = rustic(&args);
+        let elapsed = started.elapsed();
+        assert!(output.status.success(), "{}", stderr(&output));
+        let dump = stdout(&output);
+        // The zero-delay timer runs while the script loads; the script
+        // runs after the sheet before it, and the long timer last.
+        assert!(
+            dump.contains("local=\"data-order\" value=\"soon script:3px late\""),
+            "single process {single}: {dump}"
+        );
+        // The sheet and the script load side by side.
+        assert!(
+            elapsed < pause * 2,
+            "single process {single}: {elapsed:?} for a {pause:?} sheet and script"
+        );
+    }
+}

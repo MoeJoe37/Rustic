@@ -604,6 +604,8 @@ fn live_footprint(heap: &Heap) -> usize {
         + codes
         + closures
         + host_interfaces
+        + heap.stack_bytes
+        + heap.transient_bytes
 }
 
 /// Rebuild the atom table without freed strings. Chains keep their order,

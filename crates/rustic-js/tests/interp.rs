@@ -2645,17 +2645,20 @@ fn regular_expressions() {
     }
 }
 
-/// Exponential backtracking has no cap of its own, as in other engines;
-/// the step budget and cancellation reach into the matcher.
+/// A pattern with a backreference stays on the backtracker, whose
+/// exponential cases the step budget and cancellation reach; one without
+/// moves to the linear-time matcher and finishes (TD-111).
 #[test]
 fn runaway_regular_expressions_are_cancellable() {
     let mut agent = Agent::new().expect("agent");
     // Each unit of budget covers a slice of matcher steps.
     agent.set_step_budget(Some(100));
     assert_eq!(
-        agent.evaluate("/(a+)+b/.test('a'.repeat(40))"),
+        agent.evaluate("/(a|a)+\\1b/.test('a'.repeat(40))"),
         Err(EvalError::Cancelled)
     );
+    agent.set_step_budget(Some(100));
+    assert_eq!(run_in(&mut agent, "/(a+)+b/.test('a'.repeat(40))"), "false");
     agent.set_step_budget(None);
     assert_eq!(
         run_in(&mut agent, "/(a+)+b/.test('a'.repeat(8) + 'b')"),

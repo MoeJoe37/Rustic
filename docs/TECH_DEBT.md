@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-116, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-116, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-182, TD-191, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -167,7 +167,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-99 | Deliberate | JS | Annex B function-in-block semantics are missing (mapped `arguments` objects paid) | Open, `js.conformance` (M9) |
 | TD-100 | Deliberate | JS | Array destructuring does not close the iterator when a target throws | Paid |
 | TD-101 | Watch | JS | String concatenation copies both operands (no ropes): building a string in a loop is quadratic | Paid |
-| TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Open, `perf.memory` (M12) |
+| TD-102 | Watch | JS | The interpreter's value stack, frames and the AST being compiled are not charged to the heap budget | Paid |
 | TD-103 | Watch | JS | Inline caches hold one shape per site and share one epoch, so a prototype write or a collection flushes all of them | Open, `perf.interpreter` (M12) |
 | TD-104 | Watch | JS | Shape lookups walk the transition chain | Open, `perf.interpreter` (M12) |
 | TD-105 | Deliberate | JS | The Test262 module gate has known failures, its `$262` has no `gc` or `agent`, and it runs `test/language` plus the installed areas of `test/built-ins` | Open, `js.conformance` (M9) |
@@ -1655,7 +1655,7 @@ and by the collector; `appending_in_a_loop_allocates_linearly` and
 `no_workload_is_quadratic_in_its_input` hold it. The late charge of the flat
 copy is TD-116.
 
-### TD-102 — Interpreter stacks are outside the heap budget
+### TD-102 — Interpreter stacks are outside the heap budget (Paid)
 
 The value stack (at most 2²⁰ values, 8 MiB), the frame stack (at most 10,000
 frames) and the AST of the script being compiled are bounded by their own
@@ -1665,6 +1665,8 @@ footprint can exceed its limit by those bounds.
 Watch for: JS-09's heap report. Pay by charging stack growth to the budget
 when the report needs one number per agent.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): the value and frame stacks are charged to the heap budget before they grow (`Agent::reserve_stacks` in `vm/interp.rs`, called for every frame push and generator resume, with 128 values of slack for the few values native helpers root there; `charge_stacks` at every safe point catches any other growth). The capacity stays charged while the agent lives (`Heap::stack_bytes`, part of the live footprint a collection restarts from), so deep recursion in a small heap stops with OutOfMemory at its limit. A script's parse tree is charged while it is compiled (`Heap::charge_transient`, 32 bytes per source unit: measured peaks are about 10 for comment-heavy code and 50 to 65 for dense minified code) by `evaluate`, `eval` and the `Function` constructor, and released when the tree is dropped. Tests: `interpreter_stacks_are_charged_to_the_heap_budget` and `parse_trees_are_charged_while_they_are_compiled` in tests/gc.rs. Module records parsed by the host (`ModuleRecord::parse`) are held by the embedder's module map, like `Source`, and are not agent memory.
 
 ### TD-103 — One cache entry per site, one epoch for all
 
@@ -1817,7 +1819,7 @@ step count, as V8's experimental engine does. Trigger: a measured slow
 page or a ReDoS report.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
 
-**Paid 2026-11-23** (M8 workstream 5): patterns with no backreference or lookaround also compile for a linear-time Pike VM (`crates/rustic-js/src/regexp/pike.rs`, `vm::compile_pike`: repetitions unrolled, an optional iteration that matches empty rejected by a `Progress` instruction, captures cleared by `Clear`). A search moves there after 65,536 backtracks summed over its start positions, or when the backtracking stacks would overflow, and resumes at the start position it reached. Threads keep the backtracker's priority order, so the match and its captures are the same; `the_linear_time_matcher_agrees_with_the_backtracker` compares both matchers alone at every start position, and `exponential_patterns_finish_in_linear_time` runs `(a+)+b`, `(a*)*b`, `(?:a|a)*b` and `^(\\w+\\s?)*$` over 5,000 characters in linear time (previously stopped only by cancellation). Test262 RegExp and String results are unchanged. Patterns with backreferences or lookarounds, and unrolled programs over 32,768 instructions, stay on the backtracker with its step budget, as in V8.
+**Paid 2026-11-23** (M8 workstream 5): patterns with no backreference or lookaround also compile for a linear-time Pike VM (`crates/rustic-js/src/regexp/pike.rs`, `vm::compile_pike`: repetitions unrolled, an optional iteration that matches empty rejected by a `Progress` instruction, captures cleared by `Clear`). A search moves there after 65,536 backtracks summed over its start positions, or when the backtracking stacks would overflow, and resumes at the start position it reached. Threads keep the backtracker's priority order, so the match and its captures are the same; `the_linear_time_matcher_agrees_with_the_backtracker` compares both matchers alone at every start position, and `exponential_patterns_finish_in_linear_time` runs `(a+)+b`, `(a*)*b`, `(?:a|a)*b` and `^(\w+\s?)*$` over 5,000 characters in linear time (previously stopped only by cancellation). Test262 RegExp and String results are unchanged. Patterns with backreferences or lookarounds, and unrolled programs over 32,768 instructions, stay on the backtracker with its step budget, as in V8.
 
 ### TD-112 — BigInt size cap and quadratic arithmetic
 

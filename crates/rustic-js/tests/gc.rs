@@ -941,3 +941,54 @@ fn pending_wait_async_promises_and_their_buffers_survive_collection() {
     let out = a.evaluate("out").expect("runs");
     assert_eq!(a.display(out), "timed-out2");
 }
+
+/// TD-102: deep recursion grows the interpreter's value and frame stacks,
+/// and that memory counts against the heap budget like any other.
+#[test]
+fn interpreter_stacks_are_charged_to_the_heap_budget() {
+    let mut a = agent();
+    a.evaluate("function f(n) { var a = n, b = n, c = n, d = n; return n ? f(n - 1) + 1 : 0 }")
+        .unwrap();
+    a.collect_garbage(Roots::default());
+    let before = a.heap.bytes_used();
+    assert_eq!(a.evaluate("f(8000)").unwrap(), Value::number(8000.0));
+    // At least one value per register and one frame per call.
+    let grown = a.heap.bytes_used() - before;
+    assert!(grown > 8000 * 64, "stacks charged {grown} bytes");
+    // The capacity stays with the agent, so a collection keeps it.
+    a.collect_garbage(Roots::default());
+    assert!(a.heap.bytes_used() - before > 8000 * 64);
+    // A heap too small for the stacks stops the recursion with
+    // OutOfMemory instead of growing past its limit.
+    let mut small = Agent::with_heap_limit(2 * MIN_GC_THRESHOLD).unwrap();
+    let limit = small.heap.byte_limit();
+    small
+        .evaluate("function g(n) { var a, b, c, d, e, f, h, i; return n ? g(n - 1) : 0 }")
+        .unwrap();
+    let result = small.evaluate("g(9000)");
+    assert!(
+        matches!(result, Err(rustic_js::EvalError::OutOfMemory)),
+        "{result:?} with a {limit}-byte heap"
+    );
+    assert!(small.heap.peak_bytes() <= limit);
+}
+
+/// TD-102: a script's parse tree counts while it is compiled, and is
+/// released afterwards.
+#[test]
+fn parse_trees_are_charged_while_they_are_compiled() {
+    let mut a = agent();
+    let base = baseline(&mut a);
+    let source = format!("var x = 0; {}", "x = x + 1;".repeat(20_000));
+    a.evaluate(&source).unwrap();
+    assert!(a.heap.peak_bytes() > base + 20 * source.len());
+    let stats = a.collect_garbage(Roots::default());
+    // Only the global binding and the code remain, not the tree.
+    assert!(stats.bytes_after < base + 20 * source.len());
+    let mut small = Agent::with_heap_limit(2 * MIN_GC_THRESHOLD).unwrap();
+    let big = format!("var y = 0; {}", "y = y + 1;".repeat(200_000));
+    assert!(matches!(
+        small.evaluate(&big),
+        Err(rustic_js::EvalError::OutOfMemory)
+    ));
+}

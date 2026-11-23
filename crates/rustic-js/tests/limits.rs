@@ -431,6 +431,13 @@ fn bytes_each(make: &str, count: usize) -> usize {
             "var keep = []; for (var i = 0; i < {count}; i++) keep[i] = null;"
         ))
         .expect("runs");
+    // A first round grows the interpreter stacks, whose capacity is
+    // charged and kept (TD-102), so the measured round sees only values.
+    agent
+        .evaluate(&format!(
+            "var make = {make}; for (var i = 0; i < 2; i++) make(i); make = null;"
+        ))
+        .expect("runs");
     let before = agent.collect_garbage(Roots::default()).bytes_after;
     agent
         .evaluate(&format!(

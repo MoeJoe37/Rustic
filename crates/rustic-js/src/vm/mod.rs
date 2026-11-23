@@ -68,7 +68,20 @@ impl From<Abrupt> for EvalError {
     }
 }
 
+/// Bytes charged per source code unit for a script's parse tree while
+/// it is compiled (TD-102). Measured peaks: about 10 for comment-heavy
+/// Test262 files, 50 to 65 for dense minified code.
+const AST_BYTES_PER_UNIT: usize = 32;
+
 impl Agent {
+    /// Charge the parse tree of `units` source code units to the heap
+    /// budget; the caller releases the bytes once the tree is dropped.
+    fn charge_parse(&mut self, units: usize) -> Result<usize, crate::runtime::OutOfMemory> {
+        let bytes = units.saturating_mul(AST_BYTES_PER_UNIT);
+        self.heap.charge_transient(bytes)?;
+        Ok(bytes)
+    }
+
     /// Compile a parsed script. The result is a heap record like any
     /// other: unless it is run or rooted it goes at the next collection.
     pub fn compile_script(&mut self, program: &Program) -> Result<CodeId, CompileError> {
@@ -91,8 +104,22 @@ impl Agent {
         if let Some(token) = self.cancellation() {
             limits.cancellation = token;
         }
-        let code = {
-            let program = parse_script(source, &limits).map_err(|e| match e {
+        let charged = self
+            .charge_parse(source.len())
+            .map_err(|_| EvalError::OutOfMemory)?;
+        let code = self.compile_source(source, &limits);
+        self.heap.release_transient(charged);
+        Ok(self.run_script(code?)?)
+    }
+
+    /// Parse and compile script source; the parse tree is dropped on return.
+    fn compile_source(
+        &mut self,
+        source: &Source,
+        limits: &ParseLimits,
+    ) -> Result<CodeId, EvalError> {
+        {
+            let program = parse_script(source, limits).map_err(|e| match e {
                 ParseError::Cancelled => EvalError::Cancelled,
                 other => EvalError::Parse(other),
             })?;
@@ -106,9 +133,8 @@ impl Agent {
             self.set_debug_compiling(script);
             let compiled = self.compile_script(&program);
             self.set_debug_compiling(0);
-            compiled.map_err(EvalError::Compile)?
-        };
-        Ok(self.run_script(code)?)
+            compiled.map_err(EvalError::Compile)
+        }
     }
 
     /// `CreateDynamicFunction` (§20.2.1.1.1) for ordinary and generator functions: the
@@ -123,7 +149,6 @@ impl Agent {
         params: &str,
         body: &str,
     ) -> JsResult<Value> {
-        use crate::ast::{ExpressionKind, StatementKind};
         // The function is unnamed so that `anonymous` is not bound inside it;
         // its `name` is set afterwards.
         self.ensure_can_compile_strings()?;
@@ -138,7 +163,35 @@ impl Agent {
         if let Some(token) = self.cancellation() {
             limits.cancellation = token;
         }
-        let program = match parse_script(&source, &limits) {
+        let charged = self
+            .charge_parse(source.len())
+            .map_err(|_| Abrupt::OutOfMemory)?;
+        let code = self.compile_dynamic_function(&source, &limits);
+        self.heap.release_transient(charged);
+        let f = self.run_script(code?)?;
+        if let Some(o) = f.as_object() {
+            let name = crate::runtime::PropertyKey::String(self.names.name);
+            let anonymous = self.string("anonymous")?;
+            self.define_property_or_throw(
+                o,
+                name,
+                crate::runtime::PropertyDescriptor::data_with(anonymous, false, false, true),
+            )?;
+        }
+        Ok(f)
+    }
+
+    /// The parse and compile half of [`Self::create_dynamic_function`].
+    fn compile_dynamic_function(
+        &mut self,
+        source: &Source,
+        limits: &ParseLimits,
+    ) -> JsResult<CodeId> {
+        use crate::ast::{ExpressionKind, StatementKind};
+        let syntax_error = |agent: &mut Agent, message: &str| {
+            Err(agent.throw(crate::runtime::ErrorKind::SyntaxError, message))
+        };
+        let program = match parse_script(source, limits) {
             Ok(program) => program,
             Err(ParseError::Cancelled) => return Err(Abrupt::Cancelled),
             Err(e) => return syntax_error(self, &e.to_string()),
@@ -157,22 +210,11 @@ impl Agent {
         if !single_function {
             return syntax_error(self, "invalid function parameters or body");
         }
-        let code = match self.compile_script(&program) {
-            Ok(code) => code,
-            Err(CompileError::OutOfMemory) => return Err(Abrupt::OutOfMemory),
-            Err(e) => return syntax_error(self, &format!("{e:?}")),
-        };
-        let f = self.run_script(code)?;
-        if let Some(o) = f.as_object() {
-            let name = crate::runtime::PropertyKey::String(self.names.name);
-            let anonymous = self.string("anonymous")?;
-            self.define_property_or_throw(
-                o,
-                name,
-                crate::runtime::PropertyDescriptor::data_with(anonymous, false, false, true),
-            )?;
+        match self.compile_script(&program) {
+            Ok(code) => Ok(code),
+            Err(CompileError::OutOfMemory) => Err(Abrupt::OutOfMemory),
+            Err(e) => syntax_error(self, &format!("{e:?}")),
         }
-        Ok(f)
     }
 
     /// PerformEval (§19.2.1.1) from its parse on: parse and compile the
@@ -199,7 +241,29 @@ impl Agent {
         if let Some(token) = self.cancellation() {
             limits.cancellation = token;
         }
-        let program = match parse_eval(&source, &limits, strict_caller, in_function) {
+        let charged = self
+            .charge_parse(source.len())
+            .map_err(|_| Abrupt::OutOfMemory)?;
+        let result =
+            self.prepare_eval_source(&source, &limits, env, var_hops, strict_caller, in_function);
+        self.heap.release_transient(charged);
+        result
+    }
+
+    /// [`Self::prepare_eval`] from the parse on, while the parse tree is
+    /// charged to the heap budget.
+    fn prepare_eval_source(
+        &mut self,
+        source: &Source,
+        limits: &ParseLimits,
+        env: EnvId,
+        var_hops: Option<u16>,
+        strict_caller: bool,
+        in_function: bool,
+    ) -> JsResult<CodeId> {
+        let syntax_error =
+            |agent: &mut Agent, message: &str| Err(agent.throw(ErrorKind::SyntaxError, message));
+        let program = match parse_eval(source, limits, strict_caller, in_function) {
             Ok(program) => program,
             Err(ParseError::Cancelled) => return Err(Abrupt::Cancelled),
             Err(e) => return syntax_error(self, &e.to_string()),

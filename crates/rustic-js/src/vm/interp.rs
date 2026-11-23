@@ -909,6 +909,7 @@ impl Agent {
         {
             return Err(self.throw(ErrorKind::RangeError, "Maximum call stack size exceeded"));
         }
+        self.reserve_stacks(registers)?;
         self.vm.stack.resize(base + registers, Value::UNDEFINED);
         let copied = argc.min(usize::from(code.params));
         self.vm.stack.copy_within(args_at..args_at + copied, base);
@@ -1029,10 +1030,64 @@ impl Agent {
         }
     }
 
+    /// Make room on the value stack for `values` more values (plus slack
+    /// for the few values native helpers root there) and on the frame
+    /// stack for one more frame, charging any growth to the heap budget
+    /// before it happens (TD-102).
+    fn reserve_stacks(&mut self, values: usize) -> JsResult<()> {
+        const SLACK: usize = 128;
+        let stack = &self.vm.stack;
+        let limit = self.vm.limits.max_stack_values.saturating_add(SLACK);
+        let needed = stack.len().saturating_add(values).saturating_add(SLACK);
+        let mut grow_values = 0;
+        if needed > stack.capacity() {
+            let target = needed
+                .max(stack.capacity().saturating_mul(2))
+                .min(limit.max(needed));
+            grow_values = target - stack.len();
+        }
+        let frames = &self.vm.frames;
+        let mut grow_frames = 0;
+        if frames.len() == frames.capacity() {
+            let target = (frames.capacity().saturating_mul(2))
+                .max(16)
+                .min(self.vm.limits.max_frames.saturating_add(1));
+            grow_frames = target.saturating_sub(frames.len()).max(1);
+        }
+        if grow_values == 0 && grow_frames == 0 {
+            return Ok(());
+        }
+        self.vm
+            .stack
+            .try_reserve_exact(grow_values)
+            .map_err(|_| Abrupt::OutOfMemory)?;
+        self.vm
+            .frames
+            .try_reserve_exact(grow_frames)
+            .map_err(|_| Abrupt::OutOfMemory)?;
+        self.charge_stacks()
+    }
+
+    /// Charge stack capacity the budget has not seen yet: growth that
+    /// [`Self::reserve_stacks`] did not cover is caught at the next
+    /// safe point.
+    fn charge_stacks(&mut self) -> JsResult<()> {
+        let bytes = self.vm.stack.capacity() * std::mem::size_of::<Value>()
+            + self.vm.frames.capacity() * std::mem::size_of::<Frame>();
+        if bytes > self.heap.stack_bytes {
+            self.heap
+                .charge(bytes - self.heap.stack_bytes)
+                .map_err(|_| Abrupt::OutOfMemory)?;
+            self.heap.stack_bytes = bytes;
+        }
+        Ok(())
+    }
+
     /// Poll for cancellation, and collect if the heap asks for it and no
     /// native code is on the stack.
     fn safepoint(&mut self) -> JsResult<()> {
         self.check_native_work()?;
+        self.charge_stacks()?;
         if self.vm.native_depth == self.vm.collect_floor && self.should_collect() {
             self.collect_at_safe_point()?;
         }
@@ -3437,6 +3492,10 @@ impl Agent {
         if floor >= self.vm.limits.max_frames || base + count > self.vm.limits.max_stack_values {
             return Err(self.throw(ErrorKind::RangeError, "Maximum call stack size exceeded"));
         }
+        self.reserve_stacks(count)?;
+        let Some(Internal::Generator(g)) = self.heap.object_mut(o).internal_mut() else {
+            unreachable!("checked above");
+        };
         g.state = GeneratorState::Executing;
         self.vm.stack.extend_from_slice(&g.registers);
         if let Some((dst, mode_reg)) = resume {

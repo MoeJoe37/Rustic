@@ -167,6 +167,11 @@ pub struct Heap {
     /// Bytes of ropes flattened since the last collection. Flattening
     /// happens behind `&self`, so it cannot charge the budget itself.
     rope_bytes: Cell<usize>,
+    /// Bytes of interpreter stacks (value and frame stack capacity)
+    /// charged to the budget (TD-102).
+    pub(crate) stack_bytes: usize,
+    /// Bytes charged for parse trees while they are compiled (TD-102).
+    pub(crate) transient_bytes: usize,
     /// Interned strings by content hash; collisions chain through
     /// `atom_next`.
     pub(crate) atoms: HashMap<u64, StringId>,
@@ -239,6 +244,8 @@ impl Heap {
             strings: Arena::default(),
             ropes: HashMap::new(),
             rope_bytes: Cell::new(0),
+            stack_bytes: 0,
+            transient_bytes: 0,
             peak_bytes: 0,
             allocated_bytes: 0,
             gc_clock: None,
@@ -340,6 +347,20 @@ impl Heap {
             self.peak_bytes = used;
         }
         Ok(())
+    }
+
+    /// Charge `bytes` held outside the heap for a while (a parse tree
+    /// being compiled) until [`Heap::release_transient`].
+    pub(crate) fn charge_transient(&mut self, bytes: usize) -> Result<(), OutOfMemory> {
+        self.charge(bytes)?;
+        self.transient_bytes += bytes;
+        Ok(())
+    }
+
+    /// Release a [`Heap::charge_transient`] charge.
+    pub(crate) fn release_transient(&mut self, bytes: usize) {
+        self.transient_bytes -= bytes;
+        let _ = self.budget.release(bytes);
     }
 
     // ---- strings ----------------------------------------------------

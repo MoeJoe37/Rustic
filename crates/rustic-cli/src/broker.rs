@@ -1218,6 +1218,9 @@ pub(crate) type Bubblewrapped = (
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum Confinement {
     /// A renderer: no files beyond `/usr`, no sockets, no devices.
+    /// (macOS confines renderers with Seatbelt, so it builds this enum
+    /// without using this case.)
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     Renderer,
     /// The network process: Internet client sockets and the trust store.
     Network,

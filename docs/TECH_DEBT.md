@@ -2805,10 +2805,11 @@ return fresh byte storage and consume a supplied body once. `Blob` input
 and `blob()` output use the same buffered path. Blob reads resolve through
 the promise queue. The file reading task source and Blob streams await
 Streams integration. `Headers` iterators read the current list on each step.
+The static `Response.json()` factory uses intrinsic JSON serialization.
 
 **Pay:** the event-driven fetch controller of TD-161 queuing response and
 body tasks on the networking task source, Streams and FormData body
-support, `Response.json()`, `AbortSignal`, upload progress and `<base>`.
+support, `AbortSignal`, upload progress and `<base>`.
 **Trigger:** the M9 web platform APIs work (Streams, Blob, FormData).
 
 ### TD-170 — IPC copies bodies and serializes requests

@@ -17,7 +17,7 @@ use std::fmt::Debug;
 use std::rc::Rc;
 
 use rustic_js::runtime::{
-    Abrupt, Agent, ErrorKind, JsResult, NativeFn, ObjectId, PropertyKey, Value,
+    Abrupt, Agent, ErrorKind, JsResult, NativeFn, ObjectId, PropertyKey, Value, to_uint16,
 };
 use rustic_net::cors::{
     is_cors_safelisted_method, is_forbidden_method, is_forbidden_request_header,
@@ -214,6 +214,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<ObjectId> {
     let response = agent.get(response_prototype, constructor_key)?;
     if let Some(constructor) = response.as_object() {
         define_method(agent, constructor, "error", response_error, 0)?;
+        define_method(agent, constructor, "json", response_json, 1)?;
     }
     let global = agent.intrinsics.global;
     define_method(agent, global, "fetch", fetch, 1)?;
@@ -1102,63 +1103,112 @@ fn construct_response(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
     let body = args.first().copied().unwrap_or(Value::NULL);
     let init = args.get(1).copied().unwrap_or(Value::UNDEFINED);
     let body = BodyInit::convert(agent, body)?;
-    let mut status = 200u16;
-    let mut status_text = Vec::new();
-    let mut list = Vec::new();
-    if !init.is_nullish() {
-        with_root(agent, init, |agent| {
-            let value = member(agent, init, "status")?;
-            if !(value == Value::UNDEFINED) {
-                let number = agent.to_number(value)?;
-                if !(200.0..=599.0).contains(&number) || number.fract() != 0.0 {
-                    return Err(agent.throw(ErrorKind::RangeError, "status must be 200 to 599"));
-                }
-                status = number as u16;
-            }
-            let value = member(agent, init, "statusText")?;
-            if !(value == Value::UNDEFINED) {
-                status_text = to_byte_string(agent, value)?;
-                if status_text
-                    .iter()
-                    .any(|&byte| matches!(byte, b'\r' | b'\n'))
-                {
-                    return Err(type_error(agent, "invalid statusText"));
-                }
-            }
-            let headers = member(agent, init, "headers")?;
-            if !(headers == Value::UNDEFINED) {
-                match record_if(agent, headers, HEADERS)? {
-                    Some(source) => {
-                        let (_, source) = read_list(agent, source)?;
-                        for (name, value) in source {
-                            append(agent, GUARD_RESPONSE, &mut list, name.as_bytes(), &value)?;
-                        }
-                    }
-                    None => fill(agent, GUARD_RESPONSE, &mut list, headers)?,
-                }
-            }
-            Ok(())
-        })?;
-    }
+    let options = response_options(agent, init)?;
     let body = body.extract(agent)?;
+    initialize_response(agent, options, body)
+}
+
+struct ResponseOptions {
+    status: u16,
+    status_text: Vec<u8>,
+    headers: HeaderList,
+}
+
+fn response_options(agent: &mut Agent, init: Value) -> JsResult<ResponseOptions> {
+    let mut options = ResponseOptions {
+        status: 200,
+        status_text: Vec::new(),
+        headers: Vec::new(),
+    };
+    if init.is_nullish() {
+        return Ok(options);
+    }
+    if init.as_object().is_none() {
+        return agent.type_error("Response initialization requires a dictionary");
+    }
+    with_root(agent, init, |agent| {
+        let headers = member(agent, init, "headers")?;
+        if !(headers == Value::UNDEFINED) {
+            match record_if(agent, headers, HEADERS)? {
+                Some(source) => {
+                    let (_, source) = read_list(agent, source)?;
+                    for (name, value) in source {
+                        append(
+                            agent,
+                            GUARD_RESPONSE,
+                            &mut options.headers,
+                            name.as_bytes(),
+                            &value,
+                        )?;
+                    }
+                }
+                None => fill(agent, GUARD_RESPONSE, &mut options.headers, headers)?,
+            }
+        }
+        let value = member(agent, init, "status")?;
+        if value != Value::UNDEFINED {
+            options.status = to_uint16(agent.to_number(value)?);
+        }
+        let value = member(agent, init, "statusText")?;
+        if value != Value::UNDEFINED {
+            options.status_text = to_byte_string(agent, value)?;
+        }
+        Ok(())
+    })?;
+    Ok(options)
+}
+
+fn initialize_response(
+    agent: &mut Agent,
+    mut options: ResponseOptions,
+    body: Option<ExtractedBody>,
+) -> JsResult<Value> {
+    if !(200..=599).contains(&options.status) {
+        return Err(agent.throw(ErrorKind::RangeError, "status must be 200 to 599"));
+    }
+    if options
+        .status_text
+        .iter()
+        .any(|&byte| matches!(byte, b'\r' | b'\n'))
+    {
+        return agent.type_error("invalid statusText");
+    }
     if let Some(body) = &body {
-        if matches!(status, 101 | 103 | 204 | 205 | 304) {
+        if matches!(options.status, 204 | 205 | 304) {
             return Err(type_error(agent, "a null-body status cannot have a body"));
         }
-        append_body_content_type(&mut list, body.content_type.as_deref());
+        append_body_content_type(&mut options.headers, body.content_type.as_deref());
     }
     new_response(
         agent,
         ResponseParts {
             kind: "default",
             url: None,
-            status,
-            status_text: &status_text,
-            headers: &list,
+            status: options.status,
+            status_text: &options.status_text,
+            headers: &options.headers,
             guard: GUARD_RESPONSE,
             body: body.as_ref().map(|body| body.bytes.as_slice()),
             redirected: false,
         },
+    )
+}
+
+fn response_json(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let data = required_arg(agent, args, 0)?;
+    let options = response_options(agent, args.get(1).copied().unwrap_or(Value::UNDEFINED))?;
+    let json = agent.stringify_json(data)?;
+    if json == Value::UNDEFINED {
+        return agent.type_error("value cannot be serialized to JSON");
+    }
+    let bytes = to_usv_string(agent, json)?.into_bytes();
+    initialize_response(
+        agent,
+        options,
+        Some(ExtractedBody {
+            bytes,
+            content_type: Some(Cow::Borrowed(b"application/json")),
+        }),
     )
 }
 

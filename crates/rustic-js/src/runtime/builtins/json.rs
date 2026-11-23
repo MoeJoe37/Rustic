@@ -577,6 +577,13 @@ struct State {
     out: Vec<u16>,
 }
 
+impl Agent {
+    /// Serialize with the intrinsic JSON algorithm, without replacer or spacing.
+    pub fn stringify_json(&mut self, value: Value) -> JsResult<Value> {
+        stringify(self, Value::UNDEFINED, &[value])
+    }
+}
+
 /// `JSON.stringify(value, replacer, space)` (§25.5.2).
 fn stringify(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let (value, replacer, space) = (arg(args, 0), arg(args, 1), arg(args, 2));

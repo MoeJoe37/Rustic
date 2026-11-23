@@ -231,6 +231,44 @@ fn blob_construction_slicing_and_fetch_preserve_immutable_bytes_and_mime() {
 }
 
 #[test]
+fn response_json_uses_intrinsic_serialization_after_dictionary_conversion() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        let checked;
+        function eq(a, b) { if (a !== b) throw `${a} != ${b}`; }
+        async function exercise() {
+            let calls = '';
+            JSON.stringify = () => { throw 'must use intrinsic JSON'; };
+            const response = Response.json({toJSON() { calls += 'j'; return {ok: true}; }}, {
+                get headers() { calls += 'h'; return {'X-Test': '1'}; },
+                get status() { calls += 's'; return 65536 + 201.9; },
+                get statusText() { calls += 't'; return 'Created'; },
+            });
+            eq(calls, 'hstj');
+            eq(response.status, 201);
+            eq(response.statusText, 'Created');
+            eq(response.headers.get('Content-Type'), 'application/json');
+            eq(response.headers.get('X-Test'), '1');
+            eq((await response.json()).ok, true);
+            const reason = {};
+            try { Response.json({toJSON() { throw reason; }}, {status: 10}); throw 'expected error'; }
+            catch (e) { eq(e, reason); }
+            for (const value of [undefined, Symbol('x'), 1n]) {
+                try { Response.json(value); throw 'expected TypeError'; }
+                catch (e) { if (!(e instanceof TypeError)) throw e; }
+            }
+        }
+        exercise().then(() => { checked = 'pass'; }, e => { checked = String(e); });
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    let value = agent.evaluate("checked").unwrap().as_string().unwrap();
+    assert_eq!(agent.heap.string(value).to_text(), "pass");
+}
+
+#[test]
 fn dom_rects_are_branded_and_keep_their_values_through_reentry() {
     let document = Document::new(DocumentLimits::default()).unwrap();
     let tree = Rc::new(Tree(RefCell::new(document)));

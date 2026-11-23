@@ -2954,6 +2954,12 @@ MIME type extracted from the current headers. The pinned Window tests
 cover buffered reads, object identity, integer clamping and default MIME
 types. Stream methods, File and FormData have separate coverage gaps.
 
+`Response.json(data, init)` serializes using the intrinsic JSON algorithm
+and supplies `application/json` when the caller leaves Content-Type absent.
+The constructor and factory share ResponseInit conversion and status checks.
+The pinned `response-static-json.any.js` cases exercise serialization,
+header overrides, error propagation and UTF-8 bytes.
+
 ## NET-04 — Partitioned HTTP cache
 
 Added 2026-11-20 (`rustic_net::http_cache`), used by every `Fetcher`

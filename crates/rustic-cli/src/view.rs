@@ -517,12 +517,12 @@ impl ViewPage {
             }
             return;
         };
-        if !self.slots.contains_key(&id) {
+        if let std::collections::hash_map::Entry::Vacant(vacant) = self.slots.entry(id) {
             match Worker::start() {
                 Ok(worker) => {
                     let mut slot = Slot::new(worker);
                     slot.used = uses;
-                    self.slots.insert(id, slot);
+                    vacant.insert(slot);
                 }
                 Err(why) => {
                     self.browser.tab_mut().load = Load::Failed(why);

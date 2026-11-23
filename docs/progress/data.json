@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "8087bfdd293bc0bf2fede451a69bbd7483b50a941d598739a915d276ee34bb7b",
-  "percent": "49.18",
-  "verified_percent": "45.74",
-  "partial_percent": "3.44",
-  "completed": 110,
-  "in_progress": 16,
+  "source_fingerprint": "49c0e528674145b8b52245fd4c8ebd2f7b896652d3eeb201679e8bd601ef83b8",
+  "percent": "49.80",
+  "verified_percent": "47.74",
+  "partial_percent": "2.06",
+  "completed": 114,
+  "in_progress": 12,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -85,11 +85,11 @@
       "id": "M8",
       "label": "Desktop alpha",
       "share": "8.12",
-      "completed": 11,
+      "completed": 15,
       "total": 18,
-      "percent": "83.99",
-      "verified_percent": "53.08",
-      "partial_percent": "30.91"
+      "percent": "91.68",
+      "verified_percent": "77.69",
+      "partial_percent": "13.99"
     },
     {
       "id": "M9",
@@ -7104,99 +7104,90 @@
           "label": "Linux runtime and native host acceptance",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Native window on Wayland and X11 presenting renderer-process frames, with scrolling input and clean failure without a window system (ADR 0065)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-shell/src/lib.rs",
-                  "marker": "pub fn run("
-                },
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0065-desktop-window-host.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-shell/src/lib.rs",
-                  "marker": "fn surfaces_present_over_white_and_uncovered_pixels_stay_white"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn view_presents_frames_in_a_window_or_fails_cleanly_without_one"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-shell/src/lib.rs",
+              "marker": "pub fn run("
             },
             {
-              "label": "Long-lived renderer per page: input routed to the page, scene frames over IPC, scripts running between frames (TD-182)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "pub fn live<R>("
-                },
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0069-long-lived-renderer.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/live.rs",
-                  "marker": "fn the_page_keeps_its_state_timers_and_input_between_frames"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/live.rs",
-                  "marker": "fn crashed_and_hung_renderers_are_replaced_then_the_page_gives_up"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/adr/0065-desktop-window-host.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Linux lifecycle on native x86-64 and aarch64 runners: resizes, minimize and restore, device scale including 1.5 under X11, Wayland, the browser shell and fontconfig system fonts (ADR 0074)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-shell/src/window.rs",
-                  "marker": "fn set_visible("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn fractional_scales_size_the_page_in_device_pixels"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-shell/src/lib.rs",
+              "marker": "fn surfaces_present_over_white_and_uncovered_pixels_stay_white"
             },
             {
-              "label": "Linux acceptance: the curated site corpus in the desktop alpha",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn view_presents_frames_in_a_window_or_fails_cleanly_without_one"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "pub fn live<R>("
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0069-long-lived-renderer.md",
+              "marker": "## Decision"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/live.rs",
+              "marker": "fn the_page_keeps_its_state_timers_and_input_between_frames"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/live.rs",
+              "marker": "fn crashed_and_hung_renderers_are_replaced_then_the_page_gives_up"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "## Decision"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-shell/src/window.rs",
+              "marker": "fn set_visible("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn fractional_scales_size_the_page_in_device_pixels"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
+            },
+            {
+              "kind": "source",
+              "path": "tests/corpus/corpus.js",
+              "marker": "var corpus = {"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "A curated site corpus"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_curated_site_corpus_runs_in_the_desktop_window"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "0.50"
         },
         {
@@ -7204,63 +7195,60 @@
           "label": "Windows runtime and native host acceptance",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Native window on Windows x64 and ARM64 CI desktops: frames, resizes, minimize and restore, keys, text, IME events and the browser shell through the platform's own handlers (ADR 0074)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-shell/src/window.rs",
-                  "marker": "fn set_visible("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Platform fonts for the CSS generic families and fallback scripts, collections split into faces",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/native.rs",
-                  "marker": "pub fn native() -> Native"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/fonts.rs",
-                  "marker": "pub fn system_fonts("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/opentype.rs",
-                  "marker": "fn collection_members_extract_to_standalone_faces"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-shell/src/window.rs",
+              "marker": "fn set_visible("
             },
             {
-              "label": "Acceptance: the curated site corpus in the desktop alpha",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/native.rs",
+              "marker": "pub fn native() -> Native"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "pub fn system_fonts("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn collection_members_extract_to_standalone_faces"
+            },
+            {
+              "kind": "source",
+              "path": "tests/corpus/corpus.js",
+              "marker": "var corpus = {"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "A curated site corpus"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_curated_site_corpus_runs_in_the_desktop_window"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.50"
         },
         {
@@ -7268,63 +7256,85 @@
           "label": "macOS runtime and native host acceptance",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Native window on macOS ARM64 and x64 CI desktops: frames, resizes, minimize and restore, keys, text, IME events and the browser shell through the platform's own handlers (ADR 0074)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-shell/src/window.rs",
-                  "marker": "fn set_visible("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Platform fonts for the CSS generic families and fallback scripts, collections split into faces",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/native.rs",
-                  "marker": "pub fn native() -> Native"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/fonts.rs",
-                  "marker": "pub fn system_fonts("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/opentype.rs",
-                  "marker": "fn collection_members_extract_to_standalone_faces"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-shell/src/window.rs",
+              "marker": "fn set_visible("
             },
             {
-              "label": "Acceptance: the curated site corpus in the desktop alpha and the pre-main sandbox (TD-183)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/native.rs",
+              "marker": "pub fn native() -> Native"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "pub fn system_fonts("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn collection_members_extract_to_standalone_faces"
+            },
+            {
+              "kind": "source",
+              "path": "tests/corpus/corpus.js",
+              "marker": "var corpus = {"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "A curated site corpus"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_curated_site_corpus_runs_in_the_desktop_window"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-renderer/src/main.rs",
+              "marker": "fn main() -> std::process::ExitCode"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "pub(crate) fn child_exe("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-sandbox/src/seatbelt.rs",
+              "marker": "pub const HIDDEN_SYSCTL_PREFIXES"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/isolation.rs",
+              "marker": "\"list-processes\","
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-sandbox/src/seatbelt.rs",
+              "marker": "assert!(!profile.contains(\"(allow sysctl-read)\")"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.50"
         },
         {
@@ -7352,58 +7362,60 @@
           "label": "Surface, input/IME and background lifecycle parity on desktop",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Surface lifecycle: resize, device-scale changes including fractional scales, minimized, occluded and zero-size windows present nothing (ADR 0074)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-shell/src/window.rs",
-                  "marker": "fn set_visible("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/view.rs",
-                  "marker": "fn fractional_scales_size_the_page_in_device_pixels"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Keyboard, typed text and IME preedit and commit from the host to the browser fields, with the candidate window placed at the caret",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-shell/src/window.rs",
-                  "marker": "set_ime_cursor_area"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/src/browser.rs",
-                  "marker": "fn the_address_field_edits_with_the_caret_and_ime"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-shell/src/window.rs",
+              "marker": "fn set_visible("
             },
             {
-              "label": "Page-level IME composition and background throttling of hidden pages (TD-196, TD-197)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn fractional_scales_size_the_page_in_device_pixels"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-shell/src/window.rs",
+              "marker": "set_ime_cursor_area"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/browser.rs",
+              "marker": "fn the_address_field_edits_with_the_caret_and_ime"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/view.rs",
+              "marker": "const MAX_LIVE_PAGES"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-ipc/src/protocol.rs",
+              "marker": "pub editing: Option<(f64, f64, f64, f64)>"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn input_methods_compose_into_the_focused_page_field"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view.rs",
+              "marker": "fn background_tabs_keep_their_live_page"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.50"
         },
         {
@@ -7479,13 +7491,13 @@
         }
       ],
       "points": 24,
-      "completed": 2,
-      "in_progress": 4,
+      "completed": 6,
+      "in_progress": 0,
       "total": 9,
-      "contribution": "2.04",
-      "percent": "51.04",
-      "verified_percent": "16.66",
-      "partial_percent": "34.38"
+      "contribution": "2.66",
+      "percent": "66.66",
+      "verified_percent": "66.66",
+      "partial_percent": "0.00"
     },
     {
       "id": "a11y",

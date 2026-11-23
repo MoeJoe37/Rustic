@@ -6,6 +6,9 @@ use std::process::{Command, Output};
 
 use rustic_net::fixture::{FixtureServer, Reply};
 
+/// Whether wall-clock bounds are meaningful: not on the emulated targets.
+const NATIVE_TIMING: bool = cfg!(any(target_arch = "x86_64", target_arch = "aarch64"));
+
 fn rustic(args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_rustic"))
         .args(args)
@@ -702,10 +705,14 @@ fn scripts_wait_for_earlier_stylesheets_and_timers_run_while_they_load() {
             "single process {single}: {dump}"
         );
         // The sheet and the script load side by side.
-        assert!(
-            elapsed < pause * 2,
-            "single process {single}: {elapsed:?} for a {pause:?} sheet and script"
-        );
+        // Emulated targets (QEMU in CI) start processes too slowly for a
+        // wall-clock bound; the ordering above still holds there.
+        if NATIVE_TIMING {
+            assert!(
+                elapsed < pause * 2,
+                "single process {single}: {elapsed:?} for a {pause:?} sheet and script"
+            );
+        }
     }
 }
 
@@ -750,9 +757,13 @@ fn documents_stream_into_the_parser_as_they_arrive() {
         assert!(dump.contains("text \"text\""), "{dump}");
         // The script starts loading while the rest of the document is
         // still on its way.
-        assert!(
-            elapsed < pause * 2,
-            "single process {single}: {elapsed:?} for a {pause:?} document and script"
-        );
+        // Emulated targets (QEMU in CI) start processes too slowly for a
+        // wall-clock bound; the ordering above still holds there.
+        if NATIVE_TIMING {
+            assert!(
+                elapsed < pause * 2,
+                "single process {single}: {elapsed:?} for a {pause:?} document and script"
+            );
+        }
     }
 }

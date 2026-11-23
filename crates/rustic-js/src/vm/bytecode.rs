@@ -609,12 +609,20 @@ pub struct FunctionCode {
     /// environment slot of each parameter; [`UNMAPPED_PARAMETER`] for a
     /// parameter that a later one of the same name hides.
     pub arguments_map: Option<Box<[u16]>>,
-    /// The debugger's script id for this code, or 0 (ADR 0072).
-    pub script: u32,
+    /// Debugger tables, present only for code compiled while a debugger
+    /// was attached (ADR 0072), so other code pays one pointer.
+    pub(crate) debug: Option<Box<DebugTables>>,
+}
+
+/// What the debugger needs of one compiled function (ADR 0072).
+#[derive(Debug)]
+pub(crate) struct DebugTables {
+    /// The debugger's script id for this code.
+    pub(crate) script: u32,
     /// Statement starts, indexed by [`Op::Step`] operands.
-    pub(crate) debug_points: Box<[crate::debug::DebugPoint]>,
+    pub(crate) points: Box<[crate::debug::DebugPoint]>,
     /// Register-allocated bindings visible at each debug point, by name.
-    pub(crate) debug_locals: Box<[DebugLocals]>,
+    pub(crate) locals: Box<[DebugLocals]>,
 }
 
 /// Register-allocated bindings visible at one debug point: name and register.
@@ -704,24 +712,26 @@ impl FunctionCode {
             + self.handlers.len() * std::mem::size_of::<Handler>()
             + self.sites.len() * std::mem::size_of::<NamedSite>()
             + self.templates.len() * std::mem::size_of::<TemplateSite>()
-            + self.debug_points.len() * std::mem::size_of::<crate::debug::DebugPoint>()
-            + self
-                .debug_locals
-                .iter()
-                .map(|l| 16 + l.len() * 8)
-                .sum::<usize>()
+            + self.debug.as_ref().map_or(0, |debug| {
+                std::mem::size_of::<DebugTables>()
+                    + debug.points.len() * std::mem::size_of::<crate::debug::DebugPoint>()
+                    + debug.locals.iter().map(|l| 16 + l.len() * 8).sum::<usize>()
+            })
     }
 
     /// The debug point of the last statement step at or before the op
     /// that ran before `pc`, if the code has steps.
+    /// The debugger's script id for this code, or 0 without one.
+    pub(crate) fn debug_script(&self) -> u32 {
+        self.debug.as_ref().map_or(0, |debug| debug.script)
+    }
+
     pub(crate) fn debug_point_before(&self, pc: u32) -> Option<crate::debug::DebugPoint> {
-        if self.debug_points.is_empty() {
-            return None;
-        }
+        let debug = self.debug.as_ref()?;
         let end = (pc as usize).min(self.ops.len());
         self.ops[..end].iter().rev().find_map(|op| match op {
             Op::Step { point } | Op::DebuggerStep { point } => {
-                self.debug_points.get(*point as usize).copied()
+                debug.points.get(*point as usize).copied()
             }
             _ => None,
         })
@@ -749,7 +759,7 @@ impl FunctionCode {
         for site in self.templates.iter() {
             tracer.value(site.object.get());
         }
-        for table in self.debug_locals.iter() {
+        for table in self.debug.iter().flat_map(|debug| debug.locals.iter()) {
             for &(name, _) in table.iter() {
                 tracer.string(name);
             }

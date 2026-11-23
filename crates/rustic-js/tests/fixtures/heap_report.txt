@@ -10,7 +10,7 @@ closure capturing nothing: 120
 closure capturing one variable: 184
 symbol: 12
 fractional number in an array slot: 0
-compiled empty function: 232
+compiled empty function: 240
 instructions in an empty function: 3
-bytes per instruction, tables included (x100): 2600
+bytes per instruction, tables included (x100): 2633
 agent with the standard library: 130572

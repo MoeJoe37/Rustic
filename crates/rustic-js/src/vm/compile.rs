@@ -447,9 +447,13 @@ impl<'a, 't> Gen<'a, 't> {
             sites: self.sites.into_boxed_slice(),
             templates: self.templates.into_boxed_slice(),
             arguments_map: self.arguments_map,
-            script: self.debug_script,
-            debug_points: self.debug_points.into_boxed_slice(),
-            debug_locals: self.debug_locals.into_boxed_slice(),
+            debug: (self.debug_script != 0).then(|| {
+                Box::new(super::bytecode::DebugTables {
+                    script: self.debug_script,
+                    points: self.debug_points.into_boxed_slice(),
+                    locals: self.debug_locals.into_boxed_slice(),
+                })
+            }),
         };
         Ok(self.agent.heap.alloc_code(code)?)
     }

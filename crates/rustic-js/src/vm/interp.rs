@@ -230,7 +230,12 @@ impl Agent {
         let frame = self.vm.frames.iter().rev().nth(index)?;
         let mut locals = Vec::new();
         if let Some(point) = frame.code.debug_point_before(frame.pc) {
-            if let Some(table) = frame.code.debug_locals.get(point.locals as usize) {
+            if let Some(table) = frame
+                .code
+                .debug
+                .as_ref()
+                .and_then(|debug| debug.locals.get(point.locals as usize))
+            {
                 for &(name, register) in table.iter() {
                     let slot = frame.base as usize + usize::from(register);
                     if let Some(&value) = self.vm.stack.get(slot) {
@@ -2251,16 +2256,17 @@ impl Agent {
                 }
                 Op::Nop => {}
                 Op::Step { point } | Op::DebuggerStep { point } => {
-                    if self.debug.is_some() {
+                    if let (Some(_), Some(tables)) = (&self.debug, &code.debug) {
                         frame!().pc = pc as u32;
                         let point = point as usize;
-                        let offset = code.debug_points[point].offset;
+                        let offset = tables.points[point].offset;
                         let previous = point
                             .checked_sub(1)
-                            .map(|previous| code.debug_points[previous].offset);
+                            .map(|previous| tables.points[previous].offset);
+                        let script = tables.script;
                         let depth = self.vm.frames.len();
                         let statement = matches!(op, Op::DebuggerStep { .. });
-                        t!(self.debug_step(code.script, offset, previous, depth, statement));
+                        t!(self.debug_step(script, offset, previous, depth, statement));
                     }
                 }
             }

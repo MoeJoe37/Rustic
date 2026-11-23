@@ -366,11 +366,15 @@ impl Agent {
         for (code, pc) in self.vm_frames().take(MAX_DEBUG_FRAMES) {
             let point = code.debug_point_before(pc);
             let (line, column) = point.map_or((0, 0), |point| {
-                self.debug_position(code.script, point.offset)
+                self.debug_position(code.debug_script(), point.offset)
             });
             frames.push(DebugFrame {
                 function: self.heap.string(code.name).to_text(),
-                script: if point.is_some() { code.script } else { 0 },
+                script: if point.is_some() {
+                    code.debug_script()
+                } else {
+                    0
+                },
                 line,
                 column,
             });

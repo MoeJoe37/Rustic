@@ -34,5 +34,49 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(bench.checksum([(1.0, "x"), (2.0, "y")]), "inconsistent")
 
 
+class DeviceReportTest(unittest.TestCase):
+    def report(self, label, tiny_ms):
+        page = {"page_tiny.total": bench.summarize([(tiny_ms, "11")] * 3)}
+        return {
+            "device": {"label": label, "system": "Linux 6", "machine": "x86_64", "cpu": "cpu",
+                       "logical_cores": 4, "memory": "16.0 GiB", "python": "3"},
+            "commit": "abc1234",
+            "runs": 3,
+            "size": 10,
+            "dom_size": 10,
+            "js": {
+                "Rustic": {"calls": bench.summarize([(4.0, "7")] * 3)},
+                "V8": {"calls": bench.summarize([(2.0, "7")] * 3)},
+            },
+            "page": page,
+            "budgets": bench.check_budgets(page, {"page_tiny.total": 16.7, "page_deep.total": 50.0}),
+        }
+
+    def test_budgets_pass_only_when_measured_within_the_limit(self):
+        rows = self.report("A", 3.0)["budgets"]
+        self.assertEqual([row["within"] for row in rows], [True, False])
+        self.assertIsNone(rows[1]["median_ms"])
+        self.assertFalse(self.report("A", 20.0)["budgets"][0]["within"])
+
+    def test_merged_report_lists_every_device_with_its_ratio(self):
+        text = bench.merge_reports([self.report("Linux x64", 3.0), self.report("macOS ARM64", 30.0)])
+        self.assertIn("| Linux x64 | 1/2 | 2.0 |", text)
+        self.assertIn("| macOS ARM64 | 0/2 | 2.0 |", text)
+        self.assertIn("### macOS ARM64", text)
+        self.assertIn("| `calls` | 4.00 [4.00, 4.00] | 2.00 [2.00, 2.00] | 2.0 | yes |", text)
+
+    def test_device_info_names_the_machine(self):
+        info = bench.device_info("Here")
+        self.assertEqual(info["label"], "Here")
+        self.assertGreater(info["logical_cores"], 0)
+        self.assertTrue(info["machine"])
+
+    def test_budget_table_matches_the_page_fixtures(self):
+        for key in bench.M8_PAGE_BUDGETS_MS:
+            fixture, _, stage = key.partition(".")
+            self.assertIn(fixture, bench.PAGE_FIXTURES)
+            self.assertIn(stage, bench.PAGE_STAGES)
+
+
 if __name__ == "__main__":
     unittest.main()

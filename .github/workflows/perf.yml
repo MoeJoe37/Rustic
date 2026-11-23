@@ -1,0 +1,183 @@
+name: Performance
+
+# PERF-01 reference devices (docs/PERFORMANCE.md, "Reference devices"): the
+# GitHub-hosted runners below are the named CI reference devices for the
+# three desktop platform families on x64 and ARM64. Each job builds the
+# benchmarks in release mode, measures Rustic and the JavaScript engines the
+# runner image ships (Node's V8 everywhere, the system JavaScriptCore on
+# macOS), and uploads a per-device Markdown and JSON report. The report job
+# merges them into one page in the run summary and a `perf-report` artifact.
+#
+# Not a required check: hosted runners are shared machines, so a missed M8
+# page budget fails that device's job for triage but never blocks a merge.
+on:
+  push:
+    # A change to the harness measures itself on every device.
+    paths:
+      - .github/workflows/perf.yml
+      - tools/cross_engine_bench.py
+      - crates/rustic-raster/examples/page_bench.rs
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per cell
+        default: "11"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.99.1"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  device:
+    name: Device (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-24.04
+            slug: linux-x64
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            slug: linux-arm64
+          - name: Windows x64
+            os: windows-2022
+            slug: windows-x64
+          - name: Windows ARM64
+            os: windows-11-arm
+            slug: windows-arm64
+          - name: macOS ARM64
+            os: macos-15
+            slug: macos-arm64
+          - name: macOS x64
+            os: macos-15-intel
+            slug: macos-x64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install rustup when the runner image lacks it
+        # Same pinned rustup-init and SHA-256 values as ci.yml; update together.
+        env:
+          RUSTUP_INIT_VERSION: "1.29.3"
+        run: |
+          if command -v rustup >/dev/null; then exit 0; fi
+          case "$RUNNER_OS-$RUNNER_ARCH" in
+            Windows-ARM64) host=aarch64-pc-windows-msvc; exe=.exe; sha=407e0d72f81d26a01f9d032b8317908cbb2917ba22765474b682b41390792ad9 ;;
+            Windows-X64) host=x86_64-pc-windows-msvc; exe=.exe; sha=38027d51d69a5d05493627a0634dbea52d6cd793c8f072d2373d3f4163eec7db ;;
+            Linux-X64) host=x86_64-unknown-linux-gnu; exe=; sha=b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55 ;;
+            Linux-ARM64) host=aarch64-unknown-linux-gnu; exe=; sha=9f608c142e0e38a78957d0661ba1dfaf0b6fb37184cfaa4b9a0aa57af6184282 ;;
+            macOS-ARM64) host=aarch64-apple-darwin; exe=; sha=63752a1919a3a4793173ec70f8f212621a7ce38ba6a246095984482f4de20f9f ;;
+            macOS-X64) host=x86_64-apple-darwin; exe=; sha=bc107f1fb0228de7fa32413c89c1b305cea9cd256e94b01150cd054128145429 ;;
+            *) echo "No pinned rustup-init for $RUNNER_OS-$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          installer="rustup-init$exe"
+          curl --proto '=https' --tlsv1.2 -sSfLo "$installer" "https://static.rust-lang.org/rustup/archive/$RUSTUP_INIT_VERSION/$host/$installer"
+          if command -v sha256sum >/dev/null; then
+            actual=$(sha256sum "$installer" | cut -d' ' -f1)
+          else
+            actual=$(shasum -a 256 "$installer" | cut -d' ' -f1)
+          fi
+          if [ "$actual" != "$sha" ]; then
+            echo "rustup-init checksum mismatch: expected $sha, got $actual" >&2
+            exit 1
+          fi
+          chmod +x "$installer"
+          "./$installer" -y --profile minimal --default-toolchain none
+          rm "$installer"
+          if [ "$RUNNER_OS" = Windows ]; then
+            echo "$USERPROFILE\\.cargo\\bin" >> "$GITHUB_PATH"
+          else
+            echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Install pinned Rust
+        run: rustup toolchain install "$RUST_VERSION" --profile minimal
+      - name: Build the benchmarks in release mode
+        run: |
+          cargo build --locked --release -p rustic-js --example js_bench \
+            -p rustic-engine --example dom_bench -p rustic-raster --example page_bench
+      - name: Measure this reference device
+        env:
+          DEVICE: ${{ matrix.name }} (${{ matrix.os }})
+          SLUG: ${{ matrix.slug }}
+          RUNS: ${{ github.event.inputs.runs || '11' }}
+        run: |
+          exe=
+          if [ "$RUNNER_OS" = Windows ]; then exe=.exe; fi
+          engines=()
+          if command -v node >/dev/null; then
+            engines+=(--engine "V8 (Node $(node --version))=node {file}")
+          fi
+          jsc=/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc
+          if [ -x "$jsc" ]; then
+            engines+=(--engine "JavaScriptCore (macOS $(sw_vers -productVersion))=$jsc {file}")
+          fi
+          python=python3
+          if ! command -v python3 >/dev/null; then python=python; fi
+          mkdir -p perf-report
+          "$python" tools/cross_engine_bench.py \
+            --rustic "target/release/examples/js_bench$exe" \
+            --dom "target/release/examples/dom_bench$exe" \
+            --page "target/release/examples/page_bench$exe" \
+            "${engines[@]}" --runs "$RUNS" --device "$DEVICE" --commit "$GITHUB_SHA" \
+            --json "perf-report/$SLUG.json" --output "perf-report/$SLUG.md" --enforce-budgets
+      - name: Show the device report
+        if: ${{ always() }}
+        run: cat perf-report/*.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Retain the device report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-${{ matrix.slug }}
+          path: perf-report
+          if-no-files-found: ignore
+          retention-days: 90
+
+  report:
+    name: Report
+    needs: device
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Merge the per-device reports
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p devices
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --pattern 'perf-*' --dir devices
+          mapfile -t reports < <(find devices -name '*.json' | sort)
+          if [ "${#reports[@]}" -eq 0 ]; then
+            echo "No device produced a report" >&2
+            exit 1
+          fi
+          python3 tools/cross_engine_bench.py --merge "${reports[@]}" --output perf-report.md
+          cat perf-report.md >> "$GITHUB_STEP_SUMMARY"
+          mkdir -p merged && cp perf-report.md "${reports[@]}" merged/
+      - name: Retain the merged report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: perf-report
+          path: merged
+          retention-days: 90

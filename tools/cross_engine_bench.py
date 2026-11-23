@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """PERF-01 cross-engine harness: run Rustic's JS-09 corpus in Rustic and in
-JavaScript engine shells, and the DOM microbenchmarks in Rustic, then write a
+JavaScript engine shells, and the DOM and page pipeline benchmarks in Rustic,
+then write a
 Markdown report with exact versions, medians and 95% confidence intervals.
 
 Each shell sample is a fresh process that loads the workload, calls
@@ -14,10 +15,16 @@ engine that cannot run is reported as "not runnable", never as a number.
         --engine "V8 (Deno 2.9.8, V8 15.0.245.2)=deno run --quiet {file}" \\
         --engine "SpiderMonkey 160.0.1=/path/js {file}" \\
         --output report.md
+
+The reference-device workflow (.github/workflows/perf.yml) adds `--page`
+(the page pipeline fixtures of `page_bench`), `--device` and `--json` for a
+per-device report, and then merges every device's JSON with `--merge`.
 """
 
 import argparse
+import json
 import math
+import os
 from pathlib import Path
 import platform
 import shlex
@@ -132,18 +139,211 @@ def checksum(samples) -> str | None:
     return results.pop() if len(results) == 1 else "inconsistent"
 
 
+DOM_WORKLOADS = ["dom_create_append", "dom_query", "dom_attributes", "dom_dispatch"]
+PAGE_FIXTURES = ["page_tiny", "page_article", "page_large_dom", "page_selectors", "page_deep"]
+PAGE_STAGES = ["parse", "style", "layout", "paint", "raster", "total"]
+
+# M8 desktop-alpha page budgets (docs/PERFORMANCE.md, "M8 budgets"): the
+# median end-to-end time of one fixture, parse to raster, in milliseconds,
+# on every reference device. Keep this table and the document in step.
+M8_PAGE_BUDGETS_MS = {
+    "page_tiny.total": 16.7,
+    "page_article.total": 250.0,
+    "page_large_dom.total": 600.0,
+    "page_selectors.total": 300.0,
+    "page_deep.total": 50.0,
+}
+
+
+def _run_text(argv: list[str]) -> str:
+    try:
+        result = subprocess.run(argv, capture_output=True, encoding="utf-8", timeout=60, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def device_info(label: str) -> dict:
+    """What the report needs to name the machine: OS, architecture, CPU,
+    logical cores and memory, from the platform's own tools when present."""
+    system = platform.system()
+    cpu = ""
+    memory = ""
+    if system == "Linux":
+        try:
+            for line in Path("/proc/cpuinfo").read_text(encoding="utf-8").splitlines():
+                key, _, value = line.partition(":")
+                if key.strip() in ("model name", "Model", "Hardware") and value.strip():
+                    cpu = value.strip()
+                    break
+            if not cpu:
+                for line in _run_text(["lscpu"]).splitlines():
+                    if line.startswith("Model name:"):
+                        cpu = line.partition(":")[2].strip()
+                        break
+            for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+                if line.startswith("MemTotal:"):
+                    memory = f"{int(line.split()[1]) / 1024 / 1024:.1f} GiB"
+                    break
+        except OSError:
+            pass
+    elif system == "Darwin":
+        cpu = _run_text(["sysctl", "-n", "machdep.cpu.brand_string"])
+        bytes_ = _run_text(["sysctl", "-n", "hw.memsize"])
+        memory = f"{int(bytes_) / 2**30:.1f} GiB" if bytes_.isdigit() else ""
+    elif system == "Windows":
+        cpu = _run_text(["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Processor | Select-Object -First 1).Name"])
+        bytes_ = _run_text(["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory"])
+        memory = f"{int(bytes_) / 2**30:.1f} GiB" if bytes_.isdigit() else ""
+    return {
+        "label": label,
+        "system": f"{system} {platform.release()}",
+        "machine": platform.machine(),
+        "cpu": cpu or platform.processor() or "unknown",
+        "logical_cores": os.cpu_count() or 0,
+        "memory": memory or "unknown",
+        "python": platform.python_version(),
+    }
+
+
+def summarize(samples) -> dict:
+    """JSON form of one cell: the median and interval, or the reason it did not run."""
+    if isinstance(samples, str):
+        return {"status": samples}
+    middle, low, high = median_interval([ms for ms, _ in samples])
+    return {"median_ms": middle, "low_ms": low, "high_ms": high, "runs": len(samples), "check": checksum(samples)}
+
+
+def summary_cell(entry: dict) -> str:
+    if "median_ms" not in entry:
+        return entry["status"]
+    return f"{entry['median_ms']:.2f} [{entry['low_ms']:.2f}, {entry['high_ms']:.2f}]"
+
+
+def check_budgets(page: dict, budgets: dict[str, float]) -> list[dict]:
+    """Budget rows for the page results; a fixture that did not run misses."""
+    rows = []
+    for key, limit in budgets.items():
+        entry = page.get(key, {"status": f"{NOT_RUNNABLE}: not measured"})
+        median = entry.get("median_ms")
+        rows.append({"metric": key, "budget_ms": limit, "median_ms": median, "within": median is not None and median <= limit})
+    return rows
+
+
+def render_device(report: dict) -> list[str]:
+    device = report["device"]
+    lines = [
+        f"### {device['label']}",
+        "",
+        f"{device['system']}, {device['machine']}, {device['cpu']}, {device['logical_cores']} logical cores, "
+        f"{device['memory']}. Rustic `{report.get('commit', 'unknown')}`; {report['runs']} runs per cell.",
+        "",
+    ]
+    js = report.get("js", {})
+    if js:
+        labels = list(js)
+        workloads = sorted({name for results in js.values() for name in results})
+        lines += [
+            f"JavaScript corpus (size {report['size']}). Cells are median ms [95% CI]; the ratio is "
+            "Rustic ÷ fastest other engine.",
+            "",
+            "| Workload | " + " | ".join(labels) + " | Rustic ÷ best | Results agree |",
+            "| --- | " + " | ".join("---" for _ in labels) + " | --- | --- |",
+        ]
+        for name in workloads:
+            entries = {label: js[label].get(name, {"status": NOT_RUNNABLE}) for label in labels}
+            medians = {label: e["median_ms"] for label, e in entries.items() if "median_ms" in e}
+            others = [v for label, v in medians.items() if label != "Rustic"]
+            ratio = f"{medians['Rustic'] / min(others):.1f}" if "Rustic" in medians and others and min(others) > 0 else "—"
+            sums = {e.get("check") for e in entries.values()} - {None}
+            agree = "yes" if len(sums) == 1 and "inconsistent" not in sums else "no"
+            lines.append(f"| `{name}` | " + " | ".join(summary_cell(e) for e in entries.values()) + f" | {ratio} | {agree} |")
+        lines.append("")
+    dom = report.get("dom", {})
+    if dom:
+        lines += [
+            f"DOM microbenchmarks (size {report['dom_size']}; JavaScript shells have no DOM, so only Rustic runs):",
+            "",
+            "| Workload | Rustic |",
+            "| --- | --- |",
+        ]
+        lines += [f"| `{name}` | {summary_cell(dom[name])} |" for name in DOM_WORKLOADS if name in dom]
+        lines.append("")
+    page = report.get("page", {})
+    if page:
+        lines += [
+            "Page pipeline (Rustic fixtures, 1280×720, median ms [95% CI]; other engines: not compared, "
+            "they need the browser-hosted harness):",
+            "",
+            "| Fixture | " + " | ".join(PAGE_STAGES) + " |",
+            "| --- | " + " | ".join("---" for _ in PAGE_STAGES) + " |",
+        ]
+        for fixture in PAGE_FIXTURES:
+            cells = [summary_cell(page.get(f"{fixture}.{stage}", {"status": NOT_RUNNABLE})) for stage in PAGE_STAGES]
+            lines.append(f"| `{fixture}` | " + " | ".join(cells) + " |")
+        lines.append("")
+    budgets = report.get("budgets", [])
+    if budgets:
+        lines += ["M8 page budgets:", "", "| Metric | Budget ms | Median ms | Within |", "| --- | --- | --- | --- |"]
+        for row in budgets:
+            median = "not measured" if row["median_ms"] is None else f"{row['median_ms']:.2f}"
+            lines.append(f"| `{row['metric']}` | {row['budget_ms']} | {median} | {'yes' if row['within'] else 'no'} |")
+        lines.append("")
+    return lines
+
+
+def merge_reports(reports: list[dict]) -> str:
+    """One Markdown page for several per-device JSON reports."""
+    lines = ["# Rustic reference-device performance report", ""]
+    if reports:
+        commits = sorted({report.get("commit", "unknown") for report in reports})
+        lines += [f"Commit(s): {', '.join(f'`{c}`' for c in commits)}. {len(reports)} reference devices.", ""]
+        lines += ["| Device | Page budgets within | Slowest JS ratio |", "| --- | --- | --- |"]
+        for report in reports:
+            budgets = report.get("budgets", [])
+            within = sum(1 for row in budgets if row["within"])
+            ratios = []
+            js = report.get("js", {})
+            for name in js.get("Rustic", {}):
+                rustic = js["Rustic"][name].get("median_ms")
+                others = [js[label][name].get("median_ms") for label in js if label != "Rustic" and name in js[label]]
+                others = [v for v in others if v]
+                if rustic and others:
+                    ratios.append(rustic / min(others))
+            slowest = f"{max(ratios):.1f}" if ratios else "not compared"
+            lines.append(f"| {report['device']['label']} | {within}/{len(budgets)} | {slowest} |")
+        lines.append("")
+    for report in reports:
+        lines += render_device(report)
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--rustic", type=Path, required=True, help="js_bench built in release mode")
+    parser.add_argument("--rustic", type=Path, help="js_bench built in release mode")
     parser.add_argument("--dom", type=Path, help="dom_bench built in release mode")
+    parser.add_argument("--page", type=Path, help="page_bench built in release mode")
     parser.add_argument("--engine", action="append", default=[], help='"label=command with {file}"')
     parser.add_argument("--size", type=int, default=200_000)
     parser.add_argument("--dom-size", type=int, default=20_000)
     parser.add_argument("--runs", type=int, default=11)
+    parser.add_argument("--device", default=None, help="reference device name for the report")
+    parser.add_argument("--commit", default=None, help="Rustic commit measured")
+    parser.add_argument("--json", type=Path, help="also write the per-device report as JSON")
+    parser.add_argument("--enforce-budgets", action="store_true", help="exit 1 when a page budget is missed")
+    parser.add_argument("--merge", type=Path, nargs="+", help="merge per-device JSON reports into --output")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    workloads = sorted(path.stem for path in CORPUS.glob("*.js"))
+    if args.merge:
+        reports = [json.loads(path.read_text(encoding="utf-8")) for path in args.merge]
+        reports.sort(key=lambda report: report["device"]["label"])
+        args.output.write_text(merge_reports(reports), encoding="utf-8")
+        print(f"wrote {args.output}")
+        return 0
+    if not args.rustic and not args.page:
+        parser.error("--rustic or --page is required")
+
     engines = []
     for spec in args.engine:
         label, _, command = spec.partition("=")
@@ -151,48 +351,39 @@ def main() -> int:
             parser.error(f"--engine needs label=command: {spec!r}")
         engines.append((label, command))
 
-    results = {"Rustic": run_rustic(args.rustic, workloads, args.size, args.runs, ["--samples"])}
-    for label, command in engines:
-        print(f"running {label}", file=sys.stderr)
-        results[label] = {name: run_shell(command, CORPUS / f"{name}.js", args.size, args.runs) for name in workloads}
-
-    labels = list(results)
-    lines = [
-        f"Host: {platform.machine()}, {platform.system()} {platform.release()}; "
-        f"{args.runs} fresh-process (or fresh-agent) runs per cell, size {args.size}.",
-        "",
-        "Cells are median ms [95% confidence interval of the median]. The ratio is",
-        "Rustic ÷ fastest other engine, so lower is better and 1.0 is parity.",
-        "",
-        "| Workload | " + " | ".join(labels) + " | Rustic ÷ best | Results agree |",
-        "| --- | " + " | ".join("---" for _ in labels) + " | --- | --- |",
-    ]
-    for name in workloads:
-        cells = [cell(results[label][name]) for label in labels]
-        medians = {
-            label: median_interval([ms for ms, _ in results[label][name]])[0]
-            for label in labels
-            if not isinstance(results[label][name], str)
-        }
-        others = [value for label, value in medians.items() if label != "Rustic"]
-        ratio = f"{medians['Rustic'] / min(others):.1f}" if "Rustic" in medians and others else "—"
-        sums = {checksum(results[label][name]) for label in labels} - {None}
-        agree = "yes" if len(sums) == 1 and "inconsistent" not in sums else "no"
-        lines.append(f"| `{name}` | " + " | ".join(cells) + f" | {ratio} | {agree} |")
+    label = args.device or f"{platform.system()} {platform.machine()}"
+    report = {
+        "device": device_info(label),
+        "commit": args.commit or _run_text(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"]) or "unknown",
+        "runs": args.runs,
+        "size": args.size,
+        "dom_size": args.dom_size,
+    }
+    if args.rustic:
+        workloads = sorted(path.stem for path in CORPUS.glob("*.js"))
+        raw = {"Rustic": run_rustic(args.rustic, workloads, args.size, args.runs, ["--samples"])}
+        for engine, command in engines:
+            print(f"running {engine}", file=sys.stderr)
+            raw[engine] = {name: run_shell(command, CORPUS / f"{name}.js", args.size, args.runs) for name in workloads}
+        report["js"] = {engine: {name: summarize(s) for name, s in results.items()} for engine, results in raw.items()}
     if args.dom:
-        dom_names = ["dom_create_append", "dom_query", "dom_attributes", "dom_dispatch"]
-        dom = run_rustic(args.dom, dom_names, args.dom_size, args.runs, [])
-        lines += [
-            "",
-            f"DOM microbenchmarks (size {args.dom_size}; shells have no DOM, so only Rustic runs):",
-            "",
-            "| Workload | Rustic | Other engines |",
-            "| --- | --- | --- |",
-        ]
-        for name in dom_names:
-            lines.append(f"| `{name}` | {cell(dom[name])} | {NOT_RUNNABLE}: no DOM in a JavaScript shell |")
-    args.output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        dom = run_rustic(args.dom, DOM_WORKLOADS, args.dom_size, args.runs, [])
+        report["dom"] = {name: summarize(s) for name, s in dom.items()}
+    if args.page:
+        keys = [f"{fixture}.{stage}" for fixture in PAGE_FIXTURES for stage in PAGE_STAGES]
+        page = run_rustic(args.page, keys, args.size, args.runs, [])
+        report["page"] = {key: summarize(s) for key, s in page.items()}
+        report["budgets"] = check_budgets(report["page"], M8_PAGE_BUDGETS_MS)
+
+    args.output.write_text("\n".join(render_device(report)) + "\n", encoding="utf-8")
+    if args.json:
+        args.json.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"wrote {args.output}")
+    missed = [row["metric"] for row in report.get("budgets", []) if not row["within"]]
+    if missed:
+        print(f"M8 page budgets missed: {', '.join(missed)}", file=sys.stderr)
+        if args.enforce_budgets:
+            return 1
     return 0
 
 

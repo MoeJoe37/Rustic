@@ -130,7 +130,32 @@ sites use local replay; no live site or personal account is measured.
 
 ### Reference devices
 
-Exact models are chosen and recorded when PERF-01 lands; each class must exist:
+**CI reference devices (M8).** The [Performance workflow](../.github/workflows/perf.yml)
+runs weekly and on demand on six GitHub-hosted runners, which are the named
+reference devices for the desktop families until physical machines exist:
+
+| Device | Runner image | Family and architecture | Engines compared |
+| --- | --- | --- | --- |
+| Linux x64 | `ubuntu-24.04` | Linux, x86-64 | Rustic, V8 (the image's Node) |
+| Linux ARM64 | `ubuntu-24.04-arm` | Linux, aarch64 | Rustic, V8 (Node) |
+| Windows x64 | `windows-2022` | Windows, x86-64 | Rustic, V8 (Node) |
+| Windows ARM64 | `windows-11-arm` | Windows, ARM64 | Rustic, V8 (Node) |
+| macOS ARM64 | `macos-15` | macOS, Apple silicon | Rustic, V8 (Node), JavaScriptCore (system `jsc`) |
+| macOS x64 | `macos-15-intel` | macOS, Intel | Rustic, V8 (Node), JavaScriptCore (system `jsc`) |
+
+Each job records the CPU model, logical cores, memory, OS release and the
+exact engine versions in its report (`perf-<device>` artifact, Markdown and
+JSON), and the report job merges every device into one page (`perf-report`
+artifact and the run summary). Hosted runners are shared virtual machines:
+their numbers name a device class, they are not controlled hardware, so they
+never gate a merge. SpiderMonkey has no shell on these images and is "not
+compared" there; the [first report](reviews/2026-11-19-perf-01-m5.md) measured
+it on a controlled x86-64 host. Physical reference machines (a Windows ARM64
+laptop, an Apple-silicon laptop, an aarch64 board with fixed clocks) and
+browser-hosted comparisons with Chrome, Firefox and Safari are an external
+step: they need hardware the project does not have yet.
+
+Each class below must exist by the stage that needs it:
 
 | Platform family | Reference classes |
 | --- | --- |
@@ -166,6 +191,39 @@ engine's; no subtest may be worse than the best engine by more than 5% without
 a reviewed, published exception; p95 interaction latency is never worse than the
 best engine. A stage gate missed on one device class blocks the stage. Results
 are published per device and engine; an aggregate never hides a lost metric.
+
+## M8 budgets
+
+The desktop alpha adds page-level budgets measured by the page pipeline
+benchmark (`crates/rustic-raster/examples/page_bench.rs`): five generated
+fixtures, each parsed, styled, laid out, painted and rasterized at 1280×720
+with the bundled test font. The budget is the median of 11 runs of the whole
+pipeline on **every** CI reference device; `tools/cross_engine_bench.py`
+(`M8_PAGE_BUDGETS_MS`) holds the same table and the Performance workflow fails
+the device's job when one is missed.
+
+| Fixture | What it stresses | M8 budget (median, ms) | First measurement (sandbox x86-64, 2026-11-23) |
+| --- | --- | --- | --- |
+| `page_tiny` | Start-up cost of every stage | 16.7 (one 60 Hz frame) | 3.8 |
+| `page_article` | 200 wrapped paragraphs: shaping and line breaking | 250 | 123 |
+| `page_large_dom` | 5,000 block elements | 600 | 244 |
+| `page_selectors` | 600 descendant, attribute and `:nth-child` rules on 2,400 elements | 300 | 131 |
+| `page_deep` | 400 nested blocks | 50 | 11.7 |
+
+The budgets are about twice the first measurement so that shared runners
+pass with room for their variance; they ratchet down as each device's
+history shows its spread. A stage that grows by more than 10% on a device for
+two consecutive runs needs an explanation, per the regression rule above.
+Other M8 budgets are the existing ones: the warm frame update (the
+`frame_budget` example's damage-limited repaint within 16.7 ms), the
+50 ms task rule and the per-renderer memory caps of ISO-04.
+
+**Where the M8 ratchet stands.** On the JavaScript corpus the ratio to V8
+with its JIT is 2.0 to 15 on the sandbox (`property_access` 2.0,
+`framework_diff` 15), so the 2.0 speed ratchet for M8 is met by one workload
+and missed by the rest. It is recorded per device by the workflow, as the
+ratchet requires; closing the gap is the M12 interpreter and JIT work
+(`perf.interpreter`, `perf.baseline_jit`), not something an alpha can reach.
 
 ## Optimization order
 

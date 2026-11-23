@@ -646,7 +646,9 @@ fn quirks_mode_takes_same_origin_stylesheets_of_any_type() {
 
 #[test]
 fn scripts_wait_for_earlier_stylesheets_and_timers_run_while_they_load() {
-    let pause = std::time::Duration::from_millis(900);
+    // Long enough that emulated CI's process start-up stays well
+    // under one pause.
+    let pause = std::time::Duration::from_millis(2000);
     let slow = |body: &[u8], kind: &str| {
         let mut bytes = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n\r\n",
@@ -709,7 +711,9 @@ fn scripts_wait_for_earlier_stylesheets_and_timers_run_while_they_load() {
 
 #[test]
 fn documents_stream_into_the_parser_as_they_arrive() {
-    let pause = std::time::Duration::from_millis(900);
+    // Long enough that emulated CI's process start-up stays well
+    // under one pause.
+    let pause = std::time::Duration::from_millis(2000);
     let first = b"<!doctype html><script src=/a.js></script>".to_vec();
     let second = b"<p id=t>text</p>".to_vec();
     let mut head = format!(

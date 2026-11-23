@@ -328,10 +328,7 @@ fn deep_collapsed_chains_are_iterative_and_fail_atomically_at_coordinate_limits(
     assert_eq!(yh(&doc, &layout, "leaf"), (5.0, 10.0));
     assert_eq!(layout.fragments()[0].content().size().height().get(), 22.0);
     let before = tree.clone();
-    let limits = LayoutLimits {
-        max_boxes: 1,
-        ..LayoutLimits::default()
-    };
+    let limits = LayoutLimits::default().with_max_boxes(1);
     assert_eq!(
         BlockLayout::compute(
             &tree,

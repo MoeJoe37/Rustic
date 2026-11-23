@@ -11,6 +11,7 @@ use crate::replaced::{NaturalSize, canvas_size};
 
 /// Independent work, box and depth limits. These are not total process memory.
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub struct LayoutLimits {
     /// Maximum visited DOM nodes and indexed element styles.
     pub max_nodes: usize,
@@ -20,6 +21,10 @@ pub struct LayoutLimits {
     pub max_text_units: usize,
     /// Maximum DOM edges from the selected root, including boxless elements.
     pub max_depth: usize,
+    /// Units of flow work (box visits, float scans, containing-chain steps
+    /// and formatting-root retries) one layout may spend before it fails with
+    /// [`crate::FlowError::WorkLimit`]. Defaults to [`crate::MAX_FLOW_WORK`].
+    pub max_flow_work: usize,
 }
 impl Default for LayoutLimits {
     fn default() -> Self {
@@ -28,7 +33,40 @@ impl Default for LayoutLimits {
             max_boxes: 100_000,
             max_text_units: 8 * 1024 * 1024,
             max_depth: 256,
+            max_flow_work: crate::MAX_FLOW_WORK,
         }
+    }
+}
+impl LayoutLimits {
+    /// These limits with `max_nodes` replaced.
+    #[must_use]
+    pub const fn with_max_nodes(mut self, value: usize) -> Self {
+        self.max_nodes = value;
+        self
+    }
+    /// These limits with `max_boxes` replaced.
+    #[must_use]
+    pub const fn with_max_boxes(mut self, value: usize) -> Self {
+        self.max_boxes = value;
+        self
+    }
+    /// These limits with `max_text_units` replaced.
+    #[must_use]
+    pub const fn with_max_text_units(mut self, value: usize) -> Self {
+        self.max_text_units = value;
+        self
+    }
+    /// These limits with `max_depth` replaced.
+    #[must_use]
+    pub const fn with_max_depth(mut self, value: usize) -> Self {
+        self.max_depth = value;
+        self
+    }
+    /// These limits with `max_flow_work` replaced.
+    #[must_use]
+    pub const fn with_max_flow_work(mut self, value: usize) -> Self {
+        self.max_flow_work = value;
+        self
     }
 }
 

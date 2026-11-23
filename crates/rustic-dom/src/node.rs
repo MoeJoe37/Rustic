@@ -183,6 +183,11 @@ pub struct Node {
     pub(crate) data_bytes: usize,
     pub(crate) template_host: Option<NodeId>,
     pub(crate) shadow_host: Option<NodeId>,
+    /// An upper bound on the height of this node's subtree (0 for a leaf),
+    /// raised along the ancestors on every link and left high on removal;
+    /// an insertion recomputes it exactly only when the bound would fail the
+    /// depth limit (TD-03).
+    pub(crate) height_bound: u32,
 }
 
 impl Node {
@@ -202,6 +207,7 @@ impl Node {
             data_bytes,
             template_host: None,
             shadow_host: None,
+            height_bound: 0,
         }
     }
 

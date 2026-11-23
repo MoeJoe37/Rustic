@@ -507,21 +507,31 @@ impl Document {
             }
         }
         // A fragment's children land one level shallower than in the fragment.
-        let height = self.walk(child)?.map(|(_, depth)| depth).max().unwrap_or(0);
-        let height = if fragment {
-            height.saturating_sub(1)
-        } else {
-            height
-        };
+        // The cached bound decides most insertions in constant time; only a
+        // bound that would fail is replaced by the exact height (TD-03).
         if !moved.is_empty() {
-            depth
-                .checked_add(1)
-                .and_then(|depth| depth.checked_add(height))
-                .filter(|depth| *depth <= self.limits.max_depth)
-                .ok_or(DomError::DepthLimit)?;
+            let max_depth = self.limits.max_depth;
+            let fits = |height: usize| {
+                let height = if fragment {
+                    height.saturating_sub(1)
+                } else {
+                    height
+                };
+                depth
+                    .checked_add(1)
+                    .and_then(|depth| depth.checked_add(height))
+                    .is_some_and(|depth| depth <= max_depth)
+            };
+            let bound = usize::try_from(self.live(child).height_bound).unwrap_or(usize::MAX);
+            if !fits(bound) {
+                let exact = self.refresh_height(child)?;
+                if !fits(exact) {
+                    return Err(DomError::DepthLimit);
+                }
+            }
         }
         let before = if before == Some(child) {
-            child_node.next_sibling()
+            self.live(child).next_sibling()
         } else {
             before
         };
@@ -765,6 +775,51 @@ impl Document {
         node.parent = Some(parent);
         node.previous_sibling = previous;
         node.next_sibling = before;
+        self.raise_height_bounds(parent, child);
+    }
+
+    /// Raise the cached height bounds of `parent` and its ancestors after
+    /// `child` was linked under it. Stops at the first ancestor whose bound
+    /// already covers the new subtree, so the cost is at most the depth.
+    fn raise_height_bounds(&mut self, parent: NodeId, child: NodeId) {
+        let mut height = self.live(child).height_bound.saturating_add(1);
+        let mut current = Some(parent);
+        while let Some(id) = current {
+            let node = self.live_mut(id);
+            if node.height_bound >= height {
+                break;
+            }
+            node.height_bound = height;
+            height = height.saturating_add(1);
+            current = node.parent;
+        }
+    }
+
+    /// Recompute the exact subtree heights below `root` (inclusive) and
+    /// return the root's. Linear in the subtree; called only when the cached
+    /// bound would reject an insertion, and leaves every bound in the subtree
+    /// exact, so a repeated check of the same subtree is constant time.
+    fn refresh_height(&mut self, root: NodeId) -> Result<usize, DomError> {
+        let count = self.walk(root)?.count();
+        let mut order = Vec::new();
+        order
+            .try_reserve_exact(count)
+            .map_err(|_| DomError::AllocationFailed)?;
+        order.extend(self.walk(root)?.map(|(id, _)| id));
+        for &id in &order {
+            self.live_mut(id).height_bound = 0;
+        }
+        // Reverse preorder visits every node after all of its descendants.
+        for &id in order.iter().skip(1).rev() {
+            let height = self.live(id).height_bound.saturating_add(1);
+            let parent = self
+                .live(id)
+                .parent()
+                .expect("non-root walk node has a parent");
+            let node = self.live_mut(parent);
+            node.height_bound = node.height_bound.max(height);
+        }
+        Ok(usize::try_from(self.live(root).height_bound).unwrap_or(usize::MAX))
     }
 
     /// Disconnect a subtree while preserving all node IDs and accounted payload.
@@ -973,6 +1028,7 @@ impl Document {
         let node = self.live_mut(child);
         node.parent = Some(parent);
         node.previous_sibling = previous;
+        self.raise_height_bounds(parent, child);
     }
 
     fn unlink(&mut self, id: NodeId) {

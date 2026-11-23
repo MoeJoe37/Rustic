@@ -445,10 +445,7 @@ fn cancellation_and_limits_stop_text_layout() {
         ),
         Err(FlowError::Cancelled)
     );
-    let limits = LayoutLimits {
-        max_text_units: 7,
-        ..LayoutLimits::default()
-    };
+    let limits = LayoutLimits::default().with_max_text_units(7);
     assert_eq!(
         BlockLayout::compute_with_fonts(
             &tree,

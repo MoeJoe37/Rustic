@@ -1777,12 +1777,11 @@ pub fn default_view() -> rustic_layout::View {
 }
 
 fn layout_limits(limits: LoaderLimits) -> rustic_layout::LayoutLimits {
-    rustic_layout::LayoutLimits {
-        max_nodes: limits.parser.document.max_nodes,
-        max_boxes: limits.parser.document.max_nodes,
-        max_depth: limits.parser.document.max_depth,
-        ..rustic_layout::LayoutLimits::default()
-    }
+    let mut layout = rustic_layout::LayoutLimits::default();
+    layout.max_nodes = limits.parser.document.max_nodes;
+    layout.max_boxes = limits.parser.document.max_nodes;
+    layout.max_depth = limits.parser.document.max_depth;
+    layout
 }
 
 /// Compute used block rectangles with adjoining-margin collapse for the static subset.

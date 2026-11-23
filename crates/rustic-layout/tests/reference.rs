@@ -218,42 +218,20 @@ fn box_node_depth_text_and_cancellation_limits_are_exact() {
     let tree = build(&doc, &styles, LayoutLimits::default()).unwrap();
     let nodes = doc.walk(doc.root()).unwrap().count();
     let depth = doc.walk(doc.root()).unwrap().map(|(_, d)| d).max().unwrap();
-    let limits = LayoutLimits {
-        max_nodes: nodes,
-        max_boxes: tree.boxes().len(),
-        max_depth: depth,
-        max_text_units: 3,
-    };
+    let limits = LayoutLimits::default()
+        .with_max_nodes(nodes)
+        .with_max_boxes(tree.boxes().len())
+        .with_max_depth(depth)
+        .with_max_text_units(3);
     assert!(build(&doc, &styles, limits).is_ok());
     for (limits, expected) in [
+        (limits.with_max_nodes(nodes - 1), LayoutError::NodeLimit),
         (
-            LayoutLimits {
-                max_nodes: nodes - 1,
-                ..limits
-            },
-            LayoutError::NodeLimit,
-        ),
-        (
-            LayoutLimits {
-                max_boxes: tree.boxes().len() - 1,
-                ..limits
-            },
+            limits.with_max_boxes(tree.boxes().len() - 1),
             LayoutError::BoxLimit,
         ),
-        (
-            LayoutLimits {
-                max_depth: depth - 1,
-                ..limits
-            },
-            LayoutError::DepthLimit,
-        ),
-        (
-            LayoutLimits {
-                max_text_units: 2,
-                ..limits
-            },
-            LayoutError::TextLimit,
-        ),
+        (limits.with_max_depth(depth - 1), LayoutError::DepthLimit),
+        (limits.with_max_text_units(2), LayoutError::TextLimit),
     ] {
         assert_eq!(build(&doc, &styles, limits), Err(expected));
     }
@@ -355,14 +333,7 @@ fn deep_boxless_chains_stay_iterative_and_keep_text_style() {
         "rgb(0, 0, 255)"
     );
     assert_eq!(
-        build(
-            &doc,
-            &styles,
-            LayoutLimits {
-                max_depth: 199,
-                ..LayoutLimits::default()
-            }
-        ),
+        build(&doc, &styles, LayoutLimits::default().with_max_depth(199)),
         Err(LayoutError::DepthLimit)
     );
 }

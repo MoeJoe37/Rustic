@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-03, TD-30, TD-44, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-30, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -85,7 +85,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | --- | --- | --- | --- | --- |
 | TD-01 | Bad | HTML parser | Diagnostic count limits made error-heavy pages fail | Paid |
 | TD-02 | Deliberate | DOM / parser | Depth and node budgets abort the whole parse | Paid |
-| TD-03 | Watch | DOM | Every insert walks the moved subtree to measure height | Open, no measured blowup |
+| TD-03 | Watch | DOM | Every insert walks the moved subtree to measure height | Paid |
 | TD-04 | Deliberate | All crates | Invariant `expect`/indexing in library code | Open, governed by rule 6 |
 | TD-05 | Bad | HTML tokenizer | `char as u8` truncation in end-tag matching | Paid |
 | TD-06 | Bad | CI | Fuzz workflow toolchain/action pins were unchecked | Paid |
@@ -126,7 +126,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-41 | Deliberate | Paint | First paint slice: gamut clipping, stored-only PNG, conflated corner joins | Open |
 | TD-42 | Deliberate | Text | CFF/WOFF and discovery paid; advanced fonts/native services remain (TD-85) | Partly paid, REN-03 |
 | TD-43 | Deliberate | CSS | Media and container query `ex`/`ch`/`cap`/`ic` ignore loaded fonts | Paid |
-| TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Guarded |
+| TD-44 | Watch | Layout | Float placement and formatting-root retries are superlinear; metered by a fixed work budget | Paid |
 | TD-45 | Deliberate | Layout | Spec-permitted approximations in floats, static positions and scroll geometry | Open, REN-02b |
 | TD-46 | Deliberate | Paint | Opacity groups allocate a full surface each instead of their bounds | Open |
 | TD-47 | Deliberate | Text | CSS policies and bidi scopes paid; locale resources/full text conformance remain (TD-87) | Partly paid |
@@ -293,7 +293,7 @@ depth cap instead of failing) in an ADR, with html5lib and real-page evidence.
 **Trigger:** before the loader accepts network content or a real-page
 compatibility corpus is added.
 
-### TD-03 — Every insert walks the moved subtree to measure height
+### TD-03 — Every insert walks the moved subtree to measure height (Paid)
 
 `Document::insert_before` (`crates/rustic-dom/src/document.rs`) computes the
 moved node's subtree height with a full preorder walk on every call. Inserting
@@ -308,6 +308,8 @@ allowance, with a timing regression case in the fuzz smoke corpus.
 **Trigger:** a fuzz timeout, a profile showing the walk, or DOM APIs that let
 script move subtrees.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): every node caches an upper bound on its subtree height (`Node::height_bound`), raised along the ancestors when a node is linked and left high on removal. An insertion checks the bound in constant time and recomputes the exact heights of the moved subtree only when the bound would fail the depth limit, which leaves them exact for the next check. Tests: `moving_a_large_subtree_does_not_walk_it` (20,000 moves of a 20,000-node subtree) and `stale_height_bounds_never_reject_an_insertion_that_fits` in `crates/rustic-dom/tests/tree.rs`. What remains is a watch item, not debt: a script that alternately removes a deep branch and moves a large subtree near the depth limit pays one exact walk per such pair.
 
 ### TD-04 — Invariant `expect` and indexing in library code
 
@@ -951,7 +953,7 @@ no longer fail. Each has source and test evidence in `layout.position`. Sticky
 positioning, text/inline content, other formatting contexts and
 special/replaced elements remain explicit unsupported cases.
 
-### TD-44 — Superlinear float placement metered by a fixed budget
+### TD-44 — Superlinear float placement metered by a fixed budget (Paid)
 
 Placing a float scans every earlier float in its formatting context, so `n`
 floats cost O(n²). An auto-height formatting root beside floats can be laid out
@@ -966,6 +968,8 @@ into a non-exhaustive limits type. **Trigger:** profiling of float-heavy pages,
 a fuzz finding that hits `WorkLimit` on small input, or the next `LayoutLimits`
 change.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): float tops never decrease, so `Exclusions` keeps its areas sorted by top and a *live* list of the floats whose bottom is below the latest float top. Placement and every query that starts at or below that top scan only the live floats (the floats side by side on one row) instead of every earlier float; other queries scan only the prefix of floats that start above the query's bottom. The budget moved into `LayoutLimits::max_flow_work` (default `MAX_FLOW_WORK`), and `LayoutLimits` is now `#[non_exhaustive]` with `with_*` builders, so adding a limit no longer breaks callers. Test: `many_floats_cost_work_per_row_not_per_earlier_float` in `crates/rustic-layout/tests/flow.rs` (4,000 floats within 10⁶ work units; the old scan needed about 8 × 10⁶). Formatting-root retries are still re-laid out per float bottom and remain metered by the budget; caching retries per available width is M12 `perf.layout` work.
 
 ### TD-45 — Approximations in floats, static positions and scroll geometry
 

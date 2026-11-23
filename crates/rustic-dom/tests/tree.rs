@@ -506,3 +506,62 @@ fn deeply_nested_template_contents_dump_and_destroy_without_recursion() {
     doc.destroy_subtree(root).unwrap();
     assert_eq!(doc.node_count(), baseline);
 }
+
+#[test]
+fn stale_height_bounds_never_reject_an_insertion_that_fits() {
+    // TD-03: removing the deep branch leaves the cached bound high; the
+    // insertion then falls back to the exact height and succeeds.
+    let mut doc = Document::new(DocumentLimits {
+        max_depth: 4,
+        ..DocumentLimits::default()
+    })
+    .unwrap();
+    let a = element(&mut doc, "a");
+    let b = element(&mut doc, "b");
+    let c = element(&mut doc, "c");
+    let d = element(&mut doc, "d");
+    let host = element(&mut doc, "host");
+    doc.append_child(doc.root(), host).unwrap();
+    doc.append_child(a, b).unwrap();
+    doc.append_child(b, c).unwrap();
+    doc.append_child(c, d).unwrap();
+    assert_eq!(doc.append_child(host, a), Err(DomError::DepthLimit));
+    doc.detach(c).unwrap();
+    doc.append_child(host, a).unwrap();
+    // Re-attaching the branch under `b` (depth 4 + height 1) is too deep.
+    assert_eq!(doc.append_child(b, c), Err(DomError::DepthLimit));
+    doc.append_child(a, c).unwrap();
+    let e = element(&mut doc, "e");
+    assert_eq!(doc.append_child(d, e), Err(DomError::DepthLimit));
+}
+
+#[test]
+fn moving_a_large_subtree_does_not_walk_it() {
+    // TD-03: every move used to walk the moved subtree to measure its
+    // height, so moving a 20,000-node subtree 20,000 times cost 4 × 10⁸
+    // visits. With cached bounds each move is constant work.
+    let mut doc = Document::new(DocumentLimits::default()).unwrap();
+    let left = element(&mut doc, "left");
+    let right = element(&mut doc, "right");
+    doc.append_child(doc.root(), left).unwrap();
+    doc.append_child(left, right).unwrap();
+    let big = element(&mut doc, "big");
+    for _ in 0..200 {
+        let row = element(&mut doc, "row");
+        doc.append_child(big, row).unwrap();
+        for _ in 0..100 {
+            let cell = element(&mut doc, "cell");
+            doc.append_child(row, cell).unwrap();
+        }
+    }
+    let start = std::time::Instant::now();
+    for i in 0..20_000 {
+        let parent = if i % 2 == 0 { left } else { right };
+        doc.append_child(parent, big).unwrap();
+    }
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(5),
+        "moves took {:?}",
+        start.elapsed()
+    );
+}

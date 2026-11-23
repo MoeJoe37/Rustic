@@ -44,6 +44,7 @@ use rustic_text::FontDatabase;
 ///
 /// Float placement and formatting-context retries are superlinear in the
 /// worst case, so they are metered rather than trusted (TD-44).
+/// This is the default of [`crate::LayoutLimits::max_flow_work`].
 pub const MAX_FLOW_WORK: usize = 64_000_000;
 
 /// Why a principal box needs an unimplemented formatting algorithm.
@@ -222,6 +223,7 @@ pub struct BlockLayout {
 /// A metered work counter that also polls cancellation.
 pub(crate) struct Work<'c> {
     spent: usize,
+    limit: usize,
     cancellation: &'c CancellationToken,
 }
 
@@ -235,7 +237,7 @@ impl Work<'_> {
         self.spent = self
             .spent
             .checked_add(units.max(1))
-            .filter(|&n| n <= MAX_FLOW_WORK)
+            .filter(|&n| n <= self.limit)
             .ok_or(FlowError::WorkLimit)?;
         if before / 1024 != self.spent / 1024 || units == 0 {
             self.cancellation
@@ -2094,7 +2096,7 @@ impl BlockLayout {
     /// produce no fragment; other text, inline contexts, sticky positioning and
     /// other unsupported semantics return a typed error (TD-38). Callers must
     /// compute styles for this same viewport before calling. Limits,
-    /// [`MAX_FLOW_WORK`] and cancellation apply independently of snapshot
+    /// `max_flow_work` and cancellation apply independently of snapshot
     /// construction.
     pub fn compute(
         tree: &BoxTree,
@@ -2136,6 +2138,7 @@ impl BlockLayout {
         }
         let mut work = Work {
             spent: 0,
+            limit: limits.max_flow_work,
             cancellation,
         };
         let ends;
@@ -2215,6 +2218,7 @@ impl BlockLayout {
     ) -> Result<HashMap<NodeId, i32>, FlowError> {
         let mut work = Work {
             spent: 0,
+            limit: MAX_FLOW_WORK,
             cancellation,
         };
         work.charge(0)?;

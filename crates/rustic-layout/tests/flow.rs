@@ -239,10 +239,7 @@ fn failure_does_not_change_the_snapshot_or_an_earlier_result() {
     let before = t.clone();
     let result = layout(&t, 300.0, 200.0).unwrap();
     let expected = result.clone();
-    let limits = LayoutLimits {
-        max_boxes: 1,
-        ..LayoutLimits::default()
-    };
+    let limits = LayoutLimits::default().with_max_boxes(1);
     assert_eq!(
         BlockLayout::compute(
             &t,
@@ -263,42 +260,17 @@ fn failure_does_not_change_the_snapshot_or_an_earlier_result() {
 fn independent_layout_limits_and_cancellation_are_exact() {
     let t = tree("<main>   </main>", "");
     let viewport = CssSize::new(300.0, 200.0).unwrap();
-    let limits = LayoutLimits {
-        max_nodes: 4,
-        max_boxes: 3,
-        max_depth: 3,
-        max_text_units: 3,
-    };
+    let limits = LayoutLimits::default()
+        .with_max_nodes(4)
+        .with_max_boxes(3)
+        .with_max_depth(3)
+        .with_max_text_units(3);
     assert!(BlockLayout::compute(&t, viewport, limits, &CancellationToken::default()).is_ok());
     for (limits, error) in [
-        (
-            LayoutLimits {
-                max_nodes: 3,
-                ..limits
-            },
-            FlowError::NodeLimit,
-        ),
-        (
-            LayoutLimits {
-                max_boxes: 2,
-                ..limits
-            },
-            FlowError::BoxLimit,
-        ),
-        (
-            LayoutLimits {
-                max_depth: 2,
-                ..limits
-            },
-            FlowError::DepthLimit,
-        ),
-        (
-            LayoutLimits {
-                max_text_units: 2,
-                ..limits
-            },
-            FlowError::TextLimit,
-        ),
+        (limits.with_max_nodes(3), FlowError::NodeLimit),
+        (limits.with_max_boxes(2), FlowError::BoxLimit),
+        (limits.with_max_depth(2), FlowError::DepthLimit),
+        (limits.with_max_text_units(2), FlowError::TextLimit),
     ] {
         assert_eq!(
             BlockLayout::compute(&t, viewport, limits, &CancellationToken::default()),
@@ -373,4 +345,28 @@ fn deep_auto_height_chains_finish_and_dump_without_recursion() {
             .all(|f| f.content().size().height().get() == 7.0)
     );
     assert!(result.dump(100_000).unwrap().len() < 203 * 220);
+}
+
+#[test]
+fn many_floats_cost_work_per_row_not_per_earlier_float() {
+    // TD-44: 4,000 floats in rows of 30. Scanning every earlier float would
+    // spend about 8 × 10⁶ units; the live-row scan stays far below 10⁶.
+    let html = format!("<main>{}</main>", "<i></i>".repeat(4_000));
+    let t = tree(&html, "i { display: block; float: left; width: 10px; height: 5px }");
+    let viewport = CssSize::new(300.0, 200.0).unwrap();
+    let limits = LayoutLimits::default().with_max_flow_work(1_000_000);
+    let result = BlockLayout::compute(&t, viewport, limits, &CancellationToken::default())
+        .expect("float placement stays within a linear budget");
+    let last = result
+        .fragments()
+        .last()
+        .map(|f| rect(f.content()))
+        .unwrap();
+    // 4,000 floats / 30 per row = 133 full rows, then 10 floats on row 134.
+    assert_eq!((last.0, last.1), (90.0, 133.0 * 5.0));
+    let tight = LayoutLimits::default().with_max_flow_work(1_000);
+    assert_eq!(
+        BlockLayout::compute(&t, viewport, tight, &CancellationToken::default()).err(),
+        Some(FlowError::WorkLimit)
+    );
 }

@@ -2,6 +2,13 @@
 //!
 //! Coordinates are the formatting context's own (its root's content origin).
 //! Every query charges the caller's work budget by the areas it scans.
+//!
+//! Float tops never decrease (rule 6), so the areas are sorted by top, and a
+//! float whose bottom is at or above the latest float top can never meet a
+//! query that starts at or below that top. Such queries (every placement and
+//! almost every line or block that follows) scan only the *live* floats that
+//! straddle the latest top, which are the floats side by side on one row,
+//! instead of every earlier float (TD-44).
 
 use crate::FlowError;
 use crate::flow::Work;
@@ -47,13 +54,43 @@ pub(crate) struct Band {
 
 #[derive(Debug, Default)]
 pub(crate) struct Exclusions {
+    /// Every placed float, in placement order and so by non-decreasing top.
     areas: Vec<Area>,
     last_top: Option<f64>,
+    /// Indexes of the areas whose bottom is below `last_top`.
+    live: Vec<usize>,
 }
 
 impl Exclusions {
     pub(crate) fn is_empty(&self) -> bool {
         self.areas.is_empty()
+    }
+
+    /// The areas that can overlap `[top, bottom)`, a superset of the overlap
+    /// set, after charging `work` for scanning them.
+    fn candidates(
+        &self,
+        top: f64,
+        bottom: f64,
+        work: &mut Work,
+    ) -> Result<impl Iterator<Item = Area> + '_, FlowError> {
+        let live = self.last_top.is_some_and(|floor| top >= floor);
+        let end = if live {
+            0
+        } else {
+            // Tops are sorted: no later area can start inside the range.
+            let reach = bottom.max(top);
+            self.areas.partition_point(|a| a.top <= reach)
+        };
+        work.charge(if live { self.live.len() } else { end })?;
+        let live_areas = self
+            .live
+            .iter()
+            .take(if live { usize::MAX } else { 0 })
+            .map(|&i| self.areas[i]);
+        Ok(live_areas
+            .chain(self.areas[..end].iter().copied())
+            .filter(move |a| a.overlaps(top, bottom)))
     }
 
     /// Free band in `[left, right]` for `[top, bottom)`.
@@ -65,9 +102,8 @@ impl Exclusions {
         right: f64,
         work: &mut Work,
     ) -> Result<Band, FlowError> {
-        work.charge(self.areas.len())?;
         let (mut l, mut r) = (left, right);
-        for a in self.areas.iter().filter(|a| a.overlaps(top, bottom)) {
+        for a in self.candidates(top, bottom, work)? {
             match a.side {
                 Side::Left => l = l.max(a.right),
                 Side::Right => r = r.min(a.left),
@@ -87,11 +123,9 @@ impl Exclusions {
         bottom: f64,
         work: &mut Work,
     ) -> Result<Option<f64>, FlowError> {
-        work.charge(self.areas.len())?;
         Ok(self
-            .areas
-            .iter()
-            .filter(|a| a.overlaps(top, bottom) && a.bottom > top)
+            .candidates(top, bottom, work)?
+            .filter(|a| a.bottom > top)
             .map(|a| a.bottom)
             .reduce(f64::min))
     }
@@ -123,6 +157,12 @@ impl Exclusions {
                     Side::Right => band.right - width,
                 };
                 self.last_top = Some(y);
+                let areas = &self.areas;
+                work.charge(self.live.len())?;
+                self.live.retain(|&i| areas[i].bottom > y);
+                if height > 0.0 {
+                    self.live.push(self.areas.len());
+                }
                 self.areas.push(Area {
                     side,
                     left: x,

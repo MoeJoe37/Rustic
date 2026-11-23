@@ -69,6 +69,11 @@ pub enum Container {
     /// verification. It cannot connect to loopback or the local network,
     /// open the user's files or start processes.
     Network,
+    /// `Rustic.Gpu`, the GPU process (ADR 0071, TD-186): the renderer's
+    /// confinement plus read access to the registry (where display drivers
+    /// are registered) and device arrival notifications, which Direct3D
+    /// needs to find and open the adapter. No network, no user files.
+    Gpu,
 }
 
 impl Container {
@@ -76,6 +81,7 @@ impl Container {
         match self {
             Self::Renderer => "Rustic.Renderer",
             Self::Network => "Rustic.Network",
+            Self::Gpu => "Rustic.Gpu",
         }
     }
 
@@ -83,6 +89,7 @@ impl Container {
         match self {
             Self::Renderer => "Rustic renderer processes",
             Self::Network => "Rustic network process",
+            Self::Gpu => "Rustic GPU process",
         }
     }
 
@@ -92,6 +99,7 @@ impl Container {
         match self {
             Self::Renderer => "Local\\Rustic.Renderer.Profile",
             Self::Network => "Local\\Rustic.Network.Profile",
+            Self::Gpu => "Local\\Rustic.Gpu.Profile",
         }
     }
 
@@ -104,6 +112,7 @@ impl Container {
         match self {
             Self::Renderer => &[],
             Self::Network => &["internetClient", "lpacCryptoServices", "registryRead"],
+            Self::Gpu => &["registryRead", "lpacPnpNotifications"],
         }
     }
 }

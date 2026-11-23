@@ -288,13 +288,14 @@ fn spawn_confined(exe: &std::path::Path) -> io::Result<Started> {
     ))
 }
 
-/// Windows: the capability-less `Rustic.Renderer` AppContainer in a
+/// Windows: the `Rustic.Gpu` AppContainer (renderer confinement plus
+/// registry reads and device notifications for the driver, TD-186) in a
 /// kill-on-close job (ADR 0060).
 #[cfg(windows)]
 fn spawn_confined(exe: &std::path::Path) -> io::Result<Started> {
     let command = std::ffi::OsStr::new(GPU_COMMAND);
     let (confined, pipes) = rustic_sandbox::spawn_app_container(
-        rustic_sandbox::Container::Renderer,
+        rustic_sandbox::Container::Gpu,
         exe,
         &[command],
         &crate::broker::sandbox_env(),

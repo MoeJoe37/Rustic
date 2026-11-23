@@ -287,7 +287,7 @@ impl Compositor {
             cache: None,
         });
         if let Some(error) = block_on(device.pop_error_scope()) {
-            return Err(GpuError::Device(error.to_string()));
+            return Err(GpuError::Device(describe(&error)));
         }
         Ok(Self {
             device,
@@ -365,7 +365,7 @@ impl Compositor {
             return Err(GpuError::Lost);
         }
         if let Some(error) = validation.or(memory) {
-            return Err(GpuError::Device(error.to_string()));
+            return Err(GpuError::Device(describe(&error)));
         }
         result
     }
@@ -492,4 +492,15 @@ impl Compositor {
                 GpuError::Device("the device returned pixels that are not premultiplied".into())
             })
     }
+}
+
+/// A wgpu error with its cause: `Display` alone prints only the error's
+/// kind ("Validation Error"), which says nothing about what was refused.
+fn describe(error: &wgpu::Error) -> String {
+    let text = match error {
+        wgpu::Error::Validation { description, .. }
+        | wgpu::Error::Internal { description, .. } => description.trim().to_owned(),
+        other => other.to_string(),
+    };
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }

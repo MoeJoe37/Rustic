@@ -124,8 +124,31 @@ jobs:
         run: |
           sudo apt-get install -y -q --no-install-recommends mesa-vulkan-drivers libvulkan1
           echo RUSTIC_REQUIRE_GPU=1 >> "$GITHUB_ENV"
+      - name: Install X11 and Wayland servers for the desktop window tests
+        # ADR 0074: `rustic view` opens real windows in CI. Linux runners
+        # have no display: Xvfb serves X11 and a headless Weston Wayland;
+        # Windows and macOS runners have a desktop session of their own.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y -q --no-install-recommends \
+            xvfb xauth weston libxkbcommon-x11-0 libwayland-client0 libwayland-cursor0
       - name: Test all targets
-        run: cargo test --locked --workspace --all-targets --no-fail-fast
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a cargo test --locked --workspace --all-targets --no-fail-fast
+          else
+            cargo test --locked --workspace --all-targets --no-fail-fast
+          fi
+      - name: Test the desktop window on Wayland
+        if: runner.os == 'Linux'
+        run: |
+          export XDG_RUNTIME_DIR="$RUNNER_TEMP/xdg"
+          mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+          weston --backend=headless --socket=rustic-wl --idle-time=0 &
+          for _ in $(seq 50); do [ -S "$XDG_RUNTIME_DIR/rustic-wl" ] && break; sleep 0.2; done
+          env -u DISPLAY WAYLAND_DISPLAY=rustic-wl \
+            cargo test --locked -p rustic-cli --test view --no-fail-fast
       - name: Show sandbox denials (ADR 0063)
         if: failure() && runner.os == 'macOS'
         run: |

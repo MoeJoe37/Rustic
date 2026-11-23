@@ -216,3 +216,25 @@ fn bad_scripts_and_a_direct_live_render_are_usage_errors() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn a_page_that_loads_resources_takes_its_first_frame() {
+    // The broker sends the first frame request without waiting for the
+    // load; a renderer still fetching an image (here a missing one) keeps
+    // it for after the load instead of failing the exchange.
+    let (dir, page) = page(
+        "resources",
+        "<!doctype html><body style=\"margin:0;background:rgb(0,0,255)\">\
+         <img src=missing.png alt=Logo width=10 height=10 style=\"margin-left:20px\">",
+    );
+    let (stdout, stderr, code) = drive(&page, "60x40", "frame; probe 1,1; frame", &[]);
+    assert_eq!(code, 0, "{stderr}");
+    assert!(!stderr.contains("out of order"), "{stderr}");
+    assert_eq!(
+        stdout,
+        "frame 0: 60x40 scroll 0,0 next none\n\
+         probe 1,1: 0,0,255,255\n\
+         frame 1: 60x40 scroll 0,0 next none\n"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

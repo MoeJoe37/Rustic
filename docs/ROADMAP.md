@@ -737,6 +737,16 @@ broker and no remote endpoint. The WPT runner reads every report through
 it; the recorded baseline is 70 Window WPT files, 462 subtests, 387 PASS
 and 75 FAIL at the pinned revision. Gaps are TD-187 to TD-190.
 
+**Status 2026-11-23 (desktop hosts and shell):** UI-01 and UI-02 done
+([ADR 0074](adr/0074-browser-shell-and-native-hosts.md)): `rustic view` is a
+small browser (tabs, history, address entry, reload and stop, error pages,
+zoom, find, permission and download UI, profile label) in a trusted strip
+over the live page, on native Windows, macOS (x64, ARM64) and Linux
+(X11, Wayland) windows with resize, device scale including fractional
+scales, minimize and IME handled by the host, and text drawn with the
+platform's own fonts. Remaining: TD-183 (macOS pre-main sandbox), TD-196,
+TD-197 and the curated site corpus for the demo.
+
 **Gate:** critical accessibility flows, crash recovery, profile separation,
 supported-platform safety gates, and agreed performance budgets pass. Do not
 declare broad site compatibility from a small handpicked demo collection.
@@ -973,7 +983,7 @@ in the milestone sections above.
 | 1 | UI-05: GPU process | Frames are composited by a confined `__gpu` child; a crashed, hung or protocol-breaking GPU process is replaced without stale authority and the CPU path keeps working (`compositor.recovery` step 1) | Step 1 done 2026-11-22 ([ADR 0068](adr/0068-gpu-process.md)); scenes and window presentation move into it with the backend (TD-184, TD-185) |
 | 2 | TD-182: long-lived renderer per page | Input routed to the page, scene frames over IPC, scripts running between frames (`platform.linux` step 2) | Done 2026-11-23 ([ADR 0069](adr/0069-long-lived-renderer.md): `broker::live`, `rustic drive`); `rustic view` adopts it with the UI-01 shell |
 | 3 | UI-05: desktop GPU backends (`compositor.backend`, ADR first) | Direct3D 12, Metal and Vulkan adapters inside the GPU process with CPU fallback and parity fixtures | Backend done 2026-11-23 ([ADR 0071](adr/0071-gpu-backend.md): wgpu, byte-exact parity gated on lavapipe in CI, device-loss reopen); open: Windows/macOS GPU sandbox profiles (TD-186), shared memory (TD-184) |
-| 4 | UI-02: Windows and macOS windows (`platform.windows`, `platform.macos`) | The Linux `rustic view` window on Windows and macOS, native x64 and ARM64 | After row 2 |
+| 4 | UI-02: Windows and macOS windows (`platform.windows`, `platform.macos`) | The Linux `rustic view` window on Windows and macOS, native x64 and ARM64 | Done 2026-11-23 with the UI-01 shell ([ADR 0074](adr/0074-browser-shell-and-native-hosts.md)); macOS profile breadth (TD-183) remains |
 | parallel | M9 language: `Math.sumPrecise` (TD-143) | ECMAScript §21.3.2.34, pinned Test262 Math cases, focused rounding, iterator and budget tests | Done for this built-in. The [M9 language gate](#12-m9--compatibility-expansion-program) remains open |
 | parallel | M9 language: binary and JSON data interchange (TD-143) | ECMAScript §23.3 and §25.5. Add the pinned `Uint8Array` directory and cover exact JSON tokens, view revalidation, malformed input and cancellation | Implemented with 89 added pinned built-in passes. [Implementation ledger](IMPLEMENTATION.md#m9-language--uint8array-and-json-data-interchange) |
 | parallel | M9 language: `Array.fromAsync` (TD-143) | ECMAScript §23.1.2.2, all 95 pinned cases, iterator cleanup, native step limits and small-heap collection | Implemented. [Implementation ledger](IMPLEMENTATION.md#m9-language--arrayfromasync), [ADR 0070](adr/0070-native-promise-continuations.md) |

@@ -67,6 +67,19 @@ pub fn configure(args: Vec<OsString>) -> Result<Vec<OsString>, String> {
     Ok(output)
 }
 
+/// The profile's label for the browser shell: its directory's name, or
+/// what kind it is.
+pub fn label() -> String {
+    match CHOICE.get_or_init(ProfileChoice::default) {
+        ProfileChoice::Ephemeral => "Temporary profile".to_owned(),
+        ProfileChoice::Private => "Private".to_owned(),
+        ProfileChoice::Persistent(dir) => dir.file_name().map_or_else(
+            || dir.to_string_lossy().into_owned(),
+            |name| name.to_string_lossy().into_owned(),
+        ),
+    }
+}
+
 /// The run's profile, opened on first use.
 fn profile() -> Result<Rc<RefCell<Profile>>, ProfileError> {
     PROFILE.with(|cell| {

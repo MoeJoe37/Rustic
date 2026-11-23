@@ -57,6 +57,28 @@ impl FontDatabase {
         Ok(self.faces.len() - 1)
     }
 
+    /// Parse and add every face of a font or an OpenType collection
+    /// (each collection member is extracted with
+    /// [`crate::collection_face`]), returning their indexes. Nothing is
+    /// added unless every face parses.
+    pub fn load_all(
+        &mut self,
+        data: Vec<u8>,
+        limits: &FontLimits,
+    ) -> Result<Vec<usize>, FontError> {
+        let Some(count) = crate::collection_len(&data) else {
+            return self.load(data, limits).map(|index| vec![index]);
+        };
+        let mut faces = Vec::with_capacity(count.min(64));
+        for index in 0..count {
+            let member = crate::collection_face(&data, index, limits)?;
+            faces.push(Face::parse(member, limits)?);
+        }
+        let first = self.faces.len();
+        self.faces.extend(faces);
+        Ok((first..self.faces.len()).collect())
+    }
+
     pub(crate) fn append_faces(&mut self, faces: Vec<Face>) {
         self.faces.extend(faces);
     }

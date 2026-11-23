@@ -90,7 +90,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 47.09%** (44.49% verified complete + 2.60% partial credit) — 105/226 capabilities complete and 10 in progress across 25 subsystems. Current milestone: **M8 Desktop alpha**, 61.71% done.
+**Overall engine completion: 48.38%** (44.49% verified complete + 3.89% partial credit) — 105/226 capabilities complete and 14 in progress across 25 subsystems. Current milestone: **M8 Desktop alpha**, 77.60% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

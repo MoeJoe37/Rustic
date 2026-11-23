@@ -1247,6 +1247,28 @@ fn live_page(
                             painter.surface().expect("a frame was submitted").clone()
                         }
                     };
+                    // Find in page: one more layout to locate the matches,
+                    // marked over the frame (UI-01).
+                    let mut pixels = surface.premultiplied().to_vec();
+                    let found = match &ask.find {
+                        Some((text, index)) => {
+                            let query = crate::find::parse_query(text, *index as usize)
+                                .map_err(LoadError::Broker)?;
+                            let (tree, layout, ..) = block_layout(input)?;
+                            let matches = crate::find::matches(&tree, &layout, &query);
+                            let (active, _) = crate::find::report(&matches, query.index);
+                            crate::find::highlight(
+                                &mut pixels,
+                                (surface.width(), surface.height()),
+                                &matches,
+                                active,
+                                state.viewport,
+                                view.scale().get(),
+                            );
+                            Some(crate::find::found(&matches, active))
+                        }
+                        None => None,
+                    };
                     drop(engine_document);
                     let next_frame_us = if document.wants_animation_frame() {
                         Some(FRAME_INTERVAL.as_micros() as u64)
@@ -1259,11 +1281,12 @@ fn live_page(
                         surface: rustic_ipc::protocol::Surface {
                             width: surface.width(),
                             height: surface.height(),
-                            pixels: surface.premultiplied().to_vec(),
+                            pixels,
                             layers: Vec::new(),
                         },
                         scroll: state.viewport,
                         next_frame_us,
+                        found,
                     }))
                     .map_err(LoadError::Broker)?;
                 }
@@ -3116,20 +3139,51 @@ pub(crate) fn render_layers(
     view: rustic_layout::View,
     host: &dyn FrameHost,
 ) -> Result<rustic_ipc::protocol::Surface, LoadError> {
+    let mut marks = None;
+    let mut surface = render_unmarked_layers(parsed, path, limits, view, host, &mut marks)?;
+    if let Some(marks) = marks {
+        crate::find::highlight(
+            &mut surface.pixels,
+            (surface.width, surface.height),
+            &marks.matches,
+            marks.active,
+            marks.scroll,
+            marks.factor,
+        );
+    }
+    Ok(surface)
+}
+
+/// Find-in-page matches to mark on a rendered surface (UI-01).
+struct FindMarks {
+    matches: Vec<crate::find::Rect>,
+    active: Option<usize>,
+    scroll: (f64, f64),
+    factor: f64,
+}
+
+fn render_unmarked_layers(
+    parsed: &LoadedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    view: rustic_layout::View,
+    host: &dyn FrameHost,
+    marks: &mut Option<FindMarks>,
+) -> Result<rustic_ipc::protocol::Surface, LoadError> {
     use rustic_ipc::protocol::{FrameLayer, FrameRequest, MAX_FRAMES, Surface};
     use rustic_paint::{DisplayCommand, ItemRole, Shape};
     let input = parsed.layout_input(path, limits, view);
     let cancellation = input.cancellation;
     let (tree, layout, viewport, images, _) = block_layout(input)?;
+    // The position the scene paints: clamped, snapped to device pixels.
+    let range = layout.viewport_scroll_range(viewport);
+    let at = scroll_positions(&layout, limits, input.scroll)
+        .map_or((0.0, 0.0), |positions| range.clamp(positions.viewport()));
+    let factor = rustic_layout::CssPx::new(1.0)
+        .map(|one| one.to_device(view.scale()).get())
+        .unwrap_or(1.0);
+    let snap = |v: f64| (v * factor).round() / factor;
     if limits.report_scroll {
-        // The position the scene paints: clamped, snapped to device pixels.
-        let range = layout.viewport_scroll_range(viewport);
-        let at = scroll_positions(&layout, limits, input.scroll)
-            .map_or((0.0, 0.0), |positions| range.clamp(positions.viewport()));
-        let factor = rustic_layout::CssPx::new(1.0)
-            .map(|one| one.to_device(view.scale()).get())
-            .unwrap_or(1.0);
-        let snap = |v: f64| (v * factor).round() / factor;
         let line = format!("scroll {},{}\n", snap(at.0), snap(at.1));
         crate::renderer::emit_stdout(line.as_bytes()).map_err(LoadError::Io)?;
     }
@@ -3143,6 +3197,17 @@ pub(crate) fn render_layers(
         }
         line.push('\n');
         crate::renderer::emit_stdout(line.as_bytes()).map_err(LoadError::Io)?;
+    }
+    if let Some(query) = crate::find::query() {
+        let matches = crate::find::matches(&tree, &layout, &query);
+        let (active, line) = crate::find::report(&matches, query.index);
+        crate::renderer::emit_stdout(line.as_bytes()).map_err(LoadError::Io)?;
+        *marks = Some(FindMarks {
+            matches,
+            active,
+            scroll: (snap(at.0), snap(at.1)),
+            factor,
+        });
     }
     let layout = scrolled(layout, viewport, limits, input.scroll)?;
     let document_url = input.network.map(|session| session.document_url().clone());

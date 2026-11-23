@@ -1,16 +1,26 @@
-//! Rustic's desktop host (UI-02, ADR 0065): one native window, its event
-//! loop, and presentation of CPU-rendered surfaces.
+//! Rustic's desktop host (UI-02, ADR 0065, ADR 0069): one native window,
+//! its event loop, presentation of CPU-rendered surfaces, and the host's
+//! side of input, IME and window lifecycle.
 //!
 //! The shell owns no web semantics. It asks a [`Content`] for a surface at
-//! the window's size, device scale and scroll position, and shows it with
-//! softbuffer. It turns wheel and keyboard input into scroll requests and
-//! closes on the window's close button or Escape. A [`Content`] may also
-//! give a trusted strip (the address display and permission prompts) that
-//! the shell keeps above the page: page pixels never reach its rows, and
-//! clicks there go to the strip, never to the page. winit and softbuffer
-//! stay behind this module: the engine crates never see them, and the
-//! window, display connection and buffers live only on the thread that runs
-//! [`run`].
+//! the window's size and device scale and shows it with softbuffer. It
+//! turns the platform's keyboard, text, IME, pointer and wheel events into
+//! [`Input`] and its resize, scale, focus and visibility changes into
+//! [`Lifecycle`] events, and hands both to the content; what the content
+//! leaves unhandled falls back to scrolling (wheel, arrows, Page Up/Down,
+//! space, Home, End) and closing (Escape). A [`Content`] may also give a
+//! trusted strip (the browser's chrome: tabs, toolbar, address, prompts)
+//! that the shell keeps above the page: page pixels never reach its rows,
+//! and clicks there go to the strip, never to the page. winit and
+//! softbuffer stay behind this module: the engine crates never see them,
+//! and the window, display connection and buffers live only on the thread
+//! that runs [`run`].
+//!
+//! A hidden window (minimized, fully occluded, or zero-sized) presents
+//! nothing; the content is told so it can stop work it would only throw
+//! away. [`Script`] drives a real window through resizes, minimize and
+//! restore, key presses, text and IME composition for tests on every
+//! desktop platform, using the same handlers as the platform's events.
 
 use rustic_raster::Surface;
 
@@ -23,6 +33,9 @@ mod accessibility;
 mod window;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use window::run;
+
+mod script;
+pub use script::{Script, Step};
 
 /// Android and iOS: no desktop window exists; the mobile host owns
 /// presentation.
@@ -41,52 +54,213 @@ pub struct WindowConfig {
     pub title: String,
     /// The initial inner size in logical (CSS) pixels.
     pub size: (u32, u32),
-    /// Close after presenting this many frames (tests and smoke runs).
+    /// Close after presenting this many settled frames (tests and smoke
+    /// runs).
     pub exit_after: Option<u32>,
+    /// Drive the window through these steps, then close (tests).
+    pub script: Option<Script>,
+    /// Write each settled frame of a scripted run, as presented, to
+    /// `frame-N.png` in this directory (tests).
+    pub capture: Option<std::path::PathBuf>,
 }
 
-/// One painted frame: its pixels and the scroll position it shows.
+/// One painted frame.
 #[derive(Debug)]
 pub struct Painted {
     /// Premultiplied RGBA at device pixels.
     pub surface: Surface,
-    /// The viewport scroll position actually used (after clamping), in
-    /// CSS pixels.
-    pub scroll: (f64, f64),
+    /// Whether this frame shows what the content was asked for (no load or
+    /// repaint still pending). Only settled frames count toward
+    /// [`WindowConfig::exit_after`] and let a [`Script`] continue.
+    pub settled: bool,
+}
+
+/// Keyboard modifiers held during an input.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Modifiers {
+    /// Control.
+    pub ctrl: bool,
+    /// Shift.
+    pub shift: bool,
+    /// Alt (Option on macOS).
+    pub alt: bool,
+    /// The logo key (Command on macOS, Windows key elsewhere).
+    pub meta: bool,
+}
+
+impl Modifiers {
+    /// The platform's shortcut modifier: Command on macOS, Control
+    /// elsewhere.
+    pub fn command(self) -> bool {
+        if cfg!(target_os = "macos") {
+            self.meta
+        } else {
+            self.ctrl
+        }
+    }
+
+    /// No modifier at all, or only Shift.
+    pub fn plain(self) -> bool {
+        !self.ctrl && !self.alt && !self.meta
+    }
+}
+
+/// A key the host reports, independent of the window library.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Key {
+    /// Enter or Return.
+    Enter,
+    /// Escape.
+    Escape,
+    /// Backspace.
+    Backspace,
+    /// Delete (forward).
+    Delete,
+    /// Tab.
+    Tab,
+    /// Arrow left.
+    Left,
+    /// Arrow right.
+    Right,
+    /// Arrow up.
+    Up,
+    /// Arrow down.
+    Down,
+    /// Home.
+    Home,
+    /// End.
+    End,
+    /// Page up.
+    PageUp,
+    /// Page down.
+    PageDown,
+    /// The space bar.
+    Space,
+    /// A function key, F1 to F24.
+    Function(u8),
+    /// A key producing this character (lowercase for letters; text input
+    /// arrives separately as [`Input::Text`]).
+    Character(char),
+}
+
+/// An IME composition event (host-level plumbing; the page's composition
+/// events are the accessibility and editing workstream's).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Ime {
+    /// The input method became active for the window.
+    Enabled,
+    /// The composition so far, with the cursor's byte range in it, if the
+    /// input method shows one. An empty text ends the composition.
+    Preedit(String, Option<(usize, usize)>),
+    /// The input method committed this text.
+    Commit(String),
+    /// The input method became inactive.
+    Disabled,
+}
+
+/// One user input, in the order the platform reported it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Input {
+    /// A key press (auto-repeat included).
+    Key(Key, Modifiers),
+    /// Text a key press produced, outside an IME composition.
+    Text(String),
+    /// IME composition.
+    Ime(Ime),
+    /// A primary click inside the trusted strip, in CSS pixels from its
+    /// top-left corner.
+    ChromeClick(f64, f64),
+    /// A primary click on the page, in CSS pixels from the page area's
+    /// top-left corner (below the strip).
+    PageClick(f64, f64, Modifiers),
+    /// A scroll request (wheel, touchpad, or a scrolling key the content
+    /// did not use).
+    Scroll(ScrollInput),
+}
+
+/// A window lifecycle change.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Lifecycle {
+    /// The window's inner size in device pixels or its device scale
+    /// changed (a resize, a move to another display, a scaling change).
+    Resized {
+        /// Inner size in device pixels.
+        size: (u32, u32),
+        /// Device pixels per CSS pixel (fractional on scaled displays).
+        scale: f64,
+    },
+    /// The window became hidden (minimized, fully occluded or zero-sized:
+    /// `false`) or visible again (`true`).
+    Visible(bool),
+    /// The window gained (`true`) or lost keyboard focus.
+    Focused(bool),
+}
+
+/// What the content did with an input.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Response {
+    /// The input was used; the shell applies no default action.
+    pub handled: bool,
+    /// The window needs a new frame.
+    pub redraw: bool,
+    /// Close the window.
+    pub close: bool,
+}
+
+impl Response {
+    /// Used, and the window needs a new frame.
+    pub const REDRAW: Self = Self {
+        handled: true,
+        redraw: true,
+        close: false,
+    };
+    /// Used, nothing to repaint.
+    pub const HANDLED: Self = Self {
+        handled: true,
+        redraw: false,
+        close: false,
+    };
+    /// Not used: the shell applies its default action.
+    pub const UNHANDLED: Self = Self {
+        handled: false,
+        redraw: false,
+        close: false,
+    };
 }
 
 /// What fills the window.
 pub trait Content {
-    /// Paint the page for a window of `size` device pixels at `scale`
-    /// device pixels per CSS pixel, scrolled to `scroll` CSS pixels.
-    fn paint(
-        &mut self,
-        size: (u32, u32),
-        scale: f64,
-        scroll: (f64, f64),
-    ) -> Result<Painted, String>;
+    /// Paint the page for a page area of `size` device pixels at `scale`
+    /// device pixels per CSS pixel.
+    fn paint(&mut self, size: (u32, u32), scale: f64) -> Result<Painted, String>;
 
     /// The trusted strip's height in CSS pixels (0 for none).
     fn chrome_height(&self) -> f64 {
         0.0
     }
 
-    /// The trusted strip above the page (address display, permission
-    /// prompt) at `width` device pixels, drawn by the host, never by the
-    /// page. `None` leaves the whole window to the page.
+    /// The trusted strip above the page at `width` device pixels, drawn by
+    /// the host, never by the page. `None` leaves the whole window to the
+    /// page.
     fn chrome(&mut self, _width: u32, _scale: f64) -> Result<Option<Surface>, String> {
         Ok(None)
     }
 
-    /// A primary click inside the strip at (`x`, `y`) CSS pixels from its
-    /// top-left corner; returns whether the strip changed.
-    fn chrome_click(&mut self, _x: f64, _y: f64) -> bool {
+    /// One user input. Unhandled keys fall back to scrolling (arrows, Page
+    /// Up/Down, space, Home, End, which arrive again as [`Input::Scroll`])
+    /// and closing (Escape).
+    fn input(&mut self, _input: &Input) -> Response {
+        Response::UNHANDLED
+    }
+
+    /// A lifecycle change; returns whether the window needs a new frame.
+    fn lifecycle(&mut self, _event: Lifecycle) -> bool {
         false
     }
 
-    /// Escape: returns whether the strip used it (closing a prompt) rather
-    /// than the window closing.
-    fn chrome_escape(&mut self) -> bool {
+    /// Whether work is pending that [`Content::poll`] should check (a load
+    /// or a repaint off this thread).
+    fn busy(&self) -> bool {
         false
     }
 
@@ -107,6 +281,48 @@ pub trait Content {
     ) -> bool {
         false
     }
+
+    /// Check pending work; returns whether the window needs a new frame.
+    fn poll(&mut self) -> bool {
+        false
+    }
+
+    /// The window title, if the content has one.
+    fn title(&self) -> Option<String> {
+        None
+    }
+
+    /// Whether text entry is active (the address field or an editable
+    /// page element), so the input method should be enabled, and where
+    /// its caret is (left, top, width, height in CSS pixels of the
+    /// window) for the candidate window.
+    fn text_entry(&self) -> Option<(f64, f64, f64, f64)> {
+        None
+    }
+
+    /// A one-line description of the content's state, logged after each
+    /// settled frame of a scripted run (tests).
+    fn describe(&self) -> Option<String> {
+        None
+    }
+}
+
+/// A window buffer of 0RGB pixels as an opaque surface (scripted
+/// captures).
+pub fn buffer_surface(buffer: &[u32], width: u32, height: u32) -> Option<Surface> {
+    let mut pixels = Vec::with_capacity(buffer.len().saturating_mul(4));
+    for &pixel in buffer
+        .iter()
+        .take((width as usize).saturating_mul(height as usize))
+    {
+        pixels.extend_from_slice(&[(pixel >> 16) as u8, (pixel >> 8) as u8, pixel as u8, 255]);
+    }
+    Surface::from_premultiplied(
+        width,
+        height,
+        pixels,
+        rustic_raster::RasterLimits::default(),
+    )
 }
 
 /// Compose a window buffer of `width × height` 0RGB pixels: the trusted
@@ -156,8 +372,14 @@ pub fn present_over_white(surface: &Surface, width: u32, height: u32, buffer: &m
 }
 
 /// The scroll position after one input, before the content clamps it.
+/// `page` is the page area's height in CSS pixels.
 pub fn scrolled_by(input: &ScrollInput, scroll: (f64, f64), scale: f64, page: f64) -> (f64, f64) {
     let (x, y) = scroll;
+    let scale = if scale.is_finite() && scale > 0.0 {
+        scale
+    } else {
+        1.0
+    };
     let next = match *input {
         ScrollInput::Lines(dx, dy) => (x - dx * LINE, y - dy * LINE),
         ScrollInput::Pixels(dx, dy) => (x - dx / scale, y - dy / scale),
@@ -166,8 +388,11 @@ pub fn scrolled_by(input: &ScrollInput, scroll: (f64, f64), scale: f64, page: f6
         ScrollInput::PageDown => (x, y + page * 0.875),
         ScrollInput::PageUp => (x, y - page * 0.875),
         ScrollInput::Home => (x, 0.0),
+        // The content clamps to the real end.
+        ScrollInput::End => (x, f64::MAX / 4.0),
     };
-    (next.0.max(0.0), next.1.max(0.0))
+    let finite = |v: f64| if v.is_finite() { v.max(0.0) } else { 0.0 };
+    (finite(next.0), finite(next.1))
 }
 
 /// A scroll request from the user.
@@ -187,6 +412,58 @@ pub enum ScrollInput {
     PageUp,
     /// Home.
     Home,
+    /// End.
+    End,
+}
+
+/// The default action for a key the content left unhandled.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Fallback {
+    /// Scroll the page.
+    Scroll(ScrollInput),
+    /// Close the window.
+    Close,
+}
+
+/// The shell's default action for an unhandled key, if any.
+pub fn fallback(key: &Key, modifiers: Modifiers) -> Option<Fallback> {
+    if !modifiers.plain() {
+        return None;
+    }
+    Some(match key {
+        Key::Escape => Fallback::Close,
+        Key::Down => Fallback::Scroll(ScrollInput::Down),
+        Key::Up => Fallback::Scroll(ScrollInput::Up),
+        Key::PageDown => Fallback::Scroll(ScrollInput::PageDown),
+        Key::Space if modifiers.shift => Fallback::Scroll(ScrollInput::PageUp),
+        Key::Space => Fallback::Scroll(ScrollInput::PageDown),
+        Key::PageUp => Fallback::Scroll(ScrollInput::PageUp),
+        Key::Home => Fallback::Scroll(ScrollInput::Home),
+        Key::End => Fallback::Scroll(ScrollInput::End),
+        _ => return None,
+    })
+}
+
+/// The device scale a window reports, made usable: finite and within
+/// 0.25 to 8 (1 otherwise).
+pub fn usable_scale(scale: f64) -> f64 {
+    if scale.is_finite() && scale > 0.0 {
+        scale.clamp(0.25, 8.0)
+    } else {
+        1.0
+    }
+}
+
+/// The trusted strip's height in device pixels for `css` CSS pixels at
+/// `scale`, within a window `height` device pixels tall. Rounded up so
+/// fractional scales never leave a page row under the strip's last line.
+pub fn strip_rows(css: f64, scale: f64, height: u32) -> u32 {
+    let rows = (css.max(0.0) * usable_scale(scale)).ceil();
+    if rows >= f64::from(height) {
+        height
+    } else {
+        rows as u32
+    }
 }
 
 #[cfg(test)]
@@ -253,5 +530,47 @@ mod tests {
         );
         assert_eq!(scrolled_by(&ScrollInput::Up, at, 1.0, 600.0), (0.0, 60.0));
         assert_eq!(scrolled_by(&ScrollInput::Home, at, 1.0, 600.0), (0.0, 0.0));
+        assert!(scrolled_by(&ScrollInput::End, at, 1.0, 600.0).1 > 1e300);
+        // A broken scale or delta never yields NaN.
+        assert_eq!(
+            scrolled_by(&ScrollInput::Pixels(f64::NAN, -20.0), at, 0.0, 600.0),
+            (0.0, 120.0)
+        );
+    }
+
+    #[test]
+    fn unhandled_keys_scroll_or_close_only_without_shortcut_modifiers() {
+        let plain = Modifiers::default();
+        let shift = Modifiers {
+            shift: true,
+            ..plain
+        };
+        let ctrl = Modifiers {
+            ctrl: true,
+            ..plain
+        };
+        assert_eq!(fallback(&Key::Escape, plain), Some(Fallback::Close));
+        assert_eq!(
+            fallback(&Key::Space, plain),
+            Some(Fallback::Scroll(ScrollInput::PageDown))
+        );
+        assert_eq!(
+            fallback(&Key::Space, shift),
+            Some(Fallback::Scroll(ScrollInput::PageUp))
+        );
+        assert_eq!(fallback(&Key::Down, ctrl), None);
+        assert_eq!(fallback(&Key::Character('a'), plain), None);
+    }
+
+    #[test]
+    fn strip_rows_round_up_at_fractional_scales_and_fit_the_window() {
+        assert_eq!(strip_rows(28.0, 1.0, 600), 28);
+        assert_eq!(strip_rows(28.0, 1.25, 600), 35);
+        // 28 × 1.5 = 42 exactly; 29 × 1.5 = 43.5 rounds up.
+        assert_eq!(strip_rows(28.0, 1.5, 600), 42);
+        assert_eq!(strip_rows(29.0, 1.5, 600), 44);
+        assert_eq!(strip_rows(500.0, 2.0, 600), 600);
+        assert_eq!(strip_rows(28.0, f64::NAN, 600), 28);
+        assert_eq!(usable_scale(100.0), 8.0);
     }
 }

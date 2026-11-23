@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 47.09%** = 44.49% verified complete + 2.60% partial credit. 105/226 capabilities complete, 10 in progress.
+**Overall completion: 48.38%** = 44.49% verified complete + 3.89% partial credit. 105/226 capabilities complete, 14 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `8084d39f81806562e66a663154326f45f3d59ae815071f441b208d42a821fd29`.
+Catalog: `engine-v4`. Source fingerprint: `19f458892e4effdc303fe46674ae941e2231f52d93681c71b62ab50de85db5ad`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `8084d39f81806562e66a663154326f45f3d59
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 9/18 | 61.71% | 41.25% | 8.12% |
+| M8 Desktop alpha | 9/18 | 77.60% | 41.25% | 8.12% |
 | M9 Compatibility expansion | 0/52 | 2.60% | 0.00% | 22.01% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.78% |
@@ -47,7 +47,7 @@ Catalog: `engine-v4`. Source fingerprint: `8084d39f81806562e66a663154326f45f3d59
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 7/11 | 1 | 67.44% | 62.79% | 5% | 3.37 |
 | Compositor & GPU | 1/5 | 3 | 60.25% | 23.07% | 3% | 1.80 |
-| Platform hosts | 1/9 | 1 | 12.50% | 4.16% | 4% | 0.50 |
+| Platform hosts | 1/9 | 5 | 44.79% | 4.16% | 4% | 1.79 |
 | Accessibility | 3/5 | 1 | 75.00% | 64.28% | 2% | 1.50 |
 | DevTools | 4/4 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | Extensions (MV2) | 0/11 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -313,16 +313,28 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 ### Platform hosts
 
 - **complete** `platform.crosschecks` — Android/iOS shared-core cross-compilation · size 1 · M1 · 0.16% of engine ([source](../../.github/workflows/ci.yml), [test](../../.github/workflows/ci.yml))
-- **in progress 66.66%** `platform.linux` — Linux runtime and native host acceptance · size 3 · M8 · 0.50% of engine
+- **in progress 75.00%** `platform.linux` — Linux runtime and native host acceptance · size 3 · M8 · 0.50% of engine
   - [x] Native window on Wayland and X11 presenting renderer-process frames, with scrolling input and clean failure without a window system (ADR 0065) ([source](../../crates/rustic-shell/src/lib.rs), [source](../../docs/adr/0065-desktop-window-host.md), [test](../../crates/rustic-shell/src/lib.rs), [test](../../crates/rustic-cli/tests/view.rs))
   - [x] Long-lived renderer per page: input routed to the page, scene frames over IPC, scripts running between frames (TD-182) ([source](../../crates/rustic-cli/src/broker.rs), [source](../../docs/adr/0069-long-lived-renderer.md), [test](../../crates/rustic-cli/tests/live.rs), [test](../../crates/rustic-cli/tests/live.rs))
-  - [ ] Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64
-- **planned** `platform.windows` — Windows runtime and native host acceptance · size 3 · M8 · 0.50% of engine
-- **planned** `platform.macos` — macOS runtime and native host acceptance · size 3 · M8 · 0.50% of engine
+  - [x] Linux lifecycle on native x86-64 and aarch64 runners: resizes, minimize and restore, device scale including 1.5 under X11, Wayland, the browser shell and fontconfig system fonts (ADR 0074) ([source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [test](../../crates/rustic-cli/tests/view.rs), [test](../../crates/rustic-cli/tests/view.rs))
+  - [ ] Linux acceptance: the curated site corpus in the desktop alpha
+- **in progress 66.66%** `platform.windows` — Windows runtime and native host acceptance · size 3 · M8 · 0.50% of engine
+  - [x] Native window on Windows x64 and ARM64 CI desktops: frames, resizes, minimize and restore, keys, text, IME events and the browser shell through the platform's own handlers (ADR 0074) ([source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [test](../../crates/rustic-cli/tests/view.rs))
+  - [x] Platform fonts for the CSS generic families and fallback scripts, collections split into faces ([source](../../crates/rustic-text/src/native.rs), [source](../../crates/rustic-cli/src/fonts.rs), [test](../../crates/rustic-text/tests/opentype.rs))
+  - [ ] Acceptance: the curated site corpus in the desktop alpha
+- **in progress 66.66%** `platform.macos` — macOS runtime and native host acceptance · size 3 · M8 · 0.50% of engine
+  - [x] Native window on macOS ARM64 and x64 CI desktops: frames, resizes, minimize and restore, keys, text, IME events and the browser shell through the platform's own handlers (ADR 0074) ([source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [test](../../crates/rustic-cli/tests/view.rs))
+  - [x] Platform fonts for the CSS generic families and fallback scripts, collections split into faces ([source](../../crates/rustic-text/src/native.rs), [source](../../crates/rustic-cli/src/fonts.rs), [test](../../crates/rustic-text/tests/opentype.rs))
+  - [ ] Acceptance: the curated site corpus in the desktop alpha and the pre-main sandbox (TD-183)
 - **planned** `platform.android` — Android runtime and native host acceptance · size 3 · M14 · 0.50% of engine
 - **planned** `platform.ios` — iOS/iPadOS runtime and native host acceptance · size 3 · M14 · 0.50% of engine
-- **planned** `platform.lifecycle` — Surface, input/IME and background lifecycle parity on desktop · size 3 · M8 · 0.50% of engine
-- **planned** `platform.native` — Native font/codec/OS service adapters · size 3 · M8 · 0.50% of engine
+- **in progress 66.66%** `platform.lifecycle` — Surface, input/IME and background lifecycle parity on desktop · size 3 · M8 · 0.50% of engine
+  - [x] Surface lifecycle: resize, device-scale changes including fractional scales, minimized, occluded and zero-size windows present nothing (ADR 0074) ([source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [test](../../crates/rustic-cli/tests/view.rs))
+  - [x] Keyboard, typed text and IME preedit and commit from the host to the browser fields, with the candidate window placed at the caret ([source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/src/browser.rs))
+  - [ ] Page-level IME composition and background throttling of hidden pages (TD-196, TD-197)
+- **in progress 50.00%** `platform.native` — Native font/codec/OS service adapters · size 3 · M8 · 0.50% of engine
+  - [x] System fonts: fontconfig on Linux and the BSDs, file tables for Windows and macOS, generic-family mapping sent to renderers (ADR 0074) ([source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-text/src/native.rs), [source](../../crates/rustic-cli/src/fonts.rs), [test](../../crates/rustic-text/tests/opentype.rs))
+  - [ ] Reviewed platform font adapter (DirectWrite, Core Text) and native codec and OS service adapters (TD-85)
 - **planned** `platform.device` — Signed mobile artifacts, device/simulator suites and store/OS policy · size 2 · M14 · 0.33% of engine
 
 ### Accessibility

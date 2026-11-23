@@ -307,3 +307,69 @@ fn discovery_is_sorted_bounded_and_atomic() {
     }
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// Two sfnt fonts packed as an OpenType collection (`ttcf` 1.0), tables
+/// copied after the header without sharing.
+fn collection(fonts: &[&[u8]]) -> Vec<u8> {
+    let mut out = b"ttcf".to_vec();
+    out.extend_from_slice(&0x0001_0000u32.to_be_bytes());
+    out.extend_from_slice(&(fonts.len() as u32).to_be_bytes());
+    let header = 12 + 4 * fonts.len();
+    let mut bodies = Vec::new();
+    let mut at = header;
+    for font in fonts {
+        out.extend_from_slice(&(at as u32).to_be_bytes());
+        // Rebase every table offset by where this font starts.
+        let mut font = font.to_vec();
+        let tables = u16::from_be_bytes([font[4], font[5]]) as usize;
+        for k in 0..tables {
+            let p = 12 + 16 * k + 8;
+            let offset = u32::from_be_bytes([font[p], font[p + 1], font[p + 2], font[p + 3]]);
+            font[p..p + 4].copy_from_slice(&(offset + at as u32).to_be_bytes());
+        }
+        at += font.len();
+        bodies.push(font);
+    }
+    for body in bodies {
+        out.extend_from_slice(&body);
+    }
+    out
+}
+
+#[test]
+fn collection_members_extract_to_standalone_faces() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fonts");
+    let bold = std::fs::read(dir.join("RusticTest-Bold.ttf")).unwrap();
+    let italic = std::fs::read(dir.join("RusticTest-Italic.ttf")).unwrap();
+    let ttc = collection(&[&bold, &italic]);
+    let limits = rustic_text::FontLimits::default();
+    assert_eq!(rustic_text::collection_len(&ttc), Some(2));
+    assert_eq!(rustic_text::collection_len(&bold), None);
+    let first = rustic_text::Face::parse(
+        rustic_text::collection_face(&ttc, 0, &limits).unwrap(),
+        &limits,
+    )
+    .unwrap();
+    let second = rustic_text::Face::parse(
+        rustic_text::collection_face(&ttc, 1, &limits).unwrap(),
+        &limits,
+    )
+    .unwrap();
+    let direct = rustic_text::Face::parse(bold.clone(), &limits).unwrap();
+    assert_eq!(first.family(), direct.family());
+    assert!(first.weight() > second.weight());
+    assert!(rustic_text::collection_face(&ttc, 2, &limits).is_err());
+    let mut db = rustic_text::FontDatabase::new();
+    assert_eq!(db.load_all(ttc.clone(), &limits).unwrap(), vec![0, 1]);
+    // A truncated collection or a table outside it is refused, not read.
+    for cut in [11, 20, ttc.len() - 4] {
+        assert!(
+            rustic_text::collection_face(&ttc[..cut], 1, &limits).is_err(),
+            "{cut}"
+        );
+    }
+    let mut broken = ttc.clone();
+    let p = 12 + 4 * 2 + 12 + 8;
+    broken[p..p + 4].copy_from_slice(&u32::MAX.to_be_bytes());
+    assert!(rustic_text::collection_face(&broken, 0, &limits).is_err());
+}

@@ -260,6 +260,7 @@ pub(crate) fn drive_command(args: &[OsString]) -> u8 {
                         zoom,
                         scroll: scroll.take(),
                         elapsed_us: std::mem::take(&mut elapsed_us),
+                        find: None,
                     };
                     page.frame(ask).map(|frame| {
                         let next = frame.next_frame.map_or_else(

@@ -11,8 +11,10 @@ use rustic_engine::{Engine, Viewport};
 use std::path::Path;
 
 mod broker;
+mod browser;
 mod chrome;
 mod devtools;
+mod find;
 mod fonts;
 mod gpuproc;
 mod images;
@@ -24,10 +26,11 @@ mod reftest;
 mod renderer;
 mod storage;
 mod stylesheets;
+mod view;
 
 use loader::{LoadError, LoadedDocument, LoaderLimits};
 
-const USAGE: &str = "Rustic browser engine development tools
+pub(crate) const USAGE: &str = "Rustic browser engine development tools
 
 Usage:
   rustic info
@@ -119,14 +122,21 @@ A scrolled page, or one with fixed boxes, renders through a scene (ADR
 0064): cached content tiles at the scroll offset (snapped to device
 pixels) with the fixed boxes composited over them.
 
-Window: view opens the page in a native window (Wayland or X11 on Linux;
-ADR 0065) at --window WxH logical pixels (default 1024x768). Each frame
-renders in a renderer process at the window's size and device scale; the
-wheel, arrow keys, Page Up/Down, space and Home scroll, Escape closes. A
-strip above the page, drawn by this process and never by the page, shows
-the committed address (ASCII host, Secure/Not secure) and any permission
-prompt (Escape dismisses it). It accepts the document options above.
---exit-after N closes after N frames.
+Window: view opens a browser window (Wayland or X11 on Linux, Windows,
+macOS; ADR 0065, 0074) at --window WxH logical pixels (default 1024x768)
+showing <file> or an http(s) URL in a long-lived renderer that runs its
+scripts; clicks and keys reach the page. A strip drawn by this process,
+never by the page, holds tabs, back/forward, reload/stop, the address
+(committed ASCII host, Secure/Not secure; click or Ctrl/Cmd+L to type an
+address or file path), zoom, the find bar, permission prompts and download
+notices. Shortcuts use Ctrl (Cmd on macOS): T new tab, W close, Tab and
+1-9 switch, L address, R or F5 reload, Escape stop, [ ] or Alt+arrows
+back/forward, + - 0 zoom, F find (Enter/Shift+Enter next/previous). The
+wheel, arrows, Page Up/Down, space, Home and End scroll; Escape on an idle
+page closes. view uses the system's fonts (--system-fonts, any command;
+--test-fonts for the bundled ones). --exit-after N closes after N frames.
+render --find TEXT [--find-index N] marks the matches and prints
+a line: find COUNT ACTIVE TOP BOTTOM.
 
 Live pages: drive loads the page once in a long-lived renderer that keeps
 its document, scripts and timers (TD-182) and runs a ;-separated --input
@@ -298,7 +308,7 @@ pub fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     if args[0] == "view" {
-        return ExitCode::from(view_command(&args[1..]));
+        return ExitCode::from(view::view_command(&args[1..]));
     }
     if args[0] == "drive" {
         return ExitCode::from(live::drive_command(&args[1..]));
@@ -528,6 +538,8 @@ pub(crate) struct RenderArgs {
     view: rustic_layout::View,
     pub(crate) limits: LoaderLimits,
     pub(crate) path: OsString,
+    /// `--find TEXT [--find-index N]`: matches to mark (UI-01).
+    pub(crate) find: Option<find::Query>,
 }
 
 pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String> {
@@ -536,6 +548,7 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
     let mut report_scroll = false;
     let mut report_a11y = false;
     let mut live = false;
+    let (mut find_text, mut find_index) = (None, 0usize);
     let (mut scale, mut zoom, mut window) = (1.0, 1.0, (1280.0, 720.0));
     let mut rest = Vec::new();
     let mut iter = args.iter();
@@ -560,6 +573,17 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
             Some("--report-a11y") => report_a11y = true,
             // A broker starts a live page in a renderer (TD-182).
             Some("--live") => live = true,
+            Some("--find") => match iter.next().and_then(|v| v.to_str()) {
+                Some(value) => find_text = Some(value.to_owned()),
+                None => return Err("--find requires text".into()),
+            },
+            Some("--find-index") => {
+                find_index = iter
+                    .next()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.parse::<usize>().ok())
+                    .ok_or("--find-index requires a match number")?;
+            }
             Some("--frames") => {
                 frames = iter
                     .next()
@@ -607,11 +631,18 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
         return Err("--live needs --run-scripts".into());
     }
     limits.live = live;
+    let find = find_text
+        .map(|text| find::parse_query(&text, find_index))
+        .transpose()?;
+    if find.is_some() && frames > 1 {
+        return Err("--find marks one frame; it cannot be used with --frames".into());
+    }
     Ok(RenderArgs {
         output,
         view,
         limits,
         path,
+        find,
     })
 }
 
@@ -627,6 +658,7 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     let Some(output) = args.output else {
         return usage("missing --output".into());
     };
+    find::set(args.find.clone());
     let (limits, view) = (args.limits, args.view);
     if limits.live && !renderer::active() {
         return usage("--live is how `drive` and `view` start a live page".into());
@@ -667,210 +699,6 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
         return 1;
     }
     0
-}
-
-/// `view`: the page in a native window (UI-02, ADR 0065). Each frame is a
-/// `render` in a renderer process at the window's size, device scale and
-/// scroll position; the window scrolls with the wheel and keys and closes
-/// with Escape.
-fn view_command(args: &[OsString]) -> u8 {
-    let usage = |message: &str| {
-        eprintln!("rustic view: {message}\n\n{USAGE}");
-        2
-    };
-    if broker::single_process() {
-        return usage(
-            "view shows pages from renderer processes; it cannot run with --single-process",
-        );
-    }
-    let mut size = (1024, 768);
-    let mut exit_after = None;
-    let mut rest = Vec::new();
-    let mut iter = args.iter();
-    while let Some(arg) = iter.next() {
-        match arg.to_str() {
-            Some("--window") => {
-                let parsed = iter
-                    .next()
-                    .and_then(|v| v.to_str())
-                    .and_then(|v| v.split_once('x'))
-                    .and_then(|(w, h)| Some((w.parse::<u32>().ok()?, h.parse::<u32>().ok()?)))
-                    .filter(|&(w, h)| (64..=8192).contains(&w) && (64..=8192).contains(&h));
-                match parsed {
-                    Some(parsed) => size = parsed,
-                    None => return usage("--window requires WxH with each side from 64 to 8192"),
-                }
-            }
-            Some("--exit-after") => {
-                match iter
-                    .next()
-                    .and_then(|v| v.to_str())
-                    .and_then(|v| v.parse::<u32>().ok())
-                {
-                    Some(frames) if frames > 0 => exit_after = Some(frames),
-                    _ => return usage("--exit-after requires a positive frame count"),
-                }
-            }
-            Some("--viewport" | "--scale" | "--zoom" | "--output" | "--frames") => {
-                return usage("the window sets the view; use --window WxH");
-            }
-            _ => rest.push(arg.clone()),
-        }
-    }
-    let Some(path) = rest.last() else {
-        return usage("missing file path");
-    };
-    let title = format!("{} — Rustic", Path::new(path).to_string_lossy());
-    let config = rustic_shell::WindowConfig {
-        title,
-        size,
-        exit_after,
-    };
-    let page = ViewPage {
-        args: rest,
-        permissions: chrome::Permissions::default(),
-        shown: None,
-        strip_width: 0.0,
-        tree: None,
-    };
-    match rustic_shell::run(config, page) {
-        Ok(()) => 0,
-        Err(error) => {
-            eprintln!("rustic view: {}", EscapedText(&error));
-            1
-        }
-    }
-}
-
-/// The page `view` shows: `render` arguments without the view.
-struct ViewPage {
-    args: Vec<OsString>,
-    /// The window's permission decisions and its prompt (TD-173).
-    permissions: chrome::Permissions,
-    /// The URL the address display shows: the last one the broker
-    /// committed.
-    shown: Option<rustic_url::Url>,
-    /// The strip's width in CSS pixels at the last frame (for clicks).
-    strip_width: f64,
-    /// The page's accessibility tree from the last frame (ADR 0073).
-    tree: Option<rustic_a11y::AxTree>,
-}
-
-impl rustic_shell::Content for ViewPage {
-    fn paint(
-        &mut self,
-        size: (u32, u32),
-        scale: f64,
-        scroll: (f64, f64),
-    ) -> Result<rustic_shell::Painted, String> {
-        let scale = if scale.is_finite() {
-            scale.clamp(0.25, 8.0)
-        } else {
-            1.0
-        };
-        let css = |device: u32| ((f64::from(device) / scale).round() as u32).clamp(1, 16_384);
-        let mut args: Vec<OsString> = [
-            "--viewport".to_owned(),
-            format!("{}x{}", css(size.0), css(size.1)),
-            "--scale".to_owned(),
-            format!("{scale}"),
-            "--scroll".to_owned(),
-            format!("{},{}", scroll.0, scroll.1),
-            "--report-scroll".to_owned(),
-            "--report-a11y".to_owned(),
-            "--output".to_owned(),
-            "view.png".to_owned(),
-        ]
-        .into_iter()
-        .map(OsString::from)
-        .collect();
-        args.extend(self.args.iter().cloned());
-        let (surface, output) = broker::render_surface(&args)
-            .map_err(|status| format!("the page did not render (status {status})"))?;
-        // The renderer reports where it painted; it is untrusted, so only
-        // finite, non-negative positions are taken.
-        let reported = String::from_utf8_lossy(&output)
-            .lines()
-            .find_map(|line| line.strip_prefix("scroll "))
-            .and_then(|at| at.split_once(','))
-            .and_then(|(x, y)| Some((x.parse::<f64>().ok()?, y.parse::<f64>().ok()?)))
-            .filter(|&(x, y)| x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0);
-        // The tree is hostile input too: decoded within limits, or none.
-        self.tree = output
-            .split(|&byte| byte == b'\n')
-            .find_map(|line| line.strip_prefix(b"a11y "))
-            .and_then(decode_hex)
-            .and_then(|bytes| {
-                rustic_a11y::wire::decode(&bytes, rustic_a11y::TreeLimits::default()).ok()
-            });
-        Ok(rustic_shell::Painted {
-            surface,
-            scroll: reported.unwrap_or(scroll),
-        })
-    }
-
-    fn chrome_height(&self) -> f64 {
-        f64::from(chrome::height(&self.permissions))
-    }
-
-    fn accessibility(&mut self) -> Option<rustic_a11y::AxTree> {
-        self.tree.clone()
-    }
-
-    fn chrome(&mut self, width: u32, scale: f64) -> Result<Option<rustic_raster::Surface>, String> {
-        let scale = if scale.is_finite() {
-            scale.clamp(0.25, 8.0)
-        } else {
-            1.0
-        };
-        // The broker's committed URL, never one a renderer reports; a new
-        // document closes the previous one's prompt.
-        if let Some(committed) = broker::committed_url() {
-            if self.shown.as_ref() != Some(&committed) {
-                if self.shown.is_some() {
-                    self.permissions.navigated(std::time::Instant::now());
-                }
-                self.shown = Some(committed);
-            }
-        }
-        let address = match &self.shown {
-            Some(url) => chrome::address(url),
-            None => chrome::Address {
-                security: chrome::Security::Opaque,
-                host: "about:blank".to_owned(),
-                detail: String::new(),
-            },
-        };
-        self.strip_width = (f64::from(width) / scale).floor();
-        chrome::paint(&address, &self.permissions, width, scale).map(Some)
-    }
-
-    fn chrome_click(&mut self, x: f64, y: f64) -> bool {
-        chrome::hit(&self.permissions, self.strip_width, x, y).is_some_and(|answer| {
-            self.permissions
-                .answer(answer, std::time::Instant::now())
-                .is_some()
-        })
-    }
-
-    fn chrome_escape(&mut self) -> bool {
-        self.permissions.pending().is_some()
-            && self
-                .permissions
-                .answer(chrome::Answer::Dismiss, std::time::Instant::now())
-                .is_some()
-    }
-}
-
-/// Bytes from lowercase or uppercase hex digits; `None` for anything else.
-fn decode_hex(text: &[u8]) -> Option<Vec<u8>> {
-    if text.len() % 2 != 0 {
-        return None;
-    }
-    let digit = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
-    text.chunks(2)
-        .map(|pair| Some(digit(pair[0])? << 4 | digit(pair[1])?))
-        .collect()
 }
 
 /// `render --frames N`: paint N rendering opportunities incrementally

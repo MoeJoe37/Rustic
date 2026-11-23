@@ -102,6 +102,9 @@ pub(crate) fn next_page_input() -> Result<rustic_ipc::protocol::PageInput, Strin
     let link = FRAMES
         .with(|frames| frames.borrow().clone())
         .ok_or("a live page runs only in a renderer")?;
+    if let Some(input) = link.held.borrow_mut().take() {
+        return Ok(input);
+    }
     let received = link.channel.borrow_mut().recv::<BrokerMessage>();
     match received {
         Ok(BrokerMessage::Page(input)) => Ok(input),
@@ -263,7 +266,7 @@ pub fn run_over(reader: Box<dyn Read>, writer: Box<dyn Write>) -> u8 {
         Some("probe") => probe(&mut channel, &start.document.url),
         _ => {}
     }
-    if let Err(error) = crate::fonts::configure_bytes(start.fonts) {
+    if let Err(error) = crate::fonts::configure_granted(start.fonts, start.families) {
         eprintln!("rustic renderer: fonts: {error}");
         return 1;
     }
@@ -289,6 +292,7 @@ pub fn run_over(reader: Box<dyn Read>, writer: Box<dyn Write>) -> u8 {
     let link = Rc::new(BrokerLink {
         channel: RefCell::new(channel),
         next_id: Cell::new(0),
+        held: RefCell::new(None),
     });
     let session = Rc::new(BrokeredSession {
         link: Rc::clone(&link),
@@ -598,6 +602,10 @@ pub(crate) fn escape_report() -> String {
 struct BrokerLink {
     channel: RefCell<Link>,
     next_id: Cell<u32>,
+    /// A live page's first input, sent by the broker while this renderer
+    /// was still loading and waiting for a reply (ADR 0069): kept for
+    /// [`next_page_input`].
+    held: RefCell<Option<rustic_ipc::protocol::PageInput>>,
 }
 
 impl BrokerLink {
@@ -611,7 +619,18 @@ impl BrokerLink {
         self.next_id.set(id.wrapping_add(1));
         let mut channel = self.channel.borrow_mut();
         channel.send(&build(id))?;
-        let reply = channel.recv::<BrokerMessage>()?;
+        let mut reply = channel.recv::<BrokerMessage>()?;
+        // The broker sends a live page's first input without waiting for
+        // the load; it comes before the reply at most once.
+        if let BrokerMessage::Page(input) = reply {
+            let mut held = self.held.borrow_mut();
+            if held.is_some() {
+                eprintln!("rustic renderer: the broker answered out of order");
+                std::process::exit(1);
+            }
+            *held = Some(input);
+            reply = channel.recv::<BrokerMessage>()?;
+        }
         let reply_id = match &reply {
             BrokerMessage::Resource { id, .. }
             | BrokerMessage::Fetch { id, .. }

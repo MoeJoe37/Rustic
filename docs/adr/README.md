@@ -81,6 +81,7 @@ instead of rewriting the history of a decision.
 | [0071](0071-gpu-backend.md) | GPU backend: wgpu 26 (Vulkan, Metal, Direct3D 12) in the GPU process; compute-shader compositing byte-identical to the CPU reference; device-loss reopen; Linux GPU sandbox profile | Accepted (desktop; window surfaces and Windows/macOS GPU profiles pending) |
 | [0072](0072-automation-protocol.md) | Automation and DevTools protocol: `rustic automate` over stdio, no listening socket, broker-enforced grants, VM debugger hooks, redacted network diagnostics | Accepted |
 | [0073](0073-accessibility.md) | Accessibility: tree built in the renderer (HTML-AAM, ARIA, AccName) and sent over IPC as a bounded wire message; AccessKit 0.25 bridges (UI Automation, NSAccessibility, AT-SPI) in the shell; editing, selection and IME composition in the engine | Accepted (desktop; real screen-reader acceptance external) |
+| [0074](0074-browser-shell-and-native-hosts.md) | UI-01 browser shell (tabs, history, address entry, find, zoom, trusted strip) on live pages; host input, IME and lifecycle; system fonts per OS and collection members | Accepted |
 
 ## Records by area
 
@@ -100,7 +101,7 @@ instead of rewriting the history of a decision.
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
 | Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
-| Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071 |
+| Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071, 0074 |
 | Developer tools and automation (M8) | 0072 |
 | Accessibility and editing (M8) | 0073 |
 

@@ -31,6 +31,11 @@ pub(crate) fn seeds() -> Vec<Vec<u8>> {
                 ..DocumentGrant::default()
             },
             fonts: Vec::new(),
+            families: if id % 2 == 0 {
+                vec!["sans-serif=Seed".to_owned()]
+            } else {
+                Vec::new()
+            },
         })));
         seeds.push(broker);
         for message in [

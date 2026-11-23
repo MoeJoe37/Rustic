@@ -375,52 +375,198 @@ impl Permissions {
     }
 }
 
-/// Where the prompt's buttons are, in CSS pixels from the strip's
-/// top-left corner (the drawing and the hit test share these).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Buttons {
-    /// Block: left, top, width, height.
-    pub block: (f64, f64, f64, f64),
-    /// Allow: left, top, width, height.
-    pub allow: (f64, f64, f64, f64),
+/// A rectangle in CSS pixels from the strip's top-left corner: left, top,
+/// width, height.
+pub type Rect = (f64, f64, f64, f64);
+
+/// What a click in the strip can hit. The drawing and the hit test share
+/// [`layout`], so what is drawn is what is clicked.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Region {
+    /// A tab (switches to it).
+    Tab(usize),
+    /// A tab's close button.
+    CloseTab(usize),
+    /// The new-tab button.
+    NewTab,
+    /// Back.
+    Back,
+    /// Forward.
+    Forward,
+    /// Reload, or Stop while loading.
+    Reload,
+    /// The address field.
+    Address,
+    /// The zoom level (resets it).
+    Zoom,
+    /// The find field.
+    FindField,
+    /// Previous match.
+    FindPrevious,
+    /// Next match.
+    FindNext,
+    /// Close the find bar.
+    FindClose,
+    /// The prompt's Block button.
+    Block,
+    /// The prompt's Allow button.
+    Allow,
+    /// Close the download notice.
+    DownloadClose,
 }
 
-/// The buttons of a prompt row in a strip `width` CSS pixels wide.
-pub fn buttons(width: f64) -> Buttons {
-    let (button, gap, height) = (64.0, 8.0, 20.0);
-    let top = f64::from(ROW) + 4.0;
-    let allow_left = (width - button - gap).max(0.0);
-    let block_left = (allow_left - button - gap).max(0.0);
-    Buttons {
-        block: (block_left, top, button, height),
-        allow: (allow_left, top, button, height),
+/// One tab as the strip shows it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TabView {
+    /// Its title (the address, for now: pages cannot set the strip's
+    /// text).
+    pub title: String,
+    /// Whether it is loading.
+    pub loading: bool,
+}
+
+/// The address field as the strip shows it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AddressView {
+    /// The committed address (not being edited).
+    Committed(Address),
+    /// The user's own text being edited, with the caret's character
+    /// index and any IME composition at the caret.
+    Editing {
+        /// The text.
+        text: String,
+        /// The caret, in characters.
+        caret: usize,
+        /// Whether the whole text is selected (typing replaces it).
+        selected: bool,
+        /// The IME composition, shown at the caret.
+        preedit: String,
+    },
+}
+
+/// The find bar as the strip shows it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FindView {
+    /// The query.
+    pub text: String,
+    /// The caret, in characters.
+    pub caret: usize,
+    /// The IME composition at the caret.
+    pub preedit: String,
+    /// Match count and the active match, once the page reported them.
+    pub result: Option<(usize, usize)>,
+}
+
+/// Everything the strip shows.
+#[derive(Clone, Debug)]
+pub struct Strip<'a> {
+    /// The tabs, left to right.
+    pub tabs: &'a [TabView],
+    /// The active tab.
+    pub active: usize,
+    /// Whether back and forward lead anywhere.
+    pub back: bool,
+    /// See `back`.
+    pub forward: bool,
+    /// Whether the active tab is loading (Reload becomes Stop).
+    pub loading: bool,
+    /// The address field.
+    pub address: AddressView,
+    /// The active tab's zoom factor.
+    pub zoom: f64,
+    /// The find bar, when open.
+    pub find: Option<FindView>,
+    /// The permission prompt on screen.
+    pub prompt: Option<&'a Pending>,
+    /// A download notice.
+    pub download: Option<String>,
+    /// The profile's label.
+    pub profile: &'a str,
+}
+
+/// The strip's height in CSS pixels for these rows.
+pub fn strip_height(strip: &Strip<'_>) -> u32 {
+    let rows = 2
+        + u32::from(strip.find.is_some())
+        + u32::from(strip.prompt.is_some())
+        + u32::from(strip.download.is_some());
+    ROW * rows
+}
+
+/// Where everything clickable is, for a strip `width` CSS pixels wide.
+pub fn layout(strip: &Strip<'_>, width: f64) -> Vec<(Region, Rect)> {
+    let mut regions = Vec::new();
+    let row = f64::from(ROW);
+    let (button, gap, inner) = (22.0, 4.0, 20.0);
+    // Row 1: tabs, the new-tab button, the profile label on the right.
+    let profile = (strip.profile.chars().count().min(24) as f64 + 2.0) * CHARACTER_WIDTH;
+    let room = (width - profile - button - 2.0 * gap).max(0.0);
+    let count = strip.tabs.len().max(1) as f64;
+    let tab = (room / count).clamp(24.0, 200.0);
+    let mut x = gap;
+    for index in 0..strip.tabs.len() {
+        regions.push((Region::Tab(index), (x, 4.0, tab - 2.0, row - 4.0)));
+        regions.push((Region::CloseTab(index), (x + tab - 20.0, 7.0, 16.0, 16.0)));
+        x += tab;
     }
+    regions.push((Region::NewTab, (x + 2.0, 4.0, button, inner)));
+    // Row 2: back, forward, reload/stop, the address, the zoom level.
+    let top = row + 4.0;
+    regions.push((Region::Back, (gap, top, button, inner)));
+    regions.push((Region::Forward, (gap * 2.0 + button, top, button, inner)));
+    regions.push((Region::Reload, (gap * 3.0 + button * 2.0, top, 48.0, inner)));
+    let zoom = 48.0;
+    let address_left = gap * 4.0 + button * 2.0 + 48.0;
+    let address_width = (width - address_left - zoom - gap * 2.0).max(0.0);
+    regions.push((Region::Address, (address_left, top, address_width, inner)));
+    regions.push((
+        Region::Zoom,
+        (address_left + address_width + gap, top, zoom, inner),
+    ));
+    let mut next = row * 2.0;
+    if strip.find.is_some() {
+        let top = next + 4.0;
+        let field = (width * 0.4).clamp(80.0, 320.0);
+        regions.push((Region::FindField, (gap, top, field, inner)));
+        let after = gap * 2.0 + field + 96.0;
+        regions.push((Region::FindPrevious, (after, top, button, inner)));
+        regions.push((Region::FindNext, (after + button + gap, top, button, inner)));
+        regions.push((
+            Region::FindClose,
+            ((width - button - gap).max(0.0), top, button, inner),
+        ));
+        next += row;
+    }
+    if strip.prompt.is_some() {
+        let (wide, top) = (64.0, next + 4.0);
+        let allow_left = (width - wide - 8.0).max(0.0);
+        let block_left = (allow_left - wide - 8.0).max(0.0);
+        regions.push((Region::Block, (block_left, top, wide, inner)));
+        regions.push((Region::Allow, (allow_left, top, wide, inner)));
+        next += row;
+    }
+    if strip.download.is_some() {
+        regions.push((
+            Region::DownloadClose,
+            ((width - button - gap).max(0.0), next + 4.0, button, inner),
+        ));
+    }
+    regions
 }
 
-fn inside((left, top, width, height): (f64, f64, f64, f64), x: f64, y: f64) -> bool {
+fn inside((left, top, width, height): Rect, x: f64, y: f64) -> bool {
     x >= left && x < left + width && y >= top && y < top + height
 }
 
-/// The strip's height in CSS pixels: one row, two with a prompt.
-pub fn height(permissions: &Permissions) -> u32 {
-    if permissions.pending().is_some() {
-        ROW * 2
-    } else {
-        ROW
-    }
-}
-
-/// The answer a click at (`x`, `y`) CSS pixels gives, if it hits a button.
-pub fn hit(permissions: &Permissions, width: f64, x: f64, y: f64) -> Option<Answer> {
-    permissions.pending()?;
-    let buttons = buttons(width);
-    if inside(buttons.allow, x, y) {
-        Some(Answer::Allow)
-    } else if inside(buttons.block, x, y) {
-        Some(Answer::Block)
-    } else {
-        None
-    }
+/// What a click at (`x`, `y`) CSS pixels hits. Tab close buttons win over
+/// their tab.
+pub fn hit(strip: &Strip<'_>, width: f64, x: f64, y: f64) -> Option<Region> {
+    let regions = layout(strip, width);
+    regions
+        .iter()
+        .find(|(region, rect)| matches!(region, Region::CloseTab(_)) && inside(*rect, x, y))
+        .or_else(|| regions.iter().find(|(_, rect)| inside(*rect, x, y)))
+        .map(|&(region, _)| region)
 }
 
 fn escape(text: &str) -> String {
@@ -437,37 +583,223 @@ fn escape(text: &str) -> String {
     out
 }
 
-/// The strip as an HTML document `width` CSS pixels wide.
-pub fn document(address: &Address, permissions: &Permissions, width: u32) -> String {
-    let width_f = f64::from(width);
-    let (badge, badge_color) = match address.security {
-        Security::Secure => ("Secure", "#1a7f37"),
-        Security::NotSecure => ("Not secure", "#b42318"),
-        Security::File => ("File", "#444"),
-        Security::Opaque => ("", "#444"),
+/// At most `room` characters of `text`, with "..." when cut.
+fn fit(text: &str, room: usize) -> String {
+    let count = text.chars().count();
+    if count <= room {
+        return text.to_owned();
+    }
+    let keep = room.saturating_sub(3);
+    let head: String = text.chars().take(keep).collect();
+    if room >= 3 {
+        format!("{head}...")
+    } else {
+        head
+    }
+}
+
+/// An edited line with its caret: the visible window keeps the caret in
+/// view; the caret is a left border on the text after it.
+fn edited(text: &str, caret: usize, preedit: &str, room: usize) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let caret = caret.min(chars.len());
+    let preedit: String = preedit.chars().collect();
+    let room = room.max(4);
+    let start = caret.saturating_sub(room.saturating_sub(4));
+    let before: String = chars[start..caret].iter().collect();
+    let after: String = chars[caret..].iter().take(room).collect();
+    let composing = if preedit.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<u style=\"text-decoration:underline;color:#111\">{}</u>",
+            escape(&preedit)
+        )
     };
-    let badge_chars = badge.len() + 2;
-    let room = ((width_f - 16.0) / CHARACTER_WIDTH).floor().max(0.0) as usize;
-    let (host, detail) = elide(address, room.saturating_sub(badge_chars));
+    format!(
+        "<b>{}</b>{composing}<b style=\"border-left:1px solid #111\">{}&#8203;</b>",
+        escape(&before),
+        escape(&after)
+    )
+}
+
+fn boxed(rect: Rect, label: &str, extra: &str) -> String {
+    let (left, top, w, h) = rect;
+    format!(
+        "<span style=\"left:{left}px;top:{top}px;width:{}px;height:{}px;{extra}\">{}</span>",
+        (w - 2.0).max(0.0),
+        (h - 2.0).max(0.0),
+        escape(label)
+    )
+}
+
+/// The strip as an HTML document `width` CSS pixels wide.
+pub fn document(strip: &Strip<'_>, width: u32) -> String {
+    let width_f = f64::from(width);
+    let regions = layout(strip, width_f);
+    let at = |wanted: Region| {
+        regions
+            .iter()
+            .find(|(region, _)| *region == wanted)
+            .map(|&(_, rect)| rect)
+    };
+    let height = strip_height(strip);
     let mut html = format!(
         "<!doctype html><html><head><meta charset=utf-8><style>\
-         html,body{{margin:0;background:#e8e8e8;}}\
+         html,body{{margin:0;background:#dcdcdc;}}\
          div{{position:absolute;left:0;width:{width}px;height:{ROW}px;\
          font:13px/{ROW}px monospace;white-space:pre;overflow:hidden;}}\
          b{{font-weight:normal;color:#111;}} i{{font-style:normal;color:#666;}}\
          span{{position:absolute;height:20px;font:13px/20px monospace;text-align:center;\
-         border:1px solid #888;background:#fff;color:#111;}}\
-         </style></head><body>\
-         <div style=\"top:0;border-bottom:1px solid #aaa;\">&#32;<i style=\"color:{badge_color}\">{badge}</i>{sep}<b>{host}</b><i>{detail}</i></div>",
-        sep = if badge.is_empty() { "" } else { "  " },
-        host = escape(&host),
-        detail = escape(&detail),
+         border:1px solid #999;background:#f4f4f4;color:#111;overflow:hidden;white-space:pre;}}\
+         </style></head><body style=\"height:{height}px\">\
+         <div style=\"top:0;\"></div>"
     );
-    if let Some(pending) = permissions.pending() {
-        let buttons = buttons(width_f);
-        let room = ((buttons.block.0 - 16.0) / CHARACTER_WIDTH)
-            .floor()
-            .max(0.0) as usize;
+    for (index, tab) in strip.tabs.iter().enumerate() {
+        let Some(rect) = at(Region::Tab(index)) else {
+            continue;
+        };
+        let room = ((rect.2 - 28.0) / CHARACTER_WIDTH).floor().max(0.0) as usize;
+        let title = if tab.loading {
+            format!("* {}", tab.title)
+        } else {
+            tab.title.clone()
+        };
+        let style = if index == strip.active {
+            "background:#fff;border-bottom:1px solid #fff;text-align:left;"
+        } else {
+            "background:#e8e8e8;text-align:left;"
+        };
+        html.push_str(&boxed(rect, &format!(" {}", fit(&title, room)), style));
+        if let Some(close) = at(Region::CloseTab(index)) {
+            html.push_str(&boxed(close, "x", "border:0;background:transparent;"));
+        }
+    }
+    if let Some(rect) = at(Region::NewTab) {
+        html.push_str(&boxed(rect, "+", ""));
+    }
+    let profile = fit(strip.profile, 24);
+    let _ = write!(
+        html,
+        "<div style=\"top:0;left:auto;right:0;width:{}px;text-align:right;\"><i>{} </i></div>",
+        (profile.chars().count() as f64 + 2.0) * CHARACTER_WIDTH,
+        escape(&profile)
+    );
+    // Toolbar.
+    let _ = write!(
+        html,
+        "<div style=\"top:{ROW}px;background:#fff;border-bottom:1px solid #aaa;\"></div>"
+    );
+    let dim = |enabled: bool| if enabled { "" } else { "color:#aaa;" };
+    if let Some(rect) = at(Region::Back) {
+        html.push_str(&boxed(rect, "<", dim(strip.back)));
+    }
+    if let Some(rect) = at(Region::Forward) {
+        html.push_str(&boxed(rect, ">", dim(strip.forward)));
+    }
+    if let Some(rect) = at(Region::Reload) {
+        html.push_str(&boxed(
+            rect,
+            if strip.loading { "Stop" } else { "Reload" },
+            "",
+        ));
+    }
+    if let Some(rect) = at(Region::Address) {
+        let (left, top, w, h) = rect;
+        let room = ((w - 12.0) / CHARACTER_WIDTH).floor().max(0.0) as usize;
+        let inner = match &strip.address {
+            AddressView::Committed(address) => {
+                let (badge, badge_color) = match address.security {
+                    Security::Secure => ("Secure", "#1a7f37"),
+                    Security::NotSecure => ("Not secure", "#b42318"),
+                    Security::File => ("File", "#444"),
+                    Security::Opaque => ("", "#444"),
+                };
+                let badge_chars = if badge.is_empty() { 0 } else { badge.len() + 2 };
+                let (host, detail) = elide(address, room.saturating_sub(badge_chars));
+                format!(
+                    "<i style=\"color:{badge_color}\">{badge}</i>{sep}<b>{}</b><i>{}</i>",
+                    escape(&host),
+                    escape(&detail),
+                    sep = if badge.is_empty() { "" } else { "  " },
+                )
+            }
+            AddressView::Editing {
+                text,
+                caret,
+                selected,
+                preedit,
+            } => {
+                if *selected && preedit.is_empty() {
+                    format!(
+                        "<b style=\"background:#b3d4fc\">{}</b>",
+                        escape(&fit(text, room))
+                    )
+                } else {
+                    edited(text, *caret, preedit, room)
+                }
+            }
+        };
+        let border = if matches!(strip.address, AddressView::Editing { .. }) {
+            "border-color:#1f6feb;"
+        } else {
+            ""
+        };
+        let _ = write!(
+            html,
+            "<span style=\"left:{left}px;top:{top}px;width:{}px;height:{}px;text-align:left;\
+             background:#fff;{border}\"> {inner}</span>",
+            (w - 2.0).max(0.0),
+            (h - 2.0).max(0.0),
+        );
+    }
+    if let Some(rect) = at(Region::Zoom) {
+        let percent = (strip.zoom * 100.0).round();
+        html.push_str(&boxed(rect, &format!("{percent}%"), ""));
+    }
+    let mut next = ROW * 2;
+    if let Some(find) = &strip.find {
+        let _ = write!(
+            html,
+            "<div style=\"top:{next}px;background:#f2f2f2;border-bottom:1px solid #aaa;\"></div>"
+        );
+        if let Some(rect) = at(Region::FindField) {
+            let (left, top, w, h) = rect;
+            let room = ((w - 12.0) / CHARACTER_WIDTH).floor().max(0.0) as usize;
+            let _ = write!(
+                html,
+                "<span style=\"left:{left}px;top:{top}px;width:{}px;height:{}px;text-align:left;\
+                 background:#fff;border-color:#1f6feb;\"> {}</span>",
+                (w - 2.0).max(0.0),
+                (h - 2.0).max(0.0),
+                edited(&find.text, find.caret, &find.preedit, room)
+            );
+            let result = match find.result {
+                Some((0, _)) => "No matches".to_owned(),
+                Some((count, active)) => format!("{} of {count}", active + 1),
+                None => String::new(),
+            };
+            let _ = write!(
+                html,
+                "<div style=\"top:{next}px;left:{}px;width:92px;\"><i>{}</i></div>",
+                left + w + 6.0,
+                escape(&result)
+            );
+        }
+        for (region, label) in [
+            (Region::FindPrevious, "^"),
+            (Region::FindNext, "v"),
+            (Region::FindClose, "x"),
+        ] {
+            if let Some(rect) = at(region) {
+                html.push_str(&boxed(rect, label, ""));
+            }
+        }
+        next += ROW;
+    }
+    if let Some(pending) = strip.prompt {
+        let block = at(Region::Block).map_or(0.0, |rect| rect.0);
+        let room = ((block - 16.0) / CHARACTER_WIDTH).floor().max(0.0) as usize;
         let ask = format!(
             " {} wants to {}",
             pending.origin(),
@@ -476,20 +808,44 @@ pub fn document(address: &Address, permissions: &Permissions, width: u32) -> Str
         let ask: String = ask.chars().take(room).collect();
         let _ = write!(
             html,
-            "<div style=\"top:{ROW}px;background:#fff8d6;border-bottom:1px solid #aaa;\">{}</div>",
+            "<div style=\"top:{next}px;background:#fff8d6;border-bottom:1px solid #aaa;\">{}</div>",
             escape(&ask)
         );
-        for ((left, top, w, h), label) in [(buttons.block, "Block"), (buttons.allow, "Allow")] {
-            let _ = write!(
-                html,
-                "<span style=\"left:{left}px;top:{top}px;width:{}px;height:{}px;\">{label}</span>",
-                w - 2.0,
-                h - 2.0
-            );
+        for (region, label) in [(Region::Block, "Block"), (Region::Allow, "Allow")] {
+            if let Some(rect) = at(region) {
+                html.push_str(&boxed(rect, label, ""));
+            }
+        }
+        next += ROW;
+    }
+    if let Some(download) = &strip.download {
+        let room = ((width_f - 40.0) / CHARACTER_WIDTH).floor().max(0.0) as usize;
+        let _ = write!(
+            html,
+            "<div style=\"top:{next}px;background:#e6f0ff;border-bottom:1px solid #aaa;\"> {}</div>",
+            escape(&fit(download, room))
+        );
+        if let Some(rect) = at(Region::DownloadClose) {
+            html.push_str(&boxed(rect, "x", ""));
         }
     }
     html.push_str("</body></html>");
     html
+}
+
+/// A trusted page the browser shows in place of a document (a load
+/// error, a refused download, an empty tab): a heading and a detail line,
+/// escaped printable ASCII.
+pub fn message_document(heading: &str, detail: &str) -> String {
+    format!(
+        "<!doctype html><html><head><meta charset=utf-8><style>\
+         html,body{{margin:0;background:#fff;color:#222;}}\
+         h1{{font:20px/28px sans-serif;margin:48px 32px 12px;}}\
+         p{{font:14px/20px sans-serif;margin:0 32px;color:#555;white-space:pre-wrap;}}\
+         </style></head><body><h1>{}</h1><p>{}</p></body></html>",
+        escape(heading),
+        escape(detail)
+    )
 }
 
 /// The strip's document: no subresources, no scripts, no storage.
@@ -526,17 +882,17 @@ impl Session for StripSession {
     }
 }
 
-/// Render the strip at `width` device pixels and `scale` device pixels per
-/// CSS pixel, in this (trusted) process, scripts off.
-pub fn paint(
-    address: &Address,
-    permissions: &Permissions,
+/// Render a trusted `html` document of `css_height` CSS pixels at `width`
+/// device pixels and `scale` device pixels per CSS pixel, in this
+/// (trusted) process, scripts off: the strip, or a message page.
+pub fn paint_trusted(
+    html: String,
     width: u32,
+    css_height: u32,
     scale: f64,
 ) -> Result<rustic_raster::Surface, String> {
+    let scale = rustic_shell::usable_scale(scale);
     let css_width = ((f64::from(width) / scale).floor() as u32).max(1);
-    let css_height = height(permissions);
-    let html = document(address, permissions, css_width);
     let url = Url::parse("about:blank", None).map_err(|_| "no strip URL".to_owned())?;
     let document = SessionDocument {
         session: Rc::new(StripSession {
@@ -549,12 +905,17 @@ pub fn paint(
     let limits = LoaderLimits::default();
     let mut engine = Engine::new(1);
     let parsed = loader::load_session_document(&mut engine, &document, limits)
-        .map_err(|error| format!("cannot draw the address bar: {error}"))?;
-    let view = rustic_layout::View::new(f64::from(css_width), f64::from(css_height), scale, 1.0)
-        .map_err(|_| "cannot size the address bar".to_owned())?;
+        .map_err(|error| format!("cannot draw the browser's own UI: {error}"))?;
+    let view = rustic_layout::View::new(
+        f64::from(css_width),
+        f64::from(css_height.max(1)),
+        scale,
+        1.0,
+    )
+    .map_err(|_| "cannot size the browser's own UI".to_owned())?;
     loader::render_list(&parsed, std::path::Path::new("about:blank"), limits, view)
         .map(|(_, surface)| surface)
-        .map_err(|error| format!("cannot draw the address bar: {error}"))
+        .map_err(|error| format!("cannot draw the browser's own UI: {error}"))
 }
 
 #[cfg(test)]
@@ -728,25 +1089,58 @@ mod tests {
         );
     }
 
+    fn strip<'a>(prompt: Option<&'a Pending>, tabs: &'a [TabView]) -> Strip<'a> {
+        Strip {
+            tabs,
+            active: 0,
+            back: false,
+            forward: true,
+            loading: false,
+            address: AddressView::Committed(address(&url("https://a.test/x"))),
+            zoom: 1.0,
+            find: None,
+            prompt,
+            download: None,
+            profile: "Default",
+        }
+    }
+
     #[test]
-    fn buttons_hit_only_while_a_prompt_is_shown() {
+    fn prompt_buttons_hit_only_while_a_prompt_is_shown() {
         let now = Instant::now();
+        let tabs = [TabView {
+            title: "a.test".into(),
+            loading: false,
+        }];
         let mut permissions = Permissions::default();
-        assert_eq!(hit(&permissions, 400.0, 360.0, 40.0), None);
-        assert_eq!(height(&permissions), ROW);
+        let plain = strip(None, &tabs);
+        assert_eq!(strip_height(&plain), ROW * 2);
+        assert!(
+            !layout(&plain, 400.0)
+                .iter()
+                .any(|(r, _)| *r == Region::Allow)
+        );
         permissions.request(
             &url("https://a.test/").origin(),
             Permission::Camera,
             true,
             now,
         );
-        assert_eq!(height(&permissions), ROW * 2);
-        let buttons = buttons(400.0);
-        let (x, y) = (buttons.allow.0 + 1.0, buttons.allow.1 + 1.0);
-        assert_eq!(hit(&permissions, 400.0, x, y), Some(Answer::Allow));
-        let (x, y) = (buttons.block.0 + 1.0, buttons.block.1 + 1.0);
-        assert_eq!(hit(&permissions, 400.0, x, y), Some(Answer::Block));
-        assert_eq!(hit(&permissions, 400.0, 5.0, 5.0), None);
+        let prompted = strip(permissions.pending(), &tabs);
+        assert_eq!(strip_height(&prompted), ROW * 3);
+        let regions = layout(&prompted, 400.0);
+        let at = |wanted: Region| {
+            let (_, (x, y, _, _)) = *regions.iter().find(|(r, _)| *r == wanted).unwrap();
+            (x + 1.0, y + 1.0)
+        };
+        let (x, y) = at(Region::Allow);
+        assert_eq!(hit(&prompted, 400.0, x, y), Some(Region::Allow));
+        let (x, y) = at(Region::Block);
+        assert_eq!(hit(&prompted, 400.0, x, y), Some(Region::Block));
+        // A tab's close button wins over the tab under it.
+        let (x, y) = at(Region::CloseTab(0));
+        assert_eq!(hit(&prompted, 400.0, x, y), Some(Region::CloseTab(0)));
+        assert_eq!(hit(&prompted, 400.0, 399.0, 200.0), None);
     }
 
     #[test]
@@ -764,12 +1158,29 @@ mod tests {
             true,
             now,
         );
-        let html = document(&shown, &permissions, 1000);
-        assert!(!html.contains("<script>"));
+        let tabs = [TabView {
+            title: "<b>\u{202e}evil</b>".into(),
+            loading: true,
+        }];
+        let mut view = strip(permissions.pending(), &tabs);
+        view.address = AddressView::Committed(shown);
+        view.download = Some("Downloaded <x>.exe".into());
+        view.find = Some(FindView {
+            text: "<i>".into(),
+            caret: 1,
+            preedit: "\u{65e5}".into(),
+            result: Some((2, 0)),
+        });
+        let html = document(&view, 1000);
+        assert!(!html.contains("<script>") && !html.contains("<x>") && !html.contains("<i></"));
         assert!(html.contains("&lt;script&gt;"));
         assert!(html.is_ascii());
-        let surface = paint(&shown, &permissions, 400, 2.0).unwrap();
+        let height = strip_height(&view);
+        assert_eq!(height, ROW * 5);
+        let surface = paint_trusted(document(&view, 200), 400, height, 2.0).unwrap();
         assert_eq!(surface.width(), 400);
-        assert_eq!(surface.height(), ROW * 2 * 2);
+        assert_eq!(surface.height(), height * 2);
+        let page = paint_trusted(message_document("Oops", "<p>why"), 200, 100, 1.0).unwrap();
+        assert_eq!((page.width(), page.height()), (200, 100));
     }
 }

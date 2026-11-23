@@ -43,6 +43,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
                 storage: true,
             },
             fonts: vec![b"OTTO".to_vec()],
+            families: vec!["sans-serif=Arial".into()],
         }),
         BrokerMessage::Resource {
             id: 7,
@@ -102,6 +103,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             zoom: 1.25,
             scroll: Some((0.0, 120.5)),
             elapsed_us: 16_667,
+            find: Some(("needle".into(), 3)),
         })),
         BrokerMessage::Page(PageInput::Frame(FrameAsk {
             width: 1,
@@ -110,6 +112,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             zoom: 5.0,
             scroll: None,
             elapsed_us: 0,
+            find: None,
         })),
         BrokerMessage::Page(PageInput::Click {
             x: 10.5,
@@ -233,6 +236,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             },
             scroll: (0.0, 40.0),
             next_frame_us: Some(16_667),
+            found: Some((3, 1, 40.0, 56.0)),
         }),
         RendererMessage::Handled,
         RendererMessage::Accessibility(vec![1, 2, 3]),
@@ -464,6 +468,17 @@ fn a_child_process_speaks_the_protocol_over_its_standard_streams() {
 
 #[test]
 fn page_input_with_bad_numbers_or_long_keys_is_refused() {
+    let found = |find: Option<(String, u32)>| {
+        encode_frame(&BrokerMessage::Page(PageInput::Frame(FrameAsk {
+            width: 10,
+            height: 10,
+            scale: 1.0,
+            zoom: 1.0,
+            scroll: None,
+            elapsed_us: 0,
+            find,
+        })))
+    };
     let frame = |width: u32, scale: f64, scroll: Option<(f64, f64)>| {
         encode_frame(&BrokerMessage::Page(PageInput::Frame(FrameAsk {
             width,
@@ -472,8 +487,10 @@ fn page_input_with_bad_numbers_or_long_keys_is_refused() {
             zoom: 1.0,
             scroll,
             elapsed_us: 0,
+            find: None,
         })))
     };
+    assert!(decode_frame::<BrokerMessage>(&found(Some(("a".into(), 0)))).is_ok());
     assert!(decode_frame::<BrokerMessage>(&frame(10, 1.0, Some((0.0, 1.0)))).is_ok());
     for bad in [
         frame(0, 1.0, None),
@@ -482,6 +499,8 @@ fn page_input_with_bad_numbers_or_long_keys_is_refused() {
         frame(10, f64::NAN, None),
         frame(10, 1.0, Some((f64::INFINITY, 0.0))),
         frame(10, 1.0, Some((0.0, f64::NAN))),
+        found(Some((String::new(), 0))),
+        found(Some(("x".repeat(1025), 0))),
         encode_frame(&BrokerMessage::Page(PageInput::Key {
             down: true,
             key: "x".repeat(65),

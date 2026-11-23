@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "8084d39f81806562e66a663154326f45f3d59ae815071f441b208d42a821fd29",
-  "percent": "47.09",
+  "source_fingerprint": "19f458892e4effdc303fe46674ae941e2231f52d93681c71b62ab50de85db5ad",
+  "percent": "48.38",
   "verified_percent": "44.49",
-  "partial_percent": "2.60",
+  "partial_percent": "3.89",
   "completed": 105,
-  "in_progress": 10,
+  "in_progress": 14,
   "total": 226,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -87,9 +87,9 @@
       "share": "8.12",
       "completed": 9,
       "total": 18,
-      "percent": "61.71",
+      "percent": "77.60",
       "verified_percent": "41.25",
-      "partial_percent": "20.46"
+      "partial_percent": "36.35"
     },
     {
       "id": "M9",
@@ -6994,7 +6994,102 @@
               ]
             },
             {
-              "label": "Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64",
+              "label": "Linux lifecycle on native x86-64 and aarch64 runners: resizes, minimize and restore, device scale including 1.5 under X11, Wayland, the browser shell and fontconfig system fonts (ADR 0074)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-shell/src/window.rs",
+                  "marker": "fn set_visible("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn fractional_scales_size_the_page_in_device_pixels"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
+                }
+              ]
+            },
+            {
+              "label": "Linux acceptance: the curated site corpus in the desktop alpha",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "75.00",
+          "engine_share": "0.50"
+        },
+        {
+          "id": "platform.windows",
+          "label": "Windows runtime and native host acceptance",
+          "size": 3,
+          "milestone": "M8",
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Native window on Windows x64 and ARM64 CI desktops: frames, resizes, minimize and restore, keys, text, IME events and the browser shell through the platform's own handlers (ADR 0074)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-shell/src/window.rs",
+                  "marker": "fn set_visible("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
+                }
+              ]
+            },
+            {
+              "label": "Platform fonts for the CSS generic families and fallback scripts, collections split into faces",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/native.rs",
+                  "marker": "pub fn native() -> Native"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/fonts.rs",
+                  "marker": "pub fn system_fonts("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/opentype.rs",
+                  "marker": "fn collection_members_extract_to_standalone_faces"
+                }
+              ]
+            },
+            {
+              "label": "Acceptance: the curated site corpus in the desktop alpha",
               "status": "planned",
               "evidence": []
             }
@@ -7003,23 +7098,67 @@
           "engine_share": "0.50"
         },
         {
-          "id": "platform.windows",
-          "label": "Windows runtime and native host acceptance",
-          "size": 3,
-          "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
-          "engine_share": "0.50"
-        },
-        {
           "id": "platform.macos",
           "label": "macOS runtime and native host acceptance",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Native window on macOS ARM64 and x64 CI desktops: frames, resizes, minimize and restore, keys, text, IME events and the browser shell through the platform's own handlers (ADR 0074)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-shell/src/window.rs",
+                  "marker": "fn set_visible("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn the_browser_shell_drives_tabs_history_find_and_zoom"
+                }
+              ]
+            },
+            {
+              "label": "Platform fonts for the CSS generic families and fallback scripts, collections split into faces",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/native.rs",
+                  "marker": "pub fn native() -> Native"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/fonts.rs",
+                  "marker": "pub fn system_fonts("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/opentype.rs",
+                  "marker": "fn collection_members_extract_to_standalone_faces"
+                }
+              ]
+            },
+            {
+              "label": "Acceptance: the curated site corpus in the desktop alpha and the pre-main sandbox (TD-183)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "66.66",
           "engine_share": "0.50"
         },
         {
@@ -7047,9 +7186,58 @@
           "label": "Surface, input/IME and background lifecycle parity on desktop",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Surface lifecycle: resize, device-scale changes including fractional scales, minimized, occluded and zero-size windows present nothing (ADR 0074)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-shell/src/window.rs",
+                  "marker": "fn set_visible("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn the_window_follows_resizes_and_survives_minimize_and_restore"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/view.rs",
+                  "marker": "fn fractional_scales_size_the_page_in_device_pixels"
+                }
+              ]
+            },
+            {
+              "label": "Keyboard, typed text and IME preedit and commit from the host to the browser fields, with the candidate window placed at the caret",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-shell/src/window.rs",
+                  "marker": "set_ime_cursor_area"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/src/browser.rs",
+                  "marker": "fn the_address_field_edits_with_the_caret_and_ime"
+                }
+              ]
+            },
+            {
+              "label": "Page-level IME composition and background throttling of hidden pages (TD-196, TD-197)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "66.66",
           "engine_share": "0.50"
         },
         {
@@ -7057,9 +7245,42 @@
           "label": "Native font/codec/OS service adapters",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "System fonts: fontconfig on Linux and the BSDs, file tables for Windows and macOS, generic-family mapping sent to renderers (ADR 0074)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/native.rs",
+                  "marker": "pub fn native() -> Native"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/fonts.rs",
+                  "marker": "pub fn system_fonts("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-text/tests/opentype.rs",
+                  "marker": "fn collection_members_extract_to_standalone_faces"
+                }
+              ]
+            },
+            {
+              "label": "Reviewed platform font adapter (DirectWrite, Core Text) and native codec and OS service adapters (TD-85)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.50"
         },
         {
@@ -7075,12 +7296,12 @@
       ],
       "points": 24,
       "completed": 1,
-      "in_progress": 1,
+      "in_progress": 5,
       "total": 9,
-      "contribution": "0.50",
-      "percent": "12.50",
+      "contribution": "1.79",
+      "percent": "44.79",
       "verified_percent": "4.16",
-      "partial_percent": "8.34"
+      "partial_percent": "40.63"
     },
     {
       "id": "a11y",

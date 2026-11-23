@@ -139,3 +139,81 @@ pub(crate) fn decode(data: Vec<u8>, limits: &FontLimits) -> Result<Vec<u8>, Font
     }
     Ok(out)
 }
+
+/// The number of faces in an OpenType collection (`ttcf`), or `None` when
+/// `data` is not a collection.
+pub fn collection_len(data: &[u8]) -> Option<usize> {
+    (data.get(..4) == Some(b"ttcf")).then(|| n32(data, 8).unwrap_or(0))
+}
+
+/// Face `index` of an OpenType collection (`ttcf`, OpenType §5 "Font
+/// Collections") as a standalone sfnt: its table directory rebuilt with
+/// each table copied after it, 4-byte aligned. Tables the collection
+/// shares between faces are copied into each extracted face. Every offset
+/// and length is checked against the collection and `limits` before
+/// anything is allocated.
+pub fn collection_face(
+    data: &[u8],
+    index: usize,
+    limits: &FontLimits,
+) -> Result<Vec<u8>, FontError> {
+    let invalid = || FontError::Invalid {
+        table: Tag::DIRECTORY,
+        reason: "invalid font collection",
+    };
+    if data.len() > limits.max_font_bytes {
+        return Err(FontError::LimitExceeded("font size"));
+    }
+    let count = collection_len(data).ok_or(FontError::NotSfnt)?;
+    if count == 0 || count > limits.max_tables.max(1) * 64 {
+        return Err(invalid());
+    }
+    if index >= count {
+        return Err(FontError::Invalid {
+            table: Tag::DIRECTORY,
+            reason: "no such face in the collection",
+        });
+    }
+    let directory = n32(data, 12 + index * 4).map_err(|_| invalid())?;
+    let version = data.get(directory..directory + 4).ok_or_else(invalid)?;
+    let tables = n16(data, directory + 4).map_err(|_| invalid())?;
+    if tables == 0 || tables > limits.max_tables {
+        return Err(FontError::LimitExceeded("table count"));
+    }
+    let header = 12 + 16 * tables;
+    let mut records = Vec::with_capacity(tables);
+    let mut total = header;
+    for k in 0..tables {
+        let at = directory + 12 + 16 * k;
+        let record = data.get(at..at + 16).ok_or_else(invalid)?;
+        let offset = n32(data, at + 8).map_err(|_| invalid())?;
+        let length = n32(data, at + 12).map_err(|_| invalid())?;
+        let end = offset.checked_add(length).ok_or_else(invalid)?;
+        if end > data.len() {
+            return Err(FontError::TableOutOfBounds(Tag([
+                record[0], record[1], record[2], record[3],
+            ])));
+        }
+        total = add(total, padded(length)?, limits.max_font_bytes)?;
+        records.push((record, offset, length));
+    }
+    let mut out = Vec::with_capacity(total);
+    out.extend_from_slice(version);
+    // numTables, searchRange, entrySelector, rangeShift as the face had them.
+    out.extend_from_slice(
+        data.get(directory + 4..directory + 12)
+            .ok_or_else(invalid)?,
+    );
+    let mut next = header;
+    for (record, _, length) in &records {
+        out.extend_from_slice(&record[..8]);
+        out.extend_from_slice(&u32::try_from(next).map_err(|_| invalid())?.to_be_bytes());
+        out.extend_from_slice(&u32::try_from(*length).map_err(|_| invalid())?.to_be_bytes());
+        next += padded(*length)?;
+    }
+    for (_, offset, length) in &records {
+        out.extend_from_slice(&data[*offset..offset + length]);
+        out.resize(padded(out.len())?, 0);
+    }
+    Ok(out)
+}

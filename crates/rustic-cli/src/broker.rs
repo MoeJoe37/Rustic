@@ -290,14 +290,7 @@ fn child_args(parent: &[String], scripts: bool) -> Vec<String> {
     args
 }
 
-/// A composited page and the renderer's standard output.
-type Captured = (rustic_raster::Surface, Vec<u8>);
-
 thread_local! {
-    /// `Some` while [`render_surface`] runs: `serve` leaves the page here
-    /// instead of writing it.
-    static CAPTURE: std::cell::RefCell<Option<Option<Captured>>> =
-        const { std::cell::RefCell::new(None) };
     /// The URL of the document the last command committed (after
     /// redirects), decided here, never reported by the renderer: the
     /// window's trusted address display (TD-173).
@@ -310,17 +303,52 @@ pub fn committed_url() -> Option<Url> {
     COMMITTED.with(|committed| committed.borrow().clone())
 }
 
-/// Run `render` with `args` (which must name an `--output`, unused) in a
-/// renderer and return the composited page and the renderer's standard
-/// output (`--report-scroll`), for the window host (`view`, ADR 0065).
-pub fn render_surface(args: &[OsString]) -> Result<Captured, u8> {
-    CAPTURE.with(|slot| *slot.borrow_mut() = Some(None));
-    let status = run("render", args);
-    let captured = CAPTURE.with(|slot| slot.borrow_mut().take()).flatten();
-    match captured {
-        Some(page) if status == 0 => Ok(page),
-        _ => Err(if status == 0 { 1 } else { status }),
+/// Why the last brokered command on this thread failed to load its
+/// document, for the browser shell's error and download UI (UI-01).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Failure {
+    /// The navigation was a download.
+    Download {
+        /// The sanitized file name (empty when saving failed).
+        name: String,
+        /// Where it was saved, or why not.
+        saved: Result<String, String>,
+    },
+    /// Any other load failure, as the command reports it.
+    Load(String),
+}
+
+impl Failure {
+    fn of(error: &LoadError) -> Self {
+        use crate::network::NetworkLoadError;
+        match error {
+            LoadError::Network(NetworkLoadError::Download(name)) => Self::Download {
+                name: name.clone(),
+                saved: Err("downloads are off (no --download-dir)".into()),
+            },
+            LoadError::Network(NetworkLoadError::Saved(path)) => Self::Download {
+                name: Path::new(path)
+                    .file_name()
+                    .map_or_else(|| path.clone(), |n| n.to_string_lossy().into_owned()),
+                saved: Ok(path.clone()),
+            },
+            LoadError::Network(NetworkLoadError::DownloadFailed(why)) => Self::Download {
+                name: String::new(),
+                saved: Err(why.clone()),
+            },
+            other => Self::Load(other.to_string()),
+        }
     }
+}
+
+thread_local! {
+    static FAILURE: std::cell::RefCell<Option<Failure>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Why the last brokered command on this thread could not load its
+/// document, if it could not.
+pub fn last_failure() -> Option<Failure> {
+    FAILURE.with(|failure| failure.borrow().clone())
 }
 
 /// A document command ready for its renderer: the grant, the job and the
@@ -365,6 +393,7 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
 /// error was reported.
 fn prepare(command: &str, args: &[OsString]) -> Result<Prepared, u8> {
     COMMITTED.with(|committed| committed.borrow_mut().take());
+    FAILURE.with(|failure| failure.borrow_mut().take());
     let Some((limits, path, output)) = document_argument(command, args) else {
         // A usage error: let the command report it; nothing is loaded.
         let mut engine = rustic_engine::Engine::new(1);
@@ -374,6 +403,7 @@ fn prepare(command: &str, args: &[OsString]) -> Result<Prepared, u8> {
     };
     let shown = EscapedText(&Path::new(&path).to_string_lossy()).to_string();
     let fail = |error: LoadError| -> u8 {
+        FAILURE.with(|failure| *failure.borrow_mut() = Some(Failure::of(&error)));
         if matches!(error, LoadError::InvalidLimits) {
             eprintln!("rustic {command}: {error}");
             2
@@ -475,6 +505,7 @@ fn prepare(command: &str, args: &[OsString]) -> Result<Prepared, u8> {
         args: renderer_args,
         document,
         fonts: crate::fonts::granted_bytes().to_vec(),
+        families: crate::fonts::granted_families().to_vec(),
     };
     Ok(Prepared {
         grant,
@@ -501,6 +532,9 @@ pub struct LiveFrame {
     pub scroll: (f64, f64),
     /// When the page wants another frame (timers, animation frames).
     pub next_frame: Option<std::time::Duration>,
+    /// Find in page: match count, active match, and its top and bottom in
+    /// CSS pixels of the document, when the frame asked for a search.
+    pub found: Option<(u32, u32, f64, f64)>,
 }
 
 /// A page loaded once in a long-lived renderer (TD-182): input and frame
@@ -685,10 +719,21 @@ impl<'a> LivePage<'a> {
         } else {
             (0.0, 0.0)
         };
+        // The renderer's find report is untrusted: only an in-range,
+        // finite, ordered one is passed on.
+        let found = painted.found.filter(|&(count, active, top, bottom)| {
+            (count as usize) <= crate::find::MAX_MATCHES
+                && (count == 0 || active < count)
+                && top.is_finite()
+                && bottom.is_finite()
+                && top >= 0.0
+                && bottom >= top
+        });
         Ok(LiveFrame {
             surface,
             scroll,
             next_frame: painted.next_frame_us.map(std::time::Duration::from_micros),
+            found,
         })
     }
 
@@ -1552,11 +1597,6 @@ fn serve(
         }
         return u8::from(write_output(&finished.output).is_err());
     }
-    if command == "render" && surfaces.len() == 1 && CAPTURE.with(|slot| slot.borrow().is_some()) {
-        let page = surfaces.pop().expect("one surface");
-        CAPTURE.with(|slot| *slot.borrow_mut() = Some(Some((page, finished.output))));
-        return 0;
-    }
     // With an image, the renderer's standard output is its report
     // (`--report-scroll`), printed after the file is written.
     let mut report = Vec::new();
@@ -1776,6 +1816,7 @@ impl<'a> Broker<'a> {
             ),
             document,
             fonts: crate::fonts::granted_bytes().to_vec(),
+            families: crate::fonts::granted_families().to_vec(),
         };
         // A frame renderer that fails costs only its frame (it paints
         // white); the page renders on.
@@ -1901,6 +1942,7 @@ impl<'a> Broker<'a> {
             args,
             document,
             fonts: crate::fonts::granted_bytes().to_vec(),
+            families: crate::fonts::granted_families().to_vec(),
         };
         match run_renderer(start, &Grant::Network(popup), self.limits, &child, None) {
             Ok(Finished { status: 0, .. }) => true,

@@ -50,6 +50,8 @@ pub struct Start {
     pub document: DocumentGrant,
     /// Font files the user granted (the renderer opens no files).
     pub fonts: Vec<Vec<u8>>,
+    /// `generic=family` mappings for those fonts (system fonts, ADR 0074).
+    pub families: Vec<String>,
 }
 
 /// Most granted font files in one [`Start`].
@@ -173,7 +175,13 @@ pub struct FrameAsk {
     /// Time since the previous frame request, in microseconds (the
     /// page's clock advances by it, at most one second per frame).
     pub elapsed_us: u64,
+    /// Find in page: the query (at most [`MAX_FIND_BYTES`]) and the
+    /// active match; matches are marked on the frame.
+    pub find: Option<(String, u32)>,
 }
+
+/// Longest find-in-page query in a [`FrameAsk`], in bytes.
+pub const MAX_FIND_BYTES: usize = 1024;
 
 /// Input for a long-lived page (TD-182): sent by the broker, which got it
 /// from the trusted window host; a renderer never synthesizes it.
@@ -239,6 +247,9 @@ pub struct Painted {
     /// When the page wants its next frame (a timer or animation frame
     /// callback), in microseconds from now; `None` when nothing is due.
     pub next_frame_us: Option<u64>,
+    /// Find in page: the match count, the active match and its top and
+    /// bottom in CSS pixels of the document (when the frame asked).
+    pub found: Option<(u32, u32, f64, f64)>,
 }
 
 /// What a resource request is for (decides the broker's policy checks).
@@ -629,6 +640,14 @@ fn put_page_input(writer: &mut Writer, input: &PageInput) {
                 None => writer.u8(0),
             }
             writer.u64(ask.elapsed_us);
+            match &ask.find {
+                Some((text, index)) => {
+                    writer.u8(1);
+                    writer.str(text);
+                    writer.u32(*index);
+                }
+                None => writer.u8(0),
+            }
         }
         PageInput::Click { x, y, modifiers } => {
             writer.u8(1);
@@ -720,6 +739,17 @@ fn get_page_input(reader: &mut Reader<'_>) -> Result<PageInput, DecodeError> {
                 zoom,
                 scroll,
                 elapsed_us: reader.u64()?,
+                find: match reader.u8()? {
+                    0 => None,
+                    1 => {
+                        let text = reader.string()?;
+                        if text.is_empty() || text.len() > MAX_FIND_BYTES {
+                            return Err(DecodeError::OutOfRange);
+                        }
+                        Some((text, reader.u32()?))
+                    }
+                    _ => return Err(DecodeError::InvalidFlag),
+                },
             })
         }
         1 => PageInput::Click {
@@ -785,6 +815,7 @@ impl Message for BrokerMessage {
                 for font in &start.fonts {
                     writer.bytes(font);
                 }
+                writer.strs(&start.families);
             }
             Self::Resource { id, result } => {
                 writer.u16(2);
@@ -895,11 +926,13 @@ impl Message for BrokerMessage {
                 let fonts = (0..count)
                     .map(|_| reader.bytes())
                     .collect::<Result<_, _>>()?;
+                let families = reader.strings(MAX_STRINGS)?;
                 Ok(Self::Start(Start {
                     command,
                     args,
                     document,
                     fonts,
+                    families,
                 }))
             }
             2 => {
@@ -1115,6 +1148,16 @@ impl Message for RendererMessage {
                     }
                     None => writer.u8(0),
                 }
+                match painted.found {
+                    Some((count, active, top, bottom)) => {
+                        writer.u8(1);
+                        writer.u32(count);
+                        writer.u32(active);
+                        put_f64(writer, top);
+                        put_f64(writer, bottom);
+                    }
+                    None => writer.u8(0),
+                }
             }
             Self::Popup {
                 id,
@@ -1230,6 +1273,16 @@ impl Message for RendererMessage {
                 next_frame_us: match reader.u8()? {
                     0 => None,
                     1 => Some(reader.u64()?),
+                    _ => return Err(DecodeError::InvalidFlag),
+                },
+                found: match reader.u8()? {
+                    0 => None,
+                    1 => Some((
+                        reader.u32()?,
+                        reader.u32()?,
+                        get_f64(reader)?,
+                        get_f64(reader)?,
+                    )),
                     _ => return Err(DecodeError::InvalidFlag),
                 },
             })),

@@ -5,15 +5,22 @@
 //! `stringify` recurses on the data and stops with a RangeError when the
 //! native stack budget of the run is spent.
 
+use std::collections::HashMap;
+
 use super::{Method, arg, install_methods, method};
 use crate::runtime::agent::{Agent, JsResult};
 use crate::runtime::number::{number_to_string, to_integer_or_infinity};
-use crate::runtime::object::{Class, PropertyDescriptor};
+use crate::runtime::object::{Class, Extra, Internal, PropertyDescriptor};
 use crate::runtime::shape::PropertyKey;
 use crate::runtime::value::{Kind, ObjectId, Value};
-use crate::runtime::{ErrorKind, JsStr};
+use crate::runtime::{ErrorKind, JsStr, OutOfMemory, StringId};
 
-const FUNCTIONS: &[Method] = &[method("parse", parse, 2), method("stringify", stringify, 3)];
+const FUNCTIONS: &[Method] = &[
+    method("isRawJSON", is_raw_json, 1),
+    method("parse", parse, 2),
+    method("rawJSON", raw_json, 1),
+    method("stringify", stringify, 3),
+];
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     let object_prototype = agent.intrinsics.object_prototype;
@@ -72,8 +79,46 @@ fn enumerable_keys(agent: &mut Agent, o: ObjectId) -> JsResult<Vec<PropertyKey>>
 
 /// A container being filled while parsing.
 enum Open {
-    Array(Vec<Value>),
+    Array(Vec<Value>, Option<Vec<Option<SourceRange>>>),
     Object(ObjectId, Option<PropertyKey>),
+}
+
+type SourceRange = (usize, usize);
+
+#[derive(Clone, Copy)]
+struct ParsedValue {
+    value: Value,
+    source: Option<SourceRange>,
+}
+
+impl ParsedValue {
+    fn container(object: ObjectId) -> Self {
+        Self {
+            value: Value::object(object),
+            source: None,
+        }
+    }
+}
+
+type ParseRecords = HashMap<(ObjectId, PropertyKey), ParsedValue>;
+
+fn record(
+    agent: &mut Agent,
+    records: &mut ParseRecords,
+    holder: ObjectId,
+    key: PropertyKey,
+    parsed: ParsedValue,
+) -> JsResult<()> {
+    agent.check_native_work()?;
+    // Duplicate object members retain the final value and its own token.
+    if !records.contains_key(&(holder, key)) {
+        agent
+            .heap
+            .charge(2 * std::mem::size_of::<((ObjectId, PropertyKey), ParsedValue)>())?;
+        records.try_reserve(1).map_err(|_| OutOfMemory)?;
+    }
+    records.insert((holder, key), parsed);
+    Ok(())
 }
 
 struct Parser<'a> {
@@ -207,22 +252,41 @@ impl Parser<'_> {
         Ok(text.parse::<f64>().unwrap_or(f64::NAN))
     }
 
-    /// A whole JSON text.
-    fn parse(&mut self, agent: &mut Agent) -> JsResult<Value> {
+    fn primitive(&mut self, agent: &mut Agent) -> JsResult<Value> {
+        Ok(match self.peek().and_then(|u| u8::try_from(u).ok()) {
+            Some(b'"') => {
+                self.at += 1;
+                let units = self.string(agent)?;
+                agent.string_from(JsStr::from_units(&units))?
+            }
+            Some(b'-' | b'0'..=b'9') => Value::number(self.number(agent)?),
+            Some(b't') if self.literal("true") => Value::TRUE,
+            Some(b'f') if self.literal("false") => Value::FALSE,
+            Some(b'n') if self.literal("null") => Value::NULL,
+            _ => return syntax_error(agent, "unexpected token", self.at),
+        })
+    }
+
+    /// A whole JSON text. Source records are needed only for callable revivers.
+    fn parse(
+        &mut self,
+        agent: &mut Agent,
+        mut records: Option<&mut ParseRecords>,
+    ) -> JsResult<ParsedValue> {
         let mut stack: Vec<Open> = Vec::new();
         loop {
             // A value.
             self.skip_space();
-            let value = match self.peek().and_then(|u| u8::try_from(u).ok()) {
+            let mut parsed = match self.peek().and_then(|u| u8::try_from(u).ok()) {
                 Some(b'{') => {
                     self.at += 1;
                     let o = agent.new_object()?;
                     self.skip_space();
                     if self.eat(b'}') {
-                        Value::object(o)
+                        ParsedValue::container(o)
                     } else {
                         let key = self.member_key(agent)?;
-                        agent.heap.charge(16)?;
+                        agent.heap.charge(std::mem::size_of::<Open>())?;
                         stack.push(Open::Object(o, Some(key)));
                         continue;
                     }
@@ -231,26 +295,23 @@ impl Parser<'_> {
                     self.at += 1;
                     self.skip_space();
                     if self.eat(b']') {
-                        Value::object(agent.create_array_from_list(&[])?)
+                        ParsedValue::container(agent.create_array_from_list(&[])?)
                     } else {
-                        agent.heap.charge(16)?;
-                        stack.push(Open::Array(Vec::new()));
+                        agent.heap.charge(std::mem::size_of::<Open>())?;
+                        stack.push(Open::Array(Vec::new(), records.is_some().then(Vec::new)));
                         continue;
                     }
                 }
-                Some(b'"') => {
-                    self.at += 1;
-                    let units = self.string(agent)?;
-                    agent.string_from(JsStr::from_units(&units))?
+                _ => {
+                    let start = self.at;
+                    let value = self.primitive(agent)?;
+                    ParsedValue {
+                        value,
+                        source: records.is_some().then_some((start, self.at)),
+                    }
                 }
-                Some(b'-' | b'0'..=b'9') => Value::number(self.number(agent)?),
-                Some(b't') if self.literal("true") => Value::TRUE,
-                Some(b'f') if self.literal("false") => Value::FALSE,
-                Some(b'n') if self.literal("null") => Value::NULL,
-                _ => return syntax_error(agent, "unexpected token", self.at),
             };
             // Close containers the value completes.
-            let mut value = value;
             loop {
                 match stack.last_mut() {
                     None => {
@@ -258,11 +319,17 @@ impl Parser<'_> {
                         if self.at != self.text.len() {
                             return syntax_error(agent, "unexpected text after JSON", self.at);
                         }
-                        return Ok(value);
+                        return Ok(parsed);
                     }
-                    Some(Open::Array(items)) => {
+                    Some(Open::Array(items, sources)) => {
                         agent.heap.charge(8)?;
-                        items.push(value);
+                        items.push(parsed.value);
+                        if let Some(sources) = sources {
+                            agent
+                                .heap
+                                .charge(std::mem::size_of::<Option<SourceRange>>())?;
+                            sources.push(parsed.source);
+                        }
                         self.skip_space();
                         if self.eat(b',') {
                             break;
@@ -270,14 +337,32 @@ impl Parser<'_> {
                         if !self.eat(b']') {
                             return syntax_error(agent, "expected , or ]", self.at);
                         }
-                        let Some(Open::Array(items)) = stack.pop() else {
+                        let Some(Open::Array(items, sources)) = stack.pop() else {
                             unreachable!("the top is an array");
                         };
-                        value = Value::object(agent.create_array_from_list(&items)?);
+                        let array = agent.create_array_from_list(&items)?;
+                        if let (Some(sources), Some(records)) = (sources, records.as_deref_mut()) {
+                            for (index, (value, source)) in
+                                items.into_iter().zip(sources).enumerate()
+                            {
+                                let index = u32::try_from(index).map_err(|_| OutOfMemory)?;
+                                record(
+                                    agent,
+                                    records,
+                                    array,
+                                    PropertyKey::Index(index),
+                                    ParsedValue { value, source },
+                                )?;
+                            }
+                        }
+                        parsed = ParsedValue::container(array);
                     }
                     Some(Open::Object(o, key)) => {
                         let (o, k) = (*o, key.take().expect("a pending member key"));
-                        agent.create_data_property_or_throw(o, k, value)?;
+                        agent.create_data_property_or_throw(o, k, parsed.value)?;
+                        if let Some(records) = records.as_deref_mut() {
+                            record(agent, records, o, k, parsed)?;
+                        }
                         self.skip_space();
                         if self.eat(b',') {
                             let next = self.member_key(agent)?;
@@ -290,7 +375,7 @@ impl Parser<'_> {
                             return syntax_error(agent, "expected , or }", self.at);
                         }
                         stack.pop();
-                        value = Value::object(o);
+                        parsed = ParsedValue::container(o);
                     }
                 }
             }
@@ -315,20 +400,41 @@ impl Parser<'_> {
 /// `JSON.parse(text, reviver)` (§25.5.1).
 fn parse(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let text = agent.to_string(arg(args, 0))?;
-    let units = agent.heap.string(text).to_units();
-    let value = parse_json_units(agent, &units)?;
     let reviver = arg(args, 1);
     if !agent.is_callable(reviver) {
-        return Ok(value);
+        let units = agent.heap.string(text).to_units();
+        return parse_json_units(agent, &units);
     }
+    let units = source_units(agent, text)?;
+    let mut records = ParseRecords::new();
+    let parsed = Parser {
+        text: &units,
+        at: 0,
+    }
+    .parse(agent, Some(&mut records))?;
     let root = agent.new_object()?;
     let empty = PropertyKey::String(agent.names.empty);
-    agent.create_data_property_or_throw(root, empty, value)?;
-    internalize(agent, root, empty, reviver)
+    agent.create_data_property_or_throw(root, empty, parsed.value)?;
+    record(agent, &mut records, root, empty, parsed)?;
+    internalize(agent, root, empty, reviver, &records, &units)
 }
 
 pub(crate) fn parse_json_units(agent: &mut Agent, text: &[u16]) -> JsResult<Value> {
-    Parser { text, at: 0 }.parse(agent)
+    Ok(Parser { text, at: 0 }.parse(agent, None)?.value)
+}
+
+fn source_units(agent: &mut Agent, text: StringId) -> JsResult<Vec<u16>> {
+    let length = agent.heap.string(text).len();
+    for _ in 0..length.div_ceil(1024) {
+        agent.check_native_work()?;
+    }
+    agent
+        .heap
+        .charge(length.checked_mul(2).ok_or(OutOfMemory)?)?;
+    let mut units = Vec::new();
+    units.try_reserve_exact(length).map_err(|_| OutOfMemory)?;
+    units.extend(agent.heap.string(text).units());
+    Ok(units)
 }
 
 /// `InternalizeJSONProperty(holder, name, reviver)` (§25.5.1.1), walked
@@ -338,6 +444,8 @@ fn internalize(
     root: ObjectId,
     name: PropertyKey,
     reviver: Value,
+    records: &ParseRecords,
+    source_text: &[u16],
 ) -> JsResult<Value> {
     struct Frame {
         holder: ObjectId,
@@ -345,30 +453,41 @@ fn internalize(
         value: Value,
         children: Vec<PropertyKey>,
         next: usize,
+        original: Option<ParsedValue>,
     }
-    let open = |agent: &mut Agent, holder: ObjectId, name: PropertyKey| -> JsResult<Frame> {
-        let value = agent.get(holder, name)?;
-        let is_array = super::array::is_array(agent, value)?;
-        let children = match value.as_object() {
-            Some(o) if is_array => {
-                let length = agent.length_of_array_like(o)?;
-                agent.heap.charge(8 * length.min(1e9) as usize)?;
-                // The heap budget keeps the length far below 2³².
-                (0..length as u32).map(PropertyKey::Index).collect()
-            }
-            Some(o) => enumerable_keys(agent, o)?,
-            None => Vec::new(),
+    let open =
+        |agent: &mut Agent, holder: ObjectId, name: PropertyKey, track: bool| -> JsResult<Frame> {
+            let value = agent.get(holder, name)?;
+            let original = track
+                .then(|| records.get(&(holder, name)))
+                .flatten()
+                .copied()
+                .filter(|parsed| agent.same_value(parsed.value, value));
+            let is_array = super::array::is_array(agent, value)?;
+            let children = match value.as_object() {
+                Some(o) if is_array => {
+                    let length = agent.length_of_array_like(o)?;
+                    let length = u32::try_from(length as u64).map_err(|_| OutOfMemory)?;
+                    let bytes = (length as usize)
+                        .checked_mul(std::mem::size_of::<PropertyKey>())
+                        .ok_or(OutOfMemory)?;
+                    agent.heap.charge(bytes)?;
+                    (0..length).map(PropertyKey::Index).collect()
+                }
+                Some(o) => enumerable_keys(agent, o)?,
+                None => Vec::new(),
+            };
+            agent.heap.charge(std::mem::size_of::<Frame>())?;
+            Ok(Frame {
+                holder,
+                name,
+                value,
+                children,
+                next: 0,
+                original,
+            })
         };
-        agent.heap.charge(std::mem::size_of::<Frame>())?;
-        Ok(Frame {
-            holder,
-            name,
-            value,
-            children,
-            next: 0,
-        })
-    };
-    let mut stack = vec![open(agent, root, name)?];
+    let mut stack = vec![open(agent, root, name, true)?];
     loop {
         let top = stack
             .last_mut()
@@ -377,13 +496,23 @@ fn internalize(
             let key = top.children[top.next];
             top.next += 1;
             let holder = top.value.as_object().expect("only objects have children");
-            let frame = open(agent, holder, key)?;
+            let frame = open(agent, holder, key, top.original.is_some())?;
             stack.push(frame);
             continue;
         }
         let frame = stack.pop().expect("the stack is not empty");
         let name = key_value(agent, frame.name)?;
-        let result = agent.call(reviver, Value::object(frame.holder), &[name, frame.value])?;
+        let context = agent.new_object()?;
+        if let Some((start, end)) = frame.original.and_then(|parsed| parsed.source) {
+            let source = agent.string_from(JsStr::from_units(&source_text[start..end]))?;
+            let key = agent.heap.key("source")?;
+            agent.create_data_property_or_throw(context, key, source)?;
+        }
+        let result = agent.call(
+            reviver,
+            Value::object(frame.holder),
+            &[name, frame.value, Value::object(context)],
+        )?;
         if stack.is_empty() {
             return Ok(result);
         }
@@ -393,6 +522,46 @@ fn internalize(
             agent.create_data_property(frame.holder, frame.name, result)?;
         }
     }
+}
+
+fn raw_json(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let text = agent.to_string(arg(args, 0))?;
+    let units = source_units(agent, text)?;
+    let mut parser = Parser {
+        text: &units,
+        at: 0,
+    };
+    // Starting directly at the primitive rejects leading space and containers.
+    parser.primitive(agent)?;
+    if parser.at != units.len() {
+        return syntax_error(agent, "unexpected text after raw JSON", parser.at);
+    }
+    let wrapper = agent.new_object_with(None)?;
+    agent.heap.charge(std::mem::size_of::<Extra>())?;
+    agent.heap.object_mut(wrapper).extra_mut().internal = Some(Internal::RawJson);
+    let key = agent.heap.key("rawJSON")?;
+    agent.define_property_or_throw(
+        wrapper,
+        key,
+        PropertyDescriptor::data_with(Value::string(text), false, true, false),
+    )?;
+    agent.prevent_extensions(wrapper)?;
+    Ok(Value::object(wrapper))
+}
+
+fn is_raw(agent: &Agent, object: ObjectId) -> bool {
+    matches!(
+        agent.heap.object(object).internal(),
+        Some(Internal::RawJson)
+    )
+}
+
+fn is_raw_json(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    Ok(Value::boolean(
+        arg(args, 0)
+            .as_object()
+            .is_some_and(|object| is_raw(agent, object)),
+    ))
 }
 
 // ---- stringify ----------------------------------------------------------------
@@ -570,6 +739,15 @@ fn serialize_property(
             push_str(agent, state, &text)?;
         }
         Kind::BigInt(_) => return agent.type_error("JSON.stringify cannot serialize a BigInt"),
+        Kind::Object(o) if is_raw(agent, o) => {
+            let key = agent.heap.key("rawJSON")?;
+            let text = agent
+                .get(o, key)?
+                .as_string()
+                .expect("frozen rawJSON property");
+            let units = source_units(agent, text)?;
+            push(agent, state, &units)?;
+        }
         Kind::Object(o) if !agent.is_callable(value) => {
             if super::array::is_array(agent, value)? {
                 serialize_array(agent, state, o)?;

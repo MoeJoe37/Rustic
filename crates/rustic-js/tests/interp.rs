@@ -1395,6 +1395,40 @@ fn core_built_ins() {
 }
 
 #[test]
+fn json_revivers_keep_exact_tokens_for_unchanged_values() {
+    let _report = Report;
+    check(
+        r#"const sources = {};
+           JSON.parse('{"dup":1,"dup":1.00,"zero":-0,"s":"\\u0041","n":9007199254740993}',
+             (k, v, context) => { sources[k] = context.source; return v; });
+           [sources.dup, sources.zero, sources.s, sources.n, sources['']].join('|')"#,
+        r#"1.00|-0|"\u0041"|9007199254740993|"#,
+    );
+    check(
+        r#"const sources = [];
+           JSON.parse('{"first":{"n":1e0},"second":{"n":1.0},"zero":-0,"same":2.0}',
+             function (k, v, c) {
+               if (k === 'first') { this.second = v; this.zero = 0; this.same = 2; }
+               if (k === 'n' || k === 'zero' || k === 'same') sources.push(c.source);
+               return v;
+             });
+           sources.join('|')"#,
+        "1e0|||2.0",
+    );
+}
+
+#[test]
+fn raw_json_round_trips_large_numbers_and_does_not_brand_proxies() {
+    let _report = Report;
+    check(
+        r#"const raw = JSON.parse('9007199254740993', (_, value, context) => JSON.rawJSON(context.source));
+           [Object.isFrozen(raw), Object.getPrototypeOf(raw) === null, JSON.isRawJSON(raw),
+            JSON.isRawJSON(new Proxy(raw, {})), JSON.stringify({n:raw})].join('|')"#,
+        r#"true|true|true|false|{"n":9007199254740993}"#,
+    );
+}
+
+#[test]
 fn strings_numbers_and_json() {
     let _report = Report;
     // Number formatting rounds the exact value, ties away from zero.
@@ -3200,6 +3234,51 @@ fn array_buffers_and_data_views() {
         "new DataView(new ArrayBuffer(1)).setInt8(0, 1n)",
         "!TypeError: cannot convert a BigInt to a number",
     );
+}
+
+#[test]
+fn uint8_array_encodings_preserve_view_bounds_and_option_order() {
+    let _report = Report;
+    check(
+        "const buffer = new ArrayBuffer(3, {maxByteLength: 7});
+         const view = new Uint8Array(buffer, 1);
+         const counts = view.setFromBase64(' -_8AAQ ', {
+           get alphabet() { buffer.resize(5); return 'base64url'; },
+           get lastChunkHandling() { return 'loose'; }
+         });
+         [counts.read, counts.written, new Uint8Array(buffer).toHex(), view.toBase64({alphabet:'base64url', omitPadding:true})].join('|')",
+        "8|4|00fbff0001|-_8AAQ",
+    );
+    check(
+        "const bytes = new Uint8Array([9,9,9,9]); const view = bytes.subarray(1,3);
+         try { view.setFromHex('6fg0'); } catch (error) { error.name + '|' + bytes.toHex(); }",
+        "SyntaxError|096f0909",
+    );
+    check(
+        "const bytes = new Uint8Array([9,9,9,9]);
+         try { bytes.setFromBase64('Zm9vZg==?', {lastChunkHandling:'strict'}); }
+         catch (error) { error.name + '|' + bytes.toHex(); }",
+        "SyntaxError|666f6f09",
+    );
+}
+
+#[test]
+fn uint8_array_decoder_charges_whitespace_and_keeps_completed_groups() {
+    let mut agent = Agent::new().expect("agent");
+    let decode = agent
+        .evaluate("Uint8Array.prototype.setFromBase64")
+        .expect("builtin");
+    let target = agent
+        .evaluate("var target = new Uint8Array(4); target")
+        .expect("target");
+    let input = agent.string("Zm9v      ZA==").expect("input");
+    agent.set_step_budget(Some(6));
+    assert_eq!(
+        agent.call_from_host(decode, target, &[input]),
+        Err(Abrupt::Cancelled)
+    );
+    agent.set_step_budget(None);
+    assert_eq!(run_in(&mut agent, "target.toHex()"), "666f6f00");
 }
 
 #[test]

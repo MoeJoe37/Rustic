@@ -140,10 +140,10 @@ writes the verdict and reason for every file. At the pinned revision:
 
 | | `test/language` | `test/built-ins` (gated areas) |
 | --- | ---: | ---: |
-| Pass | 21,939 | 17,555 |
-| Fail | 488 | 1,236 |
+| Pass | 21,939 | 17,644 |
+| Fail | 488 | 1,217 |
 | Skipped (modules, proposals) | 1,405 | 111 |
-| Pass rate of the files that run | 97.8% | 93.4% |
+| Pass rate of the files that run | 97.8% | 93.5% |
 
 Async tests run since promises landed: after the script the runner drains
 the job queue, and the test passes when `$DONE` printed
@@ -172,7 +172,7 @@ Date, Error, FinalizationRegistry, Function, GeneratorFunction,
 GeneratorPrototype, Promise, AggregateError, AsyncFunction,
 AsyncGeneratorFunction, AsyncGeneratorPrototype, the async iterator
 prototypes, BigInt, Iterator, JSON, Map, Math, NativeErrors, Number,
-Object, Proxy, Reflect, RegExp, Set, SharedArrayBuffer, String, Symbol, TypedArray, TypedArrayConstructors, WeakMap, WeakRef, WeakSet, the
+Object, Proxy, Reflect, RegExp, Set, SharedArrayBuffer, String, Symbol, TypedArray, TypedArrayConstructors, Uint8Array, WeakMap, WeakRef, WeakSet, the
 iterator prototypes, the standard global functions and the `ThrowTypeError`
 intrinsic). A sparse checkout must include them:
 `git sparse-checkout add test/built-ins/Array ...`.
@@ -244,6 +244,38 @@ passing list. Run that selection alone with the pinned checkout above:
 
 ```sh
 cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 test/built-ins/Math/sumPrecise
+```
+
+### Uint8Array and JSON data interchange (M9)
+
+`Uint8Array` provides `fromBase64`, `fromHex`, `setFromBase64`, `setFromHex`,
+`toBase64` and `toHex`. Base64 supports the standard and URL-safe alphabets,
+the three final-chunk policies, and optional output padding. Decode methods
+take primitive strings. The in-place methods report UTF-16 code units read and
+bytes written, honor the destination view and preserve completed groups on
+syntax errors. Static decoding validates and counts before allocating the
+result and decodes into that buffer directly. The encoder bounds its allocation
+against the heap budget, and the codecs meter native work. [ECMAScript §23.3](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array-objects)
+
+`JSON.parse` records exact UTF-16 token ranges for callable revivers. A
+primitive's fresh context exposes `source` when its value still matches the
+original parse record. Replacing a container also drops source associations
+for its descendants. `JSON.rawJSON` validates a single primitive token without
+surrounding whitespace. `JSON.stringify` emits that token verbatim when it
+encounters the frozen wrapper after `toJSON` and replacer processing.
+`JSON.isRawJSON` recognizes that wrapper by its internal slot. [ECMAScript §25.5](https://tc39.es/ecma262/multipage/structured-data.html#sec-json-object)
+
+The pinned JSON directory passes all 166 files, including 21 new passes.
+`Uint8Array` passes 68 of 70 files and joins the built-ins gate. The two
+remaining tests construct their inputs with the draft `transferToImmutable`
+method (TD-143). The byte-module regression separately verifies that the
+encoders can read Rustic's immutable buffers and the setters reject them.
+The eight new built-in functions and their registrations add 1,733 charged
+bytes per 64-bit agent, bringing the standard library to 130,355 bytes.
+
+```sh
+cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 test/built-ins/Uint8Array
+cargo run --locked --release -p rustic-js --example test262 -- /path/to/test262 test/built-ins/JSON
 ```
 
 ## Fuzzing

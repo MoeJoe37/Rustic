@@ -16,6 +16,25 @@ which describes the current state in one place. What is next is in the
 [roadmap queue](ROADMAP.md#18-current-implementation-queue), and the measured
 status is the [progress summary](progress/summary.md).
 
+## M9 language — Uint8Array and JSON data interchange
+
+The six `Uint8Array` base64 and hex methods share the typed-array buffer paths.
+Decoding into existing views honors byte offsets, available length, and
+option-getter changes to resizable buffers. The decoder meters input work and
+preserves completed groups when malformed input follows them.
+
+`JSON.parse` supplies a fresh reviver context with the original UTF-16 token
+for unchanged primitive values. `JSON.rawJSON` validates a single primitive
+token and preserves its text through `JSON.stringify`. Raw JSON wrappers carry
+an internal brand and a frozen own property. The focused tests cover replaced
+subtrees, duplicate keys, numeric precision, immutable byte-module views and
+the decoder's cancellation boundary.
+
+The pinned Test262 baselines gain 68 `Uint8Array` passes and 21 JSON passes.
+Two `Uint8Array` cases still need the draft immutable-buffer creation API.
+See [JS.md](JS.md#uint8array-and-json-data-interchange-m9) for the selection
+and implementation contracts.
+
 ## M9 language — Math.sumPrecise
 
 The JavaScript runtime sums any synchronous iterable of Numbers with one final

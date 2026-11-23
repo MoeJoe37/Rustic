@@ -303,6 +303,8 @@ impl IteratorKind {
 /// Internal slots the collector treats specially.
 #[derive(Clone, Debug)]
 pub(crate) enum Internal {
+    /// The brand of a frozen JSON.rawJSON wrapper.
+    RawJson,
     /// Canonical Unicode locale identifier of an Intl.Locale.
     Locale(StringId),
     /// Resolved collation settings and the cached compare callback.

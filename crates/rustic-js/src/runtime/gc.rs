@@ -389,7 +389,7 @@ impl Marker<'_> {
                 self.value(primitive);
             }
             match &extra.internal {
-                None | Some(Internal::ImportRequest(_)) => {}
+                None | Some(Internal::ImportRequest(_) | Internal::RawJson) => {}
                 Some(Internal::Host(data)) => self.hosts.push((ObjectId(index), *data)),
                 Some(Internal::HostIndexed(data)) => {
                     for &value in data.roots() {

@@ -739,8 +739,11 @@ fn byte_modules_expose_read_only_shared_data() {
                     && rejected(() => alias.fill(1))
                     && rejected(() => alias.reverse())
                     && rejected(() => alias.set([1]))
+                    && rejected(() => alias.setFromHex('00'))
+                    && rejected(() => alias.setFromBase64('AA=='))
                     && rejected(() => Atomics.store(alias, 0, 1))
                     && rejected(() => buffer.transfer())
+                    && alias.toHex() === 'ff80' && alias.toBase64() === '/4A='
                     && alias[0] === 255 && alias[1] === 128;
             "#, 8_192).unwrap())
         } else {

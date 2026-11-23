@@ -23,6 +23,8 @@ use crate::runtime::shape::PropertyKey;
 use crate::runtime::string::JsStr;
 use crate::runtime::value::{Kind, ObjectId, Value};
 
+mod encoding;
+
 /// A typed array's internal slots.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct View {
@@ -679,7 +681,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         agent.intrinsics.typed_array_prototypes[kind.index()] = kind_prototype;
         agent.intrinsics.typed_array_constructors[kind.index()] = constructor;
     }
-    Ok(())
+    encoding::install(agent)
 }
 
 /// `%TypedArray%()` (§23.2.1.1) always throws.

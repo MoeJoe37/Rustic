@@ -209,6 +209,7 @@ const BUILT_IN_DIRS: &[&str] = &[
     "ThrowTypeError",
     "TypedArray",
     "TypedArrayConstructors",
+    "Uint8Array",
     "WeakMap",
     "WeakRef",
     "WeakSet",

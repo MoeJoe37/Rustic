@@ -203,6 +203,12 @@ impl Exchange {
         Some(event)
     }
 
+    /// Bump `signal` whenever this exchange receives an event, so one
+    /// thread can wait on many exchanges ([`crate::fetch::FetchController`]).
+    pub fn attach(&self, signal: Arc<crate::pipe::Signal>) {
+        self.consumer.attach(signal);
+    }
+
     /// An exchange that delivers `body` and finishes, for a response
     /// served from the HTTP cache (its head is returned separately).
     pub(crate) fn from_body(body: Vec<u8>) -> Self {

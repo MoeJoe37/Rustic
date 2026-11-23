@@ -2068,6 +2068,10 @@ impl<'a> Broker<'a> {
 
     fn handle(&mut self, request: RendererMessage) -> BrokerMessage {
         match request {
+            RendererMessage::Prefetch { id, requests } => {
+                self.prefetch(requests);
+                BrokerMessage::Prefetched { id }
+            }
             RendererMessage::Resource {
                 id,
                 url,
@@ -2114,6 +2118,19 @@ impl<'a> Broker<'a> {
         }
     }
 
+    /// Start a network document's subresource fetches side by side
+    /// (TD-165); a local document reads its files on request.
+    fn prefetch(&self, requests: Vec<(String, rustic_ipc::protocol::ResourceKind)>) {
+        let Grant::Network(session) = &self.grant else {
+            return;
+        };
+        let requests: Vec<_> = requests
+            .into_iter()
+            .filter_map(|(url, kind)| Some((Url::parse(&url, None).ok()?, resource_kind(kind))))
+            .collect();
+        session.prefetch(&requests);
+    }
+
     fn resource(
         &self,
         url: &str,
@@ -2125,19 +2142,7 @@ impl<'a> Broker<'a> {
         };
         // The renderer's budget never raises this broker's own.
         let max = usize::try_from(max_bytes.min(self.cap())).unwrap_or(usize::MAX);
-        let kind = match kind {
-            rustic_ipc::protocol::ResourceKind::Stylesheet => ResourceKind::Stylesheet,
-            rustic_ipc::protocol::ResourceKind::Image => ResourceKind::Image,
-            rustic_ipc::protocol::ResourceKind::Script {
-                nonce,
-                parser_inserted,
-                module,
-            } => ResourceKind::Script {
-                nonce,
-                parser_inserted,
-                module,
-            },
-        };
+        let kind = resource_kind(kind);
         let result = match self.grant {
             // Only files inside the document's directory, after symbolic
             // links resolve: the same rule a single-process run applies.
@@ -2246,5 +2251,22 @@ fn kill_process(pid: u32) {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
+    }
+}
+
+/// A resource kind from the renderer, as the network session names it.
+fn resource_kind(kind: rustic_ipc::protocol::ResourceKind) -> ResourceKind {
+    match kind {
+        rustic_ipc::protocol::ResourceKind::Stylesheet => ResourceKind::Stylesheet,
+        rustic_ipc::protocol::ResourceKind::Image => ResourceKind::Image,
+        rustic_ipc::protocol::ResourceKind::Script {
+            nonce,
+            parser_inserted,
+            module,
+        } => ResourceKind::Script {
+            nonce,
+            parser_inserted,
+            module,
+        },
     }
 }

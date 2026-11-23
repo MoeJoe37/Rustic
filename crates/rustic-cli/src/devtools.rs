@@ -1441,6 +1441,10 @@ impl NetworkSession for ObservedSession {
         self.inner.document_url()
     }
 
+    fn prefetch(&self, requests: &[(Url, ResourceKind)]) {
+        self.inner.prefetch(requests);
+    }
+
     fn csp(&self) -> &rustic_net::csp::CspList {
         self.inner.csp()
     }

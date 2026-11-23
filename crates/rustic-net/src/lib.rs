@@ -61,6 +61,7 @@ mod transport;
 
 pub use headers::{HeaderError, Headers, is_token, is_valid_value as is_valid_header_value};
 pub use limits::{LimitsError, TransportLimits};
+pub use pipe::Signal;
 pub use policy::{NetworkPolicy, PolicyError, Resolver, is_public, system_resolver};
 pub use request::{Request, RequestError};
 pub use response::{HttpVersion, ProtocolError, ResponseHead, parse_response};

@@ -633,6 +633,7 @@ impl BrokerLink {
         }
         let reply_id = match &reply {
             BrokerMessage::Resource { id, .. }
+            | BrokerMessage::Prefetched { id }
             | BrokerMessage::Fetch { id, .. }
             | BrokerMessage::Storage { id, .. }
             | BrokerMessage::Frame { id, .. }
@@ -678,6 +679,22 @@ impl Session for BrokeredSession {
         &self.url
     }
 
+    fn prefetch(&self, requests: &[(Url, ResourceKind)]) {
+        if self.local || requests.is_empty() {
+            return;
+        }
+        let requests = requests
+            .iter()
+            .take(rustic_ipc::protocol::MAX_PREFETCH_REQUESTS)
+            .map(|(url, kind)| (url.serialize(), ipc_kind(kind)))
+            .collect();
+        // The broker only starts the fetches; its answer carries nothing.
+        let _ = self
+            .link
+            .request(|id| RendererMessage::Prefetch { id, requests })
+            .unwrap_or_else(|error| lost(&error));
+    }
+
     fn csp(&self) -> &CspList {
         &self.csp
     }
@@ -692,19 +709,7 @@ impl Session for BrokeredSession {
         kind: &ResourceKind,
         max_bytes: usize,
     ) -> Result<Vec<u8>, FetchError> {
-        let kind = match kind {
-            ResourceKind::Stylesheet => rustic_ipc::protocol::ResourceKind::Stylesheet,
-            ResourceKind::Image => rustic_ipc::protocol::ResourceKind::Image,
-            ResourceKind::Script {
-                nonce,
-                parser_inserted,
-                module,
-            } => rustic_ipc::protocol::ResourceKind::Script {
-                nonce: nonce.clone(),
-                parser_inserted: *parser_inserted,
-                module: *module,
-            },
-        };
+        let kind = ipc_kind(kind);
         let reply = self
             .link
             .request(|id| RendererMessage::Resource {
@@ -883,5 +888,22 @@ impl StorageHost for BrokeredStorage {
             StorageValue::Keys(keys) => keys,
             _ => Vec::new(),
         }
+    }
+}
+
+/// A resource kind as the broker protocol names it.
+fn ipc_kind(kind: &ResourceKind) -> rustic_ipc::protocol::ResourceKind {
+    match kind {
+        ResourceKind::Stylesheet => rustic_ipc::protocol::ResourceKind::Stylesheet,
+        ResourceKind::Image => rustic_ipc::protocol::ResourceKind::Image,
+        ResourceKind::Script {
+            nonce,
+            parser_inserted,
+            module,
+        } => rustic_ipc::protocol::ResourceKind::Script {
+            nonce: nonce.clone(),
+            parser_inserted: *parser_inserted,
+            module: *module,
+        },
     }
 }

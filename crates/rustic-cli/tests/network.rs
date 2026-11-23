@@ -537,3 +537,59 @@ fn downloads_are_saved_only_to_the_granted_directory_without_overwriting() {
     assert!(!dir.parent().unwrap().join("evil.pdf").exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// TD-165: a document's stylesheets and images load side by side, in a
+/// split run and a single-process one: four slow resources take about as
+/// long as one, and each still applies in document order.
+#[test]
+fn subresources_load_concurrently() {
+    let pause = std::time::Duration::from_millis(900);
+    let slow = |status_body: &[u8], kind: &str| {
+        let mut bytes = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n\r\n",
+            status_body.len()
+        )
+        .into_bytes();
+        bytes.extend_from_slice(status_body);
+        Reply::new().pause(pause).send(bytes)
+    };
+    let server = FixtureServer::start([
+        (
+            "/",
+            Reply::response(
+                200,
+                &[("Content-Type", "text/html")],
+                b"<!doctype html><link rel=stylesheet href=/a.css>\
+                  <link rel=stylesheet href=/b.css><link rel=stylesheet href=/c.css>\
+                  <link rel=stylesheet href=/d.css><p id=t>text</p>",
+            ),
+        ),
+        ("/a.css", slow(b"#t { color: rgb(1, 1, 1) }", "text/css")),
+        ("/b.css", slow(b"#t { color: rgb(2, 2, 2) }", "text/css")),
+        ("/c.css", slow(b"#t { margin-left: 3px }", "text/css")),
+        ("/d.css", slow(b"#t { margin-right: 4px }", "text/css")),
+    ])
+    .unwrap();
+    let [a, _] = grants(&server);
+    for single in [false, true] {
+        let mut args = vec!["dump-style"];
+        if single {
+            args.push("--single-process");
+        }
+        args.extend(["--allow-origin", &a, "http://a.test/"]);
+        let started = std::time::Instant::now();
+        let output = rustic(&args);
+        let elapsed = started.elapsed();
+        assert!(output.status.success(), "{}", stderr(&output));
+        let dump = stdout(&output);
+        // Later sheets win: b.css's color, and every sheet applied.
+        assert!(dump.contains("rgb(2, 2, 2)"), "{dump}");
+        assert!(dump.contains("margin-left: 3px"), "{dump}");
+        assert!(dump.contains("margin-right: 4px"), "{dump}");
+        // One at a time would take four pauses.
+        assert!(
+            elapsed < pause * 3,
+            "single process {single}: {elapsed:?} for four {pause:?} sheets"
+        );
+    }
+}

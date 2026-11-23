@@ -1479,6 +1479,9 @@ fn queue_discovered_local_resources(
         let parsed = document.document();
         discover_local_resources(parsed.parsed().document(), document_url, limits)
     };
+    if let Some(session) = fetch.network() {
+        prefetch_resources(session, &requests);
+    }
     let mut delivered = 0usize;
     for (url, kind) in requests {
         check_cancelled(cancellation)?;
@@ -1544,6 +1547,25 @@ enum LocalResourceKind {
 /// the existing per-kind document fetch limits. The document's first base href
 /// is resolved once; the subsequent fetcher enforces the canonical file grant
 /// and rejects all unsupported schemes and escaping links.
+/// Start a network document's stylesheets and images side by side
+/// (TD-165); each is still delivered in document order by whoever asks.
+fn prefetch_resources(
+    session: &dyn crate::network::Session,
+    requests: &[(rustic_url::Url, LocalResourceKind)],
+) {
+    let ahead: Vec<_> = requests
+        .iter()
+        .map(|(url, kind)| {
+            let kind = match kind {
+                LocalResourceKind::Stylesheet => ResourceKind::Stylesheet,
+                LocalResourceKind::Image => ResourceKind::Image,
+            };
+            (url.clone(), kind)
+        })
+        .collect();
+    session.prefetch(&ahead);
+}
+
 fn discover_local_resources(
     document: &Document,
     document_url: &rustic_url::Url,
@@ -1927,6 +1949,12 @@ fn compute_styles(
         Some(local) => local,
         None => &mut no_fetch,
     };
+    if let (Some(session), Some(url)) = (network, document_url.as_ref()) {
+        // Only the cascade reads here, so only its sheets start early.
+        let mut sheets = discover_local_resources(document, url, limits);
+        sheets.retain(|(_, kind)| matches!(kind, LocalResourceKind::Stylesheet));
+        prefetch_resources(session.as_ref(), &sheets);
+    }
     let mut loader = StyleLoader::new(fetcher, limits.stylesheets).with_document_encoding(encoding);
     if let Some(session) = network.filter(|session| !session.csp().is_empty()) {
         loader =

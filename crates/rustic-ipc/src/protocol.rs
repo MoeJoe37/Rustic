@@ -384,6 +384,12 @@ pub enum StorageValue {
 pub enum BrokerMessage {
     /// The job.
     Start(Start),
+    /// The reply to [`RendererMessage::Prefetch`] number `id`: the
+    /// fetches started (TD-165).
+    Prefetched {
+        /// The request number.
+        id: u32,
+    },
     /// The reply to [`RendererMessage::Resource`] number `id`.
     Resource {
         /// The request number.
@@ -438,6 +444,15 @@ pub enum BrokerMessage {
 /// Renderer to broker.
 #[derive(Clone, Debug, PartialEq)]
 pub enum RendererMessage {
+    /// Start fetching subresources the renderer will ask for, side by
+    /// side (TD-165); each still comes back through
+    /// [`RendererMessage::Resource`].
+    Prefetch {
+        /// The request number.
+        id: u32,
+        /// URLs and what each is for.
+        requests: Vec<(String, ResourceKind)>,
+    },
     /// Ask for a subresource.
     Resource {
         /// The request number.
@@ -798,6 +813,10 @@ fn get_page_input(reader: &mut Reader<'_>) -> Result<PageInput, DecodeError> {
 impl Message for BrokerMessage {
     fn encode(&self, writer: &mut Writer) {
         match self {
+            Self::Prefetched { id } => {
+                writer.u16(8);
+                writer.u32(*id);
+            }
             Self::Start(start) => {
                 writer.u16(1);
                 writer.str(&start.command);
@@ -1003,6 +1022,7 @@ impl Message for BrokerMessage {
                 opened: reader.bool()?,
             }),
             7 => Ok(Self::Page(get_page_input(reader)?)),
+            8 => Ok(Self::Prefetched { id: reader.u32()? }),
             32 => Ok(Self::AutomationCommand {
                 id: reader.u32()?,
                 line: reader.opt_string()?,
@@ -1033,9 +1053,51 @@ fn failure_of(tag: u8) -> Result<ResourceFailure, DecodeError> {
     })
 }
 
+/// Most requests in one [`RendererMessage::Prefetch`].
+pub const MAX_PREFETCH_REQUESTS: usize = 4096;
+
+fn put_resource_kind(writer: &mut Writer, kind: &ResourceKind) {
+    match kind {
+        ResourceKind::Stylesheet => writer.u8(0),
+        ResourceKind::Image => writer.u8(1),
+        ResourceKind::Script {
+            nonce,
+            parser_inserted,
+            module,
+        } => {
+            writer.u8(2);
+            writer.opt_str(nonce.as_deref());
+            writer.bool(*parser_inserted);
+            writer.bool(*module);
+        }
+    }
+}
+
+fn get_resource_kind(reader: &mut Reader<'_>) -> Result<ResourceKind, DecodeError> {
+    Ok(match reader.u8()? {
+        0 => ResourceKind::Stylesheet,
+        1 => ResourceKind::Image,
+        2 => ResourceKind::Script {
+            nonce: reader.opt_string()?,
+            parser_inserted: reader.bool()?,
+            module: reader.bool()?,
+        },
+        tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
+    })
+}
+
 impl Message for RendererMessage {
     fn encode(&self, writer: &mut Writer) {
         match self {
+            Self::Prefetch { id, requests } => {
+                writer.u16(12);
+                writer.u32(*id);
+                writer.u32(u32::try_from(requests.len()).unwrap_or(u32::MAX));
+                for (url, kind) in requests {
+                    writer.str(url);
+                    put_resource_kind(writer, kind);
+                }
+            }
             Self::Resource {
                 id,
                 url,
@@ -1045,20 +1107,7 @@ impl Message for RendererMessage {
                 writer.u16(1);
                 writer.u32(*id);
                 writer.str(url);
-                match kind {
-                    ResourceKind::Stylesheet => writer.u8(0),
-                    ResourceKind::Image => writer.u8(1),
-                    ResourceKind::Script {
-                        nonce,
-                        parser_inserted,
-                        module,
-                    } => {
-                        writer.u8(2);
-                        writer.opt_str(nonce.as_deref());
-                        writer.bool(*parser_inserted);
-                        writer.bool(*module);
-                    }
-                }
+                put_resource_kind(writer, kind);
                 writer.u64(*max_bytes);
             }
             Self::Fetch { id, request } => {
@@ -1187,16 +1236,7 @@ impl Message for RendererMessage {
             1 => {
                 let id = reader.u32()?;
                 let url = reader.string()?;
-                let kind = match reader.u8()? {
-                    0 => ResourceKind::Stylesheet,
-                    1 => ResourceKind::Image,
-                    2 => ResourceKind::Script {
-                        nonce: reader.opt_string()?,
-                        parser_inserted: reader.bool()?,
-                        module: reader.bool()?,
-                    },
-                    tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
-                };
+                let kind = get_resource_kind(reader)?;
                 let max_bytes = reader.u64()?;
                 Ok(Self::Resource {
                     id,
@@ -1292,6 +1332,19 @@ impl Message for RendererMessage {
                 noopener: reader.bool()?,
                 noreferrer: reader.bool()?,
             }),
+            12 => {
+                let id = reader.u32()?;
+                let count = reader.u32()? as usize;
+                if count > MAX_PREFETCH_REQUESTS {
+                    return Err(DecodeError::OutOfRange);
+                }
+                let mut requests = Vec::with_capacity(count);
+                for _ in 0..count {
+                    let url = reader.string()?;
+                    requests.push((url, get_resource_kind(reader)?));
+                }
+                Ok(Self::Prefetch { id, requests })
+            }
             32 => Ok(Self::AutomationOutput(reader.string()?)),
             33 => Ok(Self::AutomationRead { id: reader.u32()? }),
             tag => Err(DecodeError::UnknownTag(tag)),

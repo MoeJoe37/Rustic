@@ -32,7 +32,9 @@ use rustic_encoding::Encoding;
 use rustic_net::cookie::{CookieJar, CookieLimits};
 use rustic_net::cors::CredentialsMode;
 use rustic_net::csp::{CspList, FetchDirective, Verdict};
-use rustic_net::fetch::{Destination, FetchRequest, Fetcher, NetworkError, RequestMode};
+use rustic_net::fetch::{
+    Destination, FetchRequest, FetchResponse, Fetcher, NetworkError, RequestMode,
+};
 use rustic_net::mime::{MimeType, extract_mime_type};
 use rustic_net::mixed_content::{self, MixedContent};
 use rustic_net::navigation::{
@@ -330,6 +332,8 @@ pub(crate) struct NetworkSession {
     /// For a frame's document: the top-level site and the site for
     /// cookies of its requests (ADR 0062); `None` at the top level.
     frame: Option<(Site, Origin)>,
+    /// Subresource fetches started ahead of use (TD-165).
+    inflight: RefCell<Inflight>,
 }
 
 impl fmt::Debug for NetworkSession {
@@ -366,6 +370,10 @@ pub(crate) trait Session: fmt::Debug {
         kind: &ResourceKind,
         max_bytes: usize,
     ) -> Result<Vec<u8>, FetchError>;
+    /// Start fetching subresources the document will ask for, side by
+    /// side, so [`Self::fetch`] finds them in flight or done (TD-165).
+    /// A session that cannot does nothing, and each loads on request.
+    fn prefetch(&self, _requests: &[(Url, ResourceKind)]) {}
     /// The `charset` label of a subresource already fetched.
     fn charset_of(&self, url: &Url) -> Option<String>;
     /// Run a script `fetch()`.
@@ -400,6 +408,10 @@ impl Session for NetworkSession {
         max_bytes: usize,
     ) -> Result<Vec<u8>, FetchError> {
         self.fetch_resource(url, kind, max_bytes)
+    }
+
+    fn prefetch(&self, requests: &[(Url, ResourceKind)]) {
+        self.prefetch_resources(requests);
     }
 
     fn charset_of(&self, url: &Url) -> Option<String> {
@@ -635,6 +647,7 @@ impl NetworkSession {
             charsets: RefCell::new(HashMap::new()),
             isolation: rustic_net::isolation::IsolationPolicy::default(),
             frame: None,
+            inflight: RefCell::default(),
         }
     }
 
@@ -723,6 +736,7 @@ impl NetworkSession {
             charsets: RefCell::new(HashMap::new()),
             isolation,
             frame: None,
+            inflight: RefCell::default(),
             origin,
         };
         Ok(NetworkDocument {
@@ -873,6 +887,7 @@ impl NetworkSession {
             charsets: RefCell::new(HashMap::new()),
             isolation,
             frame: Some((top_level_site, for_cookies)),
+            inflight: RefCell::default(),
             origin,
         };
         Ok(NetworkDocument {
@@ -889,7 +904,9 @@ impl NetworkSession {
         crate::storage::save_cookies(bytes)
     }
 
-    /// Fetch one subresource of the document, at most `max_bytes`.
+    /// Fetch one subresource of the document, at most `max_bytes`. A
+    /// resource [`Session::prefetch`] already started is taken from the
+    /// fetches in flight; anything else is fetched now.
     fn fetch_resource(
         &self,
         url: &Url,
@@ -902,6 +919,85 @@ impl NetworkSession {
         if !matches!(url.scheme(), "http" | "https") {
             return Err(FetchError::Blocked);
         }
+        let started = self
+            .inflight
+            .borrow_mut()
+            .ids
+            .remove(&resource_key(url, kind));
+        let result = match started {
+            Some(id) => self.wait_for(id)?,
+            None => {
+                let (request, mut allow) = self.resource_request(url, kind)?;
+                let mut fetcher = self
+                    .fetcher
+                    .try_borrow_mut()
+                    .map_err(|_| FetchError::Failed)?;
+                fetcher.fetch_checked(request, &mut *allow)
+            }
+        };
+        self.finish_resource(url, kind, max_bytes, result)
+    }
+
+    /// Start fetching `requests` side by side (TD-165), for
+    /// [`Self::fetch_resource`] to collect later.
+    fn prefetch_resources(&self, requests: &[(Url, ResourceKind)]) {
+        for (url, kind) in requests {
+            if !matches!(url.scheme(), "http" | "https") {
+                continue;
+            }
+            let key = resource_key(url, kind);
+            if self.inflight.borrow().ids.contains_key(&key)
+                || self.inflight.borrow().ids.len() >= MAX_PREFETCHES
+            {
+                continue;
+            }
+            // A request refused before sending is refused again, and
+            // reported, when the loader asks for it.
+            let Ok((request, allow)) = self.resource_request(url, kind) else {
+                continue;
+            };
+            let Ok(mut fetcher) = self.fetcher.try_borrow_mut() else {
+                return;
+            };
+            let mut inflight = self.inflight.borrow_mut();
+            if let Ok(id) = inflight.controller.start(&mut fetcher, request, allow) {
+                inflight.ids.insert(key, id);
+            }
+        }
+    }
+
+    /// Advance the fetches in flight until `id` finishes, keeping the
+    /// others' results.
+    fn wait_for(&self, id: u64) -> Result<Result<FetchResponse, NetworkError>, FetchError> {
+        loop {
+            if let Some(result) = self.inflight.borrow_mut().done.remove(&id) {
+                return Ok(result);
+            }
+            if self.cancellation.check().is_err() {
+                self.inflight.borrow_mut().controller.cancel(id);
+                return Err(FetchError::Cancelled);
+            }
+            let mut fetcher = self
+                .fetcher
+                .try_borrow_mut()
+                .map_err(|_| FetchError::Failed)?;
+            let mut inflight = self.inflight.borrow_mut();
+            if inflight.controller.is_empty() {
+                return Err(FetchError::Failed);
+            }
+            let until = std::time::Instant::now() + Duration::from_millis(100);
+            let finished = inflight.controller.wait(&mut fetcher, Some(until));
+            inflight.done.extend(finished);
+        }
+    }
+
+    /// The Fetch request for a subresource, and the client policy (mixed
+    /// content and CSP) asked before each of its hops.
+    fn resource_request(
+        &self,
+        url: &Url,
+        kind: &ResourceKind,
+    ) -> Result<(FetchRequest, Box<HopPolicy>), FetchError> {
         let (destination, directive) = match kind {
             ResourceKind::Stylesheet => (Destination::Style, FetchDirective::StyleElement),
             ResourceKind::Image => (Destination::Image, FetchDirective::Image),
@@ -957,37 +1053,50 @@ impl NetworkSession {
             ),
             ..FetchRequest::new(target, self.origin.clone())
         };
-        let mut fetcher = self
-            .fetcher
-            .try_borrow_mut()
-            .map_err(|_| FetchError::Failed)?;
-        let response = fetcher
-            .fetch_checked(request, &mut |hop, redirects| {
-                if mixed_content::check(hop, destination, self.secure) == MixedContent::Blocked {
-                    return false;
-                }
-                let verdict = self.csp.check_request_with_nonce(
-                    hop,
-                    directive,
-                    &self.origin,
-                    redirects,
-                    nonce,
-                    parser_inserted,
-                );
-                report(&verdict);
-                verdict.allowed()
-            })
-            .map_err(|error| match error {
-                NetworkError::BlockedByClientPolicy
-                | NetworkError::BlockedByResourcePolicy
-                | NetworkError::Cors(_)
-                | NetworkError::Preflight(_)
-                | NetworkError::Transport(rustic_net::TransportError::Blocked) => {
-                    FetchError::Blocked
-                }
-                _ => FetchError::Failed,
-            })?;
-        drop(fetcher);
+        let secure = self.secure;
+        let csp = self.csp.clone();
+        let origin = self.origin.clone();
+        let nonce = nonce.map(str::to_owned);
+        let allow = Box::new(move |hop: &Url, redirects: usize| {
+            if mixed_content::check(hop, destination, secure) == MixedContent::Blocked {
+                return false;
+            }
+            let verdict = csp.check_request_with_nonce(
+                hop,
+                directive,
+                &origin,
+                redirects,
+                nonce.as_deref(),
+                parser_inserted,
+            );
+            report(&verdict);
+            verdict.allowed()
+        });
+        Ok((request, allow))
+    }
+
+    /// The checks on a subresource's response, and its body.
+    fn finish_resource(
+        &self,
+        url: &Url,
+        kind: &ResourceKind,
+        max_bytes: usize,
+        result: Result<FetchResponse, NetworkError>,
+    ) -> Result<Vec<u8>, FetchError> {
+        let destination = match kind {
+            ResourceKind::Stylesheet => Destination::Style,
+            ResourceKind::Image => Destination::Image,
+            ResourceKind::Script { .. } => Destination::Script,
+        };
+        let module = matches!(kind, ResourceKind::Script { module: true, .. });
+        let response = result.map_err(|error| match error {
+            NetworkError::BlockedByClientPolicy
+            | NetworkError::BlockedByResourcePolicy
+            | NetworkError::Cors(_)
+            | NetworkError::Preflight(_)
+            | NetworkError::Transport(rustic_net::TransportError::Blocked) => FetchError::Blocked,
+            _ => FetchError::Failed,
+        })?;
         // Opaque responses (status 0) carry a body the renderer may use
         // (images, classic scripts and stylesheets loaded no-cors).
         let internal = response.into_internal();
@@ -1054,6 +1163,39 @@ impl NetworkSession {
         }
         Ok(bytes)
     }
+}
+
+/// The client policy asked before each hop of a subresource fetch.
+type HopPolicy = dyn FnMut(&Url, usize) -> bool;
+
+/// Most subresource fetches one document starts ahead of use: each holds
+/// a transfer thread and up to one body, so the rest load on request.
+const MAX_PREFETCHES: usize = 32;
+
+/// Fetches a document started ahead of use, and those that finished
+/// while another was awaited.
+#[derive(Default)]
+struct Inflight {
+    controller: rustic_net::fetch::FetchController<'static>,
+    ids: HashMap<String, u64>,
+    done: HashMap<u64, Result<FetchResponse, NetworkError>>,
+}
+
+/// What identifies a subresource request: its URL and how it is fetched.
+fn resource_key(url: &Url, kind: &ResourceKind) -> String {
+    let kind = match kind {
+        ResourceKind::Stylesheet => "style".to_owned(),
+        ResourceKind::Image => "image".to_owned(),
+        ResourceKind::Script {
+            nonce,
+            parser_inserted,
+            module,
+        } => format!(
+            "script {module} {parser_inserted} {}",
+            nonce.as_deref().unwrap_or("")
+        ),
+    };
+    format!("{kind} {}", url.serialize())
 }
 
 /// Fetch §2.2.6 "should response to request be blocked due to its MIME

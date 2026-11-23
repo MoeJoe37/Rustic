@@ -6,7 +6,8 @@ use std::time::Duration;
 use rustic_net::cookie::{CookieJar, CookieLimits};
 use rustic_net::cors::{CorsError, CredentialsMode};
 use rustic_net::fetch::{
-    FetchRequest, FetchResponse, Fetcher, NetworkError, ReferrerPolicy, RequestMode, ResponseType,
+    FetchController, FetchRequest, FetchResponse, Fetcher, NetworkError, ReferrerPolicy,
+    RequestMode, ResponseType,
 };
 use rustic_net::fixture::{FixtureServer, Reply};
 use rustic_net::redirect::RedirectMode;
@@ -773,4 +774,107 @@ fn preflight_grants_do_not_cross_network_partitions() {
     assert_eq!(log.len(), 5);
     assert_eq!(log[3].method, "OPTIONS");
     assert_eq!(fetcher.preflight_cache().len(), 2);
+}
+
+/// TD-161: the controller runs fetches side by side on one thread; a
+/// slow response delays only itself, and redirects and CORS checks are
+/// steps of the same fetch.
+#[test]
+fn the_controller_runs_fetches_concurrently() {
+    let slow = FixtureServer::start([(
+        "/slow",
+        Reply::new()
+            .pause(Duration::from_millis(800))
+            .send(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nslow".to_vec()),
+    )])
+    .unwrap();
+    let fast = FixtureServer::start([
+        ("/fast", Reply::response(200, &[], b"fast")),
+        (
+            "/moved",
+            Reply::response(302, &[("Location", "http://b.test/fast")], b""),
+        ),
+        (
+            "/cors",
+            Reply::response(200, &[("Access-Control-Allow-Origin", "*")], b"cors"),
+        ),
+    ])
+    .unwrap();
+    let mut fetcher = fetcher(&[("http://a.test", &slow), ("http://b.test", &fast)]);
+    let mut controller = FetchController::default();
+    let started = std::time::Instant::now();
+    let mut start = |controller: &mut FetchController<'_>, target: &str, mode| {
+        controller
+            .start(
+                &mut fetcher,
+                request(target, "http://a.test", mode),
+                Box::new(|_: &Url, _: usize| true),
+            )
+            .unwrap()
+    };
+    let slow_id = start(&mut controller, "http://a.test/slow", RequestMode::NoCors);
+    let moved_id = start(&mut controller, "http://b.test/moved", RequestMode::NoCors);
+    let cors_id = start(&mut controller, "http://b.test/cors", RequestMode::Cors);
+    assert_eq!(controller.len(), 3);
+    let mut order = Vec::new();
+    while !controller.is_empty() {
+        for (id, result) in controller.wait(&mut fetcher, None) {
+            let response = result.unwrap();
+            let body = response.into_internal();
+            let bytes = rustic_net::fetch::read_all(&body.exchange, TIMEOUT).unwrap();
+            order.push((id, bytes, body.url_list.len()));
+        }
+    }
+    assert_eq!(order.len(), 3);
+    // The slow fetch finishes last; the others did not wait for it.
+    assert_eq!(order[2].0, slow_id);
+    assert_eq!(order[2].1, b"slow");
+    let moved = order.iter().find(|(id, ..)| *id == moved_id).unwrap();
+    assert_eq!((moved.1.as_slice(), moved.2), (&b"fast"[..], 2));
+    let cors = order.iter().find(|(id, ..)| *id == cors_id).unwrap();
+    assert_eq!(cors.1, b"cors");
+    // Sequential fetching would take at least the slow reply's pause
+    // before the others even started.
+    assert!(started.elapsed() < Duration::from_millis(800 + 700));
+}
+
+/// TD-161: a fetch the client policy refuses on a redirect fails at that
+/// hop inside the controller too, and a cancelled fetch is never
+/// reported.
+#[test]
+fn the_controller_checks_every_hop_and_cancels() {
+    let server = FixtureServer::start([
+        (
+            "/moved",
+            Reply::response(302, &[("Location", "http://a.test/blocked")], b""),
+        ),
+        ("/held", Reply::new().hold()),
+    ])
+    .unwrap();
+    let mut fetcher = fetcher(&[("http://a.test", &server)]);
+    let mut controller = FetchController::default();
+    let blocked = controller
+        .start(
+            &mut fetcher,
+            request("http://a.test/moved", "http://a.test", RequestMode::NoCors),
+            Box::new(|url: &Url, _: usize| !url.serialize().ends_with("blocked")),
+        )
+        .unwrap();
+    let held = controller
+        .start(
+            &mut fetcher,
+            request("http://a.test/held", "http://a.test", RequestMode::NoCors),
+            Box::new(|_: &Url, _: usize| true),
+        )
+        .unwrap();
+    let done = controller.wait(&mut fetcher, None);
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0].0, blocked);
+    assert_eq!(
+        done[0].1.as_ref().unwrap_err(),
+        &NetworkError::BlockedByClientPolicy
+    );
+    controller.cancel(held);
+    assert!(controller.is_empty());
+    assert!(controller.wait(&mut fetcher, None).is_empty());
 }

@@ -22,6 +22,56 @@ struct Shared {
     state: Mutex<State>,
     changed: Condvar,
     window: usize,
+    /// Told about every event pushed, for a consumer that waits on many
+    /// pipes at once.
+    signal: Mutex<Option<Arc<Signal>>>,
+}
+
+/// A wake-up shared by several pipes: a counter bumped on every event
+/// any of them receives.
+#[derive(Default)]
+pub struct Signal {
+    count: Mutex<u64>,
+    bumped: Condvar,
+}
+
+impl Signal {
+    /// The number of events seen so far.
+    pub fn count(&self) -> u64 {
+        *self.count.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn bump(&self) {
+        *self.count.lock().unwrap_or_else(PoisonError::into_inner) += 1;
+        self.bumped.notify_all();
+    }
+
+    /// Wait until the count passes `seen` or `deadline` passes; whether
+    /// it moved.
+    pub fn wait(&self, seen: u64, deadline: Instant) -> bool {
+        let mut count = self.count.lock().unwrap_or_else(PoisonError::into_inner);
+        while *count == seen {
+            let now = Instant::now();
+            if now >= deadline {
+                return false;
+            }
+            count = self
+                .bumped
+                .wait_timeout(count, deadline - now)
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
+        }
+        true
+    }
+}
+
+impl std::fmt::Debug for Signal {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Signal")
+            .field("count", &self.count())
+            .finish()
+    }
 }
 
 impl Shared {
@@ -42,6 +92,7 @@ pub(crate) fn pipe(window: usize) -> (Producer, Consumer) {
         }),
         changed: Condvar::new(),
         window,
+        signal: Mutex::new(None),
     });
     (Producer(Arc::clone(&shared)), Consumer(shared))
 }
@@ -94,6 +145,9 @@ impl Producer {
         state.queue.push_back(event);
         drop(state);
         self.0.changed.notify_all();
+        if let Some(signal) = &*self.0.signal.lock().unwrap_or_else(PoisonError::into_inner) {
+            signal.bump();
+        }
         Ok(())
     }
 
@@ -140,6 +194,16 @@ impl Consumer {
                 .wait_timeout(state, wait)
                 .unwrap_or_else(PoisonError::into_inner)
                 .0;
+        }
+    }
+
+    /// Bump `signal` on every event from now on; an event already queued
+    /// bumps it at once, so a waiter never misses it.
+    pub(crate) fn attach(&self, signal: Arc<Signal>) {
+        let pending = !self.0.lock().queue.is_empty();
+        *self.0.signal.lock().unwrap_or_else(PoisonError::into_inner) = Some(Arc::clone(&signal));
+        if pending {
+            signal.bump();
         }
     }
 

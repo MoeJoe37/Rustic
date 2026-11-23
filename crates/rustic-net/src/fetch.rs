@@ -15,6 +15,7 @@
 //! [`NetworkPolicy`](crate::NetworkPolicy) is checked for each URL.
 
 use std::fmt;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use rustic_url::{Origin, Url};
@@ -32,7 +33,8 @@ use crate::redirect::{
 use crate::referrer::determine_referrer;
 use crate::site::{PublicSuffixList, Site, is_potentially_trustworthy_url};
 use crate::{
-    Exchange, Headers, NetEvent, Request, RequestError, ResponseHead, Transport, TransportError,
+    Exchange, Headers, NetEvent, Request, RequestError, ResponseHead, Signal, Transport,
+    TransportError,
 };
 
 /// Fetch request "mode".
@@ -446,12 +448,42 @@ impl Fetcher {
     /// every hop, the first included, so a client's policies (CSP, mixed
     /// content) are rechecked after each redirect before anything is sent
     /// (Fetch main fetch step 7 and §4.4 step 20). A refusal is
-    /// [`NetworkError::BlockedByClientPolicy`].
+    /// [`NetworkError::BlockedByClientPolicy`]. This waits for the
+    /// response head on the calling thread; [`Self::begin`] and
+    /// [`FetchController`] run fetches without waiting.
     pub fn fetch_checked(
         &mut self,
         request: FetchRequest,
         allow: &mut dyn FnMut(&Url, usize) -> bool,
     ) -> Result<FetchResponse, NetworkError> {
+        let signal = Arc::new(Signal::default());
+        let mut pending = self.begin_with(request, allow)?;
+        pending.signal = Some(Arc::clone(&signal));
+        loop {
+            let seen = signal.count();
+            if let Some(result) = pending.poll(self) {
+                return result;
+            }
+            // Wake for the next event, or when the stage's deadline passes.
+            let deadline = pending.deadline().unwrap_or_else(Instant::now);
+            signal.wait(seen, deadline);
+        }
+    }
+
+    /// Start `request` without waiting: the returned fetch advances each
+    /// time [`PendingFetch::poll`] is called with this fetcher, as its
+    /// exchanges deliver events (TD-161).
+    pub fn begin(&mut self, request: FetchRequest) -> Result<PendingFetch<'static>, NetworkError> {
+        self.begin_with(request, Box::new(|_: &Url, _: usize| true))
+    }
+
+    /// [`Self::begin`] with a client policy check before every hop, as in
+    /// [`Self::fetch_checked`].
+    pub fn begin_with<'a>(
+        &mut self,
+        request: FetchRequest,
+        allow: impl Into<Allow<'a>>,
+    ) -> Result<PendingFetch<'a>, NetworkError> {
         let method = normalize_method(&request.method);
         if is_forbidden_method(&method) {
             return Err(NetworkError::ForbiddenMethod);
@@ -459,7 +491,7 @@ impl Fetcher {
         if request.mode == RequestMode::NoCors && request.redirect != RedirectMode::Follow {
             return Err(NetworkError::NoCorsRedirectMode);
         }
-        let mut hop = Hop {
+        let hop = Hop {
             method,
             headers: request.headers.clone(),
             body: request.body.clone(),
@@ -469,70 +501,136 @@ impl Fetcher {
             same_site: true,
             referrer_policy: request.referrer_policy,
         };
-        loop {
-            let current = hop.url_list.last().expect("non-empty").clone();
-            if !matches!(current.scheme(), "http" | "https") {
-                return Err(NetworkError::UnsupportedScheme);
-            }
-            if !allow(&current, hop.url_list.len() - 1) {
-                return Err(NetworkError::BlockedByClientPolicy);
-            }
-            hop.same_site &= request
-                .site_for_cookies
-                .as_ref()
-                .is_none_or(|site| self.suffixes().is_same_site(site, &current.origin()));
-            // Main fetch step 12.
-            let same_origin = current.origin().is_same_origin(&request.origin)
-                && hop.tainting == ResponseTainting::Basic;
-            if !same_origin {
-                match request.mode {
-                    RequestMode::Navigate => {}
-                    RequestMode::SameOrigin => return Err(NetworkError::CrossOriginSameOriginMode),
-                    RequestMode::NoCors => hop.tainting = ResponseTainting::Opaque,
-                    RequestMode::Cors => hop.tainting = ResponseTainting::Cors,
-                }
-            }
-            let serialized_origin = if hop.tainted_origin {
-                "null".to_owned()
-            } else {
-                request.origin.serialize()
-            };
-            if hop.tainting == ResponseTainting::Cors {
-                self.preflight_if_needed(&request, &hop, &current, &serialized_origin)?;
-            }
-            let (head, exchange) =
-                self.network_fetch(&request, &hop, &current, &serialized_origin)?;
-            if hop.tainting == ResponseTainting::Cors {
-                if let Err(error) =
-                    cors_check(&serialized_origin, request.credentials, head.headers())
-                {
-                    self.preflight.clear_for(&serialized_origin, &current);
-                    return Err(NetworkError::Cors(error));
-                }
-            }
-            if request.mode == RequestMode::NoCors {
-                self.resource_policy_check(&request.origin, &current, head.headers())?;
-            }
-            let location = location_url(&head, &current).map_err(NetworkError::Redirect)?;
-            let Some(location) = location else {
-                return Ok(self.filtered(&request, hop, head, exchange, false));
-            };
-            match request.redirect {
-                RedirectMode::Manual => {
-                    return Ok(self.filtered(&request, hop, head, exchange, true));
-                }
-                RedirectMode::Error => {
-                    return Err(NetworkError::Redirect(RedirectError::RedirectForbidden));
-                }
-                RedirectMode::Follow => {}
-            }
-            drop(exchange);
-            // Referrer Policy §8.2 "set request's referrer policy on redirect".
-            if let Some(policy) = ReferrerPolicy::from_headers(head.headers()) {
-                hop.referrer_policy = policy;
-            }
-            self.follow(&request, &mut hop, &current, location, head.status())?;
+        Ok(PendingFetch {
+            request,
+            hop: Some(hop),
+            allow: allow.into(),
+            stage: Stage::NextHop,
+            signal: None,
+        })
+    }
+
+    /// Main fetch for the hop at the end of the URL list: the checks, then
+    /// a preflight or the request itself.
+    fn start_hop(&mut self, pending: &mut PendingFetch<'_>) -> Result<Stage, NetworkError> {
+        let request = &pending.request;
+        let hop = pending.hop.as_mut().expect("a running fetch");
+        let current = hop.url_list.last().expect("non-empty").clone();
+        if !matches!(current.scheme(), "http" | "https") {
+            return Err(NetworkError::UnsupportedScheme);
         }
+        if !pending.allow.check(&current, hop.url_list.len() - 1) {
+            return Err(NetworkError::BlockedByClientPolicy);
+        }
+        hop.same_site &= request
+            .site_for_cookies
+            .as_ref()
+            .is_none_or(|site| self.suffixes().is_same_site(site, &current.origin()));
+        // Main fetch step 12.
+        let same_origin = current.origin().is_same_origin(&request.origin)
+            && hop.tainting == ResponseTainting::Basic;
+        if !same_origin {
+            match request.mode {
+                RequestMode::Navigate => {}
+                RequestMode::SameOrigin => return Err(NetworkError::CrossOriginSameOriginMode),
+                RequestMode::NoCors => hop.tainting = ResponseTainting::Opaque,
+                RequestMode::Cors => hop.tainting = ResponseTainting::Cors,
+            }
+        }
+        let serialized_origin = if hop.tainted_origin {
+            "null".to_owned()
+        } else {
+            request.origin.serialize()
+        };
+        if hop.tainting == ResponseTainting::Cors {
+            if let Some(preflight) =
+                self.preflight_request(request, hop, &current, &serialized_origin)?
+            {
+                let exchange = self.start_exchange(preflight, pending.signal.as_ref())?;
+                return Ok(Stage::Preflight {
+                    exchange,
+                    current,
+                    origin: serialized_origin,
+                    deadline: Instant::now() + self.head_timeout,
+                });
+            }
+        }
+        self.start_request(pending, current, serialized_origin)
+    }
+
+    /// HTTP-network-or-cache fetch for one hop: a fresh cache entry
+    /// answers at once, anything else goes to the network.
+    fn start_request(
+        &mut self,
+        pending: &mut PendingFetch<'_>,
+        current: Url,
+        origin: String,
+    ) -> Result<Stage, NetworkError> {
+        let hop = pending.hop.as_ref().expect("a running fetch");
+        match self.prepare_network(&pending.request, hop, &current, &origin)? {
+            Prepared::CachedBody(head, body) => Ok(Stage::Ready {
+                head,
+                exchange: Exchange::from_body(body),
+                current,
+                origin,
+            }),
+            Prepared::Send(wire, sent) => {
+                let exchange = self.start_exchange(*wire, pending.signal.as_ref())?;
+                Ok(Stage::Head {
+                    exchange,
+                    current,
+                    origin,
+                    sent,
+                    deadline: Instant::now() + self.head_timeout,
+                })
+            }
+        }
+    }
+
+    /// The checks on a hop's final head: CORS, the resource policy and
+    /// redirects. Returns the response, or `None` to fetch the next hop.
+    fn finish_hop(
+        &mut self,
+        pending: &mut PendingFetch<'_>,
+        head: ResponseHead,
+        exchange: Exchange,
+        current: &Url,
+        serialized_origin: &str,
+    ) -> Result<Option<FetchResponse>, NetworkError> {
+        let request = &pending.request;
+        let tainting = pending.hop.as_ref().expect("a running fetch").tainting;
+        if tainting == ResponseTainting::Cors {
+            if let Err(error) = cors_check(serialized_origin, request.credentials, head.headers()) {
+                self.preflight.clear_for(serialized_origin, current);
+                return Err(NetworkError::Cors(error));
+            }
+        }
+        if request.mode == RequestMode::NoCors {
+            self.resource_policy_check(&request.origin, current, head.headers())?;
+        }
+        let location = location_url(&head, current).map_err(NetworkError::Redirect)?;
+        let Some(location) = location else {
+            let hop = pending.hop.take().expect("a running fetch");
+            return Ok(Some(self.filtered(request, hop, head, exchange, false)));
+        };
+        match request.redirect {
+            RedirectMode::Manual => {
+                let hop = pending.hop.take().expect("a running fetch");
+                return Ok(Some(self.filtered(request, hop, head, exchange, true)));
+            }
+            RedirectMode::Error => {
+                return Err(NetworkError::Redirect(RedirectError::RedirectForbidden));
+            }
+            RedirectMode::Follow => {}
+        }
+        drop(exchange);
+        let hop = pending.hop.as_mut().expect("a running fetch");
+        // Referrer Policy §8.2 "set request's referrer policy on redirect".
+        if let Some(policy) = ReferrerPolicy::from_headers(head.headers()) {
+            hop.referrer_policy = policy;
+        }
+        self.follow(request, hop, current, location, head.status())?;
+        Ok(None)
     }
 
     /// Fetch §4.4 for `follow` mode.
@@ -576,21 +674,22 @@ impl Fetcher {
         Ok(())
     }
 
-    /// Main fetch step 12.4 and Fetch §4.8: preflight unless the cache
-    /// already covers the method and every unsafe header.
-    fn preflight_if_needed(
-        &mut self,
+    /// Main fetch step 12.4 and Fetch §4.8: the preflight request to
+    /// send, or `None` when the cache already covers the method and every
+    /// unsafe header.
+    fn preflight_request(
+        &self,
         request: &FetchRequest,
         hop: &Hop,
         current: &Url,
         origin: &str,
-    ) -> Result<(), NetworkError> {
+    ) -> Result<Option<Request>, NetworkError> {
         let unsafe_names = cors_unsafe_request_header_names(&hop.headers);
         if !request.use_cors_preflight
             && is_cors_safelisted_method(&hop.method)
             && unsafe_names.is_empty()
         {
-            return Ok(());
+            return Ok(None);
         }
         let credentialed = request.credentials == CredentialsMode::Include;
         let now = Instant::now();
@@ -616,7 +715,7 @@ impl Fetcher {
                 )
             });
         if cached {
-            return Ok(());
+            return Ok(None);
         }
         let mut preflight =
             Request::new("OPTIONS", current.clone()).map_err(NetworkError::Request)?;
@@ -628,7 +727,18 @@ impl Fetcher {
         preflight
             .header("Origin", origin.as_bytes())
             .map_err(NetworkError::Request)?;
-        let (head, _exchange) = self.send(preflight)?;
+        Ok(Some(preflight))
+    }
+
+    /// Validate a preflight's response head and cache its grant.
+    fn finish_preflight(
+        &mut self,
+        request: &FetchRequest,
+        hop: &Hop,
+        current: &Url,
+        origin: &str,
+        head: &ResponseHead,
+    ) -> Result<(), NetworkError> {
         let grant = validate_preflight(
             head.status(),
             head.headers(),
@@ -639,8 +749,16 @@ impl Fetcher {
             request.use_cors_preflight,
         )
         .map_err(NetworkError::Preflight)?;
-        self.preflight
-            .insert_in(&partition, origin, current, credentialed, &grant, now);
+        let credentialed = request.credentials == CredentialsMode::Include;
+        let partition = self.partition_key(request);
+        self.preflight.insert_in(
+            &partition,
+            origin,
+            current,
+            credentialed,
+            &grant,
+            Instant::now(),
+        );
         Ok(())
     }
 
@@ -663,15 +781,15 @@ impl Fetcher {
         }
     }
 
-    /// HTTP-network-or-cache fetch without the cache: headers, cookies,
-    /// the request itself and `Set-Cookie` processing.
-    fn network_fetch(
+    /// HTTP-network-or-cache fetch up to sending: headers, cookies and
+    /// the cache lookup.
+    fn prepare_network(
         &mut self,
         request: &FetchRequest,
         hop: &Hop,
         current: &Url,
         serialized_origin: &str,
-    ) -> Result<(ResponseHead, Exchange), NetworkError> {
+    ) -> Result<Prepared, NetworkError> {
         let mut wire = Request::new(&hop.method, current.clone()).map_err(NetworkError::Request)?;
         for (name, value) in hop.headers.iter() {
             wire.header(name, value).map_err(NetworkError::Request)?;
@@ -721,16 +839,15 @@ impl Fetcher {
             }
             None => None,
         };
-        let context = CookieContext {
-            url: current,
+        let cookie_context = CookieFacts {
             same_site: hop.same_site,
             top_level_navigation: request.mode == RequestMode::Navigate
                 && request.destination == Destination::Document,
             safe_method: matches!(hop.method.as_str(), "GET" | "HEAD" | "OPTIONS"),
-            http_api: true,
             top_level_site,
         };
         if include_credentials {
+            let context = cookie_context.context(current);
             if let Some(cookie) = self.cookies.cookie_header(&context, now) {
                 wire.header("Cookie", cookie.as_bytes())
                     .map_err(NetworkError::Request)?;
@@ -744,7 +861,7 @@ impl Fetcher {
         if cacheable {
             match self.cache.lookup(&partition, current, &hop.headers, now) {
                 crate::http_cache::Lookup::Fresh(head, body) => {
-                    return Ok((head, Exchange::from_body(body)));
+                    return Ok(Prepared::CachedBody(head, body));
                 }
                 crate::http_cache::Lookup::Revalidate(conditional) => {
                     for (name, value) in conditional {
@@ -757,17 +874,43 @@ impl Fetcher {
                 crate::http_cache::Lookup::Miss => {}
             }
         }
-        let (head, exchange) = self.send(wire)?;
-        if include_credentials {
+        Ok(Prepared::Send(
+            Box::new(wire),
+            Sent {
+                include_credentials,
+                cookies: cookie_context,
+                now,
+                cacheable,
+                partition,
+                revalidating,
+            },
+        ))
+    }
+
+    /// HTTP-network-or-cache fetch after the head arrived: `Set-Cookie`,
+    /// revalidation and invalidation, and whether to read the body into
+    /// the cache before going on.
+    fn network_head(
+        &mut self,
+        hop: &Hop,
+        current: &Url,
+        sent: &Sent,
+        head: ResponseHead,
+        exchange: Exchange,
+    ) -> Result<HeadOutcome, NetworkError> {
+        let now = sent.now;
+        let partition = &sent.partition;
+        if sent.include_credentials {
+            let context = sent.cookies.context(current);
             for value in head.headers().get_all("set-cookie") {
                 let text: String = value.iter().map(|&byte| char::from(byte)).collect();
                 // A rejected cookie leaves the response unchanged.
                 let _ = self.cookies.set_cookie(&text, &context, now);
             }
         }
-        if revalidating && head.status() == 304 {
-            if let Some((head, body)) = self.cache.freshen(&partition, current, &head, now) {
-                return Ok((head, Exchange::from_body(body)));
+        if sent.revalidating && head.status() == 304 {
+            if let Some((head, body)) = self.cache.freshen(partition, current, &head, now) {
+                return Ok(HeadOutcome::Ready(head, Exchange::from_body(body)));
             }
         }
         if !matches!(hop.method.as_str(), "GET" | "HEAD" | "OPTIONS" | "TRACE")
@@ -775,19 +918,10 @@ impl Fetcher {
         {
             self.cache.invalidate(current);
         }
-        if cacheable && self.cache.may_store(&hop.headers, &head).is_some() {
-            let body = read_all(&exchange, self.head_timeout)?;
-            self.cache.store(
-                &partition,
-                current,
-                &hop.headers,
-                head.clone(),
-                body.clone(),
-                now,
-            );
-            return Ok((head, Exchange::from_body(body)));
+        if sent.cacheable && self.cache.may_store(&hop.headers, &head).is_some() {
+            return Ok(HeadOutcome::Fill(head, exchange));
         }
-        Ok((head, exchange))
+        Ok(HeadOutcome::Ready(head, exchange))
     }
 
     /// Fetch Metadata §5: `Sec-Fetch-Dest`, `-Mode`, `-Site` (most
@@ -828,19 +962,20 @@ impl Fetcher {
         headers
     }
 
-    fn send(&self, request: Request) -> Result<(ResponseHead, Exchange), NetworkError> {
+    /// Start an exchange for `request`, bumping `signal` on its events.
+    fn start_exchange(
+        &self,
+        request: Request,
+        signal: Option<&Arc<Signal>>,
+    ) -> Result<Exchange, NetworkError> {
         let exchange = self
             .transport
             .start(request)
             .map_err(NetworkError::Transport)?;
-        match exchange.next_event(Some(self.head_timeout)) {
-            Some(NetEvent::Response(head)) => Ok((head, exchange)),
-            Some(NetEvent::Failed(error)) => Err(NetworkError::Transport(error)),
-            Some(NetEvent::Body(_) | NetEvent::Finished) => {
-                unreachable!("an exchange reports its head before any body or end")
-            }
-            None => Err(NetworkError::HeadTimeout),
+        if let Some(signal) = signal {
+            exchange.attach(Arc::clone(signal));
         }
+        Ok(exchange)
     }
 
     /// Fetch "cross-origin resource policy internal check" for no-CORS
@@ -954,4 +1089,455 @@ fn origin_header(
     } else {
         serialized.to_owned()
     })
+}
+
+/// The policy callback behind [`Allow`]: the hop's URL and redirect count.
+type AllowFn<'a> = dyn FnMut(&Url, usize) -> bool + 'a;
+
+/// A client policy asked before every hop (see [`Fetcher::fetch_checked`]).
+pub struct Allow<'a>(Box<AllowFn<'a>>);
+
+impl Allow<'_> {
+    fn check(&mut self, url: &Url, redirects: usize) -> bool {
+        (self.0)(url, redirects)
+    }
+}
+
+impl<'a, F: FnMut(&Url, usize) -> bool + 'a> From<Box<F>> for Allow<'a> {
+    fn from(check: Box<F>) -> Self {
+        Allow(check)
+    }
+}
+
+impl<'a> From<Box<dyn FnMut(&Url, usize) -> bool + 'a>> for Allow<'a> {
+    fn from(check: Box<dyn FnMut(&Url, usize) -> bool + 'a>) -> Self {
+        Allow(check)
+    }
+}
+
+impl<'a> From<&'a mut dyn FnMut(&Url, usize) -> bool> for Allow<'a> {
+    fn from(check: &'a mut dyn FnMut(&Url, usize) -> bool) -> Self {
+        Allow(Box::new(move |url: &Url, redirects: usize| {
+            check(url, redirects)
+        }))
+    }
+}
+
+/// The cookie facts of one hop, kept while its request is in flight.
+struct CookieFacts {
+    same_site: bool,
+    top_level_navigation: bool,
+    safe_method: bool,
+    top_level_site: Option<Site>,
+}
+
+impl CookieFacts {
+    fn context<'a>(&self, url: &'a Url) -> CookieContext<'a> {
+        CookieContext {
+            url,
+            same_site: self.same_site,
+            top_level_navigation: self.top_level_navigation,
+            safe_method: self.safe_method,
+            http_api: true,
+            top_level_site: self.top_level_site.clone(),
+        }
+    }
+}
+
+/// What a hop sent, for processing its response head.
+struct Sent {
+    include_credentials: bool,
+    cookies: CookieFacts,
+    now: i64,
+    cacheable: bool,
+    partition: String,
+    revalidating: bool,
+}
+
+/// A hop before it is sent.
+enum Prepared {
+    /// A fresh cache entry answers it.
+    CachedBody(ResponseHead, Vec<u8>),
+    /// It goes to the network.
+    Send(Box<Request>, Sent),
+}
+
+/// What a hop's head leads to.
+enum HeadOutcome {
+    /// The response, to check and deliver or redirect.
+    Ready(ResponseHead, Exchange),
+    /// A storable response: its body is read into the cache first.
+    Fill(ResponseHead, Exchange),
+}
+
+/// Where a running fetch is.
+enum Stage {
+    /// About to start the hop at the end of the URL list.
+    NextHop,
+    /// Waiting for a CORS preflight's head.
+    Preflight {
+        exchange: Exchange,
+        current: Url,
+        origin: String,
+        deadline: Instant,
+    },
+    /// Waiting for a hop's head.
+    Head {
+        exchange: Exchange,
+        current: Url,
+        origin: String,
+        sent: Sent,
+        deadline: Instant,
+    },
+    /// Reading a storable body into the HTTP cache.
+    Fill {
+        head: ResponseHead,
+        exchange: Exchange,
+        current: Url,
+        origin: String,
+        partition: String,
+        now: i64,
+        body: Vec<u8>,
+        deadline: Instant,
+    },
+    /// A head to check and deliver (or redirect).
+    Ready {
+        head: ResponseHead,
+        exchange: Exchange,
+        current: Url,
+        origin: String,
+    },
+    /// Delivered or failed.
+    Done,
+}
+
+/// A fetch in flight (TD-161): [`Fetcher::begin`] starts it, and each
+/// [`PendingFetch::poll`] takes it as far as the events already received
+/// allow, never waiting. Redirects, preflights and cache fills are steps
+/// of the same fetch. Dropping it cancels its exchange.
+pub struct PendingFetch<'a> {
+    request: FetchRequest,
+    hop: Option<Hop>,
+    allow: Allow<'a>,
+    stage: Stage,
+    signal: Option<Arc<Signal>>,
+}
+
+impl fmt::Debug for PendingFetch<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let stage = match self.stage {
+            Stage::NextHop => "next hop",
+            Stage::Preflight { .. } => "preflight",
+            Stage::Head { .. } => "head",
+            Stage::Fill { .. } => "cache fill",
+            Stage::Ready { .. } => "ready",
+            Stage::Done => "done",
+        };
+        formatter
+            .debug_struct("PendingFetch")
+            .field("stage", &stage)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PendingFetch<'_> {
+    /// The request being fetched.
+    pub fn request(&self) -> &FetchRequest {
+        &self.request
+    }
+
+    /// Bump `signal` whenever an exchange of this fetch receives an
+    /// event, from now on.
+    pub fn attach(&mut self, signal: Arc<Signal>) {
+        match &self.stage {
+            Stage::Preflight { exchange, .. }
+            | Stage::Head { exchange, .. }
+            | Stage::Fill { exchange, .. } => exchange.attach(Arc::clone(&signal)),
+            Stage::NextHop | Stage::Ready { .. } | Stage::Done => {}
+        }
+        self.signal = Some(signal);
+    }
+
+    /// When the current wait times out, if the fetch is waiting.
+    pub fn deadline(&self) -> Option<Instant> {
+        match &self.stage {
+            Stage::Preflight { deadline, .. }
+            | Stage::Head { deadline, .. }
+            | Stage::Fill { deadline, .. } => Some(*deadline),
+            Stage::NextHop | Stage::Ready { .. } | Stage::Done => None,
+        }
+    }
+
+    /// Advance with the events received so far: the response or the
+    /// network error once there is one, `None` while waiting. Polling a
+    /// finished fetch again returns `None`.
+    pub fn poll(&mut self, fetcher: &mut Fetcher) -> Option<Result<FetchResponse, NetworkError>> {
+        if matches!(self.stage, Stage::Done) {
+            return None;
+        }
+        match self.advance(fetcher) {
+            Ok(None) => None,
+            Ok(Some(response)) => {
+                self.stage = Stage::Done;
+                Some(Ok(response))
+            }
+            Err(error) => {
+                self.stage = Stage::Done;
+                Some(Err(error))
+            }
+        }
+    }
+
+    fn advance(&mut self, fetcher: &mut Fetcher) -> Result<Option<FetchResponse>, NetworkError> {
+        loop {
+            let stage = std::mem::replace(&mut self.stage, Stage::Done);
+            self.stage = match stage {
+                Stage::Done => return Ok(None),
+                Stage::NextHop => fetcher.start_hop(self)?,
+                Stage::Preflight {
+                    exchange,
+                    current,
+                    origin,
+                    deadline,
+                } => match exchange.next_event(Some(Duration::ZERO)) {
+                    Some(NetEvent::Response(head)) => {
+                        drop(exchange);
+                        let hop = self.hop.as_ref().expect("a running fetch");
+                        fetcher.finish_preflight(&self.request, hop, &current, &origin, &head)?;
+                        fetcher.start_request(self, current, origin)?
+                    }
+                    Some(NetEvent::Failed(error)) => return Err(NetworkError::Transport(error)),
+                    Some(NetEvent::Body(_) | NetEvent::Finished) => {
+                        unreachable!("an exchange reports its head before any body or end")
+                    }
+                    None if Instant::now() >= deadline => return Err(NetworkError::HeadTimeout),
+                    None => {
+                        self.stage = Stage::Preflight {
+                            exchange,
+                            current,
+                            origin,
+                            deadline,
+                        };
+                        return Ok(None);
+                    }
+                },
+                Stage::Head {
+                    exchange,
+                    current,
+                    origin,
+                    sent,
+                    deadline,
+                } => match exchange.next_event(Some(Duration::ZERO)) {
+                    Some(NetEvent::Response(head)) => {
+                        let hop = self.hop.as_ref().expect("a running fetch");
+                        match fetcher.network_head(hop, &current, &sent, head, exchange)? {
+                            HeadOutcome::Ready(head, exchange) => Stage::Ready {
+                                head,
+                                exchange,
+                                current,
+                                origin,
+                            },
+                            HeadOutcome::Fill(head, exchange) => Stage::Fill {
+                                head,
+                                exchange,
+                                current,
+                                origin,
+                                partition: sent.partition,
+                                now: sent.now,
+                                body: Vec::new(),
+                                deadline: Instant::now() + fetcher.head_timeout,
+                            },
+                        }
+                    }
+                    Some(NetEvent::Failed(error)) => return Err(NetworkError::Transport(error)),
+                    Some(NetEvent::Body(_) | NetEvent::Finished) => {
+                        unreachable!("an exchange reports its head before any body or end")
+                    }
+                    None if Instant::now() >= deadline => return Err(NetworkError::HeadTimeout),
+                    None => {
+                        self.stage = Stage::Head {
+                            exchange,
+                            current,
+                            origin,
+                            sent,
+                            deadline,
+                        };
+                        return Ok(None);
+                    }
+                },
+                Stage::Fill {
+                    head,
+                    exchange,
+                    current,
+                    origin,
+                    partition,
+                    now,
+                    mut body,
+                    mut deadline,
+                } => {
+                    let mut finished = false;
+                    while let Some(event) = exchange.next_event(Some(Duration::ZERO)) {
+                        match event {
+                            NetEvent::Body(bytes) => {
+                                body.extend_from_slice(&bytes);
+                                // As `read_all`: the timeout is per piece.
+                                deadline = Instant::now() + fetcher.head_timeout;
+                            }
+                            NetEvent::Finished => {
+                                finished = true;
+                                break;
+                            }
+                            NetEvent::Failed(error) => {
+                                return Err(NetworkError::Transport(error));
+                            }
+                            NetEvent::Response(_) => unreachable!("one head per exchange"),
+                        }
+                    }
+                    if finished {
+                        let hop = self.hop.as_ref().expect("a running fetch");
+                        fetcher.cache.store(
+                            &partition,
+                            &current,
+                            &hop.headers,
+                            head.clone(),
+                            body.clone(),
+                            now,
+                        );
+                        Stage::Ready {
+                            head,
+                            exchange: Exchange::from_body(body),
+                            current,
+                            origin,
+                        }
+                    } else if Instant::now() >= deadline {
+                        return Err(NetworkError::BodyTimeout);
+                    } else {
+                        self.stage = Stage::Fill {
+                            head,
+                            exchange,
+                            current,
+                            origin,
+                            partition,
+                            now,
+                            body,
+                            deadline,
+                        };
+                        return Ok(None);
+                    }
+                }
+                Stage::Ready {
+                    head,
+                    exchange,
+                    current,
+                    origin,
+                } => match fetcher.finish_hop(self, head, exchange, &current, &origin)? {
+                    Some(response) => return Ok(Some(response)),
+                    None => Stage::NextHop,
+                },
+            };
+        }
+    }
+}
+
+/// Several fetches in flight at once on one thread (TD-161, TD-165):
+/// their exchanges run on the transport's threads, and [`Self::wait`]
+/// returns as soon as any of them can move.
+pub struct FetchController<'a> {
+    signal: Arc<Signal>,
+    pending: Vec<(u64, PendingFetch<'a>)>,
+    next_id: u64,
+}
+
+impl fmt::Debug for FetchController<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("FetchController")
+            .field("pending", &self.pending.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Default for FetchController<'_> {
+    fn default() -> Self {
+        Self {
+            signal: Arc::new(Signal::default()),
+            pending: Vec::new(),
+            next_id: 0,
+        }
+    }
+}
+
+impl<'a> FetchController<'a> {
+    /// Start `request` with a client policy check before every hop; its
+    /// id names it in [`Self::wait`]'s results.
+    pub fn start(
+        &mut self,
+        fetcher: &mut Fetcher,
+        request: FetchRequest,
+        allow: impl Into<Allow<'a>>,
+    ) -> Result<u64, NetworkError> {
+        let mut pending = fetcher.begin_with(request, allow)?;
+        pending.attach(Arc::clone(&self.signal));
+        let id = self.next_id;
+        self.next_id += 1;
+        self.pending.push((id, pending));
+        Ok(id)
+    }
+
+    /// Fetches still in flight.
+    pub fn len(&self) -> usize {
+        self.pending.len()
+    }
+
+    /// Whether nothing is in flight.
+    pub fn is_empty(&self) -> bool {
+        self.pending.is_empty()
+    }
+
+    /// Cancel the fetch `id`, if it is still in flight.
+    pub fn cancel(&mut self, id: u64) {
+        self.pending.retain(|(other, _)| *other != id);
+    }
+
+    /// Advance every fetch, and return those that finished, in the
+    /// order they were started. Waits until at least one finishes or
+    /// `until` passes; an empty controller returns at once.
+    pub fn wait(
+        &mut self,
+        fetcher: &mut Fetcher,
+        until: Option<Instant>,
+    ) -> Vec<(u64, Result<FetchResponse, NetworkError>)> {
+        loop {
+            let seen = self.signal.count();
+            let mut done = Vec::new();
+            let mut index = 0;
+            while index < self.pending.len() {
+                if let Some(result) = self.pending[index].1.poll(fetcher) {
+                    let (id, _) = self.pending.remove(index);
+                    done.push((id, result));
+                } else {
+                    index += 1;
+                }
+            }
+            if !done.is_empty() || self.pending.is_empty() {
+                return done;
+            }
+            let next_deadline = self
+                .pending
+                .iter()
+                .filter_map(|(_, pending)| pending.deadline())
+                .min();
+            let deadline = match (next_deadline, until) {
+                (Some(a), Some(b)) => a.min(b),
+                (Some(a), None) => a,
+                (None, Some(b)) => b,
+                (None, None) => Instant::now() + Duration::from_millis(50),
+            };
+            if !self.signal.wait(seen, deadline)
+                && until.is_some_and(|until| Instant::now() >= until)
+            {
+                return done;
+            }
+        }
+    }
 }

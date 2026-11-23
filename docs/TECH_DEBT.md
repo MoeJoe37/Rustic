@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-111, TD-116, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -214,7 +214,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
 | TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
 | TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
-| TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Open, M7 entry |
+| TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Paid |
 | TD-149 | Deliberate | Web bindings | `getComputedStyle` throws a `TypeError` for any colon-prefixed pseudo-element argument instead of returning pseudo-element or empty styles | Open, M9 CSS, layout and paint |
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Open, M7 entry |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
@@ -2426,7 +2426,7 @@ levels deep therefore loads, but flattened earlier than in Chromium.
 **Trigger:** M9 layout work, or a real page that renders differently
 because of the cap.
 
-### TD-148 — Computed-style snapshots are eager and copied per read
+### TD-148 — Computed-style snapshots are eager and copied per read (Paid)
 
 The CLI's `LayoutSource` builds `LayoutGeometry::computed_styles` on every
 layout flush, including flushes caused only by `offsetWidth` or
@@ -2443,6 +2443,8 @@ return borrowed values from `PageTree::computed_style`. Keep the CSSOM WPT
 cases and add a flush-cost test on a large document.
 **Trigger:** M7 entry, or profiling a page with many elements and layout reads.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): `ComputedStyleSnapshot` is now a shared, lazily built record: the CLI's `LayoutSource` stores, per styled element, a closure over its `ComputedStyle` and CSSOM box, so a flush caused by `offsetWidth` or `getBoundingClientRect` serializes nothing. The first declaration read builds that element's `ComputedStyleRecord` once, and every later read (`getPropertyValue`, a named getter, `item`, `length`, an index) clones only a reference to it. Test: `lazy_snapshots_serialize_once_on_first_read_and_share_clones` in `crates/rustic-bindings/src/page.rs`; the CSSOM WPT selection and the CLI computed-style tests pass unchanged. Serializing one property at a time instead of an element's whole record is left to M12 `perf.style`.
 
 ### TD-149 — Pseudo-element `getComputedStyle` throws
 

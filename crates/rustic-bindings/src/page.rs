@@ -72,22 +72,88 @@ pub struct BoxSizes {
     pub padding: [f64; 2],
 }
 
-/// Owned CSSOM longhand and custom-property values at one layout revision.
-///
-/// No JavaScript object owns this record: a held CSSStyleDeclaration reads a
-/// fresh record through the shared revision-keyed layout cache on each access.
+/// The serialized CSSOM values of one element.
 #[derive(Clone, Debug, Default)]
-pub struct ComputedStyleSnapshot {
+pub struct ComputedStyleRecord {
     /// Supported CSS longhands in canonical property-name order.
     pub longhands: Vec<(&'static str, String)>,
     /// Computed custom properties in name order (case-sensitive).
     pub custom_properties: Vec<(String, String)>,
 }
 
+type RecordBuilder = Box<dyn Fn() -> ComputedStyleRecord>;
+
+struct LazyRecord {
+    record: std::cell::OnceCell<ComputedStyleRecord>,
+    build: Option<RecordBuilder>,
+}
+
+/// CSSOM longhand and custom-property values at one layout revision.
+///
+/// No JavaScript object owns this record: a held CSSStyleDeclaration reads it
+/// through the shared revision-keyed layout cache on each access. The host
+/// usually makes it [lazy](Self::lazy), so a layout flush caused by a
+/// geometry read serializes nothing, and the first declaration read builds
+/// the element's record once; clones share it (TD-148).
+#[derive(Clone)]
+pub struct ComputedStyleSnapshot {
+    inner: Rc<LazyRecord>,
+}
+
+impl Default for ComputedStyleSnapshot {
+    fn default() -> Self {
+        Self::new(ComputedStyleRecord::default())
+    }
+}
+
+impl Debug for ComputedStyleSnapshot {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ComputedStyleSnapshot")
+            .field("built", &self.inner.record.get().is_some())
+            .finish()
+    }
+}
+
 impl ComputedStyleSnapshot {
+    /// A snapshot of values already serialized.
+    pub fn new(record: ComputedStyleRecord) -> Self {
+        Self {
+            inner: Rc::new(LazyRecord {
+                record: std::cell::OnceCell::from(record),
+                build: None,
+            }),
+        }
+    }
+
+    /// A snapshot whose values `build` serializes on first read.
+    pub fn lazy(build: impl Fn() -> ComputedStyleRecord + 'static) -> Self {
+        Self {
+            inner: Rc::new(LazyRecord {
+                record: std::cell::OnceCell::new(),
+                build: Some(Box::new(build)),
+            }),
+        }
+    }
+
+    /// The serialized values, built now if this is the first read.
+    pub fn record(&self) -> &ComputedStyleRecord {
+        self.inner.record.get_or_init(|| {
+            self.inner
+                .build
+                .as_ref()
+                .map_or_else(ComputedStyleRecord::default, |build| build())
+        })
+    }
+
+    /// Whether the values have been serialized yet.
+    pub fn is_built(&self) -> bool {
+        self.inner.record.get().is_some()
+    }
+
     fn get(&self, name: &str) -> Option<&str> {
         if name.starts_with("--") {
             return self
+                .record()
                 .custom_properties
                 .iter()
                 .find(|(key, _)| key == name)
@@ -97,26 +163,30 @@ impl ComputedStyleSnapshot {
     }
 
     fn get_longhand(&self, property: rustic_css::PropertyId) -> Option<&str> {
-        self.longhands
+        self.record()
+            .longhands
             .iter()
             .find(|(key, _)| *key == property.name())
             .map(|(_, value)| value.as_str())
     }
 
     fn name_at(&self, index: usize) -> Option<&str> {
-        self.longhands
+        let record = self.record();
+        record
+            .longhands
             .get(index)
             .map(|(name, _)| *name)
             .or_else(|| {
                 index
-                    .checked_sub(self.longhands.len())
-                    .and_then(|offset| self.custom_properties.get(offset))
+                    .checked_sub(record.longhands.len())
+                    .and_then(|offset| record.custom_properties.get(offset))
                     .map(|(name, _)| name.as_str())
             })
     }
 
     fn len(&self) -> usize {
-        self.longhands.len() + self.custom_properties.len()
+        let record = self.record();
+        record.longhands.len() + record.custom_properties.len()
     }
 }
 
@@ -1285,4 +1355,34 @@ fn remove_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<
             .map_err(|error| dom_exception::from_dom_error(agent, error))?;
         Ok(value)
     })
+}
+
+#[cfg(test)]
+mod computed_style_snapshot_tests {
+    use super::{ComputedStyleRecord, ComputedStyleSnapshot};
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    #[test]
+    fn lazy_snapshots_serialize_once_on_first_read_and_share_clones() {
+        // TD-148: a layout flush only creates the lazy record; reads build it once.
+        let builds = Rc::new(Cell::new(0));
+        let counter = Rc::clone(&builds);
+        let snapshot = ComputedStyleSnapshot::lazy(move || {
+            counter.set(counter.get() + 1);
+            ComputedStyleRecord {
+                longhands: vec![("width", "10px".to_owned())],
+                custom_properties: vec![("--x".to_owned(), "1".to_owned())],
+            }
+        });
+        let copy = snapshot.clone();
+        assert!(!snapshot.is_built());
+        assert_eq!(builds.get(), 0);
+        assert_eq!(copy.get("width"), Some("10px"));
+        assert_eq!(snapshot.get("--x"), Some("1"));
+        assert_eq!(snapshot.len(), 2);
+        assert_eq!(snapshot.name_at(1), Some("--x"));
+        assert!(snapshot.is_built());
+        assert_eq!(builds.get(), 1);
+    }
 }

@@ -269,10 +269,10 @@ impl LayoutSource for AppliedResourceFixture {
                 .insert(node, Some([0.0, 0.0, f64::from(width), 12.0]));
             geometry.computed_styles.insert(
                 node,
-                rustic_engine::ComputedStyleSnapshot {
+                rustic_engine::ComputedStyleSnapshot::new(rustic_engine::ComputedStyleRecord {
                     longhands: vec![("width", format!("{stylesheet}px"))],
                     custom_properties: vec![("--image-width".to_owned(), format!("{image}px"))],
-                },
+                }),
             );
         }
         Ok(geometry)
@@ -550,7 +550,7 @@ impl LayoutSource for LiveStyleFixture {
                 .any(|attribute| attribute.name().local() == "data-next");
             geometry.computed_styles.insert(
                 id,
-                rustic_engine::ComputedStyleSnapshot {
+                rustic_engine::ComputedStyleSnapshot::new(rustic_engine::ComputedStyleRecord {
                     longhands: vec![
                         ("color", if next { "blue" } else { "red" }.to_owned()),
                         ("display", "block".to_owned()),
@@ -563,7 +563,7 @@ impl LayoutSource for LiveStyleFixture {
                     } else {
                         vec![("--Case".to_owned(), "preserved".to_owned())]
                     },
-                },
+                }),
             );
         }
         Ok(geometry)

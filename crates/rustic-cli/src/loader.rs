@@ -27,9 +27,9 @@ use rustic_css::{
 };
 use rustic_dom::{Document, DumpError};
 use rustic_engine::{
-    ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, ComputedStyleSnapshot,
-    DocumentStartError, Engine, EngineDocument, LayoutGeometry, LayoutReadError, LayoutSource,
-    ScriptLoadError, ScriptStop, TaskLimits,
+    ClassicFetchError, ClassicScriptLimits, ClassicScriptLoad, ComputedStyleRecord,
+    ComputedStyleSnapshot, DocumentStartError, Engine, EngineDocument, LayoutGeometry,
+    LayoutReadError, LayoutSource, ScriptLoadError, ScriptStop, TaskLimits,
 };
 use rustic_html::{
     DocumentMode, Encoding, LOCAL_ENCODING_PREFIX_BYTES, ParseError, ParserLimits, Scripting,
@@ -2095,27 +2095,26 @@ impl LayoutSource for LocalLayout {
                         .get(&style.node)
                         .map(|&&fragment| CssomBox::from_fragment(fragment, &style.computed))
                         .transpose()?;
-                    let longhands = cssom_longhands()
-                        .iter()
-                        .map(|&property| {
-                            (
-                                property.name(),
-                                cssom_value(&style.computed, layout_box, property),
-                            )
-                        })
-                        .collect();
-                    let custom_properties = style
-                        .computed
-                        .custom_properties()
-                        .iter()
-                        .map(|(name, value)| (name.to_owned(), value.to_string()))
-                        .collect();
+                    // Serialized on the first declaration read, not per flush (TD-148).
+                    let computed = style.computed;
                     Ok((
                         style.node,
-                        ComputedStyleSnapshot {
-                            longhands,
-                            custom_properties,
-                        },
+                        ComputedStyleSnapshot::lazy(move || ComputedStyleRecord {
+                            longhands: cssom_longhands()
+                                .iter()
+                                .map(|&property| {
+                                    (
+                                        property.name(),
+                                        cssom_value(&computed, layout_box, property),
+                                    )
+                                })
+                                .collect(),
+                            custom_properties: computed
+                                .custom_properties()
+                                .iter()
+                                .map(|(name, value)| (name.to_owned(), value.to_string()))
+                                .collect(),
+                        }),
                     ))
                 })
                 .collect::<Result<_, LayoutReadError>>()?,
@@ -3741,6 +3740,7 @@ mod tests {
                 .computed_styles
                 .get(&node)
                 .unwrap()
+                .record()
                 .longhands
                 .iter()
                 .find(|(name, _)| *name == "width")
@@ -3969,6 +3969,7 @@ mod tests {
                 .computed_styles
                 .get(&box_node)
                 .unwrap()
+                .record()
                 .longhands
                 .iter()
                 .find(|(name, _)| *name == "width")

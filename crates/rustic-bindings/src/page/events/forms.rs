@@ -56,6 +56,33 @@ pub struct FormSubmissions {
     pub dropped: u64,
 }
 
+/// Focus and form-control state that lives in script, for the
+/// accessibility tree (ADR 0069).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct AccessibleControls {
+    /// The focused element, if it is still connected.
+    pub focused: Option<NodeId>,
+    /// Controls whose state script or the user changed, in tree order.
+    pub controls: Vec<ControlSnapshot>,
+}
+
+/// One text field's or checkable input's live state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ControlSnapshot {
+    /// The control.
+    pub node: NodeId,
+    /// The current value (text fields).
+    pub value: Option<String>,
+    /// Checkedness (checkboxes and radio buttons).
+    pub checked: Option<bool>,
+    /// A checkbox's indeterminate state.
+    pub indeterminate: bool,
+    /// Constraint validation fails after the user edited the value.
+    pub invalid: bool,
+    /// Selection in UTF-16 units (anchor, focus), for text fields.
+    pub selection: Option<(u32, u32)>,
+}
+
 /// Page-lifetime form and focus state.
 #[derive(Debug)]
 pub(in crate::page) struct Forms {
@@ -65,6 +92,10 @@ pub(in crate::page) struct Forms {
     elements: ObjectId,
     focused: Cell<Option<NodeId>>,
     submissions: RefCell<FormSubmissions>,
+    /// The control being composed and its composition range (start and
+    /// length in UTF-16 units), between `compositionstart` and
+    /// `compositionend`.
+    pub(super) composition: Cell<Option<(NodeId, usize, usize)>>,
 }
 
 /// Control record slots: dirty value (string or undefined), custom validity
@@ -95,6 +126,7 @@ impl Forms {
                 elements,
                 focused: Cell::new(None),
                 submissions: RefCell::new(FormSubmissions::default()),
+                composition: Cell::new(None),
             },
             [values, validity, events, elements].map(Value::object),
         ))
@@ -117,6 +149,78 @@ impl Forms {
         }
         log.submissions.push(submission);
     }
+}
+
+/// Read focus and every wrapped control's live state. Controls without a
+/// wrapper have never been touched by script or input, so their state is
+/// what their attributes say and the tree reads it from the DOM.
+pub(in crate::page) fn accessible_controls(agent: &mut Agent) -> JsResult<AccessibleControls> {
+    let (focused, wrapped) = with_page(agent, |agent, page| {
+        let focused = page.events.forms.focused.get();
+        page.read(agent, page.main, |agent, document| {
+            let focused = match focused {
+                Some(id) if reaches_root(document, id, || agent.check_native_work())? => Some(id),
+                _ => None,
+            };
+            let Ok(wrappers) = page.wrappers.try_borrow() else {
+                return agent.type_error("DOM bindings are busy");
+            };
+            let mut wrapped = Vec::new();
+            let Ok(walk) = document.walk(document.root()) else {
+                return Ok((focused, wrapped));
+            };
+            for (id, _) in walk {
+                agent.check_native_work()?;
+                let control = document
+                    .node(id)
+                    .ok()
+                    .and_then(kind)
+                    .is_some_and(|kind| matches!(kind, Kind::Input(_) | Kind::TextArea));
+                if control {
+                    if let Some(object) = wrappers.existing_wrapper(id) {
+                        wrapped.try_reserve(1).map_err(|_| OutOfMemory)?;
+                        wrapped.push((id, Value::object(object)));
+                    }
+                }
+            }
+            Ok((focused, wrapped))
+        })
+    })?;
+    let mut controls = Vec::new();
+    for (node, control) in wrapped {
+        let Some(snapshot) = snapshot(agent, control)? else {
+            continue;
+        };
+        let checkable = matches!(snapshot.kind, Kind::Input("checkbox" | "radio"));
+        let edited = match record(agent, control)? {
+            Some(record) => record.get(agent, EDITED)? == Value::TRUE,
+            None => false,
+        };
+        let text = editable(snapshot.kind)
+            || matches!(snapshot.kind, Kind::Input(input) if value_mode(input));
+        let selection = if editable(snapshot.kind) {
+            let selection = super::editing::selection(agent, control, snapshot.value.len())?;
+            let (anchor, focus) = if selection.backward {
+                (selection.end, selection.start)
+            } else {
+                (selection.start, selection.end)
+            };
+            Some((anchor as u32, focus as u32))
+        } else {
+            None
+        };
+        controls.try_reserve(1).map_err(|_| OutOfMemory)?;
+        controls.push(ControlSnapshot {
+            node,
+            value: text.then(|| String::from_utf16_lossy(&snapshot.value)),
+            checked: checkable.then_some(snapshot.checked),
+            indeterminate: snapshot.kind == Kind::Input("checkbox")
+                && super::input::indeterminate_state(agent, control)?,
+            invalid: edited && !satisfies(agent, control)?,
+            selection,
+        });
+    }
+    Ok(AccessibleControls { focused, controls })
 }
 
 // ---- element classification ------------------------------------------------
@@ -168,7 +272,7 @@ fn input_type(element: &Element) -> &'static str {
 
 /// The kinds of control this module gives behavior.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum Kind {
+pub(super) enum Kind {
     /// `<input>` with its type keyword.
     Input(&'static str),
     TextArea,
@@ -224,7 +328,7 @@ fn value_mode(input: &str) -> bool {
 }
 
 /// Controls whose value the keyboard edits.
-fn editable(kind: Kind) -> bool {
+pub(super) fn editable(kind: Kind) -> bool {
     matches!(
         kind,
         Kind::TextArea
@@ -333,7 +437,7 @@ fn owned_controls(agent: &mut Agent, document: &Document, form: NodeId) -> JsRes
 
 // ---- control records --------------------------------------------------------
 
-fn record(agent: &mut Agent, control: Value) -> JsResult<Option<PrivateArray>> {
+pub(super) fn record(agent: &mut Agent, control: Value) -> JsResult<Option<PrivateArray>> {
     with_page(agent, |agent, page| {
         Ok(PrivateArray::from_value(
             agent.weak_map_get(page.events.forms.values, control),
@@ -341,7 +445,7 @@ fn record(agent: &mut Agent, control: Value) -> JsResult<Option<PrivateArray>> {
     })
 }
 
-fn ensure_record(agent: &mut Agent, control: Value) -> JsResult<PrivateArray> {
+pub(super) fn ensure_record(agent: &mut Agent, control: Value) -> JsResult<PrivateArray> {
     if let Some(record) = record(agent, control)? {
         return Ok(record);
     }
@@ -354,6 +458,10 @@ fn ensure_record(agent: &mut Agent, control: Value) -> JsResult<PrivateArray> {
             Value::FALSE,
             Value::UNDEFINED,
             Value::UNDEFINED,
+            // Selection start, end and backward (editing.rs).
+            Value::UNDEFINED,
+            Value::UNDEFINED,
+            Value::FALSE,
         ],
     )?;
     with_page(agent, |agent, page| {
@@ -370,21 +478,21 @@ fn units_of(agent: &Agent, value: Value) -> Vec<u16> {
 }
 
 /// The facts validation and submission need about one control.
-struct Snapshot {
-    kind: Kind,
+pub(super) struct Snapshot {
+    pub(super) kind: Kind,
     name: Option<DomString>,
-    value: Vec<u16>,
+    pub(super) value: Vec<u16>,
     checked: bool,
-    disabled: bool,
-    readonly: bool,
+    pub(super) disabled: bool,
+    pub(super) readonly: bool,
     required: bool,
     multiple: bool,
     min: Option<f64>,
     max: Option<f64>,
     min_length: Option<usize>,
-    max_length: Option<usize>,
+    pub(super) max_length: Option<usize>,
     in_datalist: bool,
-    owner: Option<NodeId>,
+    pub(super) owner: Option<NodeId>,
 }
 
 fn non_negative(value: Option<&DomString>) -> Option<usize> {
@@ -444,7 +552,7 @@ fn sanitize(input: &str, value: Vec<u16>) -> Vec<u16> {
     }
 }
 
-fn snapshot(agent: &mut Agent, control: Value) -> JsResult<Option<Snapshot>> {
+pub(super) fn snapshot(agent: &mut Agent, control: Value) -> JsResult<Option<Snapshot>> {
     let dirty = match record(agent, control)? {
         Some(record) => Some(record.get(agent, VALUE)?),
         None => None,
@@ -971,7 +1079,7 @@ fn base_fields(view: Value) -> [Value; 5] {
     [view, Value::FALSE, Value::FALSE, Value::FALSE, Value::FALSE]
 }
 
-fn new_event(
+pub(super) fn new_event(
     agent: &mut Agent,
     interface: &'static str,
     event_type: &str,
@@ -1021,11 +1129,12 @@ fn focus_event(agent: &mut Agent, kind: &str, related: Value) -> JsResult<Value>
     )
 }
 
-fn input_event(
+pub(super) fn input_event(
     agent: &mut Agent,
     kind: &str,
     input_type: &str,
     data: Option<&[u16]>,
+    composing: bool,
 ) -> JsResult<Value> {
     let input_type = agent.string(input_type)?;
     with_root(agent, input_type, |agent| {
@@ -1034,7 +1143,8 @@ fn input_event(
             None => Value::NULL,
         };
         with_root(agent, data, |agent| {
-            let cancelable = if kind == "beforeinput" {
+            // Composition input cannot be canceled (Input Events).
+            let cancelable = if kind == "beforeinput" && !composing {
                 Event::CANCELABLE
             } else {
                 0
@@ -1044,7 +1154,7 @@ fn input_event(
                 "InputEvent",
                 kind,
                 Event::BUBBLES | Event::COMPOSED | cancelable,
-                &[data, input_type, Value::FALSE],
+                &[data, input_type, Value::boolean(composing)],
             )
         })
     })
@@ -1069,6 +1179,7 @@ fn construct<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) -> JsR
     let (interface, members): (&'static str, &[&str]) = match KIND {
         0 => ("FocusEvent", &["relatedTarget"]),
         1 => ("InputEvent", &["data", "inputType", "isComposing"]),
+        3 => ("CompositionEvent", &["data"]),
         _ => ("SubmitEvent", &["submitter"]),
     };
     let event_type = required_arg(agent, args, 0)?;
@@ -1086,6 +1197,10 @@ fn construct<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) -> JsR
                 ("inputType", Value::UNDEFINED) => agent.string("")?,
                 ("inputType", value) => Value::string(crate::webidl::coerce_string(agent, value)?),
                 ("isComposing", value) => Value::boolean(agent.to_boolean(value)),
+                ("data", Value::UNDEFINED) if KIND == 3 => agent.string("")?,
+                ("data", value) if KIND == 3 => {
+                    Value::string(crate::webidl::coerce_string(agent, value)?)
+                }
                 ("data", value) if value.is_nullish() => Value::NULL,
                 ("data", value) => Value::string(crate::webidl::coerce_string(agent, value)?),
                 (_, value) if value.is_nullish() => Value::NULL,
@@ -1244,7 +1359,7 @@ fn move_focus(agent: &mut Agent, next: Option<(NodeId, Value)>) -> JsResult<()> 
     })
 }
 
-fn fire_focus(agent: &mut Agent, target: Value, event: Value) -> JsResult<bool> {
+pub(super) fn fire_focus(agent: &mut Agent, target: Value, event: Value) -> JsResult<bool> {
     with_root(agent, event, |agent| {
         let state = Event::receiver(agent, event)?;
         fire(
@@ -1359,13 +1474,18 @@ pub(super) fn navigate(agent: &mut Agent, backward: bool) -> JsResult<()> {
 
 // ---- text editing -----------------------------------------------------------------
 
-fn current_value(agent: &mut Agent, control: Value) -> JsResult<Vec<u16>> {
+pub(super) fn current_value(agent: &mut Agent, control: Value) -> JsResult<Vec<u16>> {
     Ok(snapshot(agent, control)?
         .map(|snapshot| snapshot.value)
         .unwrap_or_default())
 }
 
-fn store_value(agent: &mut Agent, control: Value, units: &[u16], edited: bool) -> JsResult<()> {
+pub(super) fn store_value(
+    agent: &mut Agent,
+    control: Value,
+    units: &[u16],
+    edited: bool,
+) -> JsResult<()> {
     let value = crate::webidl::from_dom_units(agent, units)?;
     with_root(agent, value, |agent| {
         let record = ensure_record(agent, control)?;
@@ -1377,70 +1497,21 @@ fn store_value(agent: &mut Agent, control: Value, units: &[u16], edited: bool) -
     })
 }
 
-/// The editing default action of a key press on a text control:
-/// `beforeinput`, the change, then `input`. Enter in a single-line input
-/// submits its form implicitly. Returns whether the key was handled.
-pub(super) fn edit(agent: &mut Agent, control: Value, key: &[u16]) -> JsResult<bool> {
-    let Some(snapshot) = snapshot(agent, control)? else {
-        return Ok(false);
-    };
-    if !editable(snapshot.kind) {
-        return Ok(false);
-    }
-    let enter = key.iter().copied().eq("Enter".encode_utf16());
-    let backspace = key.iter().copied().eq("Backspace".encode_utf16());
-    let printable =
-        !enter && !backspace && String::from_utf16(key).is_ok_and(|text| text.chars().count() == 1);
-    if enter && snapshot.kind != Kind::TextArea {
-        implicit_submission(agent, control, snapshot.owner)?;
-        return Ok(true);
-    }
-    if !(enter || backspace || printable) || snapshot.disabled || snapshot.readonly {
-        return Ok(false);
-    }
-    let (input_type, data): (&str, Option<Vec<u16>>) = if backspace {
-        ("deleteContentBackward", None)
-    } else if enter {
-        ("insertLineBreak", None)
-    } else {
-        ("insertText", Some(key.to_vec()))
-    };
-    let before = input_event(agent, "beforeinput", input_type, data.as_deref())?;
-    if !fire_focus(agent, control, before)? {
-        return Ok(true);
-    }
-    let mut value = current_value(agent, control)?;
-    if backspace {
-        let cut = match value.as_slice() {
-            [.., high, low]
-                if (0xd800..0xdc00).contains(high) && (0xdc00..0xe000).contains(low) =>
-            {
-                2
-            }
-            [] => 0,
-            _ => 1,
-        };
-        value.truncate(value.len() - cut);
-    } else {
-        let inserted: Vec<u16> = if enter { vec![0x0a] } else { key.to_vec() };
-        if snapshot
-            .max_length
-            .is_some_and(|max| value.len() + inserted.len() > max)
-        {
-            return Ok(true);
-        }
-        value.try_reserve(inserted.len()).map_err(|_| OutOfMemory)?;
-        value.extend(inserted);
-    }
-    store_value(agent, control, &value, true)?;
-    let after = input_event(agent, "input", input_type, data.as_deref())?;
-    fire_focus(agent, control, after)?;
-    Ok(true)
+/// The editing default action of a key press on a text control (caret
+/// movement, `beforeinput`, the change, then `input`; editing.rs). Enter in
+/// a single-line input submits its form implicitly. Returns whether the key
+/// was handled.
+pub(super) fn edit(agent: &mut Agent, control: Value, key: &super::KeyInput) -> JsResult<bool> {
+    super::editing::edit_key(agent, control, key)
 }
 
 /// HTML implicit submission: click the form's default button, or submit
 /// a form whose single text field blocks implicit submission.
-fn implicit_submission(agent: &mut Agent, control: Value, owner: Option<NodeId>) -> JsResult<()> {
+pub(super) fn implicit_submission(
+    agent: &mut Agent,
+    control: Value,
+    owner: Option<NodeId>,
+) -> JsResult<()> {
     let Some(form_id) = owner else {
         return Ok(());
     };
@@ -1603,7 +1674,7 @@ fn set_content(
     })
 }
 
-fn control_receiver(agent: &mut Agent, this: Value) -> JsResult<Kind> {
+pub(super) fn control_receiver(agent: &mut Agent, this: Value) -> JsResult<Kind> {
     read_node(agent, this, |agent, _, _, _, node| match kind(node) {
         Some(kind) => Ok(kind),
         None => agent.type_error("expected a form control"),
@@ -1643,12 +1714,14 @@ fn value_setter(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
         Kind::Input(input) if value_mode(input) => {
             let units = sanitize(input, value.as_units().to_vec());
             store_value(agent, this, &units, false)?;
+            super::editing::reset_selection(agent, this)?;
             // A script change resets the user-edit flag used by tooLong.
             ensure_record(agent, this)?.set(agent, EDITED, Value::FALSE)?;
             Ok(Value::UNDEFINED)
         }
         Kind::TextArea => {
             store_value(agent, this, value.as_units(), false)?;
+            super::editing::reset_selection(agent, this)?;
             ensure_record(agent, this)?.set(agent, EDITED, Value::FALSE)?;
             Ok(Value::UNDEFINED)
         }
@@ -2047,7 +2120,12 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
     define_accessor(agent, document, "activeElement", active_element, None)?;
     define_method(agent, document, "hasFocus", has_focus, 0)?;
 
-    for (interface, kind) in [("FocusEvent", 0u8), ("InputEvent", 1), ("SubmitEvent", 2)] {
+    for (interface, kind) in [
+        ("FocusEvent", 0u8),
+        ("InputEvent", 1),
+        ("SubmitEvent", 2),
+        ("CompositionEvent", 3),
+    ] {
         let (parent, constructor, attributes): (&str, NativeFn, &[(&str, &str, NativeFn)]) =
             match kind {
                 0 => (
@@ -2063,6 +2141,11 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
                         ("inputType", "get inputType", event_field::<1>),
                         ("isComposing", "get isComposing", event_field::<2>),
                     ],
+                ),
+                3 => (
+                    "UIEvent",
+                    construct::<3>,
+                    &[("data", "get data", event_field::<0>)],
                 ),
                 _ => (
                     "Event",
@@ -2105,6 +2188,7 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
 
     let input = prototype(agent, "HTMLInputElement")?;
     install_control(agent, input, true)?;
+    install_selection(agent, input)?;
     define_accessor(
         agent,
         input,
@@ -2146,6 +2230,7 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
         &[],
         |agent, proto| {
             install_control(agent, proto, false)?;
+            install_selection(agent, proto)?;
             define_accessor(
                 agent,
                 proto,
@@ -2234,6 +2319,40 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
             )
         },
     )
+}
+
+/// The HTML text control selection API (editing.rs).
+fn install_selection(agent: &mut Agent, proto: ObjectId) -> JsResult<()> {
+    use super::editing as e;
+    define_accessor(
+        agent,
+        proto,
+        "selectionStart",
+        e::selection_start,
+        Some(e::set_selection_start),
+    )?;
+    define_accessor(
+        agent,
+        proto,
+        "selectionEnd",
+        e::selection_end,
+        Some(e::set_selection_end),
+    )?;
+    define_accessor(
+        agent,
+        proto,
+        "selectionDirection",
+        e::selection_direction,
+        Some(e::set_selection_direction),
+    )?;
+    for (name, method, length) in [
+        ("setSelectionRange", e::set_selection_range as NativeFn, 2),
+        ("select", e::select_method, 0),
+        ("setRangeText", e::set_range_text, 1),
+    ] {
+        define_method(agent, proto, name, method, length)?;
+    }
+    Ok(())
 }
 
 fn text_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {

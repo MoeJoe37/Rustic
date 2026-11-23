@@ -1149,6 +1149,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustic-a11y"
+version = "0.1.0"
+dependencies = [
+ "rustic-base",
+ "rustic-dom",
+ "rustic-html",
+ "rustic-ipc",
+]
+
+[[package]]
 name = "rustic-android"
 version = "0.1.0"
 dependencies = [
@@ -1176,6 +1186,7 @@ dependencies = [
 name = "rustic-cli"
 version = "0.1.0"
 dependencies = [
+ "rustic-a11y",
  "rustic-base",
  "rustic-codecs",
  "rustic-css",
@@ -1227,6 +1238,7 @@ version = "0.1.0"
 name = "rustic-engine"
 version = "0.1.0"
 dependencies = [
+ "rustic-a11y",
  "rustic-base",
  "rustic-bindings",
  "rustic-dom",

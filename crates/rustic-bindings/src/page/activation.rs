@@ -109,7 +109,10 @@ pub(super) fn triggers_activation(input: &InputEvent) -> bool {
         InputEvent::KeyDown(key) => {
             key.key.as_units() != "Escape".encode_utf16().collect::<Vec<_>>()
         }
-        InputEvent::KeyUp(_) => false,
+        // An assistive technology's default action stands for the user's
+        // own click, as in other engines.
+        InputEvent::Assistive(super::AssistiveAction::Click) => true,
+        InputEvent::KeyUp(_) | InputEvent::Composition(_) | InputEvent::Assistive(_) => false,
     }
 }
 

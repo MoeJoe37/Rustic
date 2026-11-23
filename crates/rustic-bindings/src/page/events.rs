@@ -14,20 +14,25 @@ use crate::webidl::coerce_string;
 
 use super::{identity, install_interface, prototype, read_node, required_arg, with_page, wrap};
 
+mod editing;
 mod errors;
 mod forms;
 mod handlers;
 mod input;
 mod state;
 mod ui;
+pub use editing::Composition;
 pub use errors::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
 pub(in crate::page) use errors::{report_exception, report_rejections};
+pub(super) use forms::accessible_controls;
 pub(super) use forms::install as install_forms;
-pub use forms::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
+pub use forms::{
+    AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
+};
 pub(super) use handlers::install as install_handlers;
-pub use input::{InputEvent, KeyInput, Modifiers};
+pub use input::{AssistiveAction, InputEvent, KeyInput, Modifiers};
 pub(super) use input::{connected, deliver, install_controls, reaches_root};
 
 use state::{Event, Phase};

@@ -829,6 +829,40 @@ impl<C: Clock> ScriptedDocument<C> {
             .map_or_else(|_| page::ConsoleLog::default(), page::take_console_messages)
     }
 
+    /// Focus and form-control state that lives in script, for the
+    /// accessibility tree (ADR 0069). A stopped page reports none.
+    pub fn accessibility_state(&mut self) -> rustic_a11y::LiveState {
+        let Ok(agent) = self.agent.as_mut() else {
+            return rustic_a11y::LiveState::default();
+        };
+        let snapshot = page::accessible_controls(agent);
+        let mut live = rustic_a11y::LiveState {
+            focused: snapshot.focused,
+            ..rustic_a11y::LiveState::default()
+        };
+        for control in snapshot.controls {
+            let checked = control.checked.map(|checked| {
+                if control.indeterminate {
+                    rustic_a11y::Checked::Mixed
+                } else if checked {
+                    rustic_a11y::Checked::True
+                } else {
+                    rustic_a11y::Checked::False
+                }
+            });
+            live.controls.insert(
+                control.node,
+                rustic_a11y::ControlState {
+                    value: control.value,
+                    checked,
+                    invalid: control.invalid,
+                    selection: control.selection,
+                },
+            );
+        }
+        live
+    }
+
     /// The document's scroll positions, as script left them (ADR 0064).
     pub fn scroll_state(&self) -> ScrollState {
         self.document.scroll.borrow().clone()

@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+rustic-a11y = { path = "../rustic-a11y" }
 rustic-base = { path = "../rustic-base" }
 rustic-bindings = { path = "../rustic-bindings" }
 rustic-dom = { path = "../rustic-dom" }

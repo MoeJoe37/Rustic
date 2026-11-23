@@ -36,6 +36,7 @@ Usage:
   rustic dump-formatting [OPTIONS] [--] <file>
   rustic dump-layout [OPTIONS] [--] <file>
   rustic dump-paint [OPTIONS] [--] <file>
+  rustic dump-a11y [OPTIONS] [--] <file>
   rustic render --output <png> [VIEW] [OPTIONS] [--] <file>
   rustic reftest [VIEW] [OPTIONS] [--] <test>
   rustic hit-test --at X,Y [--at X,Y ...] [OPTIONS] [--] <file>
@@ -67,6 +68,11 @@ clips and opacity groups, and <img> content. Layout and paint use explicit
 --font files when supplied, otherwise the bundled test fonts (which map only a
 few characters); <img src> loads local PNG, JPEG, GIF and WebP files from the
 document's directory or below it, like stylesheets.
+dump-a11y prints the accessibility tree assistive technology sees for that
+layout: roles (HTML-AAM and ARIA), accessible names and descriptions
+(AccName), states, values and bounds in CSS pixels, with generic containers
+pruned and hidden content left out. With --run-scripts it reflects focus and
+form control state the scripts left.
 render rasterizes the same display list on the CPU and writes an RGBA PNG to
 --output (overwriting it). VIEW options set the window: --viewport WxH is its
 size in pixels at 100% zoom (default 1280x720), --scale the device pixel ratio
@@ -328,6 +334,14 @@ pub(crate) fn run_command(engine: &mut Engine, args: &[OsString]) -> Option<u8> 
             "dump-layout",
             &args[1..],
             loader::dump_layout,
+        ));
+    }
+    if args[0] == "dump-a11y" {
+        return Some(dump_command(
+            engine,
+            "dump-a11y",
+            &args[1..],
+            loader::dump_a11y,
         ));
     }
     if args[0] == "dump-paint" {

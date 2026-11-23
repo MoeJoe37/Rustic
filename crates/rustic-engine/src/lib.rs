@@ -24,10 +24,10 @@ pub use inline_scripts::{ClassicScriptLoad, InlineScriptLoad, ScriptLoadError, S
 pub use layout_reads::{LayoutGeometry, LayoutSource, MAX_LAYOUT_FLUSHES_PER_TURN};
 pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use rustic_bindings::page::{
-    BoxSizes, ComputedStyleSnapshot, ConsoleLevel, ConsoleLog, ConsoleMessage, FetchHost,
-    FormSubmission, FormSubmissions, InputEvent, KeyInput, LayoutReadError, Modifiers,
-    NetworkFailure, POPUP_CAPACITY, PopupRequest, QuotaExceeded, ScriptRequest, ScriptResponse,
-    StorageHost, StorageKind,
+    AssistiveAction, BoxSizes, Composition, ComputedStyleSnapshot, ConsoleLevel, ConsoleLog,
+    ConsoleMessage, FetchHost, FormSubmission, FormSubmissions, InputEvent, KeyInput,
+    LayoutReadError, Modifiers, NetworkFailure, POPUP_CAPACITY, PopupRequest, QuotaExceeded,
+    ScriptRequest, ScriptResponse, StorageHost, StorageKind,
 };
 pub use scripting::{
     DocumentTurn, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn, ScriptedDocument,

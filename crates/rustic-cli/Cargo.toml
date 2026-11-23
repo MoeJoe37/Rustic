@@ -17,6 +17,7 @@ name = "rustic"
 path = "src/main.rs"
 
 [dependencies]
+rustic-a11y = { path = "../rustic-a11y" }
 rustic-base = { path = "../rustic-base" }
 rustic-css = { path = "../rustic-css" }
 rustic-dom = { path = "../rustic-dom" }

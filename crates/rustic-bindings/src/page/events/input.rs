@@ -56,6 +56,30 @@ pub enum InputEvent {
     KeyDown(KeyInput),
     /// A key release.
     KeyUp(KeyInput),
+    /// An IME composition step at the focused control (a11y.editing).
+    Composition(super::editing::Composition),
+    /// A request from assistive technology (a11y.bridges, ADR 0069).
+    Assistive(AssistiveAction),
+}
+
+/// What assistive technology asks a node to do; the platform bridge maps
+/// UI Automation, NSAccessibility and AT-SPI actions to these.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AssistiveAction {
+    /// Focus the node (when it is a focusable area).
+    Focus,
+    /// The default action: a trusted `click` without coordinates, so links,
+    /// buttons and checkboxes activate as with the keyboard.
+    Click,
+    /// Replace a text control's value as typing would.
+    SetValue(DomString),
+    /// Select UTF-16 offsets `anchor..focus` in a text control.
+    SetSelection {
+        /// Where the selection starts.
+        anchor: u32,
+        /// Where it ends (the caret).
+        focus: u32,
+    },
 }
 
 pub(in crate::page) fn connected(document: &Document, target: NodeId) -> bool {
@@ -134,6 +158,23 @@ pub(in crate::page) fn deliver(agent: &mut Agent, id: NodeId, input: &InputEvent
             }
             Ok(())
         }
+        InputEvent::Composition(step) => super::editing::compose(agent, id, target, step),
+        InputEvent::Assistive(action) => match action {
+            AssistiveAction::Focus => super::forms::focus_element(agent, target).map(drop),
+            AssistiveAction::Click => {
+                if !disabled_click_target(agent, target)? {
+                    let event = ui::click_event(agent, None, Modifiers::default())?;
+                    fire_trusted(agent, target, event)?;
+                }
+                Ok(())
+            }
+            AssistiveAction::SetValue(text) => {
+                super::editing::replace_value(agent, target, text.as_units()).map(drop)
+            }
+            AssistiveAction::SetSelection { anchor, focus } => {
+                super::editing::select_range(agent, target, *anchor, *focus).map(drop)
+            }
+        },
     })
 }
 
@@ -154,6 +195,14 @@ fn key_default(
     down: bool,
     released: Option<NodeId>,
 ) -> JsResult<()> {
+    if down
+        && (key.modifiers.control || key.modifiers.meta)
+        && !key.modifiers.alt
+        && (is_key(key, "a") || is_key(key, "A"))
+    {
+        super::editing::select_all(agent, target)?;
+        return Ok(());
+    }
     if key.modifiers.control || key.modifiers.alt || key.modifiers.meta {
         return Ok(());
     }
@@ -161,7 +210,7 @@ fn key_default(
         return super::forms::navigate(agent, key.modifiers.shift);
     }
     // Text controls handle printable keys, Backspace and Enter.
-    if down && super::forms::edit(agent, target, key.key.as_units())? {
+    if down && super::forms::edit(agent, target, key)? {
         return Ok(());
     }
     let space = is_key(key, " ");
@@ -194,7 +243,7 @@ fn key_default(
     Ok(())
 }
 
-fn fire_trusted(agent: &mut Agent, target: Value, event: Value) -> JsResult<bool> {
+pub(super) fn fire_trusted(agent: &mut Agent, target: Value, event: Value) -> JsResult<bool> {
     with_root(agent, event, |agent| {
         let state = Event::receiver(agent, event)?;
         fire(
@@ -472,6 +521,14 @@ pub(super) fn reset_checkedness(agent: &mut Agent, target: Value) -> JsResult<()
 
 fn default_checked(agent: &mut Agent, target: Value, _: &[Value]) -> JsResult<Value> {
     content_checked(agent, target).map(Value::boolean)
+}
+
+/// Whether a checkbox's indeterminate IDL state is set.
+pub(super) fn indeterminate_state(agent: &mut Agent, target: Value) -> JsResult<bool> {
+    Ok(match record(agent, target)? {
+        Some(record) => record.get(agent, INDETERMINATE)? == Value::TRUE,
+        None => false,
+    })
 }
 
 fn indeterminate(agent: &mut Agent, target: Value, _: &[Value]) -> JsResult<Value> {

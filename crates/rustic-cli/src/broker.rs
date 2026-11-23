@@ -173,6 +173,7 @@ pub fn splits(command: &OsString) -> bool {
                 | "dump-formatting"
                 | "dump-layout"
                 | "dump-paint"
+                | "dump-a11y"
                 | "render"
                 | "hit-test"
                 | "reftest"

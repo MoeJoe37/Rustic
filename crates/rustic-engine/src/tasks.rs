@@ -102,7 +102,17 @@ impl Task {
                 .len()
                 .saturating_add(key.code.as_units().len()),
             Self::Input {
-                event: InputEvent::Click { .. },
+                event:
+                    InputEvent::Composition(
+                        rustic_bindings::page::Composition::Update(text)
+                        | rustic_bindings::page::Composition::End(text),
+                    )
+                    | InputEvent::Assistive(rustic_bindings::page::AssistiveAction::SetValue(text)),
+                ..
+            } => text.as_units().len(),
+            Self::Input {
+                event:
+                    InputEvent::Click { .. } | InputEvent::Composition(_) | InputEvent::Assistive(_),
                 ..
             }
             | Self::ResourceCompletion(_)

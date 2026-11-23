@@ -1,0 +1,20 @@
+[package]
+name = "rustic-a11y"
+description = "Rustic's accessibility tree: roles, names, states and bounds from the DOM and layout (HTML-AAM, WAI-ARIA, AccName)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+rustic-dom = { path = "../rustic-dom" }
+rustic-ipc = { path = "../rustic-ipc" }
+
+[dev-dependencies]
+rustic-base = { path = "../rustic-base" }
+rustic-html = { path = "../rustic-html" }
+
+[lints]
+workspace = true

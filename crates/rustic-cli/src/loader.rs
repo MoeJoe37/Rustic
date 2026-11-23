@@ -290,6 +290,8 @@ pub struct LoadedDocument {
     scroll: rustic_engine::ScrollState,
     /// `render --frames`: each frame's pixels and what it repainted.
     frames: Vec<(rustic_raster::Surface, FrameReport)>,
+    /// Focus and form control state the page's scripts left (ADR 0069).
+    live: rustic_a11y::LiveState,
 }
 
 /// How one `--frames` frame was painted.
@@ -378,6 +380,7 @@ pub fn load_document(
         applied_files: None,
         network: None,
         scroll: rustic_engine::ScrollState::default(),
+        live: rustic_a11y::LiveState::default(),
         frames: Vec::new(),
     })
 }
@@ -520,6 +523,7 @@ fn load_unscripted_network_document(
         applied_files: Some(applied_snapshot(limits)),
         network: Some(Rc::clone(&network.session)),
         scroll: rustic_engine::ScrollState::default(),
+        live: rustic_a11y::LiveState::default(),
         frames: Vec::new(),
     };
     Ok((document, selected))
@@ -913,12 +917,14 @@ fn run_scripted_load(
     }
     print_console(&document);
     let scroll = document.scroll_state();
+    let live = document.accessibility_state();
     Ok(LoadedDocument {
         document: document.into_document(),
         applied_files: Some(applied_files),
         network: source.network,
         scroll,
         frames,
+        live,
     })
 }
 
@@ -1793,6 +1799,103 @@ pub fn dump_layout(
 ) -> Result<String, LoadError> {
     let (_, layout, _, _, _) = block_layout(parsed.layout_input(path, limits, default_view()))?;
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
+}
+
+/// The accessibility tree (a11y.semantics, ADR 0069) of the laid-out
+/// page: what rendered, where (viewport coordinates after scrolling) and
+/// the page's live focus and control state.
+pub(crate) fn accessibility_tree(
+    parsed: &LoadedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+    view: rustic_layout::View,
+) -> Result<rustic_a11y::AxTree, LoadError> {
+    let input = parsed.layout_input(path, limits, view);
+    let rendering = match block_layout(input) {
+        Ok((tree, layout, viewport, _, _)) => {
+            let layout = scrolled(layout, viewport, limits, input.scroll)?;
+            rendering_of(&tree, Some(&layout))?
+        }
+        // The block reference cannot lay out everything yet (form controls
+        // are special elements): what generated boxes still decides what
+        // is hidden, without bounds.
+        Err(LoadError::Flow(_) | LoadError::Formatting(_)) => {
+            let (tree, _) = box_tree_with_styles(input)?;
+            rendering_of(&tree, None)?
+        }
+        Err(error) => return Err(error),
+    };
+    Ok(rustic_a11y::build(
+        input.document,
+        Some(&rendering),
+        &parsed.live,
+        rustic_a11y::TreeLimits::default(),
+    ))
+}
+
+/// Which DOM nodes generated boxes, their fragments' union in CSS pixels,
+/// and which elements are `visibility: hidden`.
+fn rendering_of(
+    tree: &rustic_layout::BoxTree,
+    layout: Option<&rustic_layout::BlockLayout>,
+) -> Result<rustic_a11y::Rendering, LoadError> {
+    use rustic_css::{PropertyId, PropertyValue, Visibility};
+    let mut rendering = rustic_a11y::Rendering::new();
+    let boxes = tree.boxes();
+    for snapshot in boxes {
+        rendering.mark_rendered(snapshot.node());
+        if matches!(snapshot.kind(), rustic_layout::BoxKind::Element(_))
+            && snapshot.style().is_some_and(|style| {
+                !matches!(
+                    style.get(PropertyId::Visibility),
+                    PropertyValue::Visibility(Visibility::Visible)
+                )
+            })
+        {
+            rendering.mark_invisible(snapshot.node());
+        }
+    }
+    let Some(layout) = layout else {
+        return Ok(rendering);
+    };
+    let fragments = layout.fragment_tree().map_err(LoadError::Flow)?;
+    for node in fragments.nodes() {
+        let source = match node.kind() {
+            rustic_layout::FragmentKind::Block(i) => {
+                layout.fragments().get(i).map(|f| f.source_box())
+            }
+            rustic_layout::FragmentKind::Inline(i) => {
+                layout.inlines().get(i).map(|f| f.source_box())
+            }
+            rustic_layout::FragmentKind::Text(i) => layout.texts().get(i).map(|f| f.source_box()),
+            rustic_layout::FragmentKind::Line(_) => None,
+        };
+        let Some(snapshot) = source.and_then(|i| boxes.get(i)) else {
+            continue;
+        };
+        let rect = node.rect();
+        rendering.add_fragment(
+            snapshot.node(),
+            rustic_a11y::Rect {
+                x: rect.origin().x.get(),
+                y: rect.origin().y.get(),
+                width: rect.size().width().get(),
+                height: rect.size().height().get(),
+            },
+        );
+    }
+    Ok(rendering)
+}
+
+/// `dump-a11y`: the accessibility tree as text.
+pub fn dump_a11y(
+    parsed: &LoadedDocument,
+    path: &Path,
+    limits: LoaderLimits,
+) -> Result<String, LoadError> {
+    accessibility_tree(parsed, path, limits, default_view())?
+        .dump(limits.max_dump_bytes)
+        .map_err(|_| LoadError::Dump(DumpError::OutputLimit))
 }
 
 /// The fonts every layout and paint command uses: the bundled test faces,

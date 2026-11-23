@@ -41,10 +41,12 @@ pub use activation::{
 };
 pub use events::LifecycleEvent;
 pub use events::{
+    AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
+};
+pub use events::{AssistiveAction, Composition, InputEvent, KeyInput, Modifiers};
+pub use events::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
-pub use events::{FormSubmission, FormSubmissions, SUBMISSION_CAPACITY};
-pub use events::{InputEvent, KeyInput, Modifiers};
 pub use fetch::{FetchHost, NetworkFailure, ScriptRequest, ScriptResponse};
 pub use popups::{POPUP_CAPACITY, PopupRequest};
 pub use web_storage::{QuotaExceeded, StorageHost, StorageKind};
@@ -694,6 +696,11 @@ pub fn take_form_submissions(agent: &Agent) -> FormSubmissions {
         .and_then(|host| host.as_any().downcast_ref::<Page>())
         .map(|page| page.events.forms.take_submissions())
         .unwrap_or_default()
+}
+
+/// Focus and live form-control state for the accessibility tree.
+pub fn accessible_controls(agent: &mut Agent) -> AccessibleControls {
+    events::accessible_controls(agent).unwrap_or_default()
 }
 
 /// "Run the scroll steps" of a rendering opportunity: fire the `scroll`

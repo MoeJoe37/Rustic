@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-83, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-102, TD-111, TD-116, TD-148, TD-150, TD-134, TD-94 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-175, TD-177, TD-178, TD-181, TD-182, TD-125, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -149,7 +149,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-80 | Deliberate | Codecs | JPEG: no arithmetic coding, lossless, hierarchical, 12-bit or `DNL`; color management ignored | Open, paint.images |
 | TD-81 | Deliberate | Codecs | WebP and PNG ignore ICC/EXIF metadata; only JPEG applies EXIF orientation | Open, paint.images |
 | TD-82 | Deliberate | Paint | Animated GIF/WebP decode every frame but paint only the first | Open, paint.images |
-| TD-83 | Watch | Codecs | Image store budget bounds retained pixels, not outstanding `Arc` copies or the transient decode peak | Open, paint.images |
+| TD-83 | Watch | Codecs | Image store budget bounds retained pixels, not outstanding `Arc` copies or the transient decode peak | Paid |
 | TD-84 | Deliberate | Codecs | Decoder speed: bit-serial VP8L/JPEG slow paths, per-pixel loops; simple VP8 filter and multi-partition frames lack reference images | Open, paint.images |
 | TD-85 | Deliberate | Fonts | Backend caches, temporary memory and native/advanced font services | Open, M8/M9 |
 | TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
@@ -1362,7 +1362,7 @@ of 10 ms or less to 100 ms when they play them. **Pay:** a frame clock in
 the engine that picks the current frame and invalidates paint, with the
 browsers' delay clamp. **Trigger:** M3 damage tracking or M4 event loop.
 
-### TD-83 — Image store budget scope
+### TD-83 — Image store budget scope (Paid)
 
 `ImageStore` charges decoded pixels it retains and evicts least recently
 used entries to stay within `max_decoded_bytes`. Callers holding an
@@ -1375,6 +1375,8 @@ counts that the budget can see; decode into a reserved allocation; an
 ordered LRU index. **Trigger:** a long-lived engine with many documents,
 or memory pressure reports.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): evicting pixels that a caller still holds now keeps a weak lease on them, charged to `max_decoded_bytes` (`StoreStats::leased_bytes`) until the last reference drops, and eviction skips held entries because evicting them frees nothing. When held pixels leave too little room the decode returns `StoreError::Full` without breaking the image. Before decoding, the store makes room for the header's frame size, so a still image never takes the total over the budget while it decodes (an animation's later frames are charged when the decode finishes). Eviction takes the least recently used entry from an ordered `BTreeMap` index instead of scanning every entry. Test: `pixels_callers_hold_stay_charged_until_released` in `crates/rustic-codecs/src/store.rs`.
 
 ### TD-84 — Image decoder speed and untested paths
 

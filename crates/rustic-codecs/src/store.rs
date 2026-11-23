@@ -9,14 +9,19 @@
 //! for good. Decoded pixels are charged against `max_decoded_bytes`; when
 //! a new decode would exceed it, the least recently used decoded entries
 //! drop their pixels (keeping their encoded bytes) and decode again on the
-//! next request. Callers that still hold an [`Arc`] keep that copy alive,
-//! so the budget bounds what the store retains, not every outstanding
-//! reference (TD-83).
+//! next request. A caller that still holds an evicted [`Arc`] keeps those
+//! pixels alive, so the store keeps a weak *lease* on them and charges them
+//! to the same budget until the last reference drops: the budget bounds the
+//! pixels the store handed out, not only those it retains. Before decoding,
+//! the store makes room for the header's frame size, so a still image never
+//! takes the total over the budget while it decodes; an animation's later
+//! frames are charged when the decode finishes. Eviction takes the least
+//! recently used entry from an ordered index (TD-83, paid).
 
 use crate::image::{Animation, DecodeLimits, ImageError, ImageFormat, decode_animation, sniff};
 use rustic_base::CancellationToken;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, Weak};
 
 /// Budgets for one store (typically one document or one process).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -57,7 +62,8 @@ pub struct ImageInfo {
 /// Why an image is not (or no longer) usable.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StoreError {
-    /// The store's entry or encoded-byte budget is spent.
+    /// The store's entry or encoded-byte budget is spent, or the decoded
+    /// budget is held by pixels callers have not released yet.
     Full,
     /// No entry has this id (it was released).
     Unknown,
@@ -109,6 +115,9 @@ pub struct StoreStats {
     pub encoded_bytes: usize,
     /// Decoded bytes held.
     pub decoded_bytes: usize,
+    /// Evicted decoded bytes still referenced by callers; charged to the
+    /// decoded budget until the last reference drops.
+    pub leased_bytes: usize,
     /// Decodes performed, including re-decodes after eviction.
     pub decodes: usize,
     /// Decoded entries evicted to make room.
@@ -122,6 +131,10 @@ pub struct ImageStore {
     by_key: HashMap<String, ImageId>,
     clock: u64,
     stats: StoreStats,
+    /// Decoded entries by last use, oldest first.
+    lru: BTreeMap<u64, ImageId>,
+    /// Evicted pixels that callers still hold, with their sizes.
+    leases: Vec<(Weak<Animation>, usize)>,
 }
 
 impl ImageStore {
@@ -133,11 +146,14 @@ impl ImageStore {
             by_key: HashMap::new(),
             clock: 0,
             stats: StoreStats::default(),
+            lru: BTreeMap::new(),
+            leases: Vec::new(),
         }
     }
 
-    /// Current totals.
-    pub fn stats(&self) -> StoreStats {
+    /// Current totals, after dropping leases whose last reference is gone.
+    pub fn stats(&mut self) -> StoreStats {
+        self.expire_leases();
         self.stats
     }
 
@@ -208,18 +224,34 @@ impl ImageStore {
         self.clock += 1;
         let clock = self.clock;
         let entry = self.entry_mut(id)?;
-        entry.info.map_err(StoreError::Broken)?;
-        entry.last_use = clock;
+        let info = entry.info.map_err(StoreError::Broken)?;
+        let previous = std::mem::replace(&mut entry.last_use, clock);
         if let Some(decoded) = &entry.decoded {
-            return Ok(Arc::clone(decoded));
+            let decoded = Arc::clone(decoded);
+            self.lru.remove(&previous);
+            self.lru.insert(clock, id);
+            return Ok(decoded);
         }
         let bytes = Arc::clone(&entry.bytes);
+        // Make room for the first frame before decoding it, so the decode
+        // does not briefly hold the old pixels and the new ones together.
+        let estimate = usize::try_from(u64::from(info.width) * u64::from(info.height) * 4)
+            .unwrap_or(usize::MAX);
+        self.make_room(estimate.min(self.limits.max_decoded_bytes), id);
         let mut limits = self.limits.decode;
-        limits.max_bytes = limits.max_bytes.min(self.limits.max_decoded_bytes);
+        let permanent = limits.max_bytes.min(self.limits.max_decoded_bytes);
+        let reclaimable = self.reclaimable_budget(id);
+        // Pixels that callers hold may leave too little room for now; that
+        // is a full store, not a broken image.
+        if estimate <= permanent && estimate > reclaimable {
+            return Err(StoreError::Full);
+        }
+        limits.max_bytes = permanent.min(reclaimable);
         let result = decode_animation(&bytes, limits, cancellation);
         let animation = match result {
             Ok(animation) => Arc::new(animation),
             Err(ImageError::Cancelled) => return Err(StoreError::Broken(ImageError::Cancelled)),
+            Err(ImageError::Limit) if reclaimable < permanent => return Err(StoreError::Full),
             Err(error) => {
                 self.entry_mut(id)?.info = Err(error);
                 return Err(StoreError::Broken(error));
@@ -227,11 +259,14 @@ impl ImageStore {
         };
         let size = animation.byte_len();
         self.stats.decodes += 1;
-        // The decoder's byte limit is at most the whole budget, so after
-        // evicting every other entry the new pixels always fit.
-        self.make_room(size, id);
+        // The decoder's byte limit is what evicting every unleased entry
+        // frees, so the new pixels fit after `make_room`.
+        if !self.make_room(size, id) {
+            return Err(StoreError::Full);
+        }
         self.stats.decoded_bytes += size;
         self.entry_mut(id)?.decoded = Some(Arc::clone(&animation));
+        self.lru.insert(clock, id);
         Ok(animation)
     }
 
@@ -239,8 +274,16 @@ impl ImageStore {
     pub fn evict(&mut self, id: ImageId) {
         if let Ok(entry) = self.entry_mut(id) {
             if let Some(decoded) = entry.decoded.take() {
-                self.stats.decoded_bytes -= decoded.byte_len();
+                let last_use = entry.last_use;
+                let size = decoded.byte_len();
+                self.lru.remove(&last_use);
+                self.stats.decoded_bytes -= size;
                 self.stats.evictions += 1;
+                // Someone else still holds these pixels: keep charging them.
+                if Arc::strong_count(&decoded) > 1 {
+                    self.leases.push((Arc::downgrade(&decoded), size));
+                    self.stats.leased_bytes += size;
+                }
             }
         }
     }
@@ -255,23 +298,63 @@ impl ImageStore {
         }
     }
 
+    /// Drop leases whose pixels no caller holds any more.
+    fn expire_leases(&mut self) {
+        let mut freed = 0;
+        self.leases.retain(|(weak, size)| {
+            let live = weak.strong_count() > 0;
+            if !live {
+                freed += size;
+            }
+            live
+        });
+        self.stats.leased_bytes -= freed;
+    }
+
+    /// Bytes of the budget not charged now.
+    fn free_budget(&self) -> usize {
+        self.limits
+            .max_decoded_bytes
+            .saturating_sub(self.stats.decoded_bytes + self.stats.leased_bytes)
+    }
+
+    /// Bytes of the budget that would be free after evicting every entry
+    /// other than `keep` that no caller holds.
+    fn reclaimable_budget(&mut self, keep: ImageId) -> usize {
+        self.expire_leases();
+        let held: usize = self
+            .lru
+            .values()
+            .filter_map(|&id| {
+                let decoded = self.entry(id).ok()?.decoded.as_ref()?;
+                (id == keep || Arc::strong_count(decoded) > 1).then(|| decoded.byte_len())
+            })
+            .sum();
+        self.limits
+            .max_decoded_bytes
+            .saturating_sub(held + self.stats.leased_bytes)
+    }
+
     /// Evict least recently used decoded entries other than `keep` until
-    /// `size` more bytes fit.
-    fn make_room(&mut self, size: usize, keep: ImageId) {
-        while size > self.limits.max_decoded_bytes - self.stats.decoded_bytes {
-            let victim = self
-                .entries
-                .iter()
-                .enumerate()
-                .filter_map(|(i, e)| e.as_ref().map(|e| (i, e)))
-                .filter(|(i, e)| *i != keep.0 && e.decoded.is_some())
-                .min_by_key(|(_, e)| e.last_use)
-                .map(|(i, _)| ImageId(i));
+    /// `size` more bytes fit, and report whether they do. Entries that
+    /// callers still hold are skipped: evicting them would free nothing.
+    fn make_room(&mut self, size: usize, keep: ImageId) -> bool {
+        self.expire_leases();
+        while size > self.free_budget() {
+            let victim = self.lru.values().copied().find(|&id| {
+                id != keep
+                    && self
+                        .entry(id)
+                        .ok()
+                        .and_then(|e| e.decoded.as_ref())
+                        .is_some_and(|d| Arc::strong_count(d) == 1)
+            });
             match victim {
                 Some(victim) => self.evict(victim),
                 None => break,
             }
         }
+        size <= self.free_budget()
     }
 
     fn entry(&self, id: ImageId) -> Result<&Entry, StoreError> {
@@ -499,6 +582,45 @@ mod tests {
             Err(StoreError::Broken(ImageError::Limit))
         );
         assert!(store.stats().decoded_bytes <= 128);
+    }
+
+    #[test]
+    fn pixels_callers_hold_stay_charged_until_released() {
+        // TD-83: each 4×4 image takes 64 bytes; the budget holds two.
+        let mut store = ImageStore::new(limits(128));
+        let cancel = CancellationToken::default();
+        let ids: Vec<_> = ["a", "b", "c"]
+            .iter()
+            .map(|k| store.insert(k, gif(4, 4)).unwrap())
+            .collect();
+        let a = store.decode(ids[0], &cancel).unwrap();
+        let b = store.decode(ids[1], &cancel).unwrap();
+        // Both are held, so neither can make room: the store is full, and
+        // the image is not broken by it.
+        assert_eq!(store.decode(ids[2], &cancel), Err(StoreError::Full));
+        assert!(matches!(
+            store.state(ids[2]),
+            Ok(ImageState::SizeAvailable(_))
+        ));
+        // Evicting a held entry keeps charging its pixels as a lease.
+        store.evict(ids[0]);
+        assert_eq!(store.stats().decoded_bytes, 64);
+        assert_eq!(store.stats().leased_bytes, 64);
+        assert_eq!(store.decode(ids[2], &cancel), Err(StoreError::Full));
+        // Releasing the caller's copy ends the lease.
+        drop(a);
+        assert_eq!(store.stats().leased_bytes, 0);
+        store.decode(ids[2], &cancel).unwrap();
+        // `b` is still held, so the next decode evicts `c`, not `b`.
+        store.decode(ids[0], &cancel).unwrap();
+        assert!(matches!(store.state(ids[1]), Ok(ImageState::Decoded(_))));
+        assert!(matches!(
+            store.state(ids[2]),
+            Ok(ImageState::SizeAvailable(_))
+        ));
+        let stats = store.stats();
+        assert!(stats.decoded_bytes + stats.leased_bytes <= 128);
+        drop(b);
     }
 
     #[test]

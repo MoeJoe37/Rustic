@@ -6545,32 +6545,136 @@
           "label": "DOM/style/layout inspection and console",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/devtools.rs",
+              "marker": "\"dom.document\""
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub fn node_layout"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn inspection_reads_dom_style_layout_and_screenshots"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn console_evaluate_and_input_need_their_grants"
+            }
+          ]
         },
         {
           "id": "devtools.debugger",
           "label": "Source debugging, breakpoints and network diagnostics",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/debug.rs",
+              "marker": "pub trait DebugHook"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/devtools.rs",
+              "marker": "pub(crate) struct ObservedSession"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/debugger.rs",
+              "marker": "fn stepping_into_over_and_out"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn debugger_breakpoints_steps_scopes_and_document_lines"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn network_diagnostics_list_requests_without_credentials"
+            }
+          ]
         },
         {
           "id": "devtools.automation",
           "label": "Secure headless automation and profiling protocol",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-devtools/src/protocol.rs",
+              "marker": "pub fn admit"
+            },
+            {
+              "kind": "source",
+              "path": "tools/run_wpt_web_tests.py",
+              "marker": "def automation_report"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn profile_counts_statements_and_reports_metrics"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-devtools/tests/protocol.rs",
+              "marker": "fn the_gate_admits_only_granted_known_methods"
+            }
+          ]
         },
         {
           "id": "devtools.acceptance",
           "label": "Debugger privacy, authority and diagnostic acceptance",
           "size": 1,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-devtools/src/redact.rs",
+              "marker": "pub fn url"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/devtools.rs",
+              "marker": "pub(crate) fn next_admitted"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn the_broker_refuses_ungranted_commands_before_the_renderer_sees_them"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn there_is_no_remote_endpoint_and_bad_grants_fail"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn a_renderer_cannot_pull_commands_or_forge_client_output"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/debugger.rs",
+              "marker": "fn inspection_runs_no_page_code"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-devtools/tests/protocol.rs",
+              "marker": "fn credentials_are_redacted"
+            }
+          ]
         }
       ]
     },

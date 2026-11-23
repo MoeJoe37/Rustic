@@ -79,6 +79,7 @@ instead of rewriting the history of a decision.
 | [0069](0069-long-lived-renderer.md) | One long-lived renderer per page driven by input and frame requests over IPC, broker-owned time, user scrolls through the page, bounded renderer replacement; `rustic drive` headless driver | Accepted (renderer side; window adoption with UI-01) |
 | [0070](0070-native-promise-continuations.md) | Traced native promise continuations and collection between jobs | Accepted for M9 `Array.fromAsync` |
 | [0071](0071-gpu-backend.md) | GPU backend: wgpu 26 (Vulkan, Metal, Direct3D 12) in the GPU process; compute-shader compositing byte-identical to the CPU reference; device-loss reopen; Linux GPU sandbox profile | Accepted (desktop; window surfaces and Windows/macOS GPU profiles pending) |
+| [0072](0072-automation-protocol.md) | Automation and DevTools protocol: `rustic automate` over stdio, no listening socket, broker-enforced grants, VM debugger hooks, redacted network diagnostics | Accepted |
 
 ## Records by area
 
@@ -99,6 +100,7 @@ instead of rewriting the history of a decision.
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
 | Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
 | Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071 |
+| Developer tools and automation (M8) | 0072 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

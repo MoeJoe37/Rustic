@@ -43,6 +43,7 @@ Usage:
   rustic hit-test --at X,Y [--at X,Y ...] [OPTIONS] [--] <file>
   rustic view [--window WxH] [OPTIONS] [--] <file>
   rustic drive --input SCRIPT [--window WxH] [--scale S] [--zoom Z] [--output <png>] [OPTIONS] [--] <file>
+  rustic automate [--devtools-allow GRANTS] [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled by default) and
@@ -91,6 +92,14 @@ hit-test lays out the file like dump-paint and prints, for each --at point in
 CSS pixels, the topmost box there in paint order (honoring overflow clips and
 visibility; the root element when no box is hit), or none outside the
 1280x720 viewport.
+automate loads the file with scripts and serves it to an automation client:
+one JSON command per line on standard input, one response or event per line
+on standard output (protocol rustic-automation/1, ADR 0072). There is no
+network listener. The client may inspect the DOM, computed style, layout and
+screenshots, read console messages and profiles by default; --devtools-allow
+takes a comma-separated list of grants (inspect, console, profile, network,
+input, evaluate, debug) and replaces the default. The broker refuses every
+command outside the grants before the renderer sees it.
 
 Use --run-scripts with any document command to run inline classics, local
 external classics and static JavaScript modules before producing output.

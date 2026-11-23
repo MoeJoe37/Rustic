@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "3de806135c6f18045b05200ebdc865ac7a2906b03826873a4d8abc44daa3f81c",
-  "percent": "44.59",
-  "verified_percent": "42.21",
+  "source_fingerprint": "55da7fda54dfeecfe3480a9f8a97006a6c86a16c675413250cee4d6e71454159",
+  "percent": "45.59",
+  "verified_percent": "43.21",
   "partial_percent": "2.38",
-  "completed": 98,
+  "completed": 102,
   "in_progress": 9,
   "total": 226,
   "fully_complete": false,
@@ -85,10 +85,10 @@
       "id": "M8",
       "label": "Desktop alpha",
       "share": "8.12",
-      "completed": 2,
+      "completed": 6,
       "total": 18,
-      "percent": "30.95",
-      "verified_percent": "13.13",
+      "percent": "43.25",
+      "verified_percent": "25.43",
       "partial_percent": "17.82"
     },
     {
@@ -7157,9 +7157,30 @@
           "label": "DOM/style/layout inspection and console",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/devtools.rs",
+              "marker": "\"dom.document\""
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/scripting.rs",
+              "marker": "pub fn node_layout"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn inspection_reads_dom_style_layout_and_screenshots"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn console_evaluate_and_input_need_their_grants"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.30"
         },
         {
@@ -7167,9 +7188,35 @@
           "label": "Source debugging, breakpoints and network diagnostics",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-js/src/debug.rs",
+              "marker": "pub trait DebugHook"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/devtools.rs",
+              "marker": "pub(crate) struct ObservedSession"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/debugger.rs",
+              "marker": "fn stepping_into_over_and_out"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn debugger_breakpoints_steps_scopes_and_document_lines"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn network_diagnostics_list_requests_without_credentials"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.30"
         },
         {
@@ -7177,9 +7224,30 @@
           "label": "Secure headless automation and profiling protocol",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-devtools/src/protocol.rs",
+              "marker": "pub fn admit"
+            },
+            {
+              "kind": "source",
+              "path": "tools/run_wpt_web_tests.py",
+              "marker": "def automation_report"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn profile_counts_statements_and_reports_metrics"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-devtools/tests/protocol.rs",
+              "marker": "fn the_gate_admits_only_granted_known_methods"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.30"
         },
         {
@@ -7187,19 +7255,55 @@
           "label": "Debugger privacy, authority and diagnostic acceptance",
           "size": 1,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-devtools/src/redact.rs",
+              "marker": "pub fn url"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/devtools.rs",
+              "marker": "pub(crate) fn next_admitted"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn the_broker_refuses_ungranted_commands_before_the_renderer_sees_them"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn there_is_no_remote_endpoint_and_bad_grants_fail"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/devtools.rs",
+              "marker": "fn a_renderer_cannot_pull_commands_or_forge_client_output"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-js/tests/debugger.rs",
+              "marker": "fn inspection_runs_no_page_code"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-devtools/tests/protocol.rs",
+              "marker": "fn credentials_are_redacted"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.10"
         }
       ],
       "points": 10,
-      "completed": 0,
+      "completed": 4,
       "in_progress": 0,
       "total": 4,
-      "contribution": "0.00",
-      "percent": "0.00",
-      "verified_percent": "0.00",
+      "contribution": "1.00",
+      "percent": "100.00",
+      "verified_percent": "100.00",
       "partial_percent": "0.00"
     },
     {

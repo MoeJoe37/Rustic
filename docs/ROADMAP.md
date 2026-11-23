@@ -728,6 +728,15 @@ desktop hosts and shell, accessibility, DevTools and automation,
 performance harness); next in this one: the hardware GPU backends inside
 the GPU process.
 
+**DevTools and automation 2026-11-23:** UI-04 and UI-06 are done as
+[ADR 0072](adr/0072-automation-protocol.md): `rustic automate` serves DOM,
+computed style, layout, screenshots, console, statement profiles, redacted
+network diagnostics, clicks, evaluation and a source debugger
+(breakpoints, stepping, scopes) over stdio, with grants enforced by the
+broker and no remote endpoint. The WPT runner reads every report through
+it; the recorded baseline is 70 Window WPT files, 462 subtests, 387 PASS
+and 75 FAIL at the pinned revision. Gaps are TD-187 to TD-190.
+
 **Gate:** critical accessibility flows, crash recovery, profile separation,
 supported-platform safety gates, and agreed performance budgets pass. Do not
 declare broad site compatibility from a small handpicked demo collection.

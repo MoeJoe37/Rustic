@@ -60,9 +60,9 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-182, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
-| M9, CSS, layout and paint | TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms |
 | M14 (Android and iOS devices, ADR 0067) | None yet; the device and simulator half of the hosted-CI row's mobile entry is paid here | Device, simulator and Apple-entitlement work deferred to the last milestone; mobile compile checks and the Android emulator job stay in CI meanwhile |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
@@ -253,6 +253,10 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-184 | Deliberate | Compositor / IPC | The GPU process receives the page and frame pixels over its pipe and returns the composited page for every composited frame (two full copies), because there is no shared memory yet | Open, M8 (compositor.backend) |
 | TD-185 | Deliberate | Compositor / desktop host | `rustic view` presents frames composited in the broker; the GPU process does not own the window surface yet | Open, M8 (platform.linux) |
 | TD-186 | Deliberate | Compositor / isolation | On Windows and macOS the confined GPU process uses the renderer AppContainer and Seatbelt profiles, which grant no GPU driver services, so the hardware compositor (ADR 0071) may only open there with `--no-sandbox`; confined runs composite on the CPU | Open, M8 (compositor.backend) |
+| TD-187 | Deliberate | JS debugger | Code from `eval`, `new Function`, class field initializers, generated constructor bodies and module scripts carries no debugger steps, and code compiled before a hook attaches has none, so breakpoints there never hit (ADR 0072) | Open, M9 (language and web APIs) |
+| TD-188 | Deliberate | DevTools | Inline script lines are mapped to document lines by finding the script text in the document bytes, which works only for UTF-8-compatible documents; others report script-relative lines | Open, M9 (language and web APIs) |
+| TD-189 | Deliberate | DevTools / network | `network.requests` lists only requests of network documents (`--allow-origin`); local-file loads and frames' requests are not logged, and the log keeps no timing or bodies | Open, M9 (language and web APIs) |
+| TD-190 | Deliberate | DevTools | Automation protocol 1 has no CSS matched-rule or cascade inspection, no key or pointer-move input (only clicks), no DOM editing and no event timeline (profiling gives statement counts and turn metrics) | Open, M9 (CSS, layout and paint) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -2926,6 +2930,45 @@ profile allowing only the IOKit classes Metal needs, each with the escape
 probes of `tests/gpu.rs`, verified on native x64 and ARM64 runners with a
 GPU. **Trigger:** UI-02 windows on Windows and macOS, or a runner with a
 GPU on either.
+
+### TD-187 — Some code has no debugger steps
+
+The debugger (ADR 0072) instruments code compiled while a hook is attached.
+`eval`, `new Function`, class field initializers, generated constructor
+bodies and module scripts are compiled through paths that do not register
+a debugger script, so they carry no `Step` ops; code compiled before
+`debug.enable` has none either. **Pay:** register those sources and
+compile their steps, and recompile (or lazily instrument) functions when a
+hook attaches late. **Trigger:** a DevTools user stepping into such code,
+or M9 language work on those paths.
+
+### TD-188 — Inline script line mapping assumes UTF-8
+
+Inline scripts are reported in document lines by searching the normalized
+document bytes for the script text. For documents in legacy encodings the
+search fails and lines stay script-relative. **Pay:** carry the source
+position of each script element from the tokenizer. **Trigger:** a
+non-UTF-8 page in a debugging report, or parser source positions (TD-15).
+
+### TD-189 — The network log is partial
+
+`network.requests` wraps the broker network session, so it sees requests of
+network documents only; local-file loads and the requests of frames and
+popups (other renderers) are not logged, and entries keep no timing or
+bodies. **Pay:** a per-page log owned by the broker across frames, with
+timing and opt-in bodies under the `network` grant. **Trigger:** frames in
+automation tests, or performance tooling (M12).
+
+### TD-190 — Automation protocol 1 is minimal
+
+Version 1 has no matched-rule or cascade view (`css.computed` gives the
+computed values only), only click input, no DOM editing, and no event
+timeline (`profile.statements` and `profile.metrics` give statement counts
+and task, timer and settle-turn totals). **Pay:** a timeline of tasks, style, layout and paint with durations;
+matched rules from the cascade with source locations, key and pointer
+input through the same trusted-input path as clicks, and DOM edits under a
+new grant. **Trigger:** UI-04 parity work, or a WPT test needing input
+beyond clicks.
 
 ### TD-183 — macOS profile breadth: sysctl reads and pre-main code
 

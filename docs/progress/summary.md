@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 44.59%** = 42.21% verified complete + 2.38% partial credit. 98/226 capabilities complete, 9 in progress.
+**Overall completion: 45.59%** = 43.21% verified complete + 2.38% partial credit. 102/226 capabilities complete, 9 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `3de806135c6f18045b05200ebdc865ac7a2906b03826873a4d8abc44daa3f81c`.
+Catalog: `engine-v4`. Source fingerprint: `55da7fda54dfeecfe3480a9f8a97006a6c86a16c675413250cee4d6e71454159`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `3de806135c6f18045b05200ebdc865ac7a290
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 2/18 | 30.95% | 13.13% | 8.12% |
+| M8 Desktop alpha | 6/18 | 43.25% | 25.43% | 8.12% |
 | M9 Compatibility expansion | 0/52 | 2.60% | 0.00% | 22.01% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.78% |
@@ -49,7 +49,7 @@ Catalog: `engine-v4`. Source fingerprint: `3de806135c6f18045b05200ebdc865ac7a290
 | Compositor & GPU | 1/5 | 3 | 60.25% | 23.07% | 3% | 1.80 |
 | Platform hosts | 1/9 | 1 | 12.50% | 4.16% | 4% | 0.50 |
 | Accessibility | 0/5 | 0 | 0.00% | 0.00% | 2% | 0.00 |
-| DevTools | 0/4 | 0 | 0.00% | 0.00% | 1% | 0.00 |
+| DevTools | 4/4 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | Extensions (MV2) | 0/11 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | uBO port & filtering | 0/8 | 0 | 0.00% | 0.00% | 2% | 0.00 |
 | Performance leadership | 1/14 | 0 | 4.68% | 4.68% | 8% | 0.37 |
@@ -335,10 +335,10 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### DevTools
 
-- **planned** `devtools.inspection` — DOM/style/layout inspection and console · size 3 · M8 · 0.30% of engine
-- **planned** `devtools.debugger` — Source debugging, breakpoints and network diagnostics · size 3 · M8 · 0.30% of engine
-- **planned** `devtools.automation` — Secure headless automation and profiling protocol · size 3 · M8 · 0.30% of engine
-- **planned** `devtools.acceptance` — Debugger privacy, authority and diagnostic acceptance · size 1 · M8 · 0.10% of engine
+- **complete** `devtools.inspection` — DOM/style/layout inspection and console · size 3 · M8 · 0.30% of engine ([source](../../crates/rustic-cli/src/devtools.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-cli/tests/devtools.rs), [test](../../crates/rustic-cli/tests/devtools.rs))
+- **complete** `devtools.debugger` — Source debugging, breakpoints and network diagnostics · size 3 · M8 · 0.30% of engine ([source](../../crates/rustic-js/src/debug.rs), [source](../../crates/rustic-cli/src/devtools.rs), [test](../../crates/rustic-js/tests/debugger.rs), [test](../../crates/rustic-cli/tests/devtools.rs), [test](../../crates/rustic-cli/tests/devtools.rs))
+- **complete** `devtools.automation` — Secure headless automation and profiling protocol · size 3 · M8 · 0.30% of engine ([source](../../crates/rustic-devtools/src/protocol.rs), [source](../../tools/run_wpt_web_tests.py), [test](../../crates/rustic-cli/tests/devtools.rs), [test](../../crates/rustic-devtools/tests/protocol.rs))
+- **complete** `devtools.acceptance` — Debugger privacy, authority and diagnostic acceptance · size 1 · M8 · 0.10% of engine ([source](../../crates/rustic-devtools/src/redact.rs), [source](../../crates/rustic-cli/src/devtools.rs), [test](../../crates/rustic-cli/tests/devtools.rs), [test](../../crates/rustic-cli/tests/devtools.rs), [test](../../crates/rustic-cli/tests/devtools.rs), [test](../../crates/rustic-js/tests/debugger.rs), [test](../../crates/rustic-devtools/tests/protocol.rs))
 
 ### Extensions (MV2)
 

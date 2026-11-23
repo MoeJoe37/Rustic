@@ -108,6 +108,83 @@ pub struct Surface {
     pub layers: Vec<FrameLayer>,
 }
 
+/// Modifier bits in [`PageInput`]: Control, Alt, Shift, Meta.
+pub const MODIFIER_CONTROL: u8 = 1;
+/// Alt.
+pub const MODIFIER_ALT: u8 = 2;
+/// Shift.
+pub const MODIFIER_SHIFT: u8 = 4;
+/// Meta (Command, Windows key).
+pub const MODIFIER_META: u8 = 8;
+
+/// Longest `key` or `code` string in a [`PageInput::Key`], in bytes.
+pub const MAX_KEY_BYTES: usize = 64;
+
+/// A frame request for a long-lived page (TD-182, ADR 0069).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FrameAsk {
+    /// The viewport width in CSS pixels (1 to 16384).
+    pub width: u32,
+    /// The viewport height in CSS pixels (1 to 16384).
+    pub height: u32,
+    /// Device pixels per CSS pixel (0.25 to 8).
+    pub scale: f64,
+    /// Page zoom (0.25 to 5); the layout viewport is the size over it.
+    pub zoom: f64,
+    /// Where the user scrolled the viewport since the last frame, in CSS
+    /// pixels; `None` keeps the page's own position.
+    pub scroll: Option<(f64, f64)>,
+    /// Time since the previous frame request, in microseconds (the
+    /// page's clock advances by it, at most one second per frame).
+    pub elapsed_us: u64,
+}
+
+/// Input for a long-lived page (TD-182): sent by the broker, which got it
+/// from the trusted window host; a renderer never synthesizes it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum PageInput {
+    /// Advance the page's clock, run what is due and paint a frame;
+    /// answered by [`RendererMessage::Painted`].
+    Frame(FrameAsk),
+    /// A primary click in the window (answered by
+    /// [`RendererMessage::Handled`]), in CSS pixels at 100% zoom from
+    /// the page area's top-left corner (the renderer divides by the zoom).
+    Click {
+        /// From the left edge.
+        x: f64,
+        /// From the top edge.
+        y: f64,
+        /// `MODIFIER_*` bits.
+        modifiers: u8,
+    },
+    /// A key press or release (DOM `key` and `code` values; answered by
+    /// [`RendererMessage::Handled`]).
+    Key {
+        /// Pressed rather than released.
+        down: bool,
+        /// The `key` value, such as `a` or `Enter`.
+        key: String,
+        /// The `code` value, such as `KeyA` or `Enter`.
+        code: String,
+        /// An automatic repeat.
+        repeat: bool,
+        /// `MODIFIER_*` bits.
+        modifiers: u8,
+    },
+}
+
+/// A long-lived page's answer to [`PageInput::Frame`].
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Painted {
+    /// The page at the asked size and scale.
+    pub surface: Surface,
+    /// The viewport position painted, in CSS pixels.
+    pub scroll: (f64, f64),
+    /// When the page wants its next frame (a timer or animation frame
+    /// callback), in microseconds from now; `None` when nothing is due.
+    pub next_frame_us: Option<u64>,
+}
+
 /// What a resource request is for (decides the broker's policy checks).
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ResourceKind {
@@ -236,7 +313,7 @@ pub enum StorageValue {
 }
 
 /// Broker to renderer.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BrokerMessage {
     /// The job.
     Start(Start),
@@ -278,10 +355,12 @@ pub enum BrokerMessage {
         /// Whether it opened.
         opened: bool,
     },
+    /// Input or a frame request for a long-lived page (`render --live`).
+    Page(PageInput),
 }
 
 /// Renderer to broker.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum RendererMessage {
     /// Ask for a subresource.
     Resource {
@@ -333,6 +412,11 @@ pub enum RendererMessage {
         /// `noreferrer`.
         noreferrer: bool,
     },
+    /// A long-lived page's frame, answering [`PageInput::Frame`].
+    Painted(Painted),
+    /// A long-lived page delivered a click or key (and ran what it
+    /// started); the broker sends nothing else until this arrives.
+    Handled,
     /// The job finished: an exit status and the command's output.
     Done {
         /// 0 success, 1 load failure, 2 usage error.
@@ -392,6 +476,155 @@ pub(crate) fn get_opt_bytes(reader: &mut Reader<'_>) -> Result<Option<Vec<u8>>, 
         1 => reader.bytes().map(Some),
         _ => Err(DecodeError::InvalidFlag),
     }
+}
+
+fn put_f64(writer: &mut Writer, value: f64) {
+    writer.u64(value.to_bits());
+}
+
+/// A finite number (positions and scales are never NaN or infinite).
+fn get_f64(reader: &mut Reader<'_>) -> Result<f64, DecodeError> {
+    let value = f64::from_bits(reader.u64()?);
+    if value.is_finite() {
+        Ok(value)
+    } else {
+        Err(DecodeError::OutOfRange)
+    }
+}
+
+fn put_surface(writer: &mut Writer, surface: &Surface) {
+    writer.u32(surface.width);
+    writer.u32(surface.height);
+    writer.bytes(&surface.pixels);
+    writer.u32(u32::try_from(surface.layers.len()).unwrap_or(u32::MAX));
+    for layer in &surface.layers {
+        writer.u32(layer.handle);
+        writer.u32(layer.x);
+        writer.u32(layer.y);
+        writer.u32(layer.width);
+        writer.u32(layer.height);
+        writer.bytes(&layer.coverage);
+    }
+}
+
+fn get_surface(reader: &mut Reader<'_>) -> Result<Surface, DecodeError> {
+    let width = reader.u32()?;
+    let height = reader.u32()?;
+    let pixels = reader.bytes()?;
+    let count = reader.u32()? as usize;
+    if count > MAX_FRAMES {
+        return Err(DecodeError::OutOfRange);
+    }
+    let layers = (0..count)
+        .map(|_| {
+            Ok(FrameLayer {
+                handle: reader.u32()?,
+                x: reader.u32()?,
+                y: reader.u32()?,
+                width: reader.u32()?,
+                height: reader.u32()?,
+                coverage: reader.bytes()?,
+            })
+        })
+        .collect::<Result<_, DecodeError>>()?;
+    Ok(Surface {
+        width,
+        height,
+        pixels,
+        layers,
+    })
+}
+
+fn put_page_input(writer: &mut Writer, input: &PageInput) {
+    match input {
+        PageInput::Frame(ask) => {
+            writer.u8(0);
+            writer.u32(ask.width);
+            writer.u32(ask.height);
+            put_f64(writer, ask.scale);
+            put_f64(writer, ask.zoom);
+            match ask.scroll {
+                Some((x, y)) => {
+                    writer.u8(1);
+                    put_f64(writer, x);
+                    put_f64(writer, y);
+                }
+                None => writer.u8(0),
+            }
+            writer.u64(ask.elapsed_us);
+        }
+        PageInput::Click { x, y, modifiers } => {
+            writer.u8(1);
+            put_f64(writer, *x);
+            put_f64(writer, *y);
+            writer.u8(*modifiers);
+        }
+        PageInput::Key {
+            down,
+            key,
+            code,
+            repeat,
+            modifiers,
+        } => {
+            writer.u8(2);
+            writer.bool(*down);
+            writer.str(key);
+            writer.str(code);
+            writer.bool(*repeat);
+            writer.u8(*modifiers);
+        }
+    }
+}
+
+fn get_page_input(reader: &mut Reader<'_>) -> Result<PageInput, DecodeError> {
+    let short = |value: String| {
+        if value.len() <= MAX_KEY_BYTES {
+            Ok(value)
+        } else {
+            Err(DecodeError::OutOfRange)
+        }
+    };
+    Ok(match reader.u8()? {
+        0 => {
+            let width = reader.u32()?;
+            let height = reader.u32()?;
+            let scale = get_f64(reader)?;
+            let zoom = get_f64(reader)?;
+            let scroll = match reader.u8()? {
+                0 => None,
+                1 => Some((get_f64(reader)?, get_f64(reader)?)),
+                _ => return Err(DecodeError::InvalidFlag),
+            };
+            if !(1..=16_384).contains(&width)
+                || !(1..=16_384).contains(&height)
+                || !(0.25..=8.0).contains(&scale)
+                || !(0.25..=5.0).contains(&zoom)
+            {
+                return Err(DecodeError::OutOfRange);
+            }
+            PageInput::Frame(FrameAsk {
+                width,
+                height,
+                scale,
+                zoom,
+                scroll,
+                elapsed_us: reader.u64()?,
+            })
+        }
+        1 => PageInput::Click {
+            x: get_f64(reader)?,
+            y: get_f64(reader)?,
+            modifiers: reader.u8()?,
+        },
+        2 => PageInput::Key {
+            down: reader.bool()?,
+            key: short(reader.string()?)?,
+            code: short(reader.string()?)?,
+            repeat: reader.bool()?,
+            modifiers: reader.u8()?,
+        },
+        tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
+    })
 }
 
 impl Message for BrokerMessage {
@@ -489,6 +722,10 @@ impl Message for BrokerMessage {
                 writer.u16(6);
                 writer.u32(*id);
                 writer.bool(*opened);
+            }
+            Self::Page(input) => {
+                writer.u16(7);
+                put_page_input(writer, input);
             }
         }
     }
@@ -589,6 +826,7 @@ impl Message for BrokerMessage {
                 id: reader.u32()?,
                 opened: reader.bool()?,
             }),
+            7 => Ok(Self::Page(get_page_input(reader)?)),
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }
@@ -711,17 +949,20 @@ impl Message for RendererMessage {
             }
             Self::Surface(surface) => {
                 writer.u16(7);
-                writer.u32(surface.width);
-                writer.u32(surface.height);
-                writer.bytes(&surface.pixels);
-                writer.u32(u32::try_from(surface.layers.len()).unwrap_or(u32::MAX));
-                for layer in &surface.layers {
-                    writer.u32(layer.handle);
-                    writer.u32(layer.x);
-                    writer.u32(layer.y);
-                    writer.u32(layer.width);
-                    writer.u32(layer.height);
-                    writer.bytes(&layer.coverage);
+                put_surface(writer, surface);
+            }
+            Self::Handled => writer.u16(10),
+            Self::Painted(painted) => {
+                writer.u16(9);
+                put_surface(writer, &painted.surface);
+                put_f64(writer, painted.scroll.0);
+                put_f64(writer, painted.scroll.1);
+                match painted.next_frame_us {
+                    Some(us) => {
+                        writer.u8(1);
+                        writer.u64(us);
+                    }
+                    None => writer.u8(0),
                 }
             }
             Self::Popup {
@@ -815,33 +1056,17 @@ impl Message for RendererMessage {
                 };
                 Ok(Self::Frame { id, request })
             }
-            7 => {
-                let width = reader.u32()?;
-                let height = reader.u32()?;
-                let pixels = reader.bytes()?;
-                let count = reader.u32()? as usize;
-                if count > MAX_FRAMES {
-                    return Err(DecodeError::OutOfRange);
-                }
-                let layers = (0..count)
-                    .map(|_| {
-                        Ok(FrameLayer {
-                            handle: reader.u32()?,
-                            x: reader.u32()?,
-                            y: reader.u32()?,
-                            width: reader.u32()?,
-                            height: reader.u32()?,
-                            coverage: reader.bytes()?,
-                        })
-                    })
-                    .collect::<Result<_, DecodeError>>()?;
-                Ok(Self::Surface(Surface {
-                    width,
-                    height,
-                    pixels,
-                    layers,
-                }))
-            }
+            7 => Ok(Self::Surface(get_surface(reader)?)),
+            10 => Ok(Self::Handled),
+            9 => Ok(Self::Painted(Painted {
+                surface: get_surface(reader)?,
+                scroll: (get_f64(reader)?, get_f64(reader)?),
+                next_frame_us: match reader.u8()? {
+                    0 => None,
+                    1 => Some(reader.u64()?),
+                    _ => return Err(DecodeError::InvalidFlag),
+                },
+            })),
             8 => Ok(Self::Popup {
                 id: reader.u32()?,
                 url: reader.string()?,

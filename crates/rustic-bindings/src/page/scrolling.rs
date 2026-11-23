@@ -119,6 +119,21 @@ fn scroll(agent: &mut Agent, target: Option<NodeId>, x: f64, y: f64) -> JsResult
     })
 }
 
+/// The user scrolled the viewport (TD-182): the same clamping and
+/// `scroll` event as `window.scrollTo`, without a script calling it.
+/// Returns whether the viewport moved.
+pub(super) fn host_scroll(agent: &mut Agent, x: f64, y: f64) -> JsResult<bool> {
+    with_page(agent, |agent, page| {
+        let moved = page.tree.scroll_to(None, finite(x), finite(y));
+        agent.check_native_work()?;
+        let moved = moved.unwrap_or(false);
+        if moved {
+            page.scrolls.push(None);
+        }
+        Ok(moved)
+    })
+}
+
 /// CSSOM View "normalize non-finite values".
 fn finite(value: f64) -> f64 {
     if value.is_finite() { value } else { 0.0 }

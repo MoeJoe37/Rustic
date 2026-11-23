@@ -5,9 +5,9 @@ use std::io::{Cursor, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 
 use rustic_ipc::protocol::{
-    BrokerMessage, DocumentGrant, FetchRequest, FetchResponse, FrameLayer, FrameRequest,
-    RendererMessage, ResourceBody, ResourceFailure, ResourceKind, Start, StorageArea, StorageOp,
-    StorageValue, Surface,
+    BrokerMessage, DocumentGrant, FetchRequest, FetchResponse, FrameAsk, FrameLayer, FrameRequest,
+    MODIFIER_SHIFT, PageInput, Painted, RendererMessage, ResourceBody, ResourceFailure,
+    ResourceKind, Start, StorageArea, StorageOp, StorageValue, Surface,
 };
 use rustic_ipc::{
     Channel, DecodeError, IpcError, Limits, MAGIC, PROTOCOL_VERSION, Role, decode_frame,
@@ -94,6 +94,34 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             id: 16,
             opened: true,
         },
+        BrokerMessage::Page(PageInput::Frame(FrameAsk {
+            width: 800,
+            height: 600,
+            scale: 1.5,
+            zoom: 1.25,
+            scroll: Some((0.0, 120.5)),
+            elapsed_us: 16_667,
+        })),
+        BrokerMessage::Page(PageInput::Frame(FrameAsk {
+            width: 1,
+            height: 1,
+            scale: 0.25,
+            zoom: 5.0,
+            scroll: None,
+            elapsed_us: 0,
+        })),
+        BrokerMessage::Page(PageInput::Click {
+            x: 10.5,
+            y: -3.0,
+            modifiers: MODIFIER_SHIFT,
+        }),
+        BrokerMessage::Page(PageInput::Key {
+            down: true,
+            key: "Enter".into(),
+            code: "NumpadEnter".into(),
+            repeat: false,
+            modifiers: 0,
+        }),
     ];
     let renderer = vec![
         RendererMessage::Resource {
@@ -164,6 +192,17 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
                 coverage: vec![200],
             }],
         }),
+        RendererMessage::Painted(Painted {
+            surface: Surface {
+                width: 1,
+                height: 1,
+                pixels: vec![1, 2, 3, 255],
+                layers: Vec::new(),
+            },
+            scroll: (0.0, 40.0),
+            next_frame_us: Some(16_667),
+        }),
+        RendererMessage::Handled,
         RendererMessage::Done {
             status: 0,
             output: b"#document\n".to_vec(),
@@ -388,4 +427,41 @@ fn a_child_process_speaks_the_protocol_over_its_standard_streams() {
         Err(IpcError::Closed)
     ));
     let _ = std::io::stderr().flush();
+}
+
+#[test]
+fn page_input_with_bad_numbers_or_long_keys_is_refused() {
+    let frame = |width: u32, scale: f64, scroll: Option<(f64, f64)>| {
+        encode_frame(&BrokerMessage::Page(PageInput::Frame(FrameAsk {
+            width,
+            height: 10,
+            scale,
+            zoom: 1.0,
+            scroll,
+            elapsed_us: 0,
+        })))
+    };
+    assert!(decode_frame::<BrokerMessage>(&frame(10, 1.0, Some((0.0, 1.0)))).is_ok());
+    for bad in [
+        frame(0, 1.0, None),
+        frame(16_385, 1.0, None),
+        frame(10, 9.0, None),
+        frame(10, f64::NAN, None),
+        frame(10, 1.0, Some((f64::INFINITY, 0.0))),
+        frame(10, 1.0, Some((0.0, f64::NAN))),
+        encode_frame(&BrokerMessage::Page(PageInput::Key {
+            down: true,
+            key: "x".repeat(65),
+            code: String::new(),
+            repeat: false,
+            modifiers: 0,
+        })),
+    ] {
+        assert!(decode_frame::<BrokerMessage>(&bad).is_err());
+    }
+    let painted = encode_frame(&RendererMessage::Painted(Painted {
+        scroll: (f64::NAN, 0.0),
+        ..Painted::default()
+    }));
+    assert!(decode_frame::<RendererMessage>(&painted).is_err());
 }

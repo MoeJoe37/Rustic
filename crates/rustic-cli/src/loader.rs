@@ -87,6 +87,10 @@ pub struct LoaderLimits {
     /// `render --frames N`: rendering opportunities to paint, one frame
     /// every [`FRAME_INTERVAL`] of the manual clock (1 by default).
     pub frames: usize,
+    /// `render --live` (renderer only, TD-182): after loading, keep the
+    /// page and answer the broker's input and frame requests until it
+    /// closes the channel.
+    pub live: bool,
 }
 
 /// The manual clock's step between `--frames` (60 per second).
@@ -114,6 +118,7 @@ impl Default for LoaderLimits {
             scroll_boxes: [None; MAX_CLICKS],
             frames: 1,
             report_scroll: false,
+            live: false,
         }
     }
 }
@@ -775,7 +780,7 @@ fn run_scripted_load(
     // notifications) run before the clock advances, under their own bound.
     let mut queued_turns = 0usize;
     // A frame sequence lets timers advance with its clock instead.
-    let animated = limits.frames > 1;
+    let animated = limits.frames > 1 || limits.live;
     let settle_now = |document: &mut rustic_engine::ScriptedDocument<ManualClock>,
                       queued: &mut usize,
                       turns: &mut usize| {
@@ -831,6 +836,9 @@ fn run_scripted_load(
                 EscapedText(&popup.url.serialize())
             );
         }
+    }
+    if limits.live {
+        return Err(live_page(document, &source, limits, &applied_files));
     }
     let mut frames = Vec::new();
     if animated {
@@ -912,6 +920,258 @@ fn run_scripted_load(
         scroll,
         frames,
     })
+}
+
+/// Most script, timer and input turns one live frame runs; the rest wait
+/// for the next frame, so a busy page cannot stall the window.
+const LIVE_TURNS_PER_FRAME: usize = 1_000;
+/// Most the page's clock advances per live frame.
+const LIVE_MAX_STEP: Duration = Duration::from_secs(1);
+
+/// A long-lived page (TD-182): the loaded document stays in this
+/// renderer, input from the broker is delivered to it, scripts and timers
+/// run between frames on a clock the broker advances, and each frame
+/// request is answered with the page painted at the asked size, scale and
+/// scroll position (scenes, ADR 0064). Ends, with the reason, when the
+/// broker closes the channel or the page fails.
+fn live_page(
+    mut document: rustic_engine::ScriptedDocument<ManualClock>,
+    source: &ScriptedSource,
+    limits: LoaderLimits,
+    applied_files: &AppliedLocalFiles,
+) -> LoadError {
+    use rustic_ipc::protocol::{
+        MODIFIER_ALT, MODIFIER_CONTROL, MODIFIER_META, MODIFIER_SHIFT, PageInput, Painted,
+        RendererMessage,
+    };
+    let handled = || crate::renderer::answer_page(&RendererMessage::Handled);
+    // The scroll positions come from the page's state (and the user's
+    // scrolls applied to it), never from command options.
+    let limits = LoaderLimits {
+        scroll: (0.0, 0.0),
+        scroll_boxes: [None; MAX_CLICKS],
+        clicks: [None; MAX_CLICKS],
+        report_scroll: false,
+        ..limits
+    };
+    let raster = rustic_raster::RasterLimits::default();
+    let mut view = limits.script_view;
+    let mut scene = rustic_raster::Scene::new(view.scale(), raster);
+    let mut painter = rustic_raster::Frames::new(view.scale(), raster);
+    let cancellation = document.document().cancellation().clone();
+    let encoding = document.document().parsed().encoding();
+    let modifiers = |bits: u8| rustic_engine::Modifiers {
+        control: bits & MODIFIER_CONTROL != 0,
+        alt: bits & MODIFIER_ALT != 0,
+        shift: bits & MODIFIER_SHIFT != 0,
+        meta: bits & MODIFIER_META != 0,
+    };
+    let run = |document: &mut rustic_engine::ScriptedDocument<ManualClock>| {
+        for _ in 0..LIVE_TURNS_PER_FRAME {
+            if document.run_next()?.is_none() {
+                break;
+            }
+        }
+        Ok::<(), LoadError>(())
+    };
+    // Test hook: `crash-on-frame:N` / `hang-on-frame:N` make this
+    // renderer fail at its Nth frame request; it only changes what this
+    // untrusted process does, which the broker must survive anyway.
+    let fault = std::env::var("RUSTIC_TEST_LIVE_RENDERER").ok();
+    let fault_at = |name: &str| {
+        fault
+            .as_deref()
+            .and_then(|fault| fault.strip_prefix(name))
+            .and_then(|n| n.parse::<usize>().ok())
+    };
+    let (crash_at, hang_at) = (fault_at("crash-on-frame:"), fault_at("hang-on-frame:"));
+    let mut frames = 0usize;
+    let result = (|| -> Result<(), LoadError> {
+        loop {
+            let input = crate::renderer::next_page_input().map_err(LoadError::Broker)?;
+            if matches!(input, PageInput::Frame(_)) {
+                frames += 1;
+                if crash_at == Some(frames) {
+                    panic!("simulated live renderer crash");
+                }
+                if hang_at == Some(frames) {
+                    loop {
+                        std::thread::sleep(Duration::from_secs(3600));
+                    }
+                }
+            }
+            match input {
+                PageInput::Click {
+                    x,
+                    y,
+                    modifiers: bits,
+                } => {
+                    let zoom = view.zoom();
+                    let (x, y) = (x / zoom, y / zoom);
+                    let state = document.scroll_state();
+                    let engine_document = document.document();
+                    let list = display_list(LayoutInput {
+                        scroll: Some(&state),
+                        ..LayoutInput::new(
+                            &engine_document,
+                            &source.path,
+                            limits,
+                            view,
+                            Some(applied_files),
+                            source.network.as_ref(),
+                        )
+                    })?;
+                    drop(engine_document);
+                    let point = rustic_layout::CssPx::new(x)
+                        .and_then(|x| Ok((x, rustic_layout::CssPx::new(y)?)))
+                        .map(|(x, y)| rustic_layout::CssPoint { x, y });
+                    if let Some(hit) = point.ok().and_then(|point| list.hit_test(point)) {
+                        let event = rustic_engine::InputEvent::Click {
+                            client_x: x as i32,
+                            client_y: y as i32,
+                            modifiers: modifiers(bits),
+                        };
+                        // A node the page removed meanwhile takes nothing.
+                        if document.queue_input(hit.node, event).is_ok() {
+                            run(&mut document)?;
+                        }
+                    }
+                    handled().map_err(LoadError::Broker)?;
+                }
+                PageInput::Key {
+                    down,
+                    key,
+                    code,
+                    repeat,
+                    modifiers: bits,
+                } => {
+                    let Some(target) = document.key_target() else {
+                        handled().map_err(LoadError::Broker)?;
+                        continue;
+                    };
+                    let key = rustic_engine::KeyInput {
+                        key: rustic_dom::DomString::from(key.as_str()),
+                        code: rustic_dom::DomString::from(code.as_str()),
+                        repeat,
+                        location: 0,
+                        modifiers: modifiers(bits),
+                    };
+                    let event = if down {
+                        rustic_engine::InputEvent::KeyDown(key)
+                    } else {
+                        rustic_engine::InputEvent::KeyUp(key)
+                    };
+                    if document.queue_input(target, event).is_ok() {
+                        run(&mut document)?;
+                    }
+                    handled().map_err(LoadError::Broker)?;
+                }
+                PageInput::Frame(ask) => {
+                    let next = rustic_layout::View::new(
+                        f64::from(ask.width),
+                        f64::from(ask.height),
+                        ask.scale,
+                        ask.zoom,
+                    )
+                    .map_err(|_| LoadError::Broker("the frame asks for an invalid view".into()))?;
+                    if next != view {
+                        if next.scale() != view.scale() {
+                            scene = rustic_raster::Scene::new(next.scale(), raster);
+                            painter = rustic_raster::Frames::new(next.scale(), raster);
+                        }
+                        view = next;
+                        // Script layout reads see the new viewport.
+                        document.set_layout_source(Box::new(LocalLayout {
+                            path: source.path.clone(),
+                            limits: LoaderLimits {
+                                script_view: view,
+                                ..limits
+                            },
+                            cancellation: cancellation.clone(),
+                            encoding,
+                            applied_files: applied_files.clone(),
+                            network: source.network.clone(),
+                        }))?;
+                        document.rendering_inputs_changed()?;
+                    }
+                    if let Some((x, y)) = ask.scroll {
+                        document.scroll_viewport(x, y)?;
+                    }
+                    let step = Duration::from_micros(ask.elapsed_us).min(LIVE_MAX_STEP);
+                    document
+                        .clock()
+                        .advance(step)
+                        .map_err(LoadError::ScriptClock)?;
+                    run(&mut document)?;
+                    document.offer_rendering_opportunity()?;
+                    document.run_next_with_render(|_, _| ())?;
+                    print_console(&document);
+                    for popup in document.take_popups() {
+                        let opened = match &source.network {
+                            Some(session) => session.open_popup(&popup),
+                            None => Err("popups open only in a split run (TD-178)".to_owned()),
+                        };
+                        if let Err(why) = opened {
+                            eprintln!(
+                                "rustic: popup {}: {why}",
+                                EscapedText(&popup.url.serialize())
+                            );
+                        }
+                    }
+                    let state = document.scroll_state();
+                    let engine_document = document.document();
+                    let input = LayoutInput {
+                        scroll: Some(&state),
+                        ..LayoutInput::new(
+                            &engine_document,
+                            &source.path,
+                            limits,
+                            view,
+                            Some(applied_files),
+                            source.network.as_ref(),
+                        )
+                    };
+                    let surface = match render_scene(input, &mut scene)? {
+                        Some((surface, _)) => {
+                            painter = rustic_raster::Frames::new(view.scale(), raster);
+                            surface
+                        }
+                        None => {
+                            scene = rustic_raster::Scene::new(view.scale(), raster);
+                            let list = display_list(input)?;
+                            painter
+                                .submit(list, &cancellation)
+                                .map_err(LoadError::Raster)?;
+                            painter.surface().expect("a frame was submitted").clone()
+                        }
+                    };
+                    drop(engine_document);
+                    let next_frame_us = if document.wants_animation_frame() {
+                        Some(FRAME_INTERVAL.as_micros() as u64)
+                    } else {
+                        document
+                            .time_until_next_timer()?
+                            .map(|delay| u64::try_from(delay.as_micros()).unwrap_or(u64::MAX))
+                    };
+                    crate::renderer::answer_page(&RendererMessage::Painted(Painted {
+                        surface: rustic_ipc::protocol::Surface {
+                            width: surface.width(),
+                            height: surface.height(),
+                            pixels: surface.premultiplied().to_vec(),
+                            layers: Vec::new(),
+                        },
+                        scroll: state.viewport,
+                        next_frame_us,
+                    }))
+                    .map_err(LoadError::Broker)?;
+                }
+            }
+        }
+    })();
+    match result {
+        Ok(()) => LoadError::Cancelled,
+        Err(error) => error,
+    }
 }
 
 /// Run the tasks that are ready now, without advancing the clock.

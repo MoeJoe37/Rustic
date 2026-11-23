@@ -834,6 +834,61 @@ impl<C: Clock> ScriptedDocument<C> {
         self.document.scroll.borrow().clone()
     }
 
+    /// The user scrolled the viewport to `(x, y)` CSS pixels (TD-182):
+    /// clamped to the current layout's scroll range like
+    /// `window.scrollTo`, with its `scroll` event at the next rendering
+    /// opportunity. Returns whether the viewport moved.
+    pub fn scroll_viewport(&mut self, x: f64, y: f64) -> Result<bool, ScriptStop> {
+        self.check_live()?;
+        self.begin_turn()?;
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        let moved = match page::scroll_viewport(agent, x, y) {
+            Ok(moved) => moved,
+            Err(error) => {
+                self.page_result(Err(error))?;
+                false
+            }
+        };
+        self.checkpoint()?;
+        Ok(moved)
+    }
+
+    /// Where host keyboard input goes: the focused element, else the
+    /// body, else the document element (`document.activeElement`).
+    pub fn key_target(&self) -> Option<NodeId> {
+        let engine_document = self.document();
+        let document = engine_document.parsed().document();
+        if let Some(focused) = self
+            .agent
+            .as_ref()
+            .ok()
+            .and_then(|agent| page::focused_element(agent, document))
+        {
+            return Some(focused);
+        }
+        let element = |parent: NodeId, name: &str| {
+            document.children(parent).ok()?.find(|&child| {
+                matches!(
+                    document.node(child).map(|node| node.kind()),
+                    Ok(rustic_dom::NodeKind::Element(element)) if element.name().local() == name
+                )
+            })
+        };
+        let html = document.children(document.root()).ok()?.find(|&child| {
+            matches!(
+                document.node(child).map(|node| node.kind()),
+                Ok(rustic_dom::NodeKind::Element(_))
+            )
+        })?;
+        Some(element(html, "body").unwrap_or(html))
+    }
+
+    /// Whether `requestAnimationFrame` callbacks wait for the next
+    /// rendering opportunity (a live host keeps offering frames).
+    pub fn wants_animation_frame(&self) -> bool {
+        self.pending.queue.borrow().has_frames()
+    }
+
     /// Take the popups `window.open()` asked for with transient activation;
     /// the host opens them (ADR 0062).
     pub fn take_popups(&self) -> Vec<page::PopupRequest> {

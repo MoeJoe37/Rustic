@@ -77,6 +77,11 @@ const FOCUS_VALUE: u32 = 3;
 const VALIDITY: u32 = 4;
 
 impl Forms {
+    /// The focused element, if any (it may since have been removed).
+    pub(in crate::page) fn focused(&self) -> Option<NodeId> {
+        self.focused.get()
+    }
+
     pub(super) fn new(agent: &mut Agent) -> JsResult<(Self, [Value; 4])> {
         let values = agent.new_weak_map()?;
         let validity = agent.new_weak_map()?;

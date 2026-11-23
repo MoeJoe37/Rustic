@@ -95,6 +95,31 @@ pub(crate) fn frame_host() -> Option<Rc<dyn crate::loader::FrameHost>> {
     })
 }
 
+/// The next input for a long-lived page (`render --live`, TD-182): waits
+/// for the broker. An error when this is not a renderer, the broker sent
+/// something else, or the broker closed the channel (the page is done).
+pub(crate) fn next_page_input() -> Result<rustic_ipc::protocol::PageInput, String> {
+    let link = FRAMES
+        .with(|frames| frames.borrow().clone())
+        .ok_or("a live page runs only in a renderer")?;
+    let received = link.channel.borrow_mut().recv::<BrokerMessage>();
+    match received {
+        Ok(BrokerMessage::Page(input)) => Ok(input),
+        Ok(_) => Err("the broker sent a reply nothing asked for".into()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+/// Answer a long-lived page's input: [`RendererMessage::Painted`] for a
+/// frame request, [`RendererMessage::Handled`] for a click or key.
+pub(crate) fn answer_page(message: &RendererMessage) -> Result<(), String> {
+    let link = FRAMES
+        .with(|frames| frames.borrow().clone())
+        .ok_or("a live page runs only in a renderer")?;
+    let sent = link.channel.borrow_mut().send(message);
+    sent.map_err(|error| error.to_string())
+}
+
 /// Hand the rendered surface to the broker, which composites the frames
 /// and writes the PNG.
 pub(crate) fn emit_surface(surface: Surface) {
@@ -552,7 +577,7 @@ impl BrokerLink {
             | BrokerMessage::Storage { id, .. }
             | BrokerMessage::Frame { id, .. }
             | BrokerMessage::Popup { id, .. } => Some(*id),
-            BrokerMessage::Start(_) => None,
+            BrokerMessage::Start(_) | BrokerMessage::Page(_) => None,
         };
         if reply_id != Some(id) {
             eprintln!("rustic renderer: the broker answered out of order");

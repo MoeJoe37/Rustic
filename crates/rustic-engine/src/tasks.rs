@@ -346,6 +346,10 @@ impl ScriptQueue {
         Ok(None)
     }
 
+    pub(crate) fn has_frames(&self) -> bool {
+        !self.frames.is_empty()
+    }
+
     pub(crate) fn frame_cursor(&self) -> u32 {
         self.frame_callback
     }

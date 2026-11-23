@@ -707,6 +707,25 @@ pub fn fire_scroll_events(agent: &mut Agent) -> JsResult<()> {
     Ok(())
 }
 
+/// The user scrolled the viewport to `(x, y)` CSS pixels (clamped to the
+/// scroll range); its `scroll` event fires at the next rendering
+/// opportunity. Returns whether the viewport moved.
+pub fn scroll_viewport(agent: &mut Agent, x: f64, y: f64) -> JsResult<bool> {
+    scrolling::host_scroll(agent, x, y)
+}
+
+/// The element keyboard input goes to (HTML "focused area"): the focused
+/// element while it is connected, else `None` (the host then picks the
+/// body or the document element, as `document.activeElement` does).
+pub fn focused_element(agent: &Agent, document: &Document) -> Option<NodeId> {
+    let host = agent.execution_host();
+    let page = host.as_ref()?.as_any().downcast_ref::<Page>()?;
+    page.events
+        .forms
+        .focused()
+        .filter(|&id| id.document() == page.main && events::connected(document, id))
+}
+
 /// Take the popups the page opened (with transient activation) since the
 /// last call, oldest first.
 pub fn take_popups(agent: &Agent) -> Vec<PopupRequest> {

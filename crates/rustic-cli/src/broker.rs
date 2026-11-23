@@ -21,8 +21,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use rustic_base::{CancellationToken, EscapedText};
 use rustic_engine::{StorageHost, StorageKind};
 use rustic_ipc::protocol::{
-    BrokerMessage, DocumentGrant, FetchResponse, RendererMessage, ResourceBody, ResourceFailure,
-    Start, StorageArea, StorageOp, StorageValue,
+    BrokerMessage, DocumentGrant, FetchResponse, FrameAsk, PageInput, RendererMessage,
+    ResourceBody, ResourceFailure, Start, StorageArea, StorageOp, StorageValue,
 };
 use rustic_ipc::{Channel, IpcError, Limits, Role};
 use rustic_style::FetchError;
@@ -98,6 +98,7 @@ const SANDBOX_ENV: &[&str] = &[
     "RUSTIC_TEST_ESCAPE_DIR",
     "RUSTIC_TEST_NETWORK_PROCESS",
     "RUSTIC_TEST_GPU_PROCESS",
+    "RUSTIC_TEST_LIVE_RENDERER",
     "RUSTIC_TEST_ESCAPE_ABSTRACT",
     "RUSTIC_TEST_ESCAPE_UNIX",
     "RUSTIC_TEST_FAULT_URL",
@@ -317,15 +318,54 @@ pub fn render_surface(args: &[OsString]) -> Result<Captured, u8> {
     }
 }
 
+/// A document command ready for its renderer: the grant, the job and the
+/// frame tree's context.
+struct Prepared {
+    grant: Grant,
+    start: Start,
+    limits: LoaderLimits,
+    output: Option<OsString>,
+    context: FrameContext,
+}
+
 /// Run `command` with its document in a renderer. Returns the exit status.
 pub fn run(command: &str, args: &[OsString]) -> u8 {
+    if args.iter().any(|arg| arg == "--live") {
+        eprintln!("rustic {command}: --live is how `drive` and `view` start a live page");
+        return 2;
+    }
+    let prepared = match prepare(command, args) {
+        Ok(prepared) => prepared,
+        Err(status) => return status,
+    };
+    let status = serve(
+        command,
+        prepared.start,
+        &prepared.grant,
+        prepared.limits,
+        prepared.output.as_ref(),
+        &prepared.context,
+    );
+    if let Grant::Network(session) = &prepared.grant {
+        if let Err(error) = session.finish() {
+            eprintln!("rustic {command}: profile: {error}");
+            return 1;
+        }
+    }
+    status
+}
+
+/// Decide `command`'s document and grant: read the granted file or
+/// navigate to the granted URL. `Err` carries the exit status after the
+/// error was reported.
+fn prepare(command: &str, args: &[OsString]) -> Result<Prepared, u8> {
     COMMITTED.with(|committed| committed.borrow_mut().take());
     let Some((limits, path, output)) = document_argument(command, args) else {
         // A usage error: let the command report it; nothing is loaded.
         let mut engine = rustic_engine::Engine::new(1);
         let mut all = vec![OsString::from(command)];
         all.extend_from_slice(args);
-        return crate::run_command(&mut engine, &all).unwrap_or(2);
+        return Err(crate::run_command(&mut engine, &all).unwrap_or(2));
     };
     let shown = EscapedText(&Path::new(&path).to_string_lossy()).to_string();
     let fail = |error: LoadError| -> u8 {
@@ -343,7 +383,7 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
                 "rustic {command}: network URLs need --allow-origin ORIGIN[=ADDRESS] for each \
                  origin, or --allow-remote; nothing was sent"
             );
-            return 2;
+            return Err(2);
         }
         let url = path.to_str().unwrap_or_default();
         let navigated = match crate::network::navigate(
@@ -352,7 +392,7 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
             CancellationToken::default(),
         ) {
             Ok(navigated) => navigated,
-            Err(error) => return fail(LoadError::Network(error)),
+            Err(error) => return Err(fail(LoadError::Network(error))),
         };
         let session = Rc::clone(&navigated.session);
         let document = DocumentGrant {
@@ -371,15 +411,15 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
             Ok(local) => local,
             Err(error) => {
                 eprintln!("rustic {command}: {error}");
-                return 2;
+                return Err(2);
             }
         };
         let (canonical, bytes) = match loader::read_granted_file(&local, limits) {
             Ok(read) => read,
-            Err(error) => return fail(error),
+            Err(error) => return Err(fail(error)),
         };
         let Some(url) = crate::stylesheets::file_url(&canonical) else {
-            return fail(LoadError::NotLocalPath);
+            return Err(fail(LoadError::NotLocalPath));
         };
         let root = canonical
             .parent()
@@ -431,14 +471,312 @@ pub fn run(command: &str, args: &[OsString]) -> u8 {
         document,
         fonts: crate::fonts::granted_bytes().to_vec(),
     };
-    let status = serve(command, start, &grant, limits, output.as_ref(), &context);
-    if let Grant::Network(session) = &grant {
-        if let Err(error) = session.finish() {
-            eprintln!("rustic {command}: profile: {error}");
-            return 1;
+    Ok(Prepared {
+        grant,
+        start,
+        limits,
+        output,
+        context,
+    })
+}
+
+/// Times a live page's renderer is replaced after it died, hung or broke
+/// the protocol, before the page gives up (TD-182).
+pub const MAX_LIVE_RESTARTS: u32 = 3;
+/// Longest a live page may take to answer input or a frame once loaded
+/// (the load itself gets the renderer timeout).
+const LIVE_ANSWER_LIMIT: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// One frame of a live page, composited and checked by the broker.
+#[derive(Debug)]
+pub struct LiveFrame {
+    /// The page at the asked size and scale.
+    pub surface: rustic_raster::Surface,
+    /// The viewport position painted, in CSS pixels (finite, at least 0).
+    pub scroll: (f64, f64),
+    /// When the page wants another frame (timers, animation frames).
+    pub next_frame: Option<std::time::Duration>,
+}
+
+/// A page loaded once in a long-lived renderer (TD-182): input and frame
+/// requests go to the same renderer, which keeps the document, its
+/// scripts and timers between frames. The broker keeps every authority:
+/// the renderer's requests are answered from the page's grant as in a
+/// one-shot run, and every frame it returns is checked. A renderer that
+/// dies, hangs or breaks the protocol is replaced by a fresh one that
+/// loads the page again (at most [`MAX_LIVE_RESTARTS`] times).
+pub struct LivePage<'a> {
+    prepared: &'a Prepared,
+    running: Option<LiveRenderer<'a>>,
+    restarts: u32,
+    /// Notes for the user about replaced renderers, taken by the host.
+    notes: Vec<String>,
+}
+
+struct LiveRenderer<'a> {
+    process: Process,
+    channel: Channel<Box<dyn Read + Send>, Box<dyn Write + Send>>,
+    relay: Option<std::thread::JoinHandle<()>>,
+    broker: Broker<'a>,
+    /// Whether the renderer answered once (finished loading).
+    loaded: bool,
+}
+
+impl Drop for LiveRenderer<'_> {
+    fn drop(&mut self) {
+        let _ = self.process.kill();
+        let _ = self.process.wait();
+        if let Some(relay) = self.relay.take() {
+            let _ = relay.join();
         }
     }
-    status
+}
+
+/// Load `args` (`render` arguments: the document and its limits; the
+/// window gives the view) as a live page and call `f` with it. The page's
+/// scripts run (a live page is a browsing page). `Err` is the exit status
+/// after the problem was reported.
+pub fn live<R>(args: &[OsString], f: impl FnOnce(&mut LivePage<'_>) -> R) -> Result<R, u8> {
+    if single_process() {
+        eprintln!("rustic: a live page runs in a renderer process; not with --single-process");
+        return Err(2);
+    }
+    let mut all: Vec<OsString> = vec!["--live".into()];
+    if !args.iter().any(|arg| arg == "--run-scripts") {
+        all.push("--run-scripts".into());
+    }
+    all.extend_from_slice(args);
+    if !all.iter().any(|arg| arg == "--output") {
+        all.extend(["--output".into(), "live.png".into()]);
+    }
+    let prepared = prepare("render", &all)?;
+    let mut page = LivePage {
+        prepared: &prepared,
+        running: None,
+        restarts: 0,
+        notes: Vec::new(),
+    };
+    let result = f(&mut page);
+    drop(page);
+    if let Grant::Network(session) = &prepared.grant {
+        if let Err(error) = session.finish() {
+            eprintln!("rustic: profile: {error}");
+            return Err(1);
+        }
+    }
+    Ok(result)
+}
+
+impl<'a> LivePage<'a> {
+    /// How many times the renderer was replaced.
+    pub fn restarts(&self) -> u32 {
+        self.restarts
+    }
+
+    /// Take the notes about replaced renderers since the last call.
+    pub fn take_notes(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.notes)
+    }
+
+    /// Deliver a primary click at window CSS pixels (100% zoom) from the
+    /// page area's top-left corner.
+    pub fn click(&mut self, x: f64, y: f64, modifiers: u8) -> Result<(), String> {
+        if !(x.is_finite() && y.is_finite()) {
+            return Ok(());
+        }
+        self.exchange(&PageInput::Click { x, y, modifiers })
+            .map(|_| ())
+    }
+
+    /// Deliver a key press or release (DOM `key` and `code` values; longer
+    /// than 64 bytes are dropped).
+    pub fn key(
+        &mut self,
+        down: bool,
+        key: &str,
+        code: &str,
+        repeat: bool,
+        modifiers: u8,
+    ) -> Result<(), String> {
+        let limit = rustic_ipc::protocol::MAX_KEY_BYTES;
+        if key.len() > limit || code.len() > limit {
+            return Ok(());
+        }
+        let input = PageInput::Key {
+            down,
+            key: key.to_owned(),
+            code: code.to_owned(),
+            repeat,
+            modifiers,
+        };
+        self.exchange(&input).map(|_| ())
+    }
+
+    /// Advance the page's clock by `ask.elapsed_us`, run what is due and
+    /// paint it at the asked size, scale, zoom and scroll position.
+    pub fn frame(&mut self, ask: FrameAsk) -> Result<LiveFrame, String> {
+        let painted = self
+            .exchange(&PageInput::Frame(ask))?
+            .ok_or("the page sent no frame")?;
+        let surface = self
+            .running
+            .as_ref()
+            .and_then(|running| running.broker.composite(painted.surface))
+            .ok_or("the page's renderer sent an invalid frame")?;
+        let (x, y) = painted.scroll;
+        let scroll = if x.is_finite() && y.is_finite() {
+            (x.max(0.0), y.max(0.0))
+        } else {
+            (0.0, 0.0)
+        };
+        Ok(LiveFrame {
+            surface,
+            scroll,
+            next_frame: painted.next_frame_us.map(std::time::Duration::from_micros),
+        })
+    }
+
+    /// Send `input` and serve the renderer's requests until it answers,
+    /// replacing a renderer that fails (the input then goes to the fresh
+    /// one). A frame request is answered with its frame.
+    fn exchange(
+        &mut self,
+        input: &PageInput,
+    ) -> Result<Option<rustic_ipc::protocol::Painted>, String> {
+        loop {
+            if self.running.is_none() {
+                self.running = Some(self.start()?);
+            }
+            let running = self.running.as_mut().expect("started above");
+            match Self::serve_one(running, input, self.prepared.limits) {
+                Ok(answer) => return Ok(answer),
+                Err(why) => {
+                    self.running = None;
+                    if self.restarts >= MAX_LIVE_RESTARTS {
+                        return Err(format!(
+                            "the page's renderer {why}; it was replaced {MAX_LIVE_RESTARTS} \
+                             times and the page was closed"
+                        ));
+                    }
+                    self.restarts += 1;
+                    self.notes.push(format!(
+                        "the page's renderer {why}; the page was reloaded in a new renderer"
+                    ));
+                }
+            }
+        }
+    }
+
+    fn start(&self) -> Result<LiveRenderer<'a>, String> {
+        let prepared = self.prepared;
+        let (process, stdout, stdin, relay) = spawn().map_err(|error| {
+            if SANDBOX.load(Ordering::Relaxed)
+                && cfg!(not(any(windows, target_os = "macos")))
+                && error.kind() == io::ErrorKind::NotFound
+            {
+                "--sandbox needs bubblewrap (bwrap) on PATH; the renderer was not started \
+                 without its sandbox"
+                    .to_owned()
+            } else {
+                format!("cannot start the renderer process: {error}")
+            }
+        })?;
+        let mut process = process;
+        let channel = match Channel::connect(stdout, stdin, Role::Broker, Limits::default()) {
+            Ok(channel) => channel,
+            Err(error) => {
+                let _ = process.kill();
+                let status = process
+                    .wait()
+                    .map_or_else(|error| error.to_string(), |status| status.to_string());
+                let _ = relay.join();
+                return Err(format!(
+                    "the renderer could not start ({error}, {status}); nothing ran unsandboxed"
+                ));
+            }
+        };
+        let mut running = LiveRenderer {
+            process,
+            channel,
+            relay: Some(relay),
+            broker: Broker::new(&prepared.grant, prepared.limits, &prepared.context),
+            loaded: false,
+        };
+        running
+            .channel
+            .send(&BrokerMessage::Start(prepared.start.clone()))
+            .map_err(|error| format!("cannot reach the renderer: {error}"))?;
+        Ok(running)
+    }
+
+    fn serve_one(
+        running: &mut LiveRenderer<'_>,
+        input: &PageInput,
+        limits: LoaderLimits,
+    ) -> Result<Option<rustic_ipc::protocol::Painted>, String> {
+        let limit = if running.loaded {
+            renderer_timeout().min(LIVE_ANSWER_LIMIT)
+        } else {
+            renderer_timeout()
+        };
+        let kill = running.process.killer();
+        let (answered, watch) = std::sync::mpsc::channel::<()>();
+        let timed_out = std::sync::Arc::new(AtomicBool::new(false));
+        let flag = std::sync::Arc::clone(&timed_out);
+        let watchdog = std::thread::spawn(move || {
+            if watch.recv_timeout(limit) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
+                flag.store(true, Ordering::SeqCst);
+                kill();
+            }
+        });
+        let frame = matches!(input, PageInput::Frame(_));
+        let result = (|| -> Result<Option<rustic_ipc::protocol::Painted>, IpcError> {
+            running.channel.send(&BrokerMessage::Page(input.clone()))?;
+            loop {
+                match running.channel.recv::<RendererMessage>()? {
+                    RendererMessage::Diagnostic(text) => eprintln!("{}", EscapedText(&text)),
+                    RendererMessage::Painted(painted) if frame => {
+                        let bytes = painted.surface.pixels.len();
+                        if bytes > limits.max_dump_bytes.max(256 << 20) {
+                            return Err(IpcError::Malformed(rustic_ipc::DecodeError::OutOfRange));
+                        }
+                        return Ok(Some(painted));
+                    }
+                    RendererMessage::Handled if !frame => return Ok(None),
+                    RendererMessage::Painted(_)
+                    | RendererMessage::Handled
+                    | RendererMessage::Surface(_)
+                    | RendererMessage::Done { .. } => {
+                        return Err(IpcError::Malformed(rustic_ipc::DecodeError::OutOfRange));
+                    }
+                    request => {
+                        let reply = running.broker.handle(request);
+                        running.channel.send(&reply)?;
+                    }
+                }
+            }
+        })();
+        let _ = answered.send(());
+        let _ = watchdog.join();
+        match result {
+            Ok(answer) => {
+                running.loaded = true;
+                Ok(answer)
+            }
+            Err(_) if timed_out.load(Ordering::SeqCst) => {
+                Err(format!("did not answer within {} s", limit.as_secs()))
+            }
+            Err(IpcError::Closed) => {
+                let _ = running.process.kill();
+                let status = running
+                    .process
+                    .wait()
+                    .map_or_else(|error| error.to_string(), |status| status.to_string());
+                Err(format!("ended ({status})"))
+            }
+            Err(error) => Err(format!("broke the IPC protocol ({error})")),
+        }
+    }
 }
 
 /// The limits, document argument and `--output` of a document command, or
@@ -1603,6 +1941,8 @@ impl<'a> Broker<'a> {
             // is a request this broker refuses.
             RendererMessage::Diagnostic(_)
             | RendererMessage::Surface(_)
+            | RendererMessage::Painted(_)
+            | RendererMessage::Handled
             | RendererMessage::Done { .. } => BrokerMessage::Storage {
                 id: u32::MAX,
                 value: StorageValue::Refused,

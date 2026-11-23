@@ -15,6 +15,7 @@ mod chrome;
 mod fonts;
 mod gpuproc;
 mod images;
+mod live;
 mod loader;
 mod netproc;
 mod network;
@@ -39,6 +40,7 @@ Usage:
   rustic reftest [VIEW] [OPTIONS] [--] <test>
   rustic hit-test --at X,Y [--at X,Y ...] [OPTIONS] [--] <file>
   rustic view [--window WxH] [OPTIONS] [--] <file>
+  rustic drive --input SCRIPT [--window WxH] [--scale S] [--zoom Z] [--output <png>] [OPTIONS] [--] <file>
   rustic --help | --version
 
 dump-dom reads one local HTML file (UTF-8, scripting disabled by default) and
@@ -109,6 +111,15 @@ strip above the page, drawn by this process and never by the page, shows
 the committed address (ASCII host, Secure/Not secure) and any permission
 prompt (Escape dismisses it). It accepts the document options above.
 --exit-after N closes after N frames.
+
+Live pages: drive loads the page once in a long-lived renderer that keeps
+its document, scripts and timers (TD-182) and runs a ;-separated --input
+script of host input against it: frame, wait MS, click X,Y, key NAME (or
+NAME:CODE, with Control+/Alt+/Shift+/Meta+ prefixes), scroll X,Y, resize
+WxH, zoom Z, probe X,Y (RGBA of the last frame's device pixel). Each
+frame prints its size, scroll position and when the page wants the next
+one; --output writes the last frame. Scripts run. A renderer that dies or
+hangs is replaced and the page reloaded (at most 3 times).
 
 Frames: render --frames N (1 to 600, needs --run-scripts) paints N
 rendering opportunities 1/60 s of the manual clock apart, repainting only
@@ -267,6 +278,9 @@ pub fn main() -> ExitCode {
     }
     if args[0] == "view" {
         return ExitCode::from(view_command(&args[1..]));
+    }
+    if args[0] == "drive" {
+        return ExitCode::from(live::drive_command(&args[1..]));
     }
     if broker::splits(&args[0]) && !broker::single_process() {
         return ExitCode::from(broker::run(&args[0].to_string_lossy(), &args[1..]));
@@ -463,6 +477,7 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
     let mut output = None;
     let mut frames = 1usize;
     let mut report_scroll = false;
+    let mut live = false;
     let (mut scale, mut zoom, mut window) = (1.0, 1.0, (1280.0, 720.0));
     let mut rest = Vec::new();
     let mut iter = args.iter();
@@ -484,6 +499,8 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
                     .ok_or("--scale requires a number")?;
             }
             Some("--report-scroll") => report_scroll = true,
+            // A broker starts a live page in a renderer (TD-182).
+            Some("--live") => live = true,
             Some("--frames") => {
                 frames = iter
                     .next()
@@ -526,6 +543,10 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
     }
     limits.frames = frames;
     limits.report_scroll = report_scroll;
+    if live && !limits.run_scripts {
+        return Err("--live needs --run-scripts".into());
+    }
+    limits.live = live;
     Ok(RenderArgs {
         output,
         view,
@@ -547,6 +568,9 @@ fn render_command(engine: &mut Engine, args: &[OsString]) -> u8 {
         return usage("missing --output".into());
     };
     let (limits, view) = (args.limits, args.view);
+    if limits.live && !renderer::active() {
+        return usage("--live is how `drive` and `view` start a live page".into());
+    }
     // A renderer hands its surface and frame layers to the broker, which
     // composites the frames (ADR 0062) and writes the PNG.
     let host = renderer::frame_host();

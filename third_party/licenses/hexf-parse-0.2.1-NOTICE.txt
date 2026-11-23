@@ -1,0 +1,11 @@
+hexf-parse 0.2.1 (Kang Seonghoon, https://github.com/lifthrasiir/hexf)
+
+The published package and the upstream repository (tag 0.2.1, revision
+4225763d744183d720f575ae96d04161b4d08ea0) carry no license text. The package
+manifest declares:
+
+    license = "CC0-1.0"
+    authors = ["Kang Seonghoon <public+rust@mearie.org>"]
+
+CC0-1.0 dedicates the work to the public domain and requires no notice; this
+file records the declaration Rustic relies on.

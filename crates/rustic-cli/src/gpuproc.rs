@@ -251,7 +251,7 @@ fn spawn_plain(exe: &std::path::Path) -> io::Result<Started> {
 #[cfg(not(any(windows, target_os = "macos")))]
 fn spawn_confined(exe: &std::path::Path) -> io::Result<Started> {
     let (child, filter, stdout, stdin, stderr) =
-        crate::broker::spawn_bubblewrap(exe, GPU_COMMAND, false)?;
+        crate::broker::spawn_bubblewrap(exe, GPU_COMMAND, crate::broker::Confinement::Gpu)?;
     Ok((
         crate::broker::Process::Sandboxed {
             child,
@@ -341,8 +341,127 @@ fn start() -> io::Result<Running> {
 // GPU process side
 // ---------------------------------------------------------------------
 
+/// Device opens one GPU process makes at most (the first included); after
+/// that it composites on the CPU (`compositor.recovery`, device loss).
+pub const MAX_DEVICE_OPENS: u32 = 3;
+
+/// The GPU process's hardware compositor (ADR 0071): opened on first use,
+/// reopened after a lost device, given up after [`MAX_DEVICE_OPENS`].
+#[derive(Default)]
+struct Device {
+    compositor: Option<rustic_gpu::Compositor>,
+    opens: u32,
+    /// No device will be used: `RUSTIC_GPU=cpu`, no adapter, or too many
+    /// losses.
+    disabled: bool,
+    /// Compositions so far (test hooks count them).
+    count: usize,
+}
+
+/// Which adapters `RUSTIC_GPU` allows: `cpu` none, `any` software ones
+/// too (WARP, lavapipe: CI runners without GPUs), otherwise hardware.
+fn adapter_choice() -> Option<rustic_gpu::AdapterChoice> {
+    match std::env::var("RUSTIC_GPU").as_deref() {
+        Ok("cpu") => None,
+        Ok("any") => Some(rustic_gpu::AdapterChoice::Any),
+        _ => Some(rustic_gpu::AdapterChoice::HardwareOnly),
+    }
+}
+
+impl Device {
+    /// Composite on the GPU, or `None` to composite this one on the CPU.
+    fn composite(
+        &mut self,
+        page: &Surface,
+        layers: &[FrameLayer],
+        frames: &[&Surface],
+        test: Option<&str>,
+    ) -> Option<Surface> {
+        self.count += 1;
+        let report = test.is_some_and(|mode| mode.split(',').any(|part| part == "report"));
+        let lose_at = test.and_then(|mode| {
+            mode.split(',')
+                .find_map(|part| part.strip_prefix("lose-on:"))
+                .and_then(|n| n.parse::<usize>().ok())
+        });
+        let layers: Vec<rustic_gpu::Layer<'_>> = layers
+            .iter()
+            .map(|layer| {
+                Some(rustic_gpu::Layer {
+                    frame: frames.get(usize::try_from(layer.handle).ok()?)?,
+                    rect: (layer.x, layer.y, layer.width, layer.height),
+                    coverage: &layer.coverage,
+                })
+            })
+            .collect::<Option<_>>()?;
+        // A lost device is reopened once per composition.
+        let lose = lose_at == Some(self.count);
+        for attempt in 0..2 {
+            let compositor = self.open(report)?;
+            if lose && attempt == 0 {
+                compositor.lose_device();
+            }
+            match compositor.composite(page, &layers) {
+                Ok(surface) => {
+                    if report {
+                        eprintln!(
+                            "rustic GPU process: composited on {} ({})",
+                            compositor.info().backend,
+                            compositor.info().name
+                        );
+                    }
+                    return Some(surface);
+                }
+                Err(rustic_gpu::GpuError::Lost) => {
+                    self.compositor = None;
+                    eprintln!("rustic GPU process: the GPU device was lost; reopening it");
+                }
+                Err(error) => {
+                    if report {
+                        eprintln!("rustic GPU process: {error}; this frame composites on the CPU");
+                    }
+                    return None;
+                }
+            }
+        }
+        None
+    }
+
+    fn open(&mut self, report: bool) -> Option<&rustic_gpu::Compositor> {
+        if self.disabled {
+            return None;
+        }
+        if self.compositor.is_none() {
+            let Some(choice) = adapter_choice() else {
+                self.disabled = true;
+                return None;
+            };
+            if self.opens >= MAX_DEVICE_OPENS {
+                self.disabled = true;
+                eprintln!(
+                    "rustic GPU process: the GPU device keeps failing; compositing on the CPU"
+                );
+                return None;
+            }
+            self.opens += 1;
+            match rustic_gpu::Compositor::open(choice) {
+                Ok(compositor) => self.compositor = Some(compositor),
+                Err(error) => {
+                    // No adapter is not a failure: the CPU composites.
+                    self.disabled = true;
+                    if report {
+                        eprintln!("rustic GPU process: {error}; compositing on the CPU");
+                    }
+                    return None;
+                }
+            }
+        }
+        self.compositor.as_ref()
+    }
+}
+
 /// Composite one command; `None` when its input is invalid.
-fn serve(composite: &Composite) -> Option<Surface> {
+fn serve(composite: &Composite, device: &mut Device, test: Option<&str>) -> Option<Surface> {
     let page = Surface::from_premultiplied(
         composite.page.width,
         composite.page.height,
@@ -362,7 +481,11 @@ fn serve(composite: &Composite) -> Option<Surface> {
         })
         .collect::<Option<Vec<_>>>()?;
     let frames: Vec<&Surface> = frames.iter().collect();
-    composite_cpu(&page, &composite.page.layers, &frames)
+    // The device checks layers as the CPU path does; whatever it refuses
+    // or cannot do composites on the CPU, which refuses invalid input.
+    device
+        .composite(&page, &composite.page.layers, &frames, test)
+        .or_else(|| composite_cpu(&page, &composite.page.layers, &frames))
 }
 
 /// Misbehave as a test asks (`RUSTIC_TEST_GPU_PROCESS`); `Some` replaces
@@ -434,6 +557,8 @@ pub fn run() -> u8 {
         }
     };
     let test_mode = std::env::var("RUSTIC_TEST_GPU_PROCESS").ok();
+    let device_test = std::env::var("RUSTIC_TEST_GPU_DEVICE").ok();
+    let mut device = Device::default();
     loop {
         let command = match channel.recv::<GpuCommand>() {
             Ok(command) => command,
@@ -444,7 +569,7 @@ pub fn run() -> u8 {
             }
         };
         let GpuCommand::Composite(composite) = command;
-        let reply = match serve(&composite) {
+        let reply = match serve(&composite, &mut device, device_test.as_deref()) {
             Some(surface) => GpuEvent::Composited {
                 id: composite.id,
                 width: surface.width(),
@@ -466,6 +591,13 @@ pub fn run() -> u8 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn cpu() -> Device {
+        Device {
+            disabled: true,
+            ..Device::default()
+        }
+    }
 
     fn solid(width: u32, height: u32, rgba: [u8; 4]) -> Surface {
         Surface::from_premultiplied(
@@ -500,16 +632,16 @@ mod tests {
             },
             frames: vec![image(&frame)],
         };
-        assert_eq!(serve(&command).unwrap(), expected);
+        assert_eq!(serve(&command, &mut cpu(), None).unwrap(), expected);
         // A handle without a frame, a layer outside the page, pixels that
         // are not premultiplied: refused, never a panic.
         command.page.layers[0].handle = 1;
-        assert!(serve(&command).is_none());
+        assert!(serve(&command, &mut cpu(), None).is_none());
         command.page.layers[0].handle = 0;
         command.page.layers[0].x = 3;
-        assert!(serve(&command).is_none());
+        assert!(serve(&command, &mut cpu(), None).is_none());
         command.page.layers[0].x = 2;
         command.frames[0].pixels = [255, 255, 255, 0].repeat(4);
-        assert!(serve(&command).is_none());
+        assert!(serve(&command, &mut cpu(), None).is_none());
     }
 }

@@ -239,3 +239,48 @@ fn the_sandboxed_gpu_process_cannot_reach_files_network_or_programs() {
     }
     assert_eq!(std::fs::read_to_string(&outside).unwrap(), "secret");
 }
+
+/// ADR 0071: with an adapter the GPU process composites on the GPU, and
+/// the page is byte-identical to the CPU reference; a lost device is
+/// reopened and the frame still arrives. Where the confined process finds
+/// no adapter it composites on the CPU (the test then checks only the
+/// pixels), unless `RUSTIC_REQUIRE_GPU=1` says this machine has one.
+#[test]
+fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device() {
+    let dir = Dir::new("hardware");
+    let (output, reference) = dir.render(&[], &[("RUSTIC_GPU", "cpu")]);
+    assert!(output.status.success(), "{}", text(&output.stderr));
+    let (output, pixels) = dir.render(
+        &[],
+        &[("RUSTIC_GPU", "any"), ("RUSTIC_TEST_GPU_DEVICE", "report")],
+    );
+    let err = text(&output.stderr);
+    assert!(output.status.success(), "{err}");
+    assert_eq!(pixels, reference, "{err}");
+    if !err.contains("composited on ") {
+        assert!(
+            std::env::var_os("RUSTIC_REQUIRE_GPU").is_none(),
+            "this machine should have a GPU adapter: {err}"
+        );
+        eprintln!("no adapter reached the GPU process; the CPU composited: {err}");
+        return;
+    }
+    // Six compositions (five one-layer, then the five-layer page); the
+    // device is lost before the second and reopened for it.
+    let (output, pixels) = dir.render(
+        &[],
+        &[
+            ("RUSTIC_GPU", "any"),
+            ("RUSTIC_TEST_GPU_DEVICE", "report,lose-on:2"),
+        ],
+    );
+    let err = text(&output.stderr);
+    assert!(output.status.success(), "{err}");
+    assert_eq!(pixels, reference, "{err}");
+    assert_eq!(
+        err.matches("device was lost; reopening").count(),
+        1,
+        "{err}"
+    );
+    assert_eq!(err.matches("composited on ").count(), 6, "{err}");
+}

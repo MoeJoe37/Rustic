@@ -6,7 +6,9 @@ yanked = "deny"
 # fallback root data in webpki-root-certs (ADR 0051).
 # BSD-2-Clause: arrayref, under tiny-skia, which sctk-adwaita uses to draw
 # Wayland window decorations (ADR 0065); permissive and AGPL-compatible.
-allow = ["AGPL-3.0-only", "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "CDLA-Permissive-2.0", "Unicode-3.0", "Zlib"]
+# CC0-1.0: hexf-parse, under naga, the shader translator of the GPU
+# compositor (ADR 0071); a public-domain dedication.
+allow = ["AGPL-3.0-only", "CC0-1.0", "MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "CDLA-Permissive-2.0", "Unicode-3.0", "Zlib"]
 confidence-threshold = 0.8
 
 [bans]
@@ -35,6 +37,11 @@ skip = [
     { crate = "jni-sys@0.3.1", reason = "ndk 0.9 under winit's android-activity, Android only" },
     { crate = "redox_syscall@0.4.1", reason = "winit on Redox only" },
     { crate = "redox_syscall@0.5.18", reason = "softbuffer on Redox only" },
+    # The GPU compositor's graph (wgpu 26; ADR 0071), held at 26 by the
+    # workspace MSRV.
+    { crate = "hashbrown@0.15.5", reason = "naga, wgpu-core and gpu-descriptor (wgpu 26); the engine uses hashbrown 0.17" },
+    { crate = "foldhash@0.1.5", reason = "hashbrown 0.15 under wgpu 26" },
+    { crate = "core-graphics-types@0.1.3", reason = "core-graphics 0.23 under winit, macOS only; metal 0.32 (wgpu) uses 0.2" },
 ]
 
 [sources]

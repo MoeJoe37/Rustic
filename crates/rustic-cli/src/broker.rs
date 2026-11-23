@@ -99,6 +99,8 @@ const SANDBOX_ENV: &[&str] = &[
     "RUSTIC_TEST_NETWORK_PROCESS",
     "RUSTIC_TEST_GPU_PROCESS",
     "RUSTIC_TEST_LIVE_RENDERER",
+    "RUSTIC_TEST_GPU_DEVICE",
+    "RUSTIC_GPU",
     "RUSTIC_TEST_ESCAPE_ABSTRACT",
     "RUSTIC_TEST_ESCAPE_UNIX",
     "RUSTIC_TEST_FAULT_URL",
@@ -1136,8 +1138,11 @@ fn spawn_confined(exe: &Path) -> io::Result<Started> {
 /// a descriptor without unsafe code) and removes the file first.
 #[cfg(not(any(windows, target_os = "macos")))]
 fn spawn_confined(exe: &Path) -> io::Result<Started> {
-    let (child, filter, stdout, stdin, stderr) =
-        spawn_bubblewrap(exe, crate::renderer::RENDERER_COMMAND, false)?;
+    let (child, filter, stdout, stdin, stderr) = spawn_bubblewrap(
+        exe,
+        crate::renderer::RENDERER_COMMAND,
+        Confinement::Renderer,
+    )?;
     Ok((
         Process::Sandboxed {
             child,
@@ -1165,11 +1170,25 @@ pub(crate) type Bubblewrapped = (
 /// namespace, read-only trust-store directories and the network filter,
 /// which admits only Internet-family client sockets.
 #[cfg(not(windows))]
+/// Which child a bubblewrap sandbox confines (its seccomp filter and binds).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Confinement {
+    /// A renderer: no files beyond `/usr`, no sockets, no devices.
+    Renderer,
+    /// The network process: Internet client sockets and the trust store.
+    Network,
+    /// The GPU process (ADR 0071): the renderer's rules plus anonymous
+    /// memory files, the GPU device nodes and the sysfs entries drivers
+    /// read to identify them.
+    Gpu,
+}
+
 pub(crate) fn spawn_bubblewrap(
     exe: &Path,
     command_name: &str,
-    network: bool,
+    confinement: Confinement,
 ) -> io::Result<Bubblewrapped> {
+    let network = confinement == Confinement::Network;
     if !cfg!(target_os = "linux") {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
@@ -1189,10 +1208,10 @@ pub(crate) fn spawn_bubblewrap(
             "the executable path is not UTF-8",
         )
     })?;
-    let program = if network {
-        rustic_sandbox::seccomp::network_filter(arch)
-    } else {
-        rustic_sandbox::seccomp::renderer_filter(arch)
+    let program = match confinement {
+        Confinement::Renderer => rustic_sandbox::seccomp::renderer_filter(arch),
+        Confinement::Network => rustic_sandbox::seccomp::network_filter(arch),
+        Confinement::Gpu => rustic_sandbox::seccomp::gpu_filter(arch),
     };
     let filter = SeccompFile::create(&rustic_sandbox::seccomp::to_bytes(&program))?;
     let mut command = Command::new("/bin/sh");
@@ -1231,6 +1250,19 @@ pub(crate) fn spawn_bubblewrap(
         // else under /etc (no resolver configuration: there is no DNS,
         // TD-157).
         for path in ["/etc/ssl", "/etc/pki", "/etc/ca-certificates"] {
+            command.args(["--ro-bind-try", path, path]);
+        }
+    }
+    if confinement == Confinement::Gpu {
+        // Render nodes and the PCI identity drivers match against; Vulkan
+        // ICD manifests live under /usr (already bound) or /etc/vulkan.
+        command.args(["--dev-bind-try", "/dev/dri", "/dev/dri"]);
+        for path in [
+            "/sys/dev/char",
+            "/sys/devices",
+            "/sys/bus/pci",
+            "/etc/vulkan",
+        ] {
             command.args(["--ro-bind-try", path, path]);
         }
     }

@@ -233,18 +233,35 @@ fn allowed_numbers(arch: Arch) -> impl Iterator<Item = u32> {
     numbers(ALLOWED, arch)
 }
 
+/// What the GPU process needs beyond the renderer (ADR 0071): drivers
+/// back device memory with anonymous memory files (Mesa's `allocation
+/// fd`) and size them. The process has no writable file to truncate.
+const GPU_ALLOWED: &[(&str, Option<u32>, Option<u32>)] = &[
+    ("memfd_create", Some(319), Some(279)),
+    ("ftruncate", Some(77), Some(46)),
+];
+
 /// The renderer filter for `arch`.
 pub fn renderer_filter(arch: Arch) -> Vec<Instruction> {
-    build(arch, false)
+    build(arch, false, false)
 }
 
 /// The network process filter for `arch`: the renderer's allowlist plus
 /// client sockets of the Internet address families.
 pub fn network_filter(arch: Arch) -> Vec<Instruction> {
-    build(arch, true)
+    build(arch, true, false)
 }
 
-fn build(arch: Arch, network: bool) -> Vec<Instruction> {
+/// The GPU process filter for `arch` (ADR 0071): the renderer's allowlist
+/// plus anonymous memory files for driver allocations. Sockets stay
+/// refused (no window system or network), and ioctl keeps the renderer's
+/// terminal rule; device access is decided by which device nodes the
+/// sandbox exposes.
+pub fn gpu_filter(arch: Arch) -> Vec<Instruction> {
+    build(arch, false, true)
+}
+
+fn build(arch: Arch, network: bool, gpu: bool) -> Vec<Instruction> {
     let op = |code, jt, jf, k| Instruction { code, jt, jf, k };
     let mut program = vec![
         op(LD_W_ABS, 0, 0, ARCH),
@@ -288,6 +305,9 @@ fn build(arch: Arch, network: bool) -> Vec<Instruction> {
     let mut numbers: Vec<u32> = allowed_numbers(arch).collect();
     if network {
         numbers.extend(self::numbers(NETWORK_ALLOWED, arch));
+    }
+    if gpu {
+        numbers.extend(self::numbers(GPU_ALLOWED, arch));
     }
     for (index, &number) in numbers.iter().enumerate() {
         // Distance to the final instruction: the remaining comparisons
@@ -472,6 +492,45 @@ mod tests {
             }
             // TCGETS.
             assert_eq!(decide(arch, ioctl, [1, 0x5401, 0, 0, 0, 0]), ALLOW);
+        }
+    }
+
+    #[test]
+    fn the_gpu_filter_adds_anonymous_memory_files_only() {
+        for arch in ARCHES {
+            let program = gpu_filter(arch);
+            let decide =
+                |nr, args| evaluate(&program, arch.audit(), nr, args).expect("well-formed");
+            for number in numbers(GPU_ALLOWED, arch).chain(allowed_numbers(arch)) {
+                assert_eq!(decide(number, [0; 6]), ALLOW, "{number}");
+            }
+            for number in numbers(GPU_ALLOWED, arch) {
+                assert_eq!(
+                    super::tests::decide(arch, number, [0; 6]),
+                    errno(ENOSYS),
+                    "the renderer still has no memory files"
+                );
+            }
+            // No sockets of any family, no namespaces, no terminal input.
+            for family in [1u64, 2, 10, 16] {
+                assert_eq!(
+                    decide(socket_number(arch), [family, 1, 0, 0, 0, 0]),
+                    errno(ENOSYS)
+                );
+            }
+            let (clone, ioctl) = special(arch);
+            assert_eq!(decide(clone, [0x1000_0000, 0, 0, 0, 0, 0]), errno(EPERM));
+            assert_eq!(decide(ioctl, [1, 0x5412, 0, 0, 0, 0]), errno(EPERM));
+            for &(name, x86_64, aarch64) in DANGEROUS {
+                let number = if arch == Arch::X86_64 {
+                    x86_64
+                } else {
+                    aarch64
+                };
+                if let Some(number) = number {
+                    assert_eq!(decide(number, [0; 6]), errno(ENOSYS), "{name}");
+                }
+            }
         }
     }
 

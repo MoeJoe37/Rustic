@@ -1,0 +1,11 @@
+block 0.1.6 (Steven Sheldon, https://github.com/SSheldon/rust-block)
+
+The published package and the upstream repository (tag 0.1.6, revision
+47178790cfc9d4a8b092051d8b413b78bd31254a, and the current default branch)
+carry no license text. The package manifest declares:
+
+    license = "MIT"
+    authors = ["Steven Sheldon"]
+
+Rustic relies on that declaration. block is linked only for Apple targets
+(the Metal backend of wgpu-hal).

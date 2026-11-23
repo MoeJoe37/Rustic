@@ -117,6 +117,13 @@ jobs:
           if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
+      - name: Install lavapipe for the GPU compositor parity gate (ADR 0071)
+        # Mesa's software Vulkan driver: the runners have no GPU, and the
+        # byte-exact parity tests must run on a real Vulkan implementation.
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y -q --no-install-recommends mesa-vulkan-drivers libvulkan1
+          echo RUSTIC_REQUIRE_GPU=1 >> "$GITHUB_ENV"
       - name: Test all targets
         run: cargo test --locked --workspace --all-targets --no-fail-fast
       - name: Show sandbox denials (ADR 0063)

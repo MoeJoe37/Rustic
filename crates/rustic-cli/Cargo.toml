@@ -24,6 +24,7 @@ rustic-dom = { path = "../rustic-dom" }
 rustic-encoding = { path = "../rustic-encoding" }
 rustic-engine = { path = "../rustic-engine" }
 rustic-html = { path = "../rustic-html" }
+rustic-gpu = { path = "../rustic-gpu" }
 rustic-ipc = { path = "../rustic-ipc" }
 rustic-sandbox = { path = "../rustic-sandbox" }
 rustic-net = { path = "../rustic-net" }

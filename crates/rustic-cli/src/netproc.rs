@@ -305,8 +305,11 @@ impl Link {
                 let (child, stdout, stdin, stderr) = spawn_seatbelt(&exe)?;
                 (child, stdout, stdin, stderr, None)
             } else if crate::broker::sandboxed() && cfg!(target_os = "linux") {
-                let (child, filter, stdout, stdin, stderr) =
-                    crate::broker::spawn_bubblewrap(&exe, NETWORK_COMMAND, true)?;
+                let (child, filter, stdout, stdin, stderr) = crate::broker::spawn_bubblewrap(
+                    &exe,
+                    NETWORK_COMMAND,
+                    crate::broker::Confinement::Network,
+                )?;
                 let stderr: Box<dyn Read + Send> = Box::new(stderr);
                 (child, stdout, stdin, stderr, Some(filter))
             } else {

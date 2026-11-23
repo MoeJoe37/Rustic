@@ -78,6 +78,7 @@ instead of rewriting the history of a decision.
 | [0068](0068-gpu-process.md) | GPU process: frame compositing moves from the broker to a confined, stateless `rustic __gpu` child with crash/hang recovery and CPU fallback; hardware backends are a later record | Accepted (step 1) |
 | [0069](0069-long-lived-renderer.md) | One long-lived renderer per page driven by input and frame requests over IPC, broker-owned time, user scrolls through the page, bounded renderer replacement; `rustic drive` headless driver | Accepted (renderer side; window adoption with UI-01) |
 | [0070](0070-native-promise-continuations.md) | Traced native promise continuations and collection between jobs | Accepted for M9 `Array.fromAsync` |
+| [0071](0071-gpu-backend.md) | GPU backend: wgpu 26 (Vulkan, Metal, Direct3D 12) in the GPU process; compute-shader compositing byte-identical to the CPU reference; device-loss reopen; Linux GPU sandbox profile | Accepted (desktop; window surfaces and Windows/macOS GPU profiles pending) |
 
 ## Records by area
 
@@ -97,7 +98,7 @@ instead of rewriting the history of a decision.
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
 | Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
-| Compositor and desktop host (M8) | 0064, 0065, 0068, 0069 |
+| Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 
@@ -111,7 +112,6 @@ authority boundary or `unsafe` code.
 | --- | --- | --- |
 | Profile and storage format, partition keys and schema versions | The next change to the on-disk format (NET-06 shipped format version 1 without a record; its contract is in [IMPLEMENTATION.md](../IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)) | Persistent on-disk compatibility promise |
 | Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed; Android implemented and green on the emulator) | Accepting ISO-08/MOB-07 (M14, ADR 0067) | Platform security boundary verified only on a device, emulator or simulator |
-| GPU abstraction and backends (Direct3D 12, Metal, Vulkan; GL ES and mobile in M14) inside the GPU process of [0068](0068-gpu-process.md) | UI-05 hardware backends (M8) | Major platform dependency and `unsafe`/FFI surface |
 | Input and accessibility bridges per platform; mobile windowing (desktop windowing is [0065](0065-desktop-window-host.md)) | UI-02/03 (M8 desktop; mobile in M14) | Platform dependencies on five OS families |
 | WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |
 | Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | New `unsafe` outside `rustic-sandbox` |

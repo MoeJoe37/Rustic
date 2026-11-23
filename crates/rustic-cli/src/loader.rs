@@ -290,7 +290,7 @@ pub struct LoadedDocument {
     scroll: rustic_engine::ScrollState,
     /// `render --frames`: each frame's pixels and what it repainted.
     frames: Vec<(rustic_raster::Surface, FrameReport)>,
-    /// Focus and form control state the page's scripts left (ADR 0069).
+    /// Focus and form control state the page's scripts left (ADR 0070).
     live: rustic_a11y::LiveState,
 }
 
@@ -947,8 +947,8 @@ fn live_page(
     applied_files: &AppliedLocalFiles,
 ) -> LoadError {
     use rustic_ipc::protocol::{
-        MODIFIER_ALT, MODIFIER_CONTROL, MODIFIER_META, MODIFIER_SHIFT, PageInput, Painted,
-        RendererMessage,
+        AssistiveRequest, CompositionPhase, MODIFIER_ALT, MODIFIER_CONTROL, MODIFIER_META,
+        MODIFIER_SHIFT, PageInput, Painted, RendererMessage,
     };
     let handled = || crate::renderer::answer_page(&RendererMessage::Handled);
     // The scroll positions come from the page's state (and the user's
@@ -1071,6 +1071,67 @@ fn live_page(
                         run(&mut document)?;
                     }
                     handled().map_err(LoadError::Broker)?;
+                }
+                PageInput::Composition { phase, text } => {
+                    if let Some(target) = document.key_target() {
+                        let text = rustic_dom::DomString::from(text.as_str());
+                        let step = match phase {
+                            CompositionPhase::Start => rustic_engine::Composition::Start,
+                            CompositionPhase::Update => rustic_engine::Composition::Update(text),
+                            CompositionPhase::End => rustic_engine::Composition::End(text),
+                        };
+                        let event = rustic_engine::InputEvent::Composition(step);
+                        if document.queue_input(target, event).is_ok() {
+                            run(&mut document)?;
+                        }
+                    }
+                    handled().map_err(LoadError::Broker)?;
+                }
+                PageInput::Assistive { node, request } => {
+                    let target = {
+                        let engine_document = document.document();
+                        node_for(engine_document.parsed().document(), node)
+                    };
+                    if let Some(target) = target {
+                        let action = match request {
+                            AssistiveRequest::Focus => rustic_engine::AssistiveAction::Focus,
+                            AssistiveRequest::Click => rustic_engine::AssistiveAction::Click,
+                            AssistiveRequest::SetValue(text) => {
+                                rustic_engine::AssistiveAction::SetValue(text.as_str().into())
+                            }
+                            AssistiveRequest::SetSelection { anchor, focus } => {
+                                rustic_engine::AssistiveAction::SetSelection { anchor, focus }
+                            }
+                        };
+                        let event = rustic_engine::InputEvent::Assistive(action);
+                        if document.queue_input(target, event).is_ok() {
+                            run(&mut document)?;
+                        }
+                    }
+                    handled().map_err(LoadError::Broker)?;
+                }
+                PageInput::Accessibility => {
+                    let live = document.accessibility_state();
+                    let state = document.scroll_state();
+                    let engine_document = document.document();
+                    let tree = tree_of(
+                        LayoutInput {
+                            scroll: Some(&state),
+                            ..LayoutInput::new(
+                                &engine_document,
+                                &source.path,
+                                limits,
+                                view,
+                                Some(applied_files),
+                                source.network.as_ref(),
+                            )
+                        },
+                        &live,
+                    )?;
+                    drop(engine_document);
+                    let bytes = rustic_a11y::wire::encode(&tree);
+                    crate::renderer::answer_page(&RendererMessage::Accessibility(bytes))
+                        .map_err(LoadError::Broker)?;
                 }
                 PageInput::Frame(ask) => {
                     let next = rustic_layout::View::new(
@@ -1801,7 +1862,7 @@ pub fn dump_layout(
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
-/// The accessibility tree (a11y.semantics, ADR 0069) of the laid-out
+/// The accessibility tree (a11y.semantics, ADR 0070) of the laid-out
 /// page: what rendered, where (viewport coordinates after scrolling) and
 /// the page's live focus and control state.
 pub(crate) fn accessibility_tree(
@@ -1810,10 +1871,16 @@ pub(crate) fn accessibility_tree(
     limits: LoaderLimits,
     view: rustic_layout::View,
 ) -> Result<rustic_a11y::AxTree, LoadError> {
-    let input = parsed.layout_input(path, limits, view);
+    tree_of(parsed.layout_input(path, limits, view), &parsed.live)
+}
+
+fn tree_of(
+    input: LayoutInput<'_>,
+    live: &rustic_a11y::LiveState,
+) -> Result<rustic_a11y::AxTree, LoadError> {
     let rendering = match block_layout(input) {
         Ok((tree, layout, viewport, _, _)) => {
-            let layout = scrolled(layout, viewport, limits, input.scroll)?;
+            let layout = scrolled(layout, viewport, input.limits, input.scroll)?;
             rendering_of(&tree, Some(&layout))?
         }
         // The block reference cannot lay out everything yet (form controls
@@ -1828,9 +1895,19 @@ pub(crate) fn accessibility_tree(
     Ok(rustic_a11y::build(
         input.document,
         Some(&rendering),
-        &parsed.live,
+        live,
         rustic_a11y::TreeLimits::default(),
     ))
+}
+
+/// The live DOM node an accessibility id names, if it is still there.
+fn node_for(document: &Document, id: u64) -> Option<rustic_dom::NodeId> {
+    let id = rustic_a11y::AxId(id);
+    document
+        .walk(document.root())
+        .ok()?
+        .map(|(node, _)| node)
+        .find(|&node| id.names(node))
 }
 
 /// Which DOM nodes generated boxes, their fragments' union in CSS pixels,

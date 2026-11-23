@@ -1,5 +1,5 @@
 //! Caret, selection and IME composition in text controls (M8
-//! `a11y.editing`, ADR 0069).
+//! `a11y.editing`, ADR 0070).
 //!
 //! Each text control keeps a selection (start, end, direction) in UTF-16
 //! code units beside its value. A control whose selection was never set

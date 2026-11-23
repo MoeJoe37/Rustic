@@ -1,4 +1,4 @@
-//! Rustic's accessibility tree (M8 `a11y.semantics`, ADR 0069).
+//! Rustic's accessibility tree (M8 `a11y.semantics`, ADR 0070).
 //!
 //! [`build`] turns a document, what layout rendered ([`Rendering`]) and the
 //! page's live control state ([`LiveState`]) into an [`AxTree`]: one node per

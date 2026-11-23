@@ -57,7 +57,7 @@ pub struct FormSubmissions {
 }
 
 /// Focus and form-control state that lives in script, for the
-/// accessibility tree (ADR 0069).
+/// accessibility tree (ADR 0070).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct AccessibleControls {
     /// The focused element, if it is still connected.

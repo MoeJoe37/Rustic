@@ -5,9 +5,10 @@ use std::io::{Cursor, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 
 use rustic_ipc::protocol::{
-    BrokerMessage, DocumentGrant, FetchRequest, FetchResponse, FrameAsk, FrameLayer, FrameRequest,
-    MODIFIER_SHIFT, PageInput, Painted, RendererMessage, ResourceBody, ResourceFailure,
-    ResourceKind, Start, StorageArea, StorageOp, StorageValue, Surface,
+    AssistiveRequest, BrokerMessage, CompositionPhase, DocumentGrant, FetchRequest, FetchResponse,
+    FrameAsk, FrameLayer, FrameRequest, MODIFIER_SHIFT, PageInput, Painted, RendererMessage,
+    ResourceBody, ResourceFailure, ResourceKind, Start, StorageArea, StorageOp, StorageValue,
+    Surface,
 };
 use rustic_ipc::{
     Channel, DecodeError, IpcError, Limits, MAGIC, PROTOCOL_VERSION, Role, decode_frame,
@@ -122,6 +123,30 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             repeat: false,
             modifiers: 0,
         }),
+        BrokerMessage::Page(PageInput::Composition {
+            phase: CompositionPhase::Update,
+            text: "\u{304b}".into(),
+        }),
+        BrokerMessage::Page(PageInput::Composition {
+            phase: CompositionPhase::Start,
+            text: String::new(),
+        }),
+        BrokerMessage::Page(PageInput::Assistive {
+            node: u64::MAX,
+            request: AssistiveRequest::SetValue("typed".into()),
+        }),
+        BrokerMessage::Page(PageInput::Assistive {
+            node: 7,
+            request: AssistiveRequest::SetSelection {
+                anchor: 3,
+                focus: 1,
+            },
+        }),
+        BrokerMessage::Page(PageInput::Assistive {
+            node: 7,
+            request: AssistiveRequest::Click,
+        }),
+        BrokerMessage::Page(PageInput::Accessibility),
     ];
     let renderer = vec![
         RendererMessage::Resource {
@@ -203,6 +228,7 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
             next_frame_us: Some(16_667),
         }),
         RendererMessage::Handled,
+        RendererMessage::Accessibility(vec![1, 2, 3]),
         RendererMessage::Done {
             status: 0,
             output: b"#document\n".to_vec(),

@@ -1,4 +1,4 @@
-//! `rustic dump-a11y` (a11y.semantics, ADR 0069): the accessibility tree
+//! `rustic dump-a11y` (a11y.semantics, ADR 0070): the accessibility tree
 //! of a laid-out page, through the sandboxed renderer like every document
 //! command, with layout bounds, hidden content left out and script state.
 
@@ -74,5 +74,50 @@ fn reflects_focus_values_and_selection_scripts_left() {
         plain.contains("textbox \"Name\" value=\"\" focusable editable\n"),
         "{plain}"
     );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn live_pages_answer_assistive_technology_and_ime_input() {
+    // The long-lived renderer sends its tree to the broker, which decodes
+    // it as hostile input; actions travel back by accessibility node id.
+    let (dir, path) = page(
+        "live",
+        "<!doctype html><title>Form</title><label for=n>Name</label><input id=n>\
+         <input type=checkbox aria-label=Agree>",
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_rustic"))
+        .args([
+            "drive",
+            "--input",
+            "a11y; assist focus Name; assist value Name=Joe; assist select Name=1,3; \
+             compose update x; compose end Y; assist click Agree; a11y",
+            &path,
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let text = String::from_utf8(output.stdout).unwrap();
+    let trees: Vec<&str> = text.split("document \"Form\"\n").skip(1).collect();
+    assert_eq!(trees.len(), 2, "{text}");
+    assert!(
+        trees[0].contains("  textbox \"Name\" value=\"\" focusable editable\n"),
+        "{text}"
+    );
+    // "Joe", then "oe" selected and replaced by the composition.
+    assert!(
+        trees[1].contains("  textbox \"Name\" value=\"JY\" focusable focused editable selection=2..2\n"),
+        "{text}"
+    );
+    assert!(trees[1].contains("  checkbox \"Agree\" focusable checked=true\n"), "{text}");
+    let missing = Command::new(env!("CARGO_BIN_EXE_rustic"))
+        .args(["drive", "--input", "assist click Nobody", &path])
+        .output()
+        .unwrap();
+    assert_eq!(missing.status.code(), Some(1));
     let _ = std::fs::remove_dir_all(&dir);
 }

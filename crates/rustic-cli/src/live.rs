@@ -12,7 +12,8 @@ use std::path::Path;
 
 use rustic_base::EscapedText;
 use rustic_ipc::protocol::{
-    FrameAsk, MODIFIER_ALT, MODIFIER_CONTROL, MODIFIER_META, MODIFIER_SHIFT,
+    AssistiveRequest, CompositionPhase, FrameAsk, MODIFIER_ALT, MODIFIER_CONTROL, MODIFIER_META,
+    MODIFIER_SHIFT,
 };
 
 /// Most steps in one `--input` script.
@@ -37,6 +38,13 @@ enum Step {
     Zoom(f64),
     /// Print the RGBA of the last frame's device pixel.
     Probe(u32, u32),
+    /// Print the page's accessibility tree (ADR 0070).
+    Accessibility,
+    /// An IME composition step for the focused element.
+    Compose(CompositionPhase, String),
+    /// An assistive technology's request for the first node (not a text
+    /// run) whose accessible name is the given one.
+    Assist(String, AssistiveRequest),
 }
 
 fn pair<T: std::str::FromStr>(text: &str, separator: char) -> Option<(T, T)> {
@@ -134,6 +142,36 @@ fn parse_script(script: &str) -> Result<Vec<Step>, String> {
             "probe" => {
                 let (x, y) = pair::<u32>(rest, ',').ok_or_else(bad)?;
                 Step::Probe(x, y)
+            }
+            "a11y" if rest.is_empty() => Step::Accessibility,
+            "compose" => {
+                let (phase, text) = rest.split_once(' ').unwrap_or((rest, ""));
+                match phase {
+                    "start" if text.is_empty() => {
+                        Step::Compose(CompositionPhase::Start, String::new())
+                    }
+                    "update" => Step::Compose(CompositionPhase::Update, text.to_owned()),
+                    "end" => Step::Compose(CompositionPhase::End, text.to_owned()),
+                    _ => return Err(bad()),
+                }
+            }
+            "assist" => {
+                let (action, target) = rest.split_once(' ').ok_or_else(bad)?;
+                let (name, argument) = target.split_once('=').unwrap_or((target, ""));
+                let request = match action {
+                    "focus" if argument.is_empty() => AssistiveRequest::Focus,
+                    "click" if argument.is_empty() => AssistiveRequest::Click,
+                    "value" => AssistiveRequest::SetValue(argument.to_owned()),
+                    "select" => {
+                        let (anchor, focus) = pair::<u32>(argument, ',').ok_or_else(bad)?;
+                        AssistiveRequest::SetSelection { anchor, focus }
+                    }
+                    _ => return Err(bad()),
+                };
+                if name.is_empty() {
+                    return Err(bad());
+                }
+                Step::Assist(name.to_owned(), request)
             }
             _ => return Err(bad()),
         };
@@ -273,6 +311,24 @@ pub(crate) fn drive_command(args: &[OsString]) -> u8 {
                     });
                     Ok(())
                 }
+                Step::Accessibility => page.accessibility().and_then(|tree| {
+                    let tree = tree.ok_or("the page sent no valid accessibility tree")?;
+                    let dump = tree.dump(1 << 24).map_err(|error| error.to_string())?;
+                    report.push_str(&dump);
+                    Ok(())
+                }),
+                Step::Compose(phase, ref text) => page.composition(phase, text),
+                Step::Assist(ref name, ref request) => page.accessibility().and_then(|tree| {
+                    let tree = tree.ok_or("the page sent no valid accessibility tree")?;
+                    let node = tree
+                        .nodes
+                        .iter()
+                        .find(|node| {
+                            node.role != rustic_a11y::Role::StaticText && node.name == *name
+                        })
+                        .ok_or_else(|| format!("no accessibility node is named {name}"))?;
+                    page.assistive(node.id.0, request.clone())
+                }),
             };
             notes(page);
             result?;
@@ -311,7 +367,9 @@ mod tests {
         let steps = parse_script(
             "frame; wait 500; click 10,20.5; key Enter; key a; key Control+Shift+z; \
                           key Space; key ::Semicolon; scroll 0,300; resize 640x480; zoom 1.5; \
-                          probe 3,4",
+                          probe 3,4; a11y; compose start; compose update k a; compose end x; \
+                          assist focus Name; assist click Send; assist value Name=Jo=e; \
+                          assist select Name=1,3",
         )
         .unwrap();
         assert_eq!(
@@ -329,6 +387,20 @@ mod tests {
                 Step::Resize(640, 480),
                 Step::Zoom(1.5),
                 Step::Probe(3, 4),
+                Step::Accessibility,
+                Step::Compose(CompositionPhase::Start, String::new()),
+                Step::Compose(CompositionPhase::Update, "k a".into()),
+                Step::Compose(CompositionPhase::End, "x".into()),
+                Step::Assist("Name".into(), AssistiveRequest::Focus),
+                Step::Assist("Send".into(), AssistiveRequest::Click),
+                Step::Assist("Name".into(), AssistiveRequest::SetValue("Jo=e".into())),
+                Step::Assist(
+                    "Name".into(),
+                    AssistiveRequest::SetSelection {
+                        anchor: 1,
+                        focus: 3
+                    }
+                ),
             ]
         );
         for bad in [
@@ -340,6 +412,12 @@ mod tests {
             "wait -1",
             "key",
             "jump",
+            "a11y now",
+            "compose start x",
+            "compose stop",
+            "assist push Send",
+            "assist focus",
+            "assist select Name=1",
         ] {
             assert!(parse_script(bad).is_err(), "{bad}");
         }

@@ -1,4 +1,4 @@
-//! a11y.editing (ADR 0069): the caret and selection in text controls, the
+//! a11y.editing (ADR 0070): the caret and selection in text controls, the
 //! HTML selection API, IME composition events, assistive-technology
 //! actions, and the live state the accessibility tree reads.
 

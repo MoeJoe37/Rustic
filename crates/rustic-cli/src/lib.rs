@@ -122,7 +122,12 @@ Live pages: drive loads the page once in a long-lived renderer that keeps
 its document, scripts and timers (TD-182) and runs a ;-separated --input
 script of host input against it: frame, wait MS, click X,Y, key NAME (or
 NAME:CODE, with Control+/Alt+/Shift+/Meta+ prefixes), scroll X,Y, resize
-WxH, zoom Z, probe X,Y (RGBA of the last frame's device pixel). Each
+WxH, zoom Z, probe X,Y (RGBA of the last frame's device pixel), a11y (print
+the accessibility tree), compose start | compose update TEXT | compose end
+TEXT (IME composition at the focused element), and assist focus NAME |
+assist click NAME | assist value NAME=TEXT | assist select NAME=A,F (an
+assistive technology's request to the first node with that accessible
+name). Each
 frame prints its size, scroll position and when the page wants the next
 one; --output writes the last frame. Scripts run. A renderer that dies or
 hangs is replaced and the page reloaded (at most 3 times).

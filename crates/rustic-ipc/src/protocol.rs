@@ -120,6 +120,42 @@ pub const MODIFIER_META: u8 = 8;
 /// Longest `key` or `code` string in a [`PageInput::Key`], in bytes.
 pub const MAX_KEY_BYTES: usize = 64;
 
+/// Longest IME composition text or assistive-technology value in a
+/// [`PageInput`], in bytes (ADR 0070).
+pub const MAX_INPUT_TEXT_BYTES: usize = 64 * 1024;
+
+/// Largest encoded accessibility tree a renderer may send (ADR 0070).
+pub const MAX_ACCESSIBILITY_BYTES: usize = 32 * 1024 * 1024;
+
+/// An IME composition step in a [`PageInput::Composition`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CompositionPhase {
+    /// Composition started.
+    Start,
+    /// The composition text changed.
+    Update,
+    /// The text was committed and composition ended.
+    End,
+}
+
+/// What assistive technology asked a node to do ([`PageInput::Assistive`]).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AssistiveRequest {
+    /// Focus it.
+    Focus,
+    /// Its default action.
+    Click,
+    /// Replace a text field's value.
+    SetValue(String),
+    /// Select UTF-16 offsets in a text field.
+    SetSelection {
+        /// Where the selection starts.
+        anchor: u32,
+        /// Where it ends.
+        focus: u32,
+    },
+}
+
 /// A frame request for a long-lived page (TD-182, ADR 0069).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FrameAsk {
@@ -171,6 +207,26 @@ pub enum PageInput {
         /// `MODIFIER_*` bits.
         modifiers: u8,
     },
+    /// An IME composition step for the focused element (answered by
+    /// [`RendererMessage::Handled`]; ADR 0070).
+    Composition {
+        /// Which step.
+        phase: CompositionPhase,
+        /// The composition or committed text (empty for a start).
+        text: String,
+    },
+    /// An assistive technology's request for one accessibility node, by
+    /// the id the page's tree gave it (answered by
+    /// [`RendererMessage::Handled`]; ADR 0070).
+    Assistive {
+        /// The accessibility node id.
+        node: u64,
+        /// The request.
+        request: AssistiveRequest,
+    },
+    /// Send the page's accessibility tree as it is now (answered by
+    /// [`RendererMessage::Accessibility`]; ADR 0070).
+    Accessibility,
 }
 
 /// A long-lived page's answer to [`PageInput::Frame`].
@@ -417,6 +473,10 @@ pub enum RendererMessage {
     /// A long-lived page delivered a click or key (and ran what it
     /// started); the broker sends nothing else until this arrives.
     Handled,
+    /// A long-lived page's encoded accessibility tree (`rustic_a11y::wire`),
+    /// answering [`PageInput::Accessibility`]; the broker decodes it as
+    /// hostile input.
+    Accessibility(Vec<u8>),
     /// The job finished: an exit status and the command's output.
     Done {
         /// 0 success, 1 load failure, 2 usage error.
@@ -573,12 +633,46 @@ fn put_page_input(writer: &mut Writer, input: &PageInput) {
             writer.bool(*repeat);
             writer.u8(*modifiers);
         }
+        PageInput::Composition { phase, text } => {
+            writer.u8(3);
+            writer.u8(match phase {
+                CompositionPhase::Start => 0,
+                CompositionPhase::Update => 1,
+                CompositionPhase::End => 2,
+            });
+            writer.str(text);
+        }
+        PageInput::Assistive { node, request } => {
+            writer.u8(4);
+            writer.u64(*node);
+            match request {
+                AssistiveRequest::Focus => writer.u8(0),
+                AssistiveRequest::Click => writer.u8(1),
+                AssistiveRequest::SetValue(text) => {
+                    writer.u8(2);
+                    writer.str(text);
+                }
+                AssistiveRequest::SetSelection { anchor, focus } => {
+                    writer.u8(3);
+                    writer.u32(*anchor);
+                    writer.u32(*focus);
+                }
+            }
+        }
+        PageInput::Accessibility => writer.u8(5),
     }
 }
 
 fn get_page_input(reader: &mut Reader<'_>) -> Result<PageInput, DecodeError> {
     let short = |value: String| {
         if value.len() <= MAX_KEY_BYTES {
+            Ok(value)
+        } else {
+            Err(DecodeError::OutOfRange)
+        }
+    };
+    let text = |value: String| {
+        if value.len() <= MAX_INPUT_TEXT_BYTES {
             Ok(value)
         } else {
             Err(DecodeError::OutOfRange)
@@ -623,6 +717,33 @@ fn get_page_input(reader: &mut Reader<'_>) -> Result<PageInput, DecodeError> {
             repeat: reader.bool()?,
             modifiers: reader.u8()?,
         },
+        3 => {
+            let phase = match reader.u8()? {
+                0 => CompositionPhase::Start,
+                1 => CompositionPhase::Update,
+                2 => CompositionPhase::End,
+                tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
+            };
+            PageInput::Composition {
+                phase,
+                text: text(reader.string()?)?,
+            }
+        }
+        4 => {
+            let node = reader.u64()?;
+            let request = match reader.u8()? {
+                0 => AssistiveRequest::Focus,
+                1 => AssistiveRequest::Click,
+                2 => AssistiveRequest::SetValue(text(reader.string()?)?),
+                3 => AssistiveRequest::SetSelection {
+                    anchor: reader.u32()?,
+                    focus: reader.u32()?,
+                },
+                tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
+            };
+            PageInput::Assistive { node, request }
+        }
+        5 => PageInput::Accessibility,
         tag => return Err(DecodeError::UnknownTag(u16::from(tag))),
     })
 }
@@ -952,6 +1073,10 @@ impl Message for RendererMessage {
                 put_surface(writer, surface);
             }
             Self::Handled => writer.u16(10),
+            Self::Accessibility(tree) => {
+                writer.u16(11);
+                writer.bytes(tree);
+            }
             Self::Painted(painted) => {
                 writer.u16(9);
                 put_surface(writer, &painted.surface);
@@ -1058,6 +1183,13 @@ impl Message for RendererMessage {
             }
             7 => Ok(Self::Surface(get_surface(reader)?)),
             10 => Ok(Self::Handled),
+            11 => {
+                let tree = reader.bytes()?;
+                if tree.len() > MAX_ACCESSIBILITY_BYTES {
+                    return Err(DecodeError::OutOfRange);
+                }
+                Ok(Self::Accessibility(tree))
+            }
             9 => Ok(Self::Painted(Painted {
                 surface: get_surface(reader)?,
                 scroll: (get_f64(reader)?, get_f64(reader)?),

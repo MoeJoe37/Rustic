@@ -58,7 +58,7 @@ pub enum InputEvent {
     KeyUp(KeyInput),
     /// An IME composition step at the focused control (a11y.editing).
     Composition(super::editing::Composition),
-    /// A request from assistive technology (a11y.bridges, ADR 0069).
+    /// A request from assistive technology (a11y.bridges, ADR 0070).
     Assistive(AssistiveAction),
 }
 

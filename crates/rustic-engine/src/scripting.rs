@@ -830,7 +830,7 @@ impl<C: Clock> ScriptedDocument<C> {
     }
 
     /// Focus and form-control state that lives in script, for the
-    /// accessibility tree (ADR 0069). A stopped page reports none.
+    /// accessibility tree (ADR 0070). A stopped page reports none.
     pub fn accessibility_state(&mut self) -> rustic_a11y::LiveState {
         let Ok(agent) = self.agent.as_mut() else {
             return rustic_a11y::LiveState::default();

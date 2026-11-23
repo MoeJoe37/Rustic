@@ -568,6 +568,13 @@ pub fn live<R>(args: &[OsString], f: impl FnOnce(&mut LivePage<'_>) -> R) -> Res
     Ok(result)
 }
 
+/// A live renderer's answer to one [`PageInput`].
+enum Answer {
+    Painted(rustic_ipc::protocol::Painted),
+    Handled,
+    Accessibility(Vec<u8>),
+}
+
 impl<'a> LivePage<'a> {
     /// How many times the renderer was replaced.
     pub fn restarts(&self) -> u32 {
@@ -586,7 +593,7 @@ impl<'a> LivePage<'a> {
             return Ok(());
         }
         self.exchange(&PageInput::Click { x, y, modifiers })
-            .map(|_| ())
+            .map(drop)
     }
 
     /// Deliver a key press or release (DOM `key` and `code` values; longer
@@ -610,15 +617,59 @@ impl<'a> LivePage<'a> {
             repeat,
             modifiers,
         };
-        self.exchange(&input).map(|_| ())
+        self.exchange(&input).map(drop)
+    }
+
+    /// Deliver an IME composition step to the focused element (ADR 0070);
+    /// over-long text is dropped.
+    pub fn composition(
+        &mut self,
+        phase: rustic_ipc::protocol::CompositionPhase,
+        text: &str,
+    ) -> Result<(), String> {
+        if text.len() > rustic_ipc::protocol::MAX_INPUT_TEXT_BYTES {
+            return Ok(());
+        }
+        let input = PageInput::Composition {
+            phase,
+            text: text.to_owned(),
+        };
+        self.exchange(&input).map(drop)
+    }
+
+    /// Deliver an assistive technology's request for accessibility node
+    /// `node` (ADR 0070).
+    pub fn assistive(
+        &mut self,
+        node: u64,
+        request: rustic_ipc::protocol::AssistiveRequest,
+    ) -> Result<(), String> {
+        if let rustic_ipc::protocol::AssistiveRequest::SetValue(text) = &request {
+            if text.len() > rustic_ipc::protocol::MAX_INPUT_TEXT_BYTES {
+                return Ok(());
+            }
+        }
+        self.exchange(&PageInput::Assistive { node, request })
+            .map(drop)
+    }
+
+    /// The page's accessibility tree now, decoded as hostile input
+    /// (ADR 0070); `None` when the renderer sent none or an invalid one.
+    pub fn accessibility(&mut self) -> Result<Option<rustic_a11y::AxTree>, String> {
+        Ok(match self.exchange(&PageInput::Accessibility)? {
+            Answer::Accessibility(bytes) => {
+                rustic_a11y::wire::decode(&bytes, rustic_a11y::TreeLimits::default()).ok()
+            }
+            _ => None,
+        })
     }
 
     /// Advance the page's clock by `ask.elapsed_us`, run what is due and
     /// paint it at the asked size, scale, zoom and scroll position.
     pub fn frame(&mut self, ask: FrameAsk) -> Result<LiveFrame, String> {
-        let painted = self
-            .exchange(&PageInput::Frame(ask))?
-            .ok_or("the page sent no frame")?;
+        let Answer::Painted(painted) = self.exchange(&PageInput::Frame(ask))? else {
+            return Err("the page sent no frame".into());
+        };
         let surface = self
             .running
             .as_ref()
@@ -640,10 +691,7 @@ impl<'a> LivePage<'a> {
     /// Send `input` and serve the renderer's requests until it answers,
     /// replacing a renderer that fails (the input then goes to the fresh
     /// one). A frame request is answered with its frame.
-    fn exchange(
-        &mut self,
-        input: &PageInput,
-    ) -> Result<Option<rustic_ipc::protocol::Painted>, String> {
+    fn exchange(&mut self, input: &PageInput) -> Result<Answer, String> {
         loop {
             if self.running.is_none() {
                 self.running = Some(self.start()?);
@@ -714,7 +762,7 @@ impl<'a> LivePage<'a> {
         running: &mut LiveRenderer<'_>,
         input: &PageInput,
         limits: LoaderLimits,
-    ) -> Result<Option<rustic_ipc::protocol::Painted>, String> {
+    ) -> Result<Answer, String> {
         let limit = if running.loaded {
             renderer_timeout().min(LIVE_ANSWER_LIMIT)
         } else {
@@ -731,7 +779,8 @@ impl<'a> LivePage<'a> {
             }
         });
         let frame = matches!(input, PageInput::Frame(_));
-        let result = (|| -> Result<Option<rustic_ipc::protocol::Painted>, IpcError> {
+        let tree = matches!(input, PageInput::Accessibility);
+        let result = (|| -> Result<Answer, IpcError> {
             running.channel.send(&BrokerMessage::Page(input.clone()))?;
             loop {
                 match running.channel.recv::<RendererMessage>()? {
@@ -741,10 +790,14 @@ impl<'a> LivePage<'a> {
                         if bytes > limits.max_dump_bytes.max(256 << 20) {
                             return Err(IpcError::Malformed(rustic_ipc::DecodeError::OutOfRange));
                         }
-                        return Ok(Some(painted));
+                        return Ok(Answer::Painted(painted));
                     }
-                    RendererMessage::Handled if !frame => return Ok(None),
+                    RendererMessage::Accessibility(bytes) if tree => {
+                        return Ok(Answer::Accessibility(bytes));
+                    }
+                    RendererMessage::Handled if !frame && !tree => return Ok(Answer::Handled),
                     RendererMessage::Painted(_)
+                    | RendererMessage::Accessibility(_)
                     | RendererMessage::Handled
                     | RendererMessage::Surface(_)
                     | RendererMessage::Done { .. } => {
@@ -1944,6 +1997,7 @@ impl<'a> Broker<'a> {
             | RendererMessage::Surface(_)
             | RendererMessage::Painted(_)
             | RendererMessage::Handled
+            | RendererMessage::Accessibility(_)
             | RendererMessage::Done { .. } => BrokerMessage::Storage {
                 id: u32::MAX,
                 value: StorageValue::Refused,

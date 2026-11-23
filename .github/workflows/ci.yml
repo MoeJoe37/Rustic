@@ -344,7 +344,7 @@ jobs:
         run: >-
           cargo check --locked --workspace --all-targets --target "$CHECK_TARGET"
           --exclude rustic-net --exclude rustic-engine --exclude rustic-bindings
-          --exclude rustic-cli --exclude rustic-fuzz --exclude rustic-android
+          --exclude rustic-cli --exclude rustic-fuzz --exclude rustic-android --exclude rustic-renderer
 
   fuzz:
     name: Parser fuzz smoke

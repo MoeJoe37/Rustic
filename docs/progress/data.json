@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "3bea3b6e83626f4bb7e6333178d789bda21e05385b70e65ddba83ef0c894e1a8",
+  "source_fingerprint": "ec003362399a2675f19f6b537f99168afa2e78fd353c775d61509ceb3148abf7",
   "percent": "48.66",
   "verified_percent": "44.77",
   "partial_percent": "3.89",
   "completed": 108,
-  "in_progress": 16,
+  "in_progress": 17,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -4505,8 +4505,24 @@
           "label": "Original interpreter, numerics, control flow and traps",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/execute.rs",
+              "marker": "pub struct NumericInstance"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/execution.rs",
+              "marker": "fn direct_tail_calls_reuse_the_call_slot_even_inside_active_blocks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/execution.rs",
+              "marker": "fn numeric_evaluation_preserves_bits_and_traps_at_wasm_boundaries"
+            }
+          ],
           "credit": "0.00",
           "engine_share": "0.44"
         },
@@ -4563,7 +4579,7 @@
       ],
       "points": 34,
       "completed": 0,
-      "in_progress": 2,
+      "in_progress": 3,
       "total": 8,
       "contribution": "0.00",
       "percent": "0.00",

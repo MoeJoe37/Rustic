@@ -1,13 +1,13 @@
-//! WebAssembly binary admission for WASM-01.
+//! Rustic's bounded WebAssembly decoder, validator, and interpreter.
 //!
-//! The scanner verifies version 1 framing and exposes borrowed section and
-//! instruction spans. It reads custom names, function type indexes, local
-//! declarations and the data count. The separate instruction decoder checks
-//! control delimiters and reads the supported operators and operands.
+//! Follow the module boundary from [`decode_module`] through
+//! [`validate_module`] to [`NumericInstance::instantiate`]. The scanner also
+//! exposes borrowed section and instruction spans for diagnostic tools.
 
 #![warn(missing_docs)]
 
 mod binary;
+mod execute;
 mod instructions;
 mod module;
 mod reader;
@@ -18,6 +18,7 @@ pub use binary::{
     BinaryLimits, BinaryModule, FunctionBody, LocalGroup, Section, SectionKind, ValueType,
     scan_module,
 };
+pub use execute::{ExecutionError, ExecutionErrorKind, ExecutionLimits, NumericInstance, Value};
 pub use instructions::{
     BlockType, Immediate, Instruction, InstructionLimits, Opcode, decode_instructions,
 };

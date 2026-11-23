@@ -1,7 +1,8 @@
 use rustic_base::CancellationToken;
 use rustic_wasm::{
-    BinaryLimits, DecodeLimits, InstructionLimits, Opcode, ValidationLimits, decode_instructions,
-    decode_module, scan_module, validate_module,
+    BinaryLimits, DecodeLimits, ExecutionLimits, ExportIndex, InstructionLimits, NumericInstance,
+    Opcode, ValidatedModule, ValidationLimits, decode_instructions, decode_module, scan_module,
+    validate_module,
 };
 
 use crate::Target;
@@ -21,6 +22,8 @@ pub(crate) fn seeds() -> impl Iterator<Item = Vec<u8>> {
         b"\0asm\x01\0\0\0\x01\x04\x01\x60\0\0\x03\x02\x01\0\x09\x05\x01\x03\0\x01\0\x0a\x08\x01\x06\0\xd2\0\xd1\x1a\x0b",
         // An extended constant expression reading an earlier immutable global.
         b"\0asm\x01\0\0\0\x06\x0e\x02\x7f\0\x41\x05\x0b\x7f\0\x23\0\x41\x01\x6a\x0b",
+        // An exported loop which exercises the interpreter's work limit.
+        b"\0asm\x01\0\0\0\x01\x04\x01\x60\0\0\x03\x02\x01\0\x07\x07\x01\x03run\0\0\x0a\x09\x01\x07\0\x03\x40\x0c\0\x0b\x0b",
     ];
     modules
         .iter()
@@ -96,11 +99,52 @@ impl Target for WasmBinaryTarget {
             Err(error) if error.offset <= input.len() => return Ok(()),
             Err(error) => return Err(format!("module decoder error outside input: {error}")),
         };
-        if let Err(error) = validate_module(decoded, ValidationLimits::default(), &token) {
-            if error.offset > input.len() {
-                return Err(format!("validator error outside input: {error}"));
-            }
+        match validate_module(decoded, ValidationLimits::default(), &token) {
+            Ok(validated) => check_execution(&validated, input.len(), &token),
+            Err(error) if error.offset <= input.len() => Ok(()),
+            Err(error) => Err(format!("validator error outside input: {error}")),
         }
-        Ok(())
     }
+}
+
+fn check_execution(
+    validated: &ValidatedModule<'_>,
+    input_len: usize,
+    token: &CancellationToken,
+) -> Result<(), String> {
+    let module = validated.module();
+    let limits = ExecutionLimits {
+        preparation_work: 16_384,
+        invocation_work: 512,
+        values: 256,
+        calls: 32,
+        control_frames: 64,
+    };
+    let instance = match NumericInstance::instantiate(validated, limits, token) {
+        Ok(instance) => instance,
+        Err(error) if error.offset <= input_len => return Ok(()),
+        Err(error) => return Err(format!("instantiation error outside input: {error}")),
+    };
+    let declarations = module.declarations();
+    for export in declarations.exports.iter().take(4) {
+        let ExportIndex::Function(index) = export.value.target else {
+            continue;
+        };
+        let function = &module.functions()[index as usize];
+        let ty = &declarations.types[function.value.type_index as usize].value;
+        if !ty.params.is_empty() {
+            continue;
+        }
+        match instance.invoke(export.value.name, &[], token) {
+            Ok(results)
+                if results
+                    .iter()
+                    .map(|v| v.value_type())
+                    .eq(ty.results.iter().copied()) => {}
+            Ok(_) => return Err("executed result disagrees with the export signature".to_owned()),
+            Err(error) if error.offset <= input_len => {}
+            Err(error) => return Err(format!("execution error outside input: {error}")),
+        }
+    }
+    Ok(())
 }

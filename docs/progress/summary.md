@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 48.66%** = 44.77% verified complete + 3.89% partial credit. 108/228 capabilities complete, 16 in progress.
+**Overall completion: 48.66%** = 44.77% verified complete + 3.89% partial credit. 108/228 capabilities complete, 17 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `3bea3b6e83626f4bb7e6333178d789bda21e05385b70e65ddba83ef0c894e1a8`.
+Catalog: `engine-v4`. Source fingerprint: `ec003362399a2675f19f6b537f99168afa2e78fd353c775d61509ceb3148abf7`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `3bea3b6e83626f4bb7e6333178d789bda21e0
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
-| WebAssembly | 0/8 | 2 | 0.00% | 0.00% | 3% | 0.00 |
+| WebAssembly | 0/8 | 3 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 9/12 | 0 | 70.45% | 70.45% | 5% | 3.52 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -199,7 +199,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 - **in progress 0.00%** `wasm.decode` — Bounded binary decoder and malformed-module handling · size 2 · M9 · 0.17% of engine ([source](../../crates/rustic-wasm/src/binary.rs), [source](../../crates/rustic-wasm/src/sections.rs), [test](../../crates/rustic-wasm/tests/sections.rs), [test](../../crates/rustic-wasm/tests/binary.rs), [test](../../crates/rustic-wasm/tests/instructions.rs), [source](../../crates/rustic-fuzz/src/wasm.rs))
 - **in progress 0.00%** `wasm.validate` — Complete selected type/instruction/module validation · size 3 · M9 · 0.26% of engine ([source](../../crates/rustic-wasm/src/validate.rs), [test](../../crates/rustic-wasm/tests/validation.rs), [test](../../crates/rustic-wasm/tests/validation.rs))
-- **planned** `wasm.execute` — Original interpreter, numerics, control flow and traps · size 5 · M9 · 0.44% of engine
+- **in progress 0.00%** `wasm.execute` — Original interpreter, numerics, control flow and traps · size 5 · M9 · 0.44% of engine ([source](../../crates/rustic-wasm/src/execute.rs), [test](../../crates/rustic-wasm/tests/execution.rs), [test](../../crates/rustic-wasm/tests/execution.rs))
 - **planned** `wasm.instances` — Memories, tables, globals, instances and resource limits · size 3 · M9 · 0.26% of engine
 - **planned** `wasm.web` — Streaming Web API, MIME/CSP and capability-safe imports · size 3 · M9 · 0.26% of engine
 - **planned** `wasm.features` — Required reference/GC, exception, SIMD, shared-memory and baseline features · size 8 · M9 · 0.70% of engine

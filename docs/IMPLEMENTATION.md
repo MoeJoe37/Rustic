@@ -3256,5 +3256,23 @@ The integration suites in `crates/rustic-wasm/tests/sections.rs` and
 polymorphism, initializer visibility, and cancellation and resource limits.
 The `wasm-binary` fuzz target exercises both passes. GC and concrete reference
 types, SIMD, exception instructions, shared memory, and 64-bit addressing
-remain outside the supported profile. Instantiation and execution are pending.
+remain outside the supported profile.
 [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)
+
+## WASM-03 — Bounded numeric interpreter
+
+`NumericInstance::instantiate` prepares structured control targets and runs
+the optional start function. The interpreter executes validated scalar
+numeric instructions, locals, typed selection, multi-value control flow,
+direct calls and direct tail calls. It preserves float bit patterns for
+reinterpretation and reports Wasm traps at the originating instruction.
+Execution uses explicit stacks, with separate preparation, invocation,
+call-depth, control-frame and value limits. Cancellation is checked during
+preparation and execution. Each invocation starts with a fresh budget.
+
+`crates/rustic-wasm/tests/execution.rs` covers returns and branches that unwind
+frames, loop arguments, recursive calls, tail-call frame reuse, numeric
+boundaries, start traps and resource limits. The fuzz target runs compatible
+zero-argument exports under a small execution budget. Mutable globals,
+memories, tables, indirect calls and external imports require wider instance
+support. [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)

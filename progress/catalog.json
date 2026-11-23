@@ -4155,8 +4155,24 @@
           "label": "Original interpreter, numerics, control flow and traps",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/execute.rs",
+              "marker": "pub struct NumericInstance"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/execution.rs",
+              "marker": "fn direct_tail_calls_reuse_the_call_slot_even_inside_active_blocks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/execution.rs",
+              "marker": "fn numeric_evaluation_preserves_bits_and_traps_at_wasm_boundaries"
+            }
+          ]
         },
         {
           "id": "wasm.instances",

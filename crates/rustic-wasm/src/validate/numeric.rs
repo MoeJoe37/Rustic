@@ -1,7 +1,7 @@
 use crate::{Opcode, ValueType as Ty};
 use Ty::{F32, F64, I32, I64};
 
-pub(super) fn effect(op: Opcode) -> Option<(&'static [Ty], Ty)> {
+pub(crate) fn effect(op: Opcode) -> Option<(&'static [Ty], Ty)> {
     Some(match op {
         Opcode::Core(0x41) => (&[], I32),
         Opcode::Core(0x42) => (&[], I64),

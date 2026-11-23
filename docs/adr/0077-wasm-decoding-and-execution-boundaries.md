@@ -1,7 +1,7 @@
 # ADR 0077 — WebAssembly decoding and execution boundaries
 
 Date: 2026-11-23
-Status: Accepted for M9 WASM-01/02 foundations
+Status: Accepted for M9 WASM-01–03 foundations
 
 ## Context
 
@@ -25,10 +25,16 @@ Keep binary decoding and type validation as execution-independent stages. The
 validator builds import-first index spaces and checks bodies with explicit
 operand and control stacks. It budgets work across the module, including
 multi-value branches and initializer expressions. The validated module type
-can only be created by this pass. An interpreter will consume that type under
-separate stack, memory and execution limits, with host imports supplied through
-an embedding adapter. A later compilation tier requires its own executable
-memory and platform review. Every host retains the interpreter.
+can only be created by this pass. The numeric interpreter consumes that type,
+resolves structured control targets in a bounded preparation pass, and runs
+functions using explicit value, local, call and control stacks. Invocation work
+and stack budgets apply to the start function and every export call. Trap
+diagnostics retain byte offsets because the interpreter reads the validated
+instructions directly.
+
+Host imports will be supplied through an embedding adapter. Mutable instance
+state will have its own allocation limits. A later compilation tier requires
+its own executable memory and platform review. Every host retains the interpreter.
 
 ## Alternatives and consequences
 
@@ -49,8 +55,10 @@ instructions need further coverage before the selected product profile is
 complete.
 
 Tests check framing and declaration encodings, initializer visibility, operand
-types, branch targets, index spaces, cancellation and cumulative budgets. The
-`wasm-binary` fuzz target checks offsets and read boundaries through decoding and
-validation on mutated modules. Revisit the representation when the interpreter
-needs a different ownership or instruction layout, or when concrete reference
-types need subtype and canonical identity information.
+types, branch targets, index spaces, cancellation and cumulative budgets.
+Execution tests exercise numerical results and traps, recursive and tail calls,
+loop and block branches, start traps, and work and stack limits. The
+`wasm-binary` fuzz target exercises decoding, validation, and bounded numeric
+execution on mutated modules. Revisit the representation when concrete
+reference types need subtype and canonical identity information, or when
+instantiation requires an owned input lifetime.

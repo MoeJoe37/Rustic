@@ -6,7 +6,7 @@ use crate::module::*;
 use crate::{Immediate, Instruction, Opcode, ValueType};
 
 mod body;
-mod numeric;
+pub(crate) mod numeric;
 
 /// Index spaces checked by the validator.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

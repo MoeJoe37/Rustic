@@ -1,4 +1,4 @@
-//! Debugger hooks (ADR 0069): breakpoints, stepping, `debugger`
+//! Debugger hooks (ADR 0072): breakpoints, stepping, `debugger`
 //! statements, stacks and scopes, and the guarantees that debugging is
 //! off unless attached and that a pause cannot run page code.
 

@@ -1,4 +1,4 @@
-//! Source-level debugging hooks for the bytecode VM (ADR 0069).
+//! Source-level debugging hooks for the bytecode VM (ADR 0072).
 //!
 //! Debugging costs nothing unless a host attaches a [`DebugHook`] before
 //! scripts compile. With a hook attached, [`Agent::evaluate_source`]

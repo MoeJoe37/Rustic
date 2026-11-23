@@ -493,7 +493,7 @@ pub enum Op {
     /// No operation (`debugger` without a debugger attached).
     Nop,
     /// A statement starts: entry `point` of the code's debug points. Only
-    /// code compiled with a debugger attached has these (ADR 0069).
+    /// code compiled with a debugger attached has these (ADR 0072).
     Step { point: u32 },
     /// A `debugger` statement compiled with a debugger attached: always
     /// pauses while one is attached.
@@ -609,7 +609,7 @@ pub struct FunctionCode {
     /// environment slot of each parameter; [`UNMAPPED_PARAMETER`] for a
     /// parameter that a later one of the same name hides.
     pub arguments_map: Option<Box<[u16]>>,
-    /// The debugger's script id for this code, or 0 (ADR 0069).
+    /// The debugger's script id for this code, or 0 (ADR 0072).
     pub script: u32,
     /// Statement starts, indexed by [`Op::Step`] operands.
     pub(crate) debug_points: Box<[crate::debug::DebugPoint]>,

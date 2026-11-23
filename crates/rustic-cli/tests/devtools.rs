@@ -1,4 +1,4 @@
-//! `rustic automate` (ADR 0069): inspection, console, evaluation, input,
+//! `rustic automate` (ADR 0072): inspection, console, evaluation, input,
 //! the debugger, profiling and network diagnostics through the automation
 //! protocol, and the acceptance checks for its authority and privacy
 //! model: grants enforced by the broker, no remote endpoint, redacted

@@ -454,7 +454,7 @@ impl<'a, 't> Gen<'a, 't> {
         Ok(self.agent.heap.alloc_code(code)?)
     }
 
-    // ---- debugging (ADR 0069) ----------------------------------------
+    // ---- debugging (ADR 0072) ----------------------------------------
 
     /// Record a statement start at source `offset` with the register
     /// bindings visible in the current scope; returns its point index.

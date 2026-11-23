@@ -383,7 +383,7 @@ pub struct Agent {
     /// Recently compiled patterns, most recent last, so a pattern built
     /// in a loop is parsed and compiled once.
     pub(crate) regexp_cache: Vec<RegExpCacheEntry>,
-    /// The attached debugger (ADR 0069).
+    /// The attached debugger (ADR 0072).
     pub(crate) debug: Option<Box<crate::debug::DebugState>>,
 }
 

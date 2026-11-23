@@ -122,9 +122,39 @@ def window_page(path: Path, directory: Path, support: list[str] = ()) -> bytes:
     return source
 
 
-def run_case(binary: Path, name: str, directory: Path, support: list[str] = ()) -> list[dict]:
-    page = directory / "case.html"
-    page.write_bytes(window_page(UPSTREAM / name, directory, support))
+# The automation protocol commands that read the harness report
+# (ADR 0072): the root element, then its attributes.
+AUTOMATION_COMMANDS = (
+    '{"id":1,"method":"dom.query","params":{"selector":":root"}}\n'
+    '{"id":2,"method":"dom.attributes","params":{"node":1}}\n'
+    '{"id":3,"method":"session.close"}\n'
+)
+
+
+def automation_report(binary: Path, name: str, page: Path) -> str:
+    """Read the harness report through `rustic automate` with only the
+    read-only inspect grant."""
+    result = subprocess.run(
+        [str(binary), "automate", "--devtools-allow", "inspect", str(page)],
+        input=AUTOMATION_COMMANDS, check=False, capture_output=True, encoding="utf-8", timeout=60,
+    )
+    if result.returncode:
+        raise ValueError(f"{name}: automation session failed: {result.stderr.strip()}")
+    responses = {}
+    for line in result.stdout.splitlines():
+        message = json.loads(line)
+        if "id" in message:
+            responses[message["id"]] = message
+    if responses.get(1, {}).get("result") != {"nodes": [1]}:
+        raise ValueError(f"{name}: no root element: {responses.get(1)}")
+    attributes = dict(responses.get(2, {}).get("result", {}).get("attributes", []))
+    report = attributes.get("data-rustic-wpt-output")
+    if report is None or not re.fullmatch(r"[0-9a-f]+", report):
+        raise ValueError(f"{name}: upstream harness did not send one completion report")
+    return report
+
+
+def dump_dom_report(binary: Path, name: str, page: Path) -> str:
     result = subprocess.run(
         [str(binary), "dump-dom", "--run-scripts", str(page)],
         check=False, capture_output=True, encoding="utf-8", timeout=30,
@@ -134,7 +164,15 @@ def run_case(binary: Path, name: str, directory: Path, support: list[str] = ()) 
     reports = REPORT_ATTRIBUTE.findall(result.stdout)
     if len(reports) != 1:
         raise ValueError(f"{name}: upstream harness did not send one completion report")
-    report = json.loads(bytes.fromhex(reports[0]).decode("utf-16be"))
+    return reports[0]
+
+
+def run_case(binary: Path, name: str, directory: Path, support: list[str] = (),
+             driver: str = "automate") -> list[dict]:
+    page = directory / "case.html"
+    page.write_bytes(window_page(UPSTREAM / name, directory, support))
+    read = automation_report if driver == "automate" else dump_dom_report
+    report = json.loads(bytes.fromhex(read(binary, name, page)).decode("utf-16be"))
     if report["status"] != 0 or not report["tests"]:
         raise ValueError(f"{name}: harness status {report['status']}: {report['message']}")
     records = []
@@ -150,7 +188,7 @@ def run_case(binary: Path, name: str, directory: Path, support: list[str] = ()) 
     return records
 
 
-def run(binary: Path, cases: list[str]) -> dict:
+def run(binary: Path, cases: list[str], driver: str = "automate") -> dict:
     support = support_files(json.loads(MANIFEST.read_text(encoding="utf-8")))
     with tempfile.TemporaryDirectory(prefix="rustic-wpt-") as temp:
         directory = Path(temp)
@@ -162,13 +200,15 @@ def run(binary: Path, cases: list[str]) -> dict:
             raise ValueError("support file basenames must be unique")
         for name in support:
             shutil.copyfile(UPSTREAM / name, directory / Path(name).name)
-        return {name: run_case(binary, name, directory, support) for name in cases}
+        return {name: run_case(binary, name, directory, support, driver) for name in cases}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rustic", type=Path, help="path to the built CLI executable")
     parser.add_argument("--record", action="store_true", help="replace the baseline for review")
+    parser.add_argument("--driver", choices=("automate", "dump-dom"), default="automate",
+                        help="read results through the automation protocol (default) or a DOM dump")
     args = parser.parse_args()
     if args.record and args.rustic is None:
         parser.error("--record needs --rustic")
@@ -178,7 +218,7 @@ def main() -> int:
         if args.rustic is None:
             print(f"Verified pinned assets and expectations for {len(cases)} Window WPT files")
             return 0
-        actual = run(args.rustic.resolve(strict=True), cases)
+        actual = run(args.rustic.resolve(strict=True), cases, args.driver)
         validate_expectations(actual, cases)
         if args.record:
             EXPECTATIONS.write_text(json.dumps(actual, indent=2) + "\n", encoding="utf-8")
@@ -190,8 +230,9 @@ def main() -> int:
                 return 1
         counts = Counter(item["status"] for records in actual.values() for item in records)
         statuses = ", ".join(f"{counts[name]} {name}" for name in STATUS if counts[name])
-        print(f"{len(cases)} Window WPT files, {counts.total()} subtests: {statuses}")
-    except (OSError, ValueError, KeyError, IndexError, TypeError, subprocess.TimeoutExpired) as exc:
+        print(f"{len(cases)} Window WPT files via {args.driver}, {counts.total()} subtests: {statuses}")
+    except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
+            subprocess.TimeoutExpired) as exc:
         print(f"Window WPT: {exc}", file=sys.stderr)
         return 1
     return 0

@@ -92,7 +92,7 @@ pub struct LoaderLimits {
     /// closes the channel.
     pub live: bool,
     /// `--devtools-allow LIST`: what an automation session may do
-    /// (ADR 0069); `None` unless given.
+    /// (ADR 0072); `None` unless given.
     pub devtools: Option<rustic_devtools::Grants>,
 }
 
@@ -742,7 +742,7 @@ fn run_scripted_load(
     let cancellation = load.cancellation().expect("admitted load").clone();
     let applied_files = applied_snapshot(limits);
     // An automation session sets up its debugger and breakpoints before
-    // any HTML is parsed (ADR 0069).
+    // any HTML is parsed (ADR 0072).
     let devtools = crate::devtools::active();
     if let Some(session) = &devtools {
         session.attach(&mut load, &source.url)?;
@@ -841,6 +841,13 @@ fn run_scripted_load(
         }
         settle_now(&mut document, &mut queued_turns, &mut turns)?;
     }
+    // A static load takes its one rendering opportunity (animation frame
+    // callbacks, resize observations) before the automation session reads
+    // the page, so the session sees what the dump would.
+    if !animated {
+        document.offer_rendering_opportunity()?;
+        document.run_next_with_render(|_, _| ())?;
+    }
     // The automation session drives the settled page until it closes.
     if let Some(session) = &devtools {
         session.loaded(&mut document);
@@ -936,9 +943,6 @@ fn run_scripted_load(
             }
             frames.push((surface, report));
         }
-    } else {
-        document.offer_rendering_opportunity()?;
-        document.run_next_with_render(|_, _| ())?;
     }
     print_console(&document);
     let scroll = document.scroll_state();

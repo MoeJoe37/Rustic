@@ -1,4 +1,4 @@
-//! Rustic's automation and DevTools protocol (ADR 0069).
+//! Rustic's automation and DevTools protocol (ADR 0072).
 //!
 //! `rustic automate` serves one page over standard input and output: the
 //! client writes one JSON command per line and reads one JSON response per

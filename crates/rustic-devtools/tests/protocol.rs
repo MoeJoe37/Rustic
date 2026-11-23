@@ -1,4 +1,4 @@
-//! The automation protocol's gate, codec and redaction (ADR 0069).
+//! The automation protocol's gate, codec and redaction (ADR 0072).
 
 use rustic_devtools::authority::{Grant, Grants, METHODS, required_grant};
 use rustic_devtools::json::{JsonError, MAX_DEPTH, Value};

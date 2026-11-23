@@ -1,4 +1,4 @@
-//! What an automation client may do (ADR 0069).
+//! What an automation client may do (ADR 0072).
 //!
 //! Every method belongs to one [`Grant`]. A session starts with the
 //! read-only [`Grants::DEFAULT`] set unless the user who launched it names

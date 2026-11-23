@@ -382,7 +382,7 @@ pub(crate) fn run_command(engine: &mut Engine, args: &[OsString]) -> Option<u8> 
 }
 
 /// `rustic automate`: serve the page to an automation client over the
-/// standard streams (ADR 0069). Scripts always run; the session's grants
+/// standard streams (ADR 0072). Scripts always run; the session's grants
 /// default to the read-only set.
 fn automate_command(engine: &mut Engine, args: &[OsString]) -> u8 {
     let (mut limits, path) = match parse_dump_args(args) {

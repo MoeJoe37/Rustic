@@ -306,7 +306,7 @@ impl<C: Clock> ClassicScriptLoad<C> {
         })
     }
 
-    /// Attach a debugger to the document's agent (ADR 0069); call before
+    /// Attach a debugger to the document's agent (ADR 0072); call before
     /// feeding HTML so every script gets statement steps.
     pub fn set_debug_hook(
         &mut self,

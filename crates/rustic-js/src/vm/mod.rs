@@ -97,7 +97,7 @@ impl Agent {
                 other => EvalError::Parse(other),
             })?;
             // With a debugger attached, the script gets an id and steps
-            // (ADR 0069); the id is cleared again whatever compiling did.
+            // (ADR 0072); the id is cleared again whatever compiling did.
             let script = if self.debug.is_some() {
                 self.debug_register(source)
             } else {

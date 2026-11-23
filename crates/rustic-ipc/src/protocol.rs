@@ -414,7 +414,7 @@ pub enum BrokerMessage {
     /// Input or a frame request for a long-lived page (`render --live`).
     Page(PageInput),
     /// The reply to [`RendererMessage::AutomationRead`] number `id`: the
-    /// next automation command the broker admitted (ADR 0069), or `None`
+    /// next automation command the broker admitted (ADR 0072), or `None`
     /// when the client closed the session.
     AutomationCommand {
         /// The request number.
@@ -486,7 +486,7 @@ pub enum RendererMessage {
     /// answering [`PageInput::Accessibility`]; the broker decodes it as
     /// hostile input.
     Accessibility(Vec<u8>),
-    /// An automation protocol line for the client (ADR 0069); the broker
+    /// An automation protocol line for the client (ADR 0072); the broker
     /// forwards it only when it is one well-formed response or event.
     AutomationOutput(String),
     /// Ask for the next automation command.

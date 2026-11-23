@@ -834,7 +834,7 @@ impl<C: Clock> ScriptedDocument<C> {
             .map_or(0, page::take_listener_error_count)
     }
 
-    /// The page's script agent, for developer tools (ADR 0069): attaching
+    /// The page's script agent, for developer tools (ADR 0072): attaching
     /// a debugger, setting breakpoints, reading a stopped stack. Running
     /// script through it bypasses the turn bookkeeping; use
     /// [`Self::evaluate_for_devtools`] for that.

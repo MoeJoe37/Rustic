@@ -1,4 +1,4 @@
-//! Redaction of credentials in network diagnostics (ADR 0069).
+//! Redaction of credentials in network diagnostics (ADR 0072).
 //!
 //! The renderer never holds cookies or HTTP authentication: the broker
 //! keeps them. These helpers are a second line: whatever a diagnostic

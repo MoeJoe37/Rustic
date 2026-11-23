@@ -140,7 +140,7 @@ impl crate::loader::FrameHost for BrokerLink {
     }
 }
 
-/// The next automation command the broker admitted (ADR 0069); `None`
+/// The next automation command the broker admitted (ADR 0072); `None`
 /// when the session ended or this is not a renderer.
 pub(crate) fn automation_read() -> Option<String> {
     let link = FRAMES.with(|frames| frames.borrow().clone())?;
@@ -154,7 +154,7 @@ pub(crate) fn automation_read() -> Option<String> {
 }
 
 /// Send one automation protocol line to the broker, which forwards it to
-/// the client (ADR 0069).
+/// the client (ADR 0072).
 pub(crate) fn automation_write(line: &str) {
     if let Some(link) = FRAMES.with(|frames| frames.borrow().clone()) {
         let sent = link
@@ -393,7 +393,7 @@ fn compromised(mut channel: Link, document: &str, mode: &std::ffi::OsStr) -> u8 
     }
     if mode == "automation" {
         // Pull an automation command without being granted a session, then
-        // try to forge extra protocol lines for the client (ADR 0069).
+        // try to forge extra protocol lines for the client (ADR 0072).
         let pulled = channel
             .send(&RendererMessage::AutomationRead { id: 0 })
             .and_then(|()| channel.recv::<BrokerMessage>());

@@ -880,7 +880,7 @@ fn document_argument(
         }
         _ => {
             let (mut limits, path) = crate::parse_dump_args(args).ok()?;
-            // `automate` always runs scripts (ADR 0069).
+            // `automate` always runs scripts (ADR 0072).
             limits.run_scripts |= command == "automate";
             Some((limits, path, None))
         }
@@ -1401,7 +1401,7 @@ fn run_renderer(
                     });
                 }
                 RendererMessage::Diagnostic(text) => eprintln!("{}", EscapedText(&text)),
-                // An automation session (ADR 0069): only the top-level
+                // An automation session (ADR 0072): only the top-level
                 // renderer of `automate` has one. Its lines reach the
                 // client only when well-formed, and it receives only the
                 // commands this broker admitted for the session's grants.

@@ -1,4 +1,4 @@
-//! `rustic automate`: the automation and DevTools session (ADR 0069).
+//! `rustic automate`: the automation and DevTools session (ADR 0072).
 //!
 //! The session serves one page over the standard streams of the process
 //! the user started: commands arrive one JSON object per line and each
@@ -1362,7 +1362,7 @@ fn stdin_lines() -> &'static std::sync::Mutex<std::sync::mpsc::Receiver<String>>
     })
 }
 
-/// The broker's gate (ADR 0069): the next command line from standard
+/// The broker's gate (ADR 0072): the next command line from standard
 /// input that `grants` admits, answering refused lines itself so they
 /// never reach the renderer; `None` at the end of input or once `stop`
 /// is set (the renderer's watchdog fired).

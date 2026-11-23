@@ -56,7 +56,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 
 | Due | Entries | Why then |
 | --- | --- | --- |
-| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-161, TD-165, TD-134 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
+| M8, before remote browsing is on by default (was "M7 entry"; moved when M7 closed, ADR 0067) | TD-165, TD-134 | Costs that are only bounded by a budget, or memory that is not charged: acceptable for local fixtures and explicit `--allow-origin`/`--allow-remote` grants, an attack surface once the M8 shell browses remote pages without a flag |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166, TD-196 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
@@ -227,7 +227,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-159 | Deliberate | Network | No Public Suffix List is bundled: without a host-supplied list every domain's last label is its public suffix, so `co.uk`-style suffixes count as registrable | Paid 2026-11-20 |
 | TD-160 | Deliberate | Network / storage | The cookie jar and CORS-preflight cache are in memory and not keyed by network partition; one `Fetcher` is one profile | Paid 2026-11-20 |
 | TD-162 | Deliberate | Network / codecs | `gzip` and `deflate` response bodies are buffered whole (up to `max_body_bytes`) and inflated at the end of the body; only brotli decodes incrementally | Open, M12 |
-| TD-161 | Deliberate | Network | `Fetcher` blocks per hop, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*`, `Accept-Language` and the HTTP cache paid 2026-11-20) | Open, M7 entry |
+| TD-161 | Deliberate | Network | `Fetcher` blocks per hop, takes whole request bodies and has no Lax-allowing-unsafe window (`Referer`, `Sec-Fetch-*`, `Accept-Language` and the HTTP cache paid 2026-11-20) | Paid |
 | TD-163 | Deliberate | Network | CSP violation reports are returned to the caller (the console) but never sent: no `report-uri` or `report-to` delivery, no `securitypolicyviolation` event | Open, M9 web APIs |
 | TD-164 | Deliberate | Network / engine | CSP is enforced for scripts, `eval` and subresource URLs, but not for inline `<style>`, `style` attributes or inline event handlers in the engine | Paid 2026-11-20 |
 | TD-165 | Deliberate | Network / CLI | CLI network loads read each body whole and fetch subresources one at a time on the calling thread; the quirks-mode same-origin stylesheet MIME exception is missing | Open, M7 entry |
@@ -2684,7 +2684,7 @@ site plus frame site), a versioned on-disk schema for persistent profiles
 and an ephemeral one for private mode.
 **Trigger:** NET-06 (`storage.profiles`, `storage.partition`).
 
-### TD-161 — Fetcher is a blocking, cache-less prototype
+### TD-161 — Fetcher is a blocking, cache-less prototype (Paid)
 
 **Rescheduled 2026-11-20 (M6 completion):** the HTTP cache, referrer computation and fetch metadata are done. What remains is the event-driven controller, which belongs to the M7 network process (ISO-02), and the Lax-allowing-unsafe exception, a Chromium compatibility allowance Rustic may never adopt (decide with M7 cookie policy review).
 
@@ -2701,6 +2701,8 @@ and fetch metadata (both done 2026-11-20: the `referrer` module and the
 **Trigger:** the engine loading subresources over HTTP (NET-02 wiring) or
 the script-facing `fetch()` binding, whichever comes first.
 **Rescheduled 2026-11-22:** M7 closed with this entry open ([ADR 0067](adr/0067-mobile-devices-last.md)); it is now due in M8, before remote browsing is on by default or the browser shell ships, as the payoff schedule records.
+
+**Paid 2026-11-23** (M8 workstream 5): `Fetcher::begin` now runs a fetch as a non-blocking state machine (`PendingFetch`: redirects, CORS preflight, cache revalidation and the client policy before every hop), and `FetchController` runs many of them over one `Fetcher`, each `Exchange` waking a shared `Signal` instead of blocking per hop; `fetch_checked` is a thin loop over it. The CLI network session uses it to load a document's subresources side by side, in process and through the broker (TD-165). The cookie jar adopts Chromium's Lax-allowing-unsafe window (120 seconds for a cookie without `SameSite`, not for cookies restored from a profile; ADR 0054 updated). Streaming request bodies need `ReadableStream`, which does not exist yet, so they moved to TD-169 with the rest of Streams. Tests: `the_controller_runs_fetches_concurrently`, `the_controller_checks_every_hop_and_cancels` (rustic-net `tests/fetch.rs`), `same_site_rules` (cookie tests), `subresources_load_concurrently` (rustic-cli `tests/network.rs`).
 
 ### TD-162 — gzip and deflate bodies are not streamed
 
@@ -2809,7 +2811,8 @@ The static `Response.json()` factory uses intrinsic JSON serialization.
 
 **Pay:** the event-driven fetch controller of TD-161 queuing response and
 body tasks on the networking task source, Streams and FormData body
-support, `AbortSignal`, upload progress and `<base>`.
+support (including streaming request bodies, moved here from TD-161 on
+2026-11-23), `AbortSignal`, upload progress and `<base>`.
 **Trigger:** the M9 web platform APIs work (Streams, Blob, FormData).
 
 ### TD-170 — IPC copies bodies and serializes requests

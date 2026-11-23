@@ -27,6 +27,10 @@ pub use parse::{
 
 use crate::site::{PublicSuffixList, Site, is_potentially_trustworthy_url};
 
+/// How long a cookie without `SameSite` also accompanies top-level
+/// cross-site unsafe requests (Chromium's Lax-allowing-unsafe window).
+pub const LAX_ALLOWING_UNSAFE_SECONDS: i64 = 120;
+
 /// A stored cookie (§5.7 "cookie" fields).
 #[derive(Clone, Eq, PartialEq)]
 pub struct Cookie {
@@ -37,6 +41,9 @@ pub struct Cookie {
     domain: String,
     path: String,
     creation: u64,
+    /// Unix seconds when first stored (kept across replacements), for
+    /// the Lax-allowing-unsafe window; `i64::MIN` when unknown.
+    created_at: i64,
     last_access: u64,
     host_only: bool,
     secure_only: bool,
@@ -442,6 +449,7 @@ impl CookieJar {
             domain,
             path,
             creation,
+            created_at: now,
             last_access: creation,
             host_only,
             secure_only: parsed.secure,
@@ -459,6 +467,7 @@ impl CookieJar {
                 return Err(CookieRejection::HttpOnly);
             }
             cookie.creation = self.cookies[index].creation;
+            cookie.created_at = self.cookies[index].created_at;
             self.cookies.remove(index);
         }
         if !cookie.is_expired(now) {
@@ -554,8 +563,17 @@ impl CookieJar {
                     || match cookie.same_site {
                         SameSite::None => true,
                         SameSite::Strict => false,
-                        SameSite::Lax | SameSite::Default => {
-                            context.top_level_navigation && context.safe_method
+                        SameSite::Lax => context.top_level_navigation && context.safe_method,
+                        // Lax-by-default, with Chromium's Lax-allowing-unsafe
+                        // window: a cookie without `SameSite` younger than two
+                        // minutes also goes with a top-level cross-site
+                        // `POST`, as in a login form posted back to its site.
+                        SameSite::Default => {
+                            context.top_level_navigation
+                                && (context.safe_method
+                                    || now.checked_sub(cookie.created_at).is_some_and(|age| {
+                                        (0..=LAX_ALLOWING_UNSAFE_SECONDS).contains(&age)
+                                    }))
                         }
                     };
                 host_ok

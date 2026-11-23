@@ -312,8 +312,22 @@ fn same_site_rules() {
         safe_method: false,
         ..navigation.clone()
     };
+    // Lax-allowing-unsafe: a cookie without SameSite goes with a
+    // top-level cross-site POST for two minutes after it was first set,
+    // and replacing it does not restart the window.
     assert_eq!(
         jar.cookie_header(&unsafe_navigation, NOW).as_deref(),
+        Some("default=1; none=1")
+    );
+    let late = NOW + super::LAX_ALLOWING_UNSAFE_SECONDS;
+    jar.set_cookie("default=2", &first_party(&target), late)
+        .unwrap();
+    assert_eq!(
+        jar.cookie_header(&unsafe_navigation, late).as_deref(),
+        Some("default=2; none=1")
+    );
+    assert_eq!(
+        jar.cookie_header(&unsafe_navigation, late + 1).as_deref(),
         Some("none=1")
     );
     // Storing from a cross-site subresource needs SameSite=None; a

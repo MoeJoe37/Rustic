@@ -124,6 +124,9 @@ impl CookieJar {
                 domain,
                 path,
                 creation: 0,
+                // A restored cookie's age is unknown, so it gets no
+                // Lax-allowing-unsafe window.
+                created_at: i64::MIN,
                 last_access: 0,
                 host_only: *host_only == 1,
                 secure_only: *secure_only == 1,

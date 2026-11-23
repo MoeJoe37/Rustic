@@ -64,8 +64,11 @@ and whether `Secure` cookies work on `http://localhost`.
 - The vendored list goes stale; `tools/import_public_suffix_list.py`
   re-pins it, and a profile may supply a newer list at runtime.
 - Lax-by-default breaks some cross-site `POST` login flows that Chromium
-  works around with a two-minute "Lax-allowing-unsafe" window; Rustic
-  does not have that window.
+  works around with a two-minute "Lax-allowing-unsafe" window. Rustic
+  adopted that window on 2026-11-23 (TD-161): a cookie without `SameSite`
+  also accompanies a top-level cross-site unsafe request for 120 seconds
+  after it was first stored. A cookie restored from a profile has no
+  known age and gets no window.
 
 ## Validation
 

@@ -172,10 +172,14 @@ jobs:
             | grep -i rustic | sort | uniq -c | sort -rn | head -150 || true
           ls -t ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i rustic | head -3 \
             | while read -r report; do head -80 ~/Library/Logs/DiagnosticReports/"$report"; done || true
-      - name: Report the GPU adapter with and without the sandbox (TD-186)
-        # Evidence for the Windows and macOS GPU sandbox profiles: which
-        # adapter (WARP, Metal) the GPU process reaches on this runner.
+      - name: Require the sandboxed GPU process to reach the adapter (TD-186)
+        # The Windows Rustic.Gpu AppContainer and the macOS Seatbelt GPU
+        # profile must reach the same adapter (WARP, Metal) as an
+        # unconfined GPU process; Linux enforces this in the test job.
         if: runner.os != 'Linux'
+        shell: bash
+        env:
+          RUSTIC_REQUIRE_CONFINED_GPU: "1"
         run: cargo test --locked -p rustic-cli --test gpu the_gpu_adapter_report -- --nocapture | grep '^gpu adapter' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Test documentation examples
         run: cargo test --locked --workspace --doc

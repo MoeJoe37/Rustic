@@ -498,8 +498,9 @@ impl Compositor {
 /// kind ("Validation Error"), which says nothing about what was refused.
 fn describe(error: &wgpu::Error) -> String {
     let text = match error {
-        wgpu::Error::Validation { description, .. }
-        | wgpu::Error::Internal { description, .. } => description.trim().to_owned(),
+        wgpu::Error::Validation { description, .. } | wgpu::Error::Internal { description, .. } => {
+            description.trim().to_owned()
+        }
         other => other.to_string(),
     };
     text.split_whitespace().collect::<Vec<_>>().join(" ")

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 49.80%** = 47.74% verified complete + 2.06% partial credit. 114/228 capabilities complete, 12 in progress.
+**Overall completion: 50.03%** = 48.43% verified complete + 1.60% partial credit. 115/228 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `49c0e528674145b8b52245fd4c8ebd2f7b896652d3eeb201679e8bd601ef83b8`.
+Catalog: `engine-v4`. Source fingerprint: `259259f40668d09a544eff0d769ab80cda5449df8d255ec2958c8f6605b6ed58`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `49c0e528674145b8b52245fd4c8ebd2f7b896
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.60% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 15/18 | 91.68% | 77.69% | 8.12% |
+| M8 Desktop alpha | 16/18 | 94.52% | 86.20% | 8.12% |
 | M9 Compatibility expansion | 3/54 | 5.19% | 2.63% | 22.35% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.83% | 0.00% | 14.74% |
@@ -46,7 +46,7 @@ Catalog: `engine-v4`. Source fingerprint: `49c0e528674145b8b52245fd4c8ebd2f7b896
 | Network & navigation | 6/8 | 0 | 75.00% | 75.00% | 4% | 3.00 |
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 7/11 | 1 | 67.44% | 62.79% | 5% | 3.37 |
-| Compositor & GPU | 2/5 | 2 | 69.23% | 38.46% | 3% | 2.07 |
+| Compositor & GPU | 3/5 | 1 | 76.92% | 61.53% | 3% | 2.30 |
 | Platform hosts | 6/9 | 0 | 66.66% | 66.66% | 4% | 2.66 |
 | Accessibility | 3/5 | 1 | 75.00% | 64.28% | 2% | 1.50 |
 | DevTools | 4/4 | 0 | 100.00% | 100.00% | 1% | 1.00 |
@@ -299,10 +299,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 ### Compositor & GPU
 
 - **complete** `compositor.scene` — Incremental scene submission and scrolling · size 3 · M8 · 0.69% of engine ([source](../../crates/rustic-layout/src/scroll.rs), [source](../../docs/adr/0064-scrolling-and-compositor-scenes.md), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-layout/tests/scroll.rs), [test](../../crates/rustic-cli/tests/scroll.rs), [source](../../crates/rustic-raster/src/scene.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-raster/src/frames.rs), [source](../../crates/rustic-cli/src/lib.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/frames_render.rs), [source](../../crates/rustic-bindings/src/page/scrolling.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-cli/tests/scroll.rs))
-- **in progress 66.66%** `compositor.backend` — Desktop GPU adapters and CPU fallback · size 3 · M8 · 0.69% of engine
-  - [x] Vulkan, Metal and Direct3D 12 through wgpu in the GPU process with CPU fallback (ADR 0071) ([source](../../crates/rustic-gpu/src/lib.rs), [source](../../crates/rustic-gpu/src/lib.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
-  - [x] Driver access for the confined GPU process: Linux profile ([source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-sandbox/src/seccomp.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
-  - [ ] Driver access for the confined GPU process: Windows AppContainer and macOS Seatbelt GPU profiles, verified on GPU hardware (TD-186)
+- **complete** `compositor.backend` — Desktop GPU adapters and CPU fallback · size 3 · M8 · 0.69% of engine ([source](../../crates/rustic-gpu/src/lib.rs), [source](../../crates/rustic-gpu/src/lib.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [source](../../crates/rustic-cli/src/broker.rs), [test](../../crates/rustic-sandbox/src/seccomp.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [source](../../crates/rustic-sandbox/src/windows.rs), [source](../../crates/rustic-sandbox/src/seatbelt.rs), [test](../../crates/rustic-sandbox/src/seatbelt.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
 - **planned** `compositor.mobile` — Android and iOS GPU adapters verified on devices · size 2 · M14 · 0.46% of engine
 - **complete** `compositor.recovery` — Surface/device loss, GPU process crash/restart and resource recovery · size 2 · M8 · 0.46% of engine ([source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [test](../../crates/rustic-cli/tests/gpu.rs), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [source](../../crates/rustic-cli/src/gpuproc.rs), [test](../../crates/rustic-gpu/tests/parity.rs), [test](../../crates/rustic-cli/tests/gpu.rs))
 - **in progress 66.66%** `compositor.parity` — GPU/reference parity, performance and energy gates · size 3 · M8 · 0.69% of engine · **external dependency:** Needs a machine with a hardware GPU and power counters (self-hosted runner or contributor hardware): no GitHub-hosted runner has either; the benchmark and budgets are ready (docs/PERFORMANCE.md, "GPU frame budgets")

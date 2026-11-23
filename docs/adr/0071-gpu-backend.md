@@ -1,7 +1,7 @@
 # ADR 0071 — GPU backend: wgpu inside the GPU process
 
 Date: 2026-11-23
-Status: Accepted (desktop backends; window surfaces with TD-185, mobile devices in M14)
+Status: Accepted (desktop backends and GPU sandbox profiles; window surfaces with TD-185, mobile devices in M14)
 
 ## Context
 
@@ -54,11 +54,16 @@ nothing stale, and the page is never affected by which compositor ran it
    that adds `memfd_create` and `ftruncate` (anonymous memory files for
    driver allocations) to the renderer allowlist. It still has no network,
    no home directory, no writable file system and cannot start programs.
-6. **Windows and macOS stay on the renderer profiles for now.** The
-   confined GPU process uses the `Rustic.Renderer` AppContainer and the
-   Seatbelt renderer profile, which grant no driver services; there the
-   device may fail to open and the confined process composites on the CPU
-   (`--no-sandbox` reaches the hardware). GPU-specific profiles are TD-186.
+6. **Windows and macOS GPU profiles (TD-186, paid 2026-11-23).** On
+   Windows the GPU process runs in its own less privileged `Rustic.Gpu`
+   AppContainer holding only `registryRead` and `lpacPnpNotifications`
+   (driver registration and device arrival). On macOS the Seatbelt GPU
+   profile adds the graphics IOKit user clients by class, IOKit property
+   reads, the Metal compiler and GPU memory services, driver bundle reads
+   and metadata reads of the binary's directory and its parents (IOSurface
+   reads the main bundle's GPU policies). Neither grants network, writes,
+   user files, the window server or process creation. As first recorded,
+   both platforms used the renderer profiles and composited on the CPU.
 
 ## Alternatives considered
 
@@ -96,6 +101,12 @@ a device lost mid-run is reopened. CI installs lavapipe on Linux x64 and
 ARM64 and sets `RUSTIC_REQUIRE_GPU=1`, so both gates must find an adapter
 and cannot pass by skipping. The seccomp unit test checks the GPU filter
 adds only anonymous memory files.
+`the_gpu_adapter_report_with_and_without_the_sandbox` with
+`RUSTIC_REQUIRE_CONFINED_GPU=1` requires the confined GPU process to reach
+the unconfined adapter on every desktop test runner: lavapipe on Linux,
+WARP on Windows x64 and ARM64, paravirtual Metal on macOS x64 (run on
+3ae83ba). `the_gpu_profile_adds_only_graphics_drivers_and_metal_services`
+checks what the macOS profile adds.
 
 ## Revisit trigger
 

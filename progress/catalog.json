@@ -6332,55 +6332,57 @@
           "label": "Desktop GPU adapters and CPU fallback",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Vulkan, Metal and Direct3D 12 through wgpu in the GPU process with CPU fallback (ADR 0071)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-gpu/src/lib.rs",
-                  "marker": "pub fn composite"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-gpu/src/lib.rs",
-                  "marker": "const SHADER"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/gpu.rs",
-                  "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-gpu/src/lib.rs",
+              "marker": "pub fn composite"
             },
             {
-              "label": "Driver access for the confined GPU process: Linux profile",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "--dev-bind-try"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-sandbox/src/seccomp.rs",
-                  "marker": "fn the_gpu_filter_adds_anonymous_memory_files_only"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/gpu.rs",
-                  "marker": "fn the_sandboxed_gpu_process_cannot_reach_files_network_or_programs"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-gpu/src/lib.rs",
+              "marker": "const SHADER"
             },
             {
-              "label": "Driver access for the confined GPU process: Windows AppContainer and macOS Seatbelt GPU profiles, verified on GPU hardware (TD-186)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "--dev-bind-try"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-sandbox/src/seccomp.rs",
+              "marker": "fn the_gpu_filter_adds_anonymous_memory_files_only"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn the_sandboxed_gpu_process_cannot_reach_files_network_or_programs"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-sandbox/src/windows.rs",
+              "marker": "Self::Gpu => \"Rustic.Gpu\""
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-sandbox/src/seatbelt.rs",
+              "marker": "pub fn gpu_profile"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-sandbox/src/seatbelt.rs",
+              "marker": "fn the_gpu_profile_adds_only_graphics_drivers_and_metal_services"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn the_gpu_adapter_report_with_and_without_the_sandbox"
             }
           ]
         },

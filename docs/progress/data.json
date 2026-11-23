@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "49c0e528674145b8b52245fd4c8ebd2f7b896652d3eeb201679e8bd601ef83b8",
-  "percent": "49.80",
-  "verified_percent": "47.74",
-  "partial_percent": "2.06",
-  "completed": 114,
-  "in_progress": 12,
+  "source_fingerprint": "259259f40668d09a544eff0d769ab80cda5449df8d255ec2958c8f6605b6ed58",
+  "percent": "50.03",
+  "verified_percent": "48.43",
+  "partial_percent": "1.60",
+  "completed": 115,
+  "in_progress": 11,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -85,11 +85,11 @@
       "id": "M8",
       "label": "Desktop alpha",
       "share": "8.12",
-      "completed": 15,
+      "completed": 16,
       "total": 18,
-      "percent": "91.68",
-      "verified_percent": "77.69",
-      "partial_percent": "13.99"
+      "percent": "94.52",
+      "verified_percent": "86.20",
+      "partial_percent": "8.32"
     },
     {
       "id": "M9",
@@ -6888,58 +6888,60 @@
           "label": "Desktop GPU adapters and CPU fallback",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Vulkan, Metal and Direct3D 12 through wgpu in the GPU process with CPU fallback (ADR 0071)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-gpu/src/lib.rs",
-                  "marker": "pub fn composite"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-gpu/src/lib.rs",
-                  "marker": "const SHADER"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/gpu.rs",
-                  "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-gpu/src/lib.rs",
+              "marker": "pub fn composite"
             },
             {
-              "label": "Driver access for the confined GPU process: Linux profile",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/broker.rs",
-                  "marker": "--dev-bind-try"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-sandbox/src/seccomp.rs",
-                  "marker": "fn the_gpu_filter_adds_anonymous_memory_files_only"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/gpu.rs",
-                  "marker": "fn the_sandboxed_gpu_process_cannot_reach_files_network_or_programs"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-gpu/src/lib.rs",
+              "marker": "const SHADER"
             },
             {
-              "label": "Driver access for the confined GPU process: Windows AppContainer and macOS Seatbelt GPU profiles, verified on GPU hardware (TD-186)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/broker.rs",
+              "marker": "--dev-bind-try"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-sandbox/src/seccomp.rs",
+              "marker": "fn the_gpu_filter_adds_anonymous_memory_files_only"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn the_sandboxed_gpu_process_cannot_reach_files_network_or_programs"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-sandbox/src/windows.rs",
+              "marker": "Self::Gpu => \"Rustic.Gpu\""
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-sandbox/src/seatbelt.rs",
+              "marker": "pub fn gpu_profile"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-sandbox/src/seatbelt.rs",
+              "marker": "fn the_gpu_profile_adds_only_graphics_drivers_and_metal_services"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/gpu.rs",
+              "marker": "fn the_gpu_adapter_report_with_and_without_the_sandbox"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "0.69"
         },
         {
@@ -7065,13 +7067,13 @@
         }
       ],
       "points": 13,
-      "completed": 2,
-      "in_progress": 2,
+      "completed": 3,
+      "in_progress": 1,
       "total": 5,
-      "contribution": "2.07",
-      "percent": "69.23",
-      "verified_percent": "38.46",
-      "partial_percent": "30.77"
+      "contribution": "2.30",
+      "percent": "76.92",
+      "verified_percent": "61.53",
+      "partial_percent": "15.39"
     },
     {
       "id": "platform",

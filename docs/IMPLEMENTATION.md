@@ -2628,8 +2628,10 @@ result is the CPU reference's bytes.
 
 Test hook `RUSTIC_TEST_GPU_DEVICE` (`report`, `lose-on:N`). CI installs
 lavapipe on Linux and sets `RUSTIC_REQUIRE_GPU=1`, so the parity tests
-cannot pass by skipping. Open: Windows and macOS confined GPU processes
-have no driver access (TD-186), pixels still cross the pipe (TD-184), the
+cannot pass by skipping. Windows (`Rustic.Gpu` AppContainer) and macOS
+(Seatbelt GPU profile) confined GPU processes reach the driver, and CI
+requires the confined adapter to match the unconfined one on every desktop
+runner (TD-186 paid). Open: pixels still cross the pipe (TD-184), the
 window is presented by the broker (TD-185).
 
 ## TD-182 — Long-lived renderer per page

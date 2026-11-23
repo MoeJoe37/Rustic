@@ -1,0 +1,52 @@
+[package]
+name = "rustic-native"
+description = "Reviewed adapters to operating-system services: the DirectWrite and Core Text font services that name the platform's font files (ADR 0078)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "=0.62.2", default-features = false, features = [
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-core-foundation = { version = "=0.3.2", default-features = false, features = [
+    "std",
+    "CFBase",
+    "CFArray",
+    "CFCGTypes",
+    "CFString",
+    "CFURL",
+] }
+objc2-core-text = { version = "=0.3.2", default-features = false, features = [
+    "std",
+    "CTFont",
+    "CTFontDescriptor",
+    "CTFontTraits",
+] }
+
+# OS font services are C and COM APIs, so this crate calls `unsafe` code
+# (ADR 0078, after ADR 0060): denied, not forbidden, so only the
+# per-platform adapter modules can allow it, and every unsafe block must
+# state why it is sound. Everything else matches the workspace lints.
+[lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+allow_attributes_without_reason = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+
+[dev-dependencies]
+rustic-text = { path = "../rustic-text" }

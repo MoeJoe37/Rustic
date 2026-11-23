@@ -5,9 +5,9 @@
 //! fallback; the other granted faces join per-cluster fallback.
 //!
 //! `--system-fonts` (the default for `view`) grants the platform's own
-//! fonts instead (platform.native, ADR 0074): fontconfig's answers on Linux
-//! and the BSDs, the files [`rustic_text::native`] lists on Windows and
-//! macOS (and on Unix without fontconfig), each CSS generic family mapped
+//! fonts instead (platform.native, ADR 0074 and 0078): fontconfig's answers
+//! on Linux and the BSDs, DirectWrite's on Windows and Core Text's on macOS
+//! (`rustic_native`), then the files [`rustic_text::native`] lists, each CSS generic family mapped
 //! to the family the platform uses for it, plus fallback faces for other
 //! scripts. The broker reads them (a renderer opens no files) within
 //! [`SYSTEM_FONT_BYTES`]; members of font collections are extracted.
@@ -280,6 +280,41 @@ fn fontconfig(pattern: &str) -> Option<PathBuf> {
     (path.is_absolute() && font && path.is_file()).then_some(path)
 }
 
+/// Most fallback files taken from the platform font service's list.
+const MAX_SERVICE_FALLBACKS: usize = 8;
+
+/// The files the platform font service (DirectWrite on Windows, Core Text
+/// on macOS; ADR 0078) uses for a generic family's first installed
+/// family, regular first, then bold, italic and bold italic where the
+/// family has them. Empty without a service or an installed family.
+fn font_service(candidate: &rustic_text::native::Candidate) -> Vec<PathBuf> {
+    use rustic_native::Style;
+    let styled = |find: &dyn Fn(Style) -> Option<PathBuf>| -> Vec<PathBuf> {
+        let Some(regular) = find(Style::REGULAR) else {
+            return Vec::new();
+        };
+        let mut paths = vec![regular];
+        for style in &Style::ALL[1..] {
+            if let Some(path) = find(*style).filter(|path| !paths.contains(path)) {
+                paths.push(path);
+            }
+        }
+        paths
+    };
+    if candidate.generic == "system-ui" {
+        let paths = styled(&rustic_native::system_ui_file);
+        if !paths.is_empty() {
+            return paths;
+        }
+    }
+    candidate
+        .families
+        .iter()
+        .map(|family| styled(&|style| rustic_native::font_file(family, style)))
+        .find(|paths| !paths.is_empty())
+        .unwrap_or_default()
+}
+
 /// One font file's faces as standalone font data: collection members
 /// (up to four, the first family's styles) extracted, others as they are.
 fn faces_of(bytes: Vec<u8>, limits: &FontLimits, members: usize) -> Vec<(String, Vec<u8>)> {
@@ -347,6 +382,12 @@ pub fn system_fonts() -> (Vec<Vec<u8>>, Vec<String>) {
             .iter()
             .filter_map(|style| fontconfig(&format!("{}{style}", candidate.generic)))
             .collect();
+        // Then the platform font service (DirectWrite, Core Text).
+        let asked = if asked.is_empty() {
+            font_service(candidate)
+        } else {
+            asked
+        };
         let sets: Vec<Vec<PathBuf>> = if asked.is_empty() {
             candidate
                 .sets
@@ -374,6 +415,9 @@ pub fn system_fonts() -> (Vec<Vec<u8>>, Vec<String>) {
                 families.push(format!("{}={family}", candidate.generic));
             }
         }
+    }
+    for path in rustic_native::fallback_files(MAX_SERVICE_FALLBACKS) {
+        take(&path, 1, &mut files);
     }
     for name in native.fallbacks {
         if let Some(path) = find_native(&roots, name) {

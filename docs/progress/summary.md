@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 48.93%** = 45.24% verified complete + 3.69% partial credit. 109/228 capabilities complete, 17 in progress.
+**Overall completion: 49.18%** = 45.74% verified complete + 3.44% partial credit. 110/228 capabilities complete, 16 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `9d5e6b2d71ad8aebb5d2aa654499a6aef2cd199e8460ad11151b56493d4bc1a2`.
+Catalog: `engine-v4`. Source fingerprint: `8087bfdd293bc0bf2fede451a69bbd7483b50a941d598739a915d276ee34bb7b`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `9d5e6b2d71ad8aebb5d2aa654499a6aef2cd1
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.60% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 10/18 | 80.91% | 46.93% | 8.12% |
+| M8 Desktop alpha | 11/18 | 83.99% | 53.08% | 8.12% |
 | M9 Compatibility expansion | 3/54 | 5.19% | 2.63% | 22.35% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.83% | 0.00% | 14.74% |
@@ -47,7 +47,7 @@ Catalog: `engine-v4`. Source fingerprint: `9d5e6b2d71ad8aebb5d2aa654499a6aef2cd1
 | Storage & workers | 3/8 | 0 | 24.00% | 24.00% | 3% | 0.72 |
 | Security & IPC | 7/11 | 1 | 67.44% | 62.79% | 5% | 3.37 |
 | Compositor & GPU | 2/5 | 2 | 69.23% | 38.46% | 3% | 2.07 |
-| Platform hosts | 1/9 | 5 | 44.79% | 4.16% | 4% | 1.79 |
+| Platform hosts | 2/9 | 4 | 51.04% | 16.66% | 4% | 2.04 |
 | Accessibility | 3/5 | 1 | 75.00% | 64.28% | 2% | 1.50 |
 | DevTools | 4/4 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | Extensions (MV2) | 0/11 | 0 | 0.00% | 0.00% | 3% | 0.00 |
@@ -332,9 +332,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
   - [x] Surface lifecycle: resize, device-scale changes including fractional scales, minimized, occluded and zero-size windows present nothing (ADR 0074) ([source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/tests/view.rs), [test](../../crates/rustic-cli/tests/view.rs))
   - [x] Keyboard, typed text and IME preedit and commit from the host to the browser fields, with the candidate window placed at the caret ([source](../../crates/rustic-shell/src/window.rs), [test](../../crates/rustic-cli/src/browser.rs))
   - [ ] Page-level IME composition and background throttling of hidden pages (TD-196, TD-197)
-- **in progress 50.00%** `platform.native` — Native font/codec/OS service adapters · size 3 · M8 · 0.50% of engine
-  - [x] System fonts: fontconfig on Linux and the BSDs, file tables for Windows and macOS, generic-family mapping sent to renderers (ADR 0074) ([source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-text/src/native.rs), [source](../../crates/rustic-cli/src/fonts.rs), [test](../../crates/rustic-text/tests/opentype.rs))
-  - [ ] Reviewed platform font adapter (DirectWrite, Core Text) and native codec and OS service adapters (TD-85)
+- **complete** `platform.native` — Native font/codec/OS service adapters · size 3 · M8 · 0.50% of engine ([source](../../docs/adr/0078-platform-font-services.md), [source](../../crates/rustic-cli/src/fonts.rs), [test](../../crates/rustic-native/tests/fonts.rs), [test](../../crates/rustic-cli/src/fonts.rs), [source](../../docs/adr/0074-browser-shell-and-native-hosts.md), [source](../../crates/rustic-text/src/native.rs), [test](../../crates/rustic-text/tests/opentype.rs), [source](../../crates/rustic-native/src/direct_write.rs), [source](../../crates/rustic-native/src/core_text.rs), [source](../../crates/rustic-cli/src/fonts.rs))
 - **planned** `platform.device` — Signed mobile artifacts, device/simulator suites and store/OS policy · size 2 · M14 · 0.33% of engine
 
 ### Accessibility

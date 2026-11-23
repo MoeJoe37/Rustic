@@ -27,7 +27,9 @@ the TLS stack rustls with `ring` and `rustls-platform-verifier`
 content decoding, `windows-sys` for the Windows sandbox
 ([ADR 0060](adr/0060-windows-renderer-sandbox.md)), and the desktop host winit
 and softbuffer ([ADR 0065](adr/0065-desktop-window-host.md)), and wgpu for the
-GPU process ([ADR 0071](adr/0071-gpu-backend.md)). The pinned graph
+GPU process ([ADR 0071](adr/0071-gpu-backend.md)), and the DirectWrite and
+Core Text bindings `windows` and `objc2-core-text` for the platform font
+services ([ADR 0078](adr/0078-platform-font-services.md)). The pinned graph
 is [third_party/rust-dependencies.json](../third_party/rust-dependencies.json).
 Every other name in this table is a candidate to evaluate at the relevant
 milestone, not an installed package, version recommendation or compatibility
@@ -169,3 +171,19 @@ repository at the published revision, including `LICENSE.chromium`
 (BSD-3-Clause) for the five crates with Chromium-derived code. New duplicate
 versions (quick-xml, winnow, `windows` 0.58 under wgpu) are `cargo deny`
 skips with reasons. No engine crate depends on the bridge graph.
+
+## M8 platform font services (2026-11-23)
+
+[ADR 0078](adr/0078-platform-font-services.md) adds `crates/rustic-native`,
+the reviewed adapters to OS services. On Windows it uses the already
+reviewed `windows` 0.62.2 with default features off and only
+`Win32_Graphics_DirectWrite`, `Win32_Graphics_Gdi` and
+`Win32_UI_WindowsAndMessaging`, so no new package is added. On macOS it uses
+`objc2-core-foundation` 0.3.2 (already reviewed) and one new package,
+`objc2-core-text` 0.3.2 (Zlib OR Apache-2.0 OR MIT, MSRV 1.71). Its default
+features are off, and only `std`, `CTFont`, `CTFontDescriptor` and
+`CTFontTraits` are on, which pulls in no Core Graphics, block or libc
+crates. The crate ships no license file, so the notice is the objc2
+repository's `LICENSE.txt` at the published revision, as for the other
+objc2 crates. Both are binding crates without build scripts. The `unsafe`
+calls stay in Rustic's two adapter modules, under ADR 0060's rules.

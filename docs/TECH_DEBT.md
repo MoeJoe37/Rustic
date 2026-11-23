@@ -149,7 +149,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-82 | Deliberate | Paint | Animated GIF/WebP decode every frame but paint only the first | Open, paint.images |
 | TD-83 | Watch | Codecs | Image store budget bounds retained pixels, not outstanding `Arc` copies or the transient decode peak | Paid |
 | TD-84 | Deliberate | Codecs | Decoder speed: bit-serial VP8L/JPEG slow paths, per-pixel loops; simple VP8 filter and multi-partition frames lack reference images | Open, paint.images |
-| TD-85 | Deliberate | Fonts | Backend caches and temporary memory; platform font APIs (DirectWrite, Core Text) and handle-based traversal. System fonts by fontconfig and per-OS tables and collection members are in (2026-11-23, ADR 0074) | Partly paid, M9 |
+| TD-85 | Deliberate | Fonts | Backend caches and temporary memory and handle-based traversal. System fonts by fontconfig, DirectWrite and Core Text (ADR 0078), per-OS tables and collection members are in (2026-11-23, ADR 0074) | Partly paid, M9 |
 | TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
 | TD-87 | Deliberate | Text | English-only auto resources, SA segmentation and Level 4 phrases | Open, M9 |
 | TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Paid |
@@ -1422,6 +1422,14 @@ members (`collection_face`), within 64 MiB and 64 faces read by the broker.
 Remaining: DirectWrite/Core Text adapters, per-user font configuration
 beyond the listed directories, handle-based traversal and global cache
 accounting.
+
+**Partly paid 2026-11-23 (ADR 0078):** `rustic-native` asks DirectWrite on
+Windows and Core Text on macOS for each generic family's files, the system
+UI font (the message font, the system font) and Core Text's fallback
+cascade; the broker reads and parses the files within the same budgets.
+Remaining: handle-based traversal and global cache accounting. Native
+codec and other OS service adapters belong to the capabilities that need
+them (ADR 0078), not to this entry.
 
 Pay before loading arbitrary remote fonts or native platform font integration:
 add global temporary/cache accounting, native service adapters and native device

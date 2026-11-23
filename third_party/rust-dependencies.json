@@ -102,6 +102,37 @@
         "async-io",
         "rwh_06"
       ]
+    },
+    "crates/rustic-native:windows": {
+      "version": "=0.62.2",
+      "default-features": false,
+      "features": [
+        "Win32_Graphics_DirectWrite",
+        "Win32_Graphics_Gdi",
+        "Win32_UI_WindowsAndMessaging"
+      ]
+    },
+    "crates/rustic-native:objc2-core-foundation": {
+      "version": "=0.3.2",
+      "default-features": false,
+      "features": [
+        "std",
+        "CFBase",
+        "CFArray",
+        "CFCGTypes",
+        "CFString",
+        "CFURL"
+      ]
+    },
+    "crates/rustic-native:objc2-core-text": {
+      "version": "=0.3.2",
+      "default-features": false,
+      "features": [
+        "std",
+        "CTFont",
+        "CTFontDescriptor",
+        "CTFontTraits"
+      ]
     }
   },
   "packages": [
@@ -1848,6 +1879,17 @@
         "third_party/licenses/objc2-core-location-0.2.2-LICENSE.txt": "e353f37b12aefbb9f9b29490e837cfee05d9bda70804b3562839a3285c1df1e5"
       },
       "source_revision": "e282618be4c3a3b9542957e0c8540e9588472ce8"
+    },
+    {
+      "name": "objc2-core-text",
+      "version": "0.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "0cde0dfb48d25d2b4862161a4d5fcc0e3c24367869ad306b0c9ec0073bfed92d",
+      "license": "Zlib OR Apache-2.0 OR MIT",
+      "notices": {
+        "third_party/licenses/objc2-core-text-0.3.2-LICENSE.txt": "7f976f7e9cb2d87df7230606feb932c3f21ac0e664045a775b600046ff850c54"
+      },
+      "source_revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b"
     },
     {
       "name": "objc2-encode",

@@ -11,6 +11,9 @@
 pub struct Candidate {
     /// The CSS generic family (`sans-serif`, `serif`, ...).
     pub generic: &'static str,
+    /// Family names to ask the platform font service for (DirectWrite,
+    /// Core Text; `rustic_native`), in order, before the file sets.
+    pub families: &'static [&'static str],
     /// File sets, relative to one of [`Native::roots`].
     pub sets: &'static [&'static [&'static str]],
 }
@@ -36,14 +39,17 @@ const WINDOWS: Native = Native {
     generics: &[
         Candidate {
             generic: "sans-serif",
+            families: &["Arial"],
             sets: &[&["arial.ttf", "arialbd.ttf", "ariali.ttf", "arialbi.ttf"]],
         },
         Candidate {
             generic: "serif",
+            families: &["Times New Roman"],
             sets: &[&["times.ttf", "timesbd.ttf", "timesi.ttf", "timesbi.ttf"]],
         },
         Candidate {
             generic: "monospace",
+            families: &["Consolas", "Courier New"],
             sets: &[
                 &[
                     "consola.ttf",
@@ -56,6 +62,7 @@ const WINDOWS: Native = Native {
         },
         Candidate {
             generic: "system-ui",
+            families: &["Segoe UI"],
             sets: &[&[
                 "segoeui.ttf",
                 "segoeuib.ttf",
@@ -65,14 +72,17 @@ const WINDOWS: Native = Native {
         },
         Candidate {
             generic: "cursive",
+            families: &["Comic Sans MS"],
             sets: &[&["comic.ttf", "comicbd.ttf"]],
         },
         Candidate {
             generic: "fantasy",
+            families: &["Impact"],
             sets: &[&["impact.ttf"]],
         },
         Candidate {
             generic: "emoji",
+            families: &["Segoe UI Emoji"],
             sets: &[&["seguiemj.ttf"]],
         },
     ],
@@ -95,6 +105,7 @@ const MACOS: Native = Native {
     generics: &[
         Candidate {
             generic: "sans-serif",
+            families: &["Arial", "Helvetica"],
             sets: &[
                 &[
                     "Arial.ttf",
@@ -107,6 +118,7 @@ const MACOS: Native = Native {
         },
         Candidate {
             generic: "serif",
+            families: &["Times New Roman", "Times"],
             sets: &[
                 &[
                     "Times New Roman.ttf",
@@ -119,6 +131,7 @@ const MACOS: Native = Native {
         },
         Candidate {
             generic: "monospace",
+            families: &["Courier New", "Menlo"],
             sets: &[
                 &[
                     "Courier New.ttf",
@@ -131,14 +144,17 @@ const MACOS: Native = Native {
         },
         Candidate {
             generic: "system-ui",
+            families: &[],
             sets: &[&["SFNS.ttf"], &["Helvetica.ttc"]],
         },
         Candidate {
             generic: "cursive",
+            families: &["Comic Sans MS"],
             sets: &[&["Comic Sans MS.ttf", "Comic Sans MS Bold.ttf"]],
         },
         Candidate {
             generic: "fantasy",
+            families: &["Impact"],
             sets: &[&["Impact.ttf"]],
         },
     ],
@@ -157,6 +173,7 @@ const UNIX: Native = Native {
     generics: &[
         Candidate {
             generic: "sans-serif",
+            families: &[],
             sets: &[
                 &[
                     "dejavu/DejaVuSans.ttf",
@@ -175,6 +192,7 @@ const UNIX: Native = Native {
         },
         Candidate {
             generic: "serif",
+            families: &[],
             sets: &[
                 &[
                     "dejavu/DejaVuSerif.ttf",
@@ -190,6 +208,7 @@ const UNIX: Native = Native {
         },
         Candidate {
             generic: "monospace",
+            families: &[],
             sets: &[
                 &[
                     "dejavu/DejaVuSansMono.ttf",

@@ -6825,39 +6825,57 @@
           "label": "Native font/codec/OS service adapters",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "System fonts: fontconfig on Linux and the BSDs, file tables for Windows and macOS, generic-family mapping sent to renderers (ADR 0074)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/native.rs",
-                  "marker": "pub fn native() -> Native"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/fonts.rs",
-                  "marker": "pub fn system_fonts("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/opentype.rs",
-                  "marker": "fn collection_members_extract_to_standalone_faces"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/adr/0078-platform-font-services.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Reviewed platform font adapter (DirectWrite, Core Text) and native codec and OS service adapters (TD-85)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "pub fn system_fonts("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-native/tests/fonts.rs",
+              "marker": "fn the_font_service_names_parsable_files_of_the_family_asked"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "fn system_fonts_map_every_generic_within_the_budget"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "## Decision"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/native.rs",
+              "marker": "pub fn native() -> Native"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn collection_members_extract_to_standalone_faces"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-native/src/direct_write.rs",
+              "marker": "pub(crate) fn font_file("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-native/src/core_text.rs",
+              "marker": "pub(crate) fn font_file("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "fn font_service("
             }
           ]
         },

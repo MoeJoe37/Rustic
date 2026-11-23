@@ -85,6 +85,7 @@ instead of rewriting the history of a decision.
 | [0075](0075-web-text-encoding.md) | Window text encoding, Web IDL byte views and GC-owned native binding state | Accepted for M9 `web.encoding` |
 | [0076](0076-window-url-and-search-params.md) | URL state overrides and one shared URL and search parameter snapshot | Accepted for M9 `url.setters` |
 | [0077](0077-wasm-decoding-and-execution-boundaries.md) | WebAssembly binary admission, validator boundary and interpreter-first execution | Accepted for WASM-01 foundations |
+| [0078](0078-platform-font-services.md) | DirectWrite and Core Text font services in `rustic-native`; native codec and OS service adapters owned by their capabilities | Accepted for M8 `platform.native` |
 
 ## Records by area
 
@@ -104,7 +105,7 @@ instead of rewriting the history of a decision.
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
 | Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
-| Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071, 0074 |
+| Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071, 0074, 0078 |
 | Developer tools and automation (M8) | 0072 |
 | Accessibility and editing (M8) | 0073 |
 

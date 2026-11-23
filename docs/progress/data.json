@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "9d5e6b2d71ad8aebb5d2aa654499a6aef2cd199e8460ad11151b56493d4bc1a2",
-  "percent": "48.93",
-  "verified_percent": "45.24",
-  "partial_percent": "3.69",
-  "completed": 109,
-  "in_progress": 17,
+  "source_fingerprint": "8087bfdd293bc0bf2fede451a69bbd7483b50a941d598739a915d276ee34bb7b",
+  "percent": "49.18",
+  "verified_percent": "45.74",
+  "partial_percent": "3.44",
+  "completed": 110,
+  "in_progress": 16,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -85,11 +85,11 @@
       "id": "M8",
       "label": "Desktop alpha",
       "share": "8.12",
-      "completed": 10,
+      "completed": 11,
       "total": 18,
-      "percent": "80.91",
-      "verified_percent": "46.93",
-      "partial_percent": "33.98"
+      "percent": "83.99",
+      "verified_percent": "53.08",
+      "partial_percent": "30.91"
     },
     {
       "id": "M9",
@@ -7411,42 +7411,60 @@
           "label": "Native font/codec/OS service adapters",
           "size": 3,
           "milestone": "M8",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "System fonts: fontconfig on Linux and the BSDs, file tables for Windows and macOS, generic-family mapping sent to renderers (ADR 0074)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
-                  "marker": "## Decision"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/native.rs",
-                  "marker": "pub fn native() -> Native"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/fonts.rs",
-                  "marker": "pub fn system_fonts("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-text/tests/opentype.rs",
-                  "marker": "fn collection_members_extract_to_standalone_faces"
-                }
-              ]
+              "kind": "source",
+              "path": "docs/adr/0078-platform-font-services.md",
+              "marker": "## Decision"
             },
             {
-              "label": "Reviewed platform font adapter (DirectWrite, Core Text) and native codec and OS service adapters (TD-85)",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "pub fn system_fonts("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-native/tests/fonts.rs",
+              "marker": "fn the_font_service_names_parsable_files_of_the_family_asked"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "fn system_fonts_map_every_generic_within_the_budget"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0074-browser-shell-and-native-hosts.md",
+              "marker": "## Decision"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/native.rs",
+              "marker": "pub fn native() -> Native"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/opentype.rs",
+              "marker": "fn collection_members_extract_to_standalone_faces"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-native/src/direct_write.rs",
+              "marker": "pub(crate) fn font_file("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-native/src/core_text.rs",
+              "marker": "pub(crate) fn font_file("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/fonts.rs",
+              "marker": "fn font_service("
             }
           ],
-          "credit": "50.00",
+          "credit": "100.00",
           "engine_share": "0.50"
         },
         {
@@ -7461,13 +7479,13 @@
         }
       ],
       "points": 24,
-      "completed": 1,
-      "in_progress": 5,
+      "completed": 2,
+      "in_progress": 4,
       "total": 9,
-      "contribution": "1.79",
-      "percent": "44.79",
-      "verified_percent": "4.16",
-      "partial_percent": "40.63"
+      "contribution": "2.04",
+      "percent": "51.04",
+      "verified_percent": "16.66",
+      "partial_percent": "34.38"
     },
     {
       "id": "a11y",

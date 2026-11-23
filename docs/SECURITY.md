@@ -69,7 +69,10 @@ the macOS `enter` module ([ADR 0063](adr/0063-macos-renderer-sandbox.md)),
 which only calls `sandbox_init`; and the `jni` module of `rustic-android`
 ([ADR 0059](adr/0059-mobile-renderer-isolation.md)), which only exports the
 JNI symbols and adopts descriptors Java detached (integers only, no JNI
-environment calls). Every unsafe block is documented (enforced by
+environment calls); and the `direct_write` and `core_text` modules of
+`rustic-native` ([ADR 0078](adr/0078-platform-font-services.md)), which run
+in the browser process and only ask the OS font service for file paths.
+Every unsafe block is documented (enforced by
 Clippy). Any further exception requires its own ADR and the same
 treatment. Dependencies
 may contain unsafe code; Rust is not a guarantee against their vulnerabilities.

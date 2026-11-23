@@ -76,6 +76,7 @@ instead of rewriting the history of a decision.
 | [0066](0066-remote-addresses-and-windows-network-container.md) | Remote origins resolve through the system resolver in the broker and reach only public addresses (no DNS rebinding to loopback or private networks); the Windows network process runs in a `Rustic.Network` LPAC with internetClient | Accepted |
 | [0067](0067-mobile-devices-last.md) | Android and iOS device work moves to the final milestone M14; M8 is the desktop alpha, M13 desktop 1.0; mobile CI checks stay; external review recorded as an external dependency | Accepted scope update |
 | [0068](0068-gpu-process.md) | GPU process: frame compositing moves from the broker to a confined, stateless `rustic __gpu` child with crash/hang recovery and CPU fallback; hardware backends are a later record | Accepted (step 1) |
+| [0069](0069-long-lived-renderer.md) | One long-lived renderer per page driven by input and frame requests over IPC, broker-owned time, user scrolls through the page, bounded renderer replacement; `rustic drive` headless driver | Accepted (renderer side; window adoption with UI-01) |
 
 ## Records by area
 
@@ -95,7 +96,7 @@ instead of rewriting the history of a decision.
 | Observers, errors, focus and forms (M5, WEB-07) | 0047, 0048, 0049, 0050 |
 | Networking and resources (M6) | 0043, 0051, 0052, 0053, 0054, 0055 |
 | Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
-| Compositor and desktop host (M8) | 0064, 0065, 0068 |
+| Compositor and desktop host (M8) | 0064, 0065, 0068, 0069 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

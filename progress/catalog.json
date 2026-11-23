@@ -6311,8 +6311,29 @@
             },
             {
               "label": "Long-lived renderer per page: input routed to the page, scene frames over IPC, scripts running between frames (TD-182)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "pub fn live<R>("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0069-long-lived-renderer.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/live.rs",
+                  "marker": "fn the_page_keeps_its_state_timers_and_input_between_frames"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/live.rs",
+                  "marker": "fn crashed_and_hung_renderers_are_replaced_then_the_page_gives_up"
+                }
+              ]
             },
             {
               "label": "Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64",

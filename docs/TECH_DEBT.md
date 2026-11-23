@@ -248,7 +248,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
 | TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
 | TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M8 (compositor.parity) |
-| TD-182 | Deliberate | Desktop host | `rustic view` starts a renderer and lays the page out again for every frame, runs no scripts between frames, routes no input to the page (only scrolling), has no browser UI and is verified only on Linux | Open, M8 (platform.linux, UI-01) |
+| TD-182 | Deliberate | Desktop host | `rustic view` still starts a renderer and lays the page out again for every frame, routes no input to the page (only scrolling), has no browser UI and is verified only on Linux. The long-lived renderer it needs exists (ADR 0069: `broker::live`, `rustic drive`, 2026-11-23); the window has not adopted it yet, and text/IME input is not routed | Open, M8 (platform.linux, UI-01) |
 | TD-183 | Deliberate | Isolation | The macOS Seatbelt profiles allow reading every `sysctl` value, and initializers that run before `main` (AppKit is linked for `rustic view`) run before the profile applies | Open, M8 (macOS packaging) |
 | TD-184 | Deliberate | Compositor / IPC | The GPU process receives the page and frame pixels over its pipe and returns the composited page for every composited frame (two full copies), because there is no shared memory yet | Open, M8 (compositor.backend) |
 | TD-185 | Deliberate | Compositor / desktop host | `rustic view` presents frames composited in the broker; the GPU process does not own the window surface yet | Open, M8 (platform.linux) |
@@ -3054,7 +3054,12 @@ position, so every frame re-parses and re-lays out the page and scripts run
 from scratch each time. Input other than scrolling (clicks, keys, text) is
 not delivered to the page, there is no address bar, tab or prompt UI, and
 the window is verified on Linux (Wayland and X11) only.
-**Pay:** a long-lived renderer per page that receives input and frame
-requests over IPC and answers with scene frames (ADR 0064), then the UI-01
-shell, and native Windows/macOS runs.
+**Partly paid 2026-11-23:** [ADR 0069](adr/0069-long-lived-renderer.md)
+keeps one renderer per page that receives clicks, keys and frame requests
+over IPC and answers with scene frames; scripts and timers run between
+frames, user scrolls go through the page, and failed renderers are
+replaced (`broker::live`, `rustic drive`, tests in
+`crates/rustic-cli/tests/live.rs`). **Pay the rest:** `rustic view`
+renders through `broker::live` in the UI-01 shell, text/IME input reaches
+the page, then native Windows/macOS runs.
 

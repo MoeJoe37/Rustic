@@ -156,8 +156,9 @@ status is the [progress summary](progress/summary.md).
 </details>
 
 <details>
-<summary>Desktop alpha (M8, current): 3 sections</summary>
+<summary>Desktop alpha (M8, current): 4 sections</summary>
 
+- [TD-182 — Long-lived renderer per page](#td-182--long-lived-renderer-per-page)
 - [UI-05 — GPU process](#ui-05--gpu-process)
 - [UI-02 — Desktop window](#ui-02--desktop-window)
 - [UI-05 — Scroll positions](#ui-05--scroll-positions)
@@ -2559,6 +2560,29 @@ service step. The existing 128 KiB limit test still passes after removing tempor
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
 
+## TD-182 — Long-lived renderer per page
+
+Added 2026-11-23 (`broker::live`/`LivePage` in `rustic-cli/src/broker.rs`,
+the live loop in `rustic-cli/src/loader.rs`, `rustic drive` in
+`rustic-cli/src/live.rs`, `PageInput`/`Painted` in `rustic_ipc::protocol`,
+[ADR 0069](adr/0069-long-lived-renderer.md)). A page loads once in one
+confined renderer that keeps its document, scripts and timers; the broker
+sends clicks, keys and frame requests and gets back frames painted at the
+asked size, scale, zoom and scroll position.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| State between frames | Clicks and keys run the page's handlers in the same document; timers fire when the broker's elapsed time reaches them; the page's next wanted frame is reported (1/60 s while animation callbacks wait) | `the_page_keeps_its_state_timers_and_input_between_frames` |
+| Scroll ownership | User scrolls go through `scroll_viewport` (clamped, `scroll` event); a frame without a user scroll keeps the script's position | `user_scrolls_clamp_and_script_scrolls_are_not_reverted` |
+| View | Window size, device scale and zoom per frame; script layout reads follow a resize | `frames_follow_the_window_scale_and_zoom` |
+| Protocol | Strict request/answer (`Handled`, `Painted`); non-finite numbers, bad sizes, scales, zooms and keys over 64 bytes refused | `page_input_with_bad_numbers_or_long_keys_is_refused`, `every_message_round_trips_over_a_stream_pair` |
+| Recovery | Watchdog per exchange (renderer timeout for the load, at most 10 s after); a dead, hung or protocol-breaking renderer is replaced and the page reloaded, at most 3 times | `crashed_and_hung_renderers_are_replaced_then_the_page_gives_up` |
+| Authority | `render --live` only through `broker::live`; requests are answered from the page's grant as in one-shot runs | `bad_scripts_and_a_direct_live_render_are_usage_errors` |
+
+Test hook `RUSTIC_TEST_LIVE_RENDERER` (`crash-on-frame:N`,
+`hang-on-frame:N`). Open: `rustic view` adopts it with the UI-01 shell,
+text/IME input, iframes paint white in live pages (TD-178).
+
 ## UI-05 — GPU process
 
 Added 2026-11-22 (`rustic_ipc::gpu`, `rustic-cli/src/gpuproc.rs`,
@@ -2598,7 +2622,7 @@ and returned instead of written (`broker::render_surface`).
 | Window | Opens and presents frames under Wayland and X11 (`--exit-after N`); without a window system it fails with exit status 1; view options are usage errors | `view_presents_frames_in_a_window_or_fails_cleanly_without_one` |
 | Untrusted report | `render --report-scroll` prints `scroll X,Y`; the broker passes only well-formed lines and `view` accepts only finite non-negative positions | the tests above |
 
-Open: TD-182 (re-render per frame, no page input, Linux only).
+Open: TD-182 (the window still re-renders per frame and routes no page input; the long-lived renderer it needs is ADR 0069; Linux only).
 
 ## UI-05 — Scroll positions
 

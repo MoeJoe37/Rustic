@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "7c9755e9a60c765226846a3dea41d07fae2bc16215ac0da70e96de2649c6214c",
-  "percent": "43.27",
+  "source_fingerprint": "5448e8337feff5d7b8d2f7205782d5ed5f48dda8371a8c3e302506ebffbdd0df",
+  "percent": "43.44",
   "verified_percent": "41.83",
-  "partial_percent": "1.44",
+  "partial_percent": "1.61",
   "completed": 97,
   "in_progress": 8,
   "total": 226,
@@ -87,9 +87,9 @@
       "share": "8.12",
       "completed": 1,
       "total": 18,
-      "percent": "14.76",
+      "percent": "16.81",
       "verified_percent": "8.51",
-      "partial_percent": "6.25"
+      "partial_percent": "8.30"
     },
     {
       "id": "M9",
@@ -6881,8 +6881,29 @@
             },
             {
               "label": "Long-lived renderer per page: input routed to the page, scene frames over IPC, scripts running between frames (TD-182)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "pub fn live<R>("
+                },
+                {
+                  "kind": "source",
+                  "path": "docs/adr/0069-long-lived-renderer.md",
+                  "marker": "## Decision"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/live.rs",
+                  "marker": "fn the_page_keeps_its_state_timers_and_input_between_frames"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/live.rs",
+                  "marker": "fn crashed_and_hung_renderers_are_replaced_then_the_page_gives_up"
+                }
+              ]
             },
             {
               "label": "Linux acceptance: the curated site corpus, lifecycle, HiDPI and fractional scaling on native x86-64 and aarch64",
@@ -6890,7 +6911,7 @@
               "evidence": []
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.50"
         },
         {
@@ -6968,10 +6989,10 @@
       "completed": 1,
       "in_progress": 1,
       "total": 9,
-      "contribution": "0.33",
-      "percent": "8.33",
+      "contribution": "0.50",
+      "percent": "12.50",
       "verified_percent": "4.16",
-      "partial_percent": "4.17"
+      "partial_percent": "8.34"
     },
     {
       "id": "a11y",

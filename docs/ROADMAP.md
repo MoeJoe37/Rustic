@@ -722,8 +722,11 @@ limitations.
 process boundary ([ADR 0068](adr/0068-gpu-process.md): frame compositing in
 a confined `rustic __gpu` child with crash, hang and protocol-violation
 recovery and CPU fallback) are done; UI-02 has a Linux window (ADR 0065).
-Next: the long-lived renderer per page (TD-182), then the hardware GPU
-backends inside the GPU process.
+The long-lived renderer per page is done ([ADR 0069](adr/0069-long-lived-renderer.md),
+2026-11-23). M8 runs in five parallel workstreams (renderer and GPU,
+desktop hosts and shell, accessibility, DevTools and automation,
+performance harness); next in this one: the hardware GPU backends inside
+the GPU process.
 
 **Gate:** critical accessibility flows, crash recovery, profile separation,
 supported-platform safety gates, and agreed performance budgets pass. Do not
@@ -959,7 +962,7 @@ in the milestone sections above.
 | done | Network process and its confinement | Exchanges in a `__network` child, confined on Linux, macOS and Windows; remote origins reach only public addresses | Done 2026-11-22 (ADR 0061, 0066; TD-157 and TD-176 paid) |
 | done | M7 completion review | Every M7 gate with recorded evidence; M7 debt rows moved | Done 2026-11-22 ([review](reviews/2026-11-22-m7-completion.md)); mobile device work, GPU crash step and external review rescheduled by ADR 0067 |
 | 1 | UI-05: GPU process | Frames are composited by a confined `__gpu` child; a crashed, hung or protocol-breaking GPU process is replaced without stale authority and the CPU path keeps working (`compositor.recovery` step 1) | Step 1 done 2026-11-22 ([ADR 0068](adr/0068-gpu-process.md)); scenes and window presentation move into it with the backend (TD-184, TD-185) |
-| 2 | TD-182: long-lived renderer per page | Input routed to the page, scene frames over IPC, scripts running between frames (`platform.linux` step 2) | After or alongside row 1 |
+| 2 | TD-182: long-lived renderer per page | Input routed to the page, scene frames over IPC, scripts running between frames (`platform.linux` step 2) | Done 2026-11-23 ([ADR 0069](adr/0069-long-lived-renderer.md): `broker::live`, `rustic drive`); `rustic view` adopts it with the UI-01 shell |
 | 3 | UI-05: desktop GPU backends (`compositor.backend`, ADR first) | Direct3D 12, Metal and Vulkan adapters inside the GPU process with CPU fallback and parity fixtures | Next after row 2 |
 | 4 | UI-02: Windows and macOS windows (`platform.windows`, `platform.macos`) | The Linux `rustic view` window on Windows and macOS, native x64 and ARM64 | After row 2 |
 | — | Hosted CI | The full matrix green on every commit; then require the `CI` check on `main` (M0 follow-up) | Green on `moejoe873/Rustic` at `e150a22` |

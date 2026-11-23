@@ -104,6 +104,90 @@ pub fn network_profile(exe: &Path) -> Result<String, ProfileError> {
     Ok(profile)
 }
 
+/// IOKit user-client classes the Metal drivers open: the IOSurface root
+/// (shared GPU memory), the accelerator families of Apple silicon (AGX),
+/// Intel, AMD and the virtual machine display (paravirtualized Metal),
+/// and graphics power control. The same classes Chromium's GPU process
+/// profile allows.
+const GPU_IOKIT_CLASSES: &[&str] = &[
+    "IOSurfaceRootUserClient",
+    "IOAccelerator",
+    "IOAccelContext",
+    "IOAccelContext2",
+    "IOAccelDevice",
+    "IOAccelDevice2",
+    "IOAccelSharedUserClient",
+    "IOAccelSharedUserClient2",
+    "IOAccelSubmitter2",
+    "AGXDeviceUserClient",
+    "AGXSharedUserClient",
+    "AGXCommandQueue",
+    "AppleParavirtDeviceUserClient",
+    "AppleGraphicsControlClient",
+    "AppleGraphicsPolicyClient",
+    "AppleMGPUPowerControlClient",
+    "AppleIntelMEUserClient",
+    "AppleSNBFBUserClient",
+    "AMDRadeonX4000_AMDAccelDevice",
+    "AMDRadeonX5000_AMDAccelDevice",
+    "AMDRadeonX6000_AMDAccelDevice",
+];
+
+/// Mach services Metal reaches: the shader compiler (it compiles in its
+/// own process), the OpenGL/Metal compiler cache service and GPU memory
+/// accounting.
+const GPU_SERVICES: &[&str] = &[
+    "com.apple.MTLCompilerService",
+    "com.apple.cvmsServ",
+    "com.apple.gpumemd.source",
+];
+
+/// Driver bundles Metal loads its device plug-ins from (read only).
+const GPU_READS: &[&str] = &[
+    "/System/Library/Extensions",
+    "/Library/Apple/System/Library/Extensions",
+    "/Library/GPUBundles",
+];
+
+/// The GPU process profile (ADR 0071, TD-186) for the binary at `exe`
+/// (canonical, as for [`renderer_profile`]): the renderer profile plus
+/// what Metal needs to open a device: the graphics drivers' IOKit user
+/// clients, reading IOKit properties (adapter discovery), the shader
+/// compiler and GPU memory services, and reading the driver bundles. No
+/// network, no writes, no user files, no window server.
+pub fn gpu_profile(exe: &Path) -> Result<String, ProfileError> {
+    let mut profile = base_profile(exe, "Rustic GPU process (ADR 0068, ADR 0071)")?;
+    profile.push_str(
+        "(allow iokit-get-properties)
+(allow iokit-open
+",
+    );
+    for class in GPU_IOKIT_CLASSES {
+        let _ = writeln!(profile, "    (iokit-user-client-class {})", literal(class));
+    }
+    profile.push_str(
+        ")
+(allow mach-lookup
+",
+    );
+    for service in GPU_SERVICES {
+        let _ = writeln!(profile, "    (global-name {})", literal(service));
+    }
+    profile.push_str(
+        ")
+(allow file-read*
+",
+    );
+    for path in GPU_READS {
+        let _ = writeln!(profile, "    (subpath {})", literal(path));
+    }
+    profile.push_str(
+        ")
+",
+    );
+    Ok(profile)
+}
+
 fn base_profile(exe: &Path, title: &str) -> Result<String, ProfileError> {
     let exe = exe.to_str().ok_or(ProfileError::UnsafePath)?;
     if !exe.starts_with('/') || exe.chars().any(char::is_control) {
@@ -167,6 +251,42 @@ mod tests {
         // Balanced parentheses: one form per allow or deny.
         let open = profile.matches('(').count();
         assert_eq!(open, profile.matches(')').count());
+    }
+
+    #[test]
+    fn the_gpu_profile_adds_only_graphics_drivers_and_metal_services() {
+        let exe = Path::new("/Applications/Rustic.app/rustic");
+        let renderer = renderer_profile(exe).unwrap();
+        let gpu = gpu_profile(exe).unwrap();
+        let added = gpu
+            .lines()
+            .filter(|line| !renderer.lines().any(|kept| kept == *line))
+            .collect::<Vec<_>>()
+            .join("\n");
+        for expected in [
+            "(iokit-user-client-class \"IOSurfaceRootUserClient\")",
+            "(iokit-user-client-class \"AGXDeviceUserClient\")",
+            "(global-name \"com.apple.MTLCompilerService\")",
+            "(subpath \"/System/Library/Extensions\")",
+        ] {
+            assert!(added.contains(expected), "{expected} missing in\n{added}");
+        }
+        // No network, writes, forks, user files, window server or
+        // pasteboard, and IOKit only by named class.
+        for forbidden in [
+            "network",
+            "file-write",
+            "process-fork",
+            "/Users",
+            "windowserver",
+            "pasteboard",
+            "(allow iokit-open)",
+        ] {
+            assert!(!added.contains(forbidden), "{forbidden} in\n{added}");
+        }
+        assert!(gpu.contains("(deny default)"));
+        assert_eq!(gpu.matches('(').count(), gpu.matches(')').count());
+        assert_eq!(gpu_profile(Path::new("rel")), Err(ProfileError::UnsafePath));
     }
 
     #[test]

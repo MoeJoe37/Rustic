@@ -72,10 +72,12 @@ pub fn confine_self(kind: &std::ffi::OsStr) -> Result<(), String> {
     let exe = std::env::current_exe()
         .and_then(std::fs::canonicalize)
         .map_err(|error| format!("cannot find the executable: {error}"))?;
-    // The GPU process holds no authority and gets the renderer's profile
-    // until its backend needs driver access (ADR 0068).
-    let profile = if kind == "renderer" || kind == "gpu" {
+    // The GPU process holds no authority; its profile adds only the
+    // graphics drivers and Metal services (ADR 0071, TD-186).
+    let profile = if kind == "renderer" {
         rustic_sandbox::seatbelt::renderer_profile(&exe)
+    } else if kind == "gpu" {
+        rustic_sandbox::seatbelt::gpu_profile(&exe)
     } else if kind == "network" {
         rustic_sandbox::seatbelt::network_profile(&exe)
     } else {

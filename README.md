@@ -70,6 +70,9 @@ page cannot paint over, and out-of-process frames are composited in a
 confined GPU process that is replaced if it crashes, hangs or misbehaves,
 with the CPU compositor as fallback ([ADR 0068](docs/adr/0068-gpu-process.md),
 [ROADMAP §18](docs/ROADMAP.md#18-current-implementation-queue)).
+Pages are exposed to screen readers through UI Automation, NSAccessibility
+and AT-SPI, with text editing, selection and IME composition in the engine
+([accessibility](docs/ACCESSIBILITY.md), [ADR 0073](docs/adr/0073-accessibility.md)).
 M9 JavaScript compatibility work includes [`Math.sumPrecise`](docs/JS.md#mathsumprecise-m9),
 [binary and JSON data interchange](docs/JS.md#uint8array-and-json-data-interchange-m9),
 and [`Array.fromAsync`](docs/JS.md#arrayfromasync-m9).
@@ -87,7 +90,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 45.59%** (43.21% verified complete + 2.38% partial credit) — 102/226 capabilities complete and 9 in progress across 25 subsystems. Current milestone: **M8 Desktop alpha**, 43.25% done.
+**Overall engine completion: 47.09%** (44.49% verified complete + 2.60% partial credit) — 105/226 capabilities complete and 10 in progress across 25 subsystems. Current milestone: **M8 Desktop alpha**, 61.71% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 
@@ -109,6 +112,8 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 | [Layout](docs/LAYOUT.md), [text](docs/TEXT.md) and [paint](docs/PAINT.md) | The M3 static renderer |
 | [JavaScript](docs/JS.md) | The M4 engine: parser, heap, interpreter, standard library, Intl and its Test262 results |
 | [Scripted documents](docs/SCRIPTING.md) | The M5 integration: script turns, bindings, events, observers, forms and what is still open |
+| [Accessibility](docs/ACCESSIBILITY.md) | The accessibility tree, platform bridges (UI Automation, NSAccessibility, AT-SPI), editing and IME |
+| [Accessibility](docs/ACCESSIBILITY.md) | The accessibility tree, platform bridges (UI Automation, NSAccessibility, AT-SPI), editing and IME |
 | [Technical debt](docs/TECH_DEBT.md) | Known shortcuts and the rules that keep them safe |
 | [Platform and device support](docs/PLATFORMS.md) | Any device that can run a browser: portability rules and the CI target matrix |
 | [Mobile support](docs/MOBILE.md) | Android/iOS architecture, compile checks and device milestones |

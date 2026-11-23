@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+rustic-a11y = { path = "../rustic-a11y" }
 rustic-raster = { path = "../rustic-raster" }
 
 # Desktop only: Android's host is an activity and iOS's a BrowserEngineKit
@@ -16,6 +17,10 @@ rustic-raster = { path = "../rustic-raster" }
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 winit = { version = "=0.30.13", default-features = false, features = ["rwh_06", "x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita-notitle"] }
 softbuffer = { version = "=0.4.8", default-features = false, features = ["x11", "x11-dlopen", "wayland", "wayland-dlopen"] }
+# Platform accessibility bridges (ADR 0073): UI Automation, NSAccessibility
+# and AT-SPI behind one tree API.
+accesskit = { version = "=0.25.0", default-features = false }
+accesskit_winit = { version = "=0.34.0", default-features = false, features = ["accesskit_unix", "async-io", "rwh_06"] }
 
 [lints]
 workspace = true

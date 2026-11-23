@@ -84,6 +84,10 @@ pub struct LoaderLimits {
     /// `render --report-scroll`: print the viewport position the page
     /// was painted at (`scroll X,Y`) on standard output (ADR 0065).
     pub report_scroll: bool,
+    /// `render --report-a11y`: print the page's encoded accessibility tree
+    /// (`a11y HEX`) on standard output for the window's platform bridge
+    /// (ADR 0073).
+    pub report_a11y: bool,
     /// `render --frames N`: rendering opportunities to paint, one frame
     /// every [`FRAME_INTERVAL`] of the manual clock (1 by default).
     pub frames: usize,
@@ -121,6 +125,7 @@ impl Default for LoaderLimits {
             scroll_boxes: [None; MAX_CLICKS],
             frames: 1,
             report_scroll: false,
+            report_a11y: false,
             live: false,
             devtools: None,
         }
@@ -294,7 +299,7 @@ pub struct LoadedDocument {
     scroll: rustic_engine::ScrollState,
     /// `render --frames`: each frame's pixels and what it repainted.
     frames: Vec<(rustic_raster::Surface, FrameReport)>,
-    /// Focus and form control state the page's scripts left (ADR 0070).
+    /// Focus and form control state the page's scripts left (ADR 0073).
     live: rustic_a11y::LiveState,
 }
 
@@ -987,6 +992,7 @@ fn live_page(
         scroll_boxes: [None; MAX_CLICKS],
         clicks: [None; MAX_CLICKS],
         report_scroll: false,
+        report_a11y: false,
         ..limits
     };
     let raster = rustic_raster::RasterLimits::default();
@@ -1997,7 +2003,7 @@ pub fn dump_layout(
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
-/// The accessibility tree (a11y.semantics, ADR 0070) of the laid-out
+/// The accessibility tree (a11y.semantics, ADR 0073) of the laid-out
 /// page: what rendered, where (viewport coordinates after scrolling) and
 /// the page's live focus and control state.
 pub(crate) fn accessibility_tree(
@@ -3125,6 +3131,17 @@ pub(crate) fn render_layers(
             .unwrap_or(1.0);
         let snap = |v: f64| (v * factor).round() / factor;
         let line = format!("scroll {},{}\n", snap(at.0), snap(at.1));
+        crate::renderer::emit_stdout(line.as_bytes()).map_err(LoadError::Io)?;
+    }
+    if limits.report_a11y {
+        let tree = accessibility_tree(parsed, path, limits, view)?;
+        let bytes = rustic_a11y::wire::encode(&tree);
+        let mut line = String::with_capacity(bytes.len() * 2 + 6);
+        line.push_str("a11y ");
+        for byte in bytes {
+            line.push_str(&format!("{byte:02x}"));
+        }
+        line.push('\n');
         crate::renderer::emit_stdout(line.as_bytes()).map_err(LoadError::Io)?;
     }
     let layout = scrolled(layout, viewport, limits, input.scroll)?;

@@ -121,10 +121,10 @@ pub const MODIFIER_META: u8 = 8;
 pub const MAX_KEY_BYTES: usize = 64;
 
 /// Longest IME composition text or assistive-technology value in a
-/// [`PageInput`], in bytes (ADR 0070).
+/// [`PageInput`], in bytes (ADR 0073).
 pub const MAX_INPUT_TEXT_BYTES: usize = 64 * 1024;
 
-/// Largest encoded accessibility tree a renderer may send (ADR 0070).
+/// Largest encoded accessibility tree a renderer may send (ADR 0073).
 pub const MAX_ACCESSIBILITY_BYTES: usize = 32 * 1024 * 1024;
 
 /// An IME composition step in a [`PageInput::Composition`].
@@ -208,7 +208,7 @@ pub enum PageInput {
         modifiers: u8,
     },
     /// An IME composition step for the focused element (answered by
-    /// [`RendererMessage::Handled`]; ADR 0070).
+    /// [`RendererMessage::Handled`]; ADR 0073).
     Composition {
         /// Which step.
         phase: CompositionPhase,
@@ -217,7 +217,7 @@ pub enum PageInput {
     },
     /// An assistive technology's request for one accessibility node, by
     /// the id the page's tree gave it (answered by
-    /// [`RendererMessage::Handled`]; ADR 0070).
+    /// [`RendererMessage::Handled`]; ADR 0073).
     Assistive {
         /// The accessibility node id.
         node: u64,
@@ -225,7 +225,7 @@ pub enum PageInput {
         request: AssistiveRequest,
     },
     /// Send the page's accessibility tree as it is now (answered by
-    /// [`RendererMessage::Accessibility`]; ADR 0070).
+    /// [`RendererMessage::Accessibility`]; ADR 0073).
     Accessibility,
 }
 

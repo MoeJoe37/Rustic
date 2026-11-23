@@ -18,6 +18,8 @@ use rustic_raster::Surface;
 // a BrowserEngineKit app (ADR 0059), so winit and softbuffer are not built
 // there and `run` reports that.
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod accessibility;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod window;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use window::run;
@@ -85,6 +87,24 @@ pub trait Content {
     /// Escape: returns whether the strip used it (closing a prompt) rather
     /// than the window closing.
     fn chrome_escape(&mut self) -> bool {
+        false
+    }
+
+    /// The page's accessibility tree as last painted, in CSS pixels from
+    /// the page area's top-left corner (ADR 0073). Asked after each frame
+    /// while an assistive technology is listening; `None` shows an empty
+    /// window to it.
+    fn accessibility(&mut self) -> Option<rustic_a11y::AxTree> {
+        None
+    }
+
+    /// An assistive technology asked page node `node` to do `action`;
+    /// returns whether the page may have changed (the window repaints).
+    fn accessibility_action(
+        &mut self,
+        _node: rustic_a11y::AxId,
+        _action: rustic_a11y::ActionRequest,
+    ) -> bool {
         false
     }
 }

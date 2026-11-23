@@ -1,21 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1382" viewBox="0 0 1000 1382" role="img" aria-labelledby="title desc">
-<title id="title">Rustic engine completion: 45.59%</title>
-<desc id="desc">Weighted engine completion is 45.59%: 43.21% from capabilities verified complete and 2.38% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
+<title id="title">Rustic engine completion: 47.09%</title>
+<desc id="desc">Weighted engine completion is 47.09%: 44.49% from capabilities verified complete and 2.60% partial credit from verified steps of in-progress capabilities. A scope map sizes every subsystem by its engine weight, milestone bars follow the roadmap, and each subsystem row shows capability cells sized by relative scope. Green is verified complete, blue is verified partial progress, gray is remaining.</desc>
 <rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
-<text x="24.00" y="60" fill="#8b949e" font-size="12">102/226 capabilities complete · 9 in progress · 25 subsystems · engine-v4</text>
-<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">45.59%</text>
+<text x="24.00" y="60" fill="#8b949e" font-size="12">105/226 capabilities complete · 10 in progress · 25 subsystems · engine-v4</text>
+<text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">47.09%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
-<rect x="24.00" y="76" width="434.02" height="14" rx="4" fill="#388bfd"/>
-<rect x="24.00" y="76" width="411.36" height="14" rx="4" fill="#2ea043"/>
+<rect x="24.00" y="76" width="448.30" height="14" rx="4" fill="#388bfd"/>
+<rect x="24.00" y="76" width="423.54" height="14" rx="4" fill="#2ea043"/>
 <rect x="24" y="104" width="10" height="10" rx="2" fill="#2ea043"/>
-<text x="40.00" y="113" fill="#c9d1d9" font-size="12">43.21% verified complete</text>
+<text x="40.00" y="113" fill="#c9d1d9" font-size="12">44.49% verified complete</text>
 <rect x="224" y="104" width="10" height="10" rx="2" fill="#388bfd"/>
-<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+2.38% partial credit (verified steps)</text>
+<text x="240.00" y="113" fill="#c9d1d9" font-size="12">+2.60% partial credit (verified steps)</text>
 <rect x="524" y="104" width="10" height="10" rx="2" fill="#30363d"/>
-<text x="540.00" y="113" fill="#c9d1d9" font-size="12">54.41% remaining</text>
+<text x="540.00" y="113" fill="#c9d1d9" font-size="12">52.91% remaining</text>
 <text x="24.00" y="142" fill="#f0f6fc" font-size="14" font-weight="600">Scope map</text>
 <text x="976.00" y="142" fill="#8b949e" font-size="11" text-anchor="end">block width = share of engine · fill = subsystem progress</text>
 <g><title>Foundation: 100.00% of 1% engine weight (1.00 engine points)</title>
@@ -134,8 +134,10 @@
 <rect x="775.58" y="184" width="1" height="4" fill="#30363d"/>
 <text x="776.08" y="198" fill="#8b949e" font-size="10" text-anchor="middle">Host</text>
 </g>
-<g><title>Accessibility: 0.00% of 2% engine weight (0.00 engine points)</title>
+<g><title>Accessibility: 75.00% of 2% engine weight (1.50 engine points)</title>
 <rect x="796.12" y="150" width="17.04" height="32" rx="3" fill="#21262d"/>
+<rect x="796.12" y="150" width="12.78" height="32" rx="3" fill="#388bfd"/>
+<rect x="796.12" y="150" width="10.95" height="32" rx="3" fill="#2ea043"/>
 <rect x="804.14" y="184" width="1" height="16" fill="#30363d"/>
 <text x="804.64" y="210" fill="#8b949e" font-size="10" text-anchor="middle">A11y</text>
 </g>
@@ -224,13 +226,13 @@
 <text x="434.00" y="458" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">100.00%</text>
 <text x="488.00" y="458" fill="#8b949e" font-size="11" text-anchor="end">3.13%</text>
 </g>
-<g><title>M8 Desktop alpha: 43.25% (6/18 capabilities, 8.12% of engine)</title>
+<g><title>M8 Desktop alpha: 61.71% (9/18 capabilities, 8.12% of engine)</title>
 <text x="512.00" y="278" fill="#8b949e" font-size="12" font-weight="600">M8</text>
 <text x="548.00" y="278" fill="#c9d1d9" font-size="12">Desktop alpha</text>
 <rect x="712.00" y="269" width="150.00" height="10" rx="3" fill="#21262d"/>
-<rect x="712.00" y="269" width="64.88" height="10" rx="3" fill="#388bfd"/>
-<rect x="712.00" y="269" width="38.15" height="10" rx="3" fill="#2ea043"/>
-<text x="922.00" y="278" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">43.25%</text>
+<rect x="712.00" y="269" width="92.56" height="10" rx="3" fill="#388bfd"/>
+<rect x="712.00" y="269" width="61.88" height="10" rx="3" fill="#2ea043"/>
+<text x="922.00" y="278" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">61.71%</text>
 <text x="976.00" y="278" fill="#8b949e" font-size="11" text-anchor="end">8.12%</text>
 </g>
 <g><title>M9 Compatibility expansion: 2.60% (0/52 capabilities, 22.01% of engine)</title>
@@ -992,28 +994,32 @@
 </g>
 <text x="976.00" y="1097" fill="#c9d1d9" font-size="12" text-anchor="end">0.50</text>
 </g>
-<g><title>Accessibility: 0/5 capabilities complete, 0.00% done, 0.00 of 2 engine points</title>
+<g><title>Accessibility: 3/5 capabilities complete, 75.00% done, 1.50 of 2 engine points</title>
 <rect x="24" y="1108" width="952" height="30" fill="#161b22"/>
 <text x="32.00" y="1127" fill="#f0f6fc" font-size="12">Accessibility</text>
 <text x="236.00" y="1127" fill="#8b949e" font-size="12" text-anchor="end">2%</text>
 <rect x="252.00" y="1118" width="200.00" height="10" rx="3" fill="#21262d"/>
-<text x="504.00" y="1127" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">0.00%</text>
-<g><title>Semantic roles, names and state tree: planned, size 3, M8</title>
-<rect x="520.00" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
+<rect x="252.00" y="1118" width="150.00" height="10" rx="3" fill="#388bfd"/>
+<rect x="252.00" y="1118" width="128.56" height="10" rx="3" fill="#2ea043"/>
+<text x="504.00" y="1127" fill="#f0f6fc" font-size="12" text-anchor="end" font-weight="600">75.00%</text>
+<g><title>Semantic roles, names and state tree: complete, size 3, M8</title>
+<rect x="520.00" y="1116" width="79.43" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI): planned, size 3, M8</title>
-<rect x="601.43" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
+<g><title>Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI): complete, size 3, M8</title>
+<rect x="601.43" y="1116" width="79.43" height="14" rx="2" fill="#2ea043"/>
 </g>
 <g><title>Android TalkBack and iOS VoiceOver bridges verified on devices: planned, size 2, M14</title>
 <rect x="682.86" y="1116" width="52.29" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Keyboard/IME, focus and assistive editing flows: planned, size 3, M8</title>
-<rect x="737.14" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
+<g><title>Keyboard/IME, focus and assistive editing flows: complete, size 3, M8</title>
+<rect x="737.14" y="1116" width="79.43" height="14" rx="2" fill="#2ea043"/>
 </g>
-<g><title>Assistive-technology and accessibility acceptance: planned, size 3, M8</title>
+<g><title>Assistive-technology and accessibility acceptance: in progress, size 3, M8, 50.00% verified, external dependency: Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI</title>
 <rect x="818.57" y="1116" width="79.43" height="14" rx="2" fill="#30363d"/>
+<rect x="818.57" y="1116" width="39.71" height="14" rx="2" fill="#388bfd"/>
+<rect x="819.07" y="1116.5" width="78.43" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<text x="976.00" y="1127" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
+<text x="976.00" y="1127" fill="#c9d1d9" font-size="12" text-anchor="end">1.50</text>
 </g>
 <g><title>DevTools: 4/4 capabilities complete, 100.00% done, 1.00 of 1 engine points</title>
 <text x="32.00" y="1157" fill="#f0f6fc" font-size="12">DevTools</text>
@@ -1201,6 +1207,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 40bba91f248f</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 62d1f0ef1f8c</text>
 </g>
 </svg>

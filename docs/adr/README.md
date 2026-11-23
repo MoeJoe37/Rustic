@@ -80,6 +80,7 @@ instead of rewriting the history of a decision.
 | [0070](0070-native-promise-continuations.md) | Traced native promise continuations and collection between jobs | Accepted for M9 `Array.fromAsync` |
 | [0071](0071-gpu-backend.md) | GPU backend: wgpu 26 (Vulkan, Metal, Direct3D 12) in the GPU process; compute-shader compositing byte-identical to the CPU reference; device-loss reopen; Linux GPU sandbox profile | Accepted (desktop; window surfaces and Windows/macOS GPU profiles pending) |
 | [0072](0072-automation-protocol.md) | Automation and DevTools protocol: `rustic automate` over stdio, no listening socket, broker-enforced grants, VM debugger hooks, redacted network diagnostics | Accepted |
+| [0073](0073-accessibility.md) | Accessibility: tree built in the renderer (HTML-AAM, ARIA, AccName) and sent over IPC as a bounded wire message; AccessKit 0.25 bridges (UI Automation, NSAccessibility, AT-SPI) in the shell; editing, selection and IME composition in the engine | Accepted (desktop; real screen-reader acceptance external) |
 
 ## Records by area
 
@@ -101,6 +102,7 @@ instead of rewriting the history of a decision.
 | Isolation and security (M7) | 0055, 0056, 0057, 0058, 0059, 0060, 0061, 0062, 0063, 0066 |
 | Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071 |
 | Developer tools and automation (M8) | 0072 |
+| Accessibility and editing (M8) | 0073 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 
@@ -114,7 +116,7 @@ authority boundary or `unsafe` code.
 | --- | --- | --- |
 | Profile and storage format, partition keys and schema versions | The next change to the on-disk format (NET-06 shipped format version 1 without a record; its contract is in [IMPLEMENTATION.md](../IMPLEMENTATION.md#net-06--profiles-storage-keys-and-web-storage)) | Persistent on-disk compatibility promise |
 | Android and iOS sandbox acceptance ([0059](0059-mobile-renderer-isolation.md) is Proposed; Android implemented and green on the emulator) | Accepting ISO-08/MOB-07 (M14, ADR 0067) | Platform security boundary verified only on a device, emulator or simulator |
-| Input and accessibility bridges per platform; mobile windowing (desktop windowing is [0065](0065-desktop-window-host.md)) | UI-02/03 (M8 desktop; mobile in M14) | Platform dependencies on five OS families |
+| Mobile input and accessibility bridges; mobile windowing (desktop: [0065](0065-desktop-window-host.md), [0073](0073-accessibility.md)) | UI-02/03 (mobile in M14) | Platform dependencies on five OS families |
 | WebAssembly execution tiers | WASM-01 (M9) | Runtime architecture shared with the JS heap |
 | Confined `unsafe` code-memory crate for the JIT | PERF-03 (M12) | New `unsafe` outside `rustic-sandbox` |
 

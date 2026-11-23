@@ -152,3 +152,20 @@ and other OpenType table readers. HarfRust's release adds shaping work
 limits, including lookup and syllable processing. Rustic continues using
 the same outline and shaping adapters and tests the resulting glyphs,
 advances and offsets against its committed reference fixtures.
+
+## M8 accessibility bridges (2026-11-23)
+
+[ADR 0073](adr/0073-accessibility.md) adopts exact AccessKit 0.25.0 and
+accesskit_winit 0.34.0 in `crates/rustic-shell` (desktop targets only) for the
+UI Automation, NSAccessibility and AT-SPI bridges. Default features are
+disabled; `accesskit_winit` enables only `accesskit_unix`, `async-io` and
+`rwh_06` (no Tokio). Both are the newest releases that build with Rust 1.85.
+The 68 new packages (AccessKit's platform adapters, zbus and its async-io
+stack on Linux, `windows` 0.62 on Windows) with checksums, source revisions,
+license expressions and retained notices are in the
+[reviewed manifest](../third_party/rust-dependencies.json). The AccessKit
+crates do not ship license files, so the notices are taken from the
+repository at the published revision, including `LICENSE.chromium`
+(BSD-3-Clause) for the five crates with Chromium-derived code. New duplicate
+versions (quick-xml, winnow, `windows` 0.58 under wgpu) are `cargo deny`
+skips with reasons. No engine crate depends on the bridge graph.

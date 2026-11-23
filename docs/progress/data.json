@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "40bba91f248f76422714eda0c1d93a2484ddcb0375ad010a77b6c0e390f8b629",
-  "percent": "45.59",
-  "verified_percent": "43.21",
-  "partial_percent": "2.38",
-  "completed": 102,
-  "in_progress": 9,
+  "source_fingerprint": "62d1f0ef1f8c4556545081466c95885bd6a62d3cd30f50362977c0ac51ee7769",
+  "percent": "47.09",
+  "verified_percent": "44.49",
+  "partial_percent": "2.60",
+  "completed": 105,
+  "in_progress": 10,
   "total": 226,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -85,11 +85,11 @@
       "id": "M8",
       "label": "Desktop alpha",
       "share": "8.12",
-      "completed": 6,
+      "completed": 9,
       "total": 18,
-      "percent": "43.25",
-      "verified_percent": "25.43",
-      "partial_percent": "17.82"
+      "percent": "61.71",
+      "verified_percent": "41.25",
+      "partial_percent": "20.46"
     },
     {
       "id": "M9",
@@ -7092,9 +7092,70 @@
           "label": "Semantic roles, names and state tree",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-a11y/src/tree.rs",
+              "marker": "pub fn build("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-a11y/src/name.rs",
+              "marker": "AccName"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-a11y/src/wire.rs",
+              "marker": "pub fn decode(bytes: &[u8], limits: TreeLimits)"
+            },
+            {
+              "kind": "source",
+              "path": "docs/adr/0073-accessibility.md",
+              "marker": "## Decision"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-a11y/tests/semantics.rs",
+              "marker": "fn landmarks_headings_lists_and_links"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-a11y/tests/semantics.rs",
+              "marker": "fn form_controls_get_labels_values_and_states"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-a11y/tests/semantics.rs",
+              "marker": "fn aria_roles_states_hiding_and_presentation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-a11y/tests/semantics.rs",
+              "marker": "fn accname_edge_cases"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-a11y/tests/semantics.rs",
+              "marker": "fn limits_truncate_instead_of_failing"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-a11y/src/wire.rs",
+              "marker": "fn refuses_hostile_input_without_panicking"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/a11y.rs",
+              "marker": "fn dumps_roles_names_bounds_and_leaves_out_hidden_content"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/a11y.rs",
+              "marker": "fn reflects_focus_values_and_selection_scripts_left"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.42"
         },
         {
@@ -7102,9 +7163,55 @@
           "label": "Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI)",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-shell/src/accessibility.rs",
+              "marker": "pub(crate) fn tree_update("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-shell/src/window.rs",
+              "marker": "accesskit_winit::Adapter"
+            },
+            {
+              "kind": "source",
+              "path": "third_party/rust-dependencies.json",
+              "marker": "\"crates/rustic-shell:accesskit\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-shell/src/accessibility.rs",
+              "marker": "fn the_page_sits_under_the_window_scaled_below_the_strip"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-shell/src/accessibility.rs",
+              "marker": "fn actions_map_back_to_page_requests"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/a11y.rs",
+              "marker": "fn render_reports_the_tree_the_window_hands_to_the_platform_bridge"
+            },
+            {
+              "kind": "test",
+              "path": "tools/a11y_probe_linux.py",
+              "marker": "AT-SPI probe passed"
+            },
+            {
+              "kind": "test",
+              "path": "tools/a11y_probe_windows.ps1",
+              "marker": "UI Automation probe passed"
+            },
+            {
+              "kind": "test",
+              "path": "tools/a11y_probe_macos.py",
+              "marker": "NSAccessibility probe passed"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.42"
         },
         {
@@ -7122,9 +7229,50 @@
           "label": "Keyboard/IME, focus and assistive editing flows",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/editing.rs",
+              "marker": "pub(super) fn edit_key("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/editing.rs",
+              "marker": "pub(super) fn compose("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-ipc/src/protocol.rs",
+              "marker": "PageInput::Composition { phase, text }"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/editing.rs",
+              "marker": "fn caret_moves_by_code_point_and_edits_apply_at_the_selection"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/editing.rs",
+              "marker": "fn the_html_selection_api"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/editing.rs",
+              "marker": "fn ime_composition_events_and_text"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/editing.rs",
+              "marker": "fn assistive_actions_focus_click_set_value_and_select"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/a11y.rs",
+              "marker": "fn live_pages_answer_assistive_technology_and_ime_input"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.42"
         },
         {
@@ -7132,20 +7280,59 @@
           "label": "Assistive-technology and accessibility acceptance",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "external": "Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI",
+          "steps": [
+            {
+              "label": "Automated checks of a running window through AT-SPI, UI Automation and NSAccessibility in CI on Linux, Windows and macOS (x64 and ARM64)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": ".github/workflows/ci.yml",
+                  "marker": "tools/a11y_probe_linux.py"
+                },
+                {
+                  "kind": "source",
+                  "path": "tests/a11y/probe.html",
+                  "marker": "Accessibility probe"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/a11y_probe_linux.py",
+                  "marker": "AT-SPI probe passed"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/a11y_probe_windows.ps1",
+                  "marker": "UI Automation probe passed"
+                },
+                {
+                  "kind": "test",
+                  "path": "tools/a11y_probe_macos.py",
+                  "marker": "NSAccessibility probe passed"
+                }
+              ]
+            },
+            {
+              "label": "Acceptance sessions with real screen-reader users on each desktop platform (external)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.42"
         }
       ],
       "points": 14,
-      "completed": 0,
-      "in_progress": 0,
+      "completed": 3,
+      "in_progress": 1,
       "total": 5,
-      "contribution": "0.00",
-      "percent": "0.00",
-      "verified_percent": "0.00",
-      "partial_percent": "0.00"
+      "contribution": "1.50",
+      "percent": "75.00",
+      "verified_percent": "64.28",
+      "partial_percent": "10.72"
     },
     {
       "id": "devtools",

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 45.59%** = 43.21% verified complete + 2.38% partial credit. 102/226 capabilities complete, 9 in progress.
+**Overall completion: 47.09%** = 44.49% verified complete + 2.60% partial credit. 105/226 capabilities complete, 10 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `40bba91f248f76422714eda0c1d93a2484ddcb0375ad010a77b6c0e390f8b629`.
+Catalog: `engine-v4`. Source fingerprint: `62d1f0ef1f8c4556545081466c95885bd6a62d3cd30f50362977c0ac51ee7769`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -17,7 +17,7 @@ Catalog: `engine-v4`. Source fingerprint: `40bba91f248f76422714eda0c1d93a2484ddc
 | M5 Scripted documents | 11/11 | 100.00% | 100.00% | 4.90% |
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
-| M8 Desktop alpha | 6/18 | 43.25% | 25.43% | 8.12% |
+| M8 Desktop alpha | 9/18 | 61.71% | 41.25% | 8.12% |
 | M9 Compatibility expansion | 0/52 | 2.60% | 0.00% | 22.01% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.78% |
@@ -48,7 +48,7 @@ Catalog: `engine-v4`. Source fingerprint: `40bba91f248f76422714eda0c1d93a2484ddc
 | Security & IPC | 7/11 | 1 | 67.44% | 62.79% | 5% | 3.37 |
 | Compositor & GPU | 1/5 | 3 | 60.25% | 23.07% | 3% | 1.80 |
 | Platform hosts | 1/9 | 1 | 12.50% | 4.16% | 4% | 0.50 |
-| Accessibility | 0/5 | 0 | 0.00% | 0.00% | 2% | 0.00 |
+| Accessibility | 3/5 | 1 | 75.00% | 64.28% | 2% | 1.50 |
 | DevTools | 4/4 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | Extensions (MV2) | 0/11 | 0 | 0.00% | 0.00% | 3% | 0.00 |
 | uBO port & filtering | 0/8 | 0 | 0.00% | 0.00% | 2% | 0.00 |
@@ -327,11 +327,13 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 
 ### Accessibility
 
-- **planned** `a11y.semantics` — Semantic roles, names and state tree · size 3 · M8 · 0.42% of engine
-- **planned** `a11y.bridges` — Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI) · size 3 · M8 · 0.42% of engine
+- **complete** `a11y.semantics` — Semantic roles, names and state tree · size 3 · M8 · 0.42% of engine ([source](../../crates/rustic-a11y/src/tree.rs), [source](../../crates/rustic-a11y/src/name.rs), [source](../../crates/rustic-a11y/src/wire.rs), [source](../../docs/adr/0073-accessibility.md), [test](../../crates/rustic-a11y/tests/semantics.rs), [test](../../crates/rustic-a11y/tests/semantics.rs), [test](../../crates/rustic-a11y/tests/semantics.rs), [test](../../crates/rustic-a11y/tests/semantics.rs), [test](../../crates/rustic-a11y/tests/semantics.rs), [test](../../crates/rustic-a11y/src/wire.rs), [test](../../crates/rustic-cli/tests/a11y.rs), [test](../../crates/rustic-cli/tests/a11y.rs))
+- **complete** `a11y.bridges` — Desktop accessibility bridges (UI Automation, NSAccessibility, AT-SPI) · size 3 · M8 · 0.42% of engine ([source](../../crates/rustic-shell/src/accessibility.rs), [source](../../crates/rustic-shell/src/window.rs), [source](../../third_party/rust-dependencies.json), [test](../../crates/rustic-shell/src/accessibility.rs), [test](../../crates/rustic-shell/src/accessibility.rs), [test](../../crates/rustic-cli/tests/a11y.rs), [test](../../tools/a11y_probe_linux.py), [test](../../tools/a11y_probe_windows.ps1), [test](../../tools/a11y_probe_macos.py))
 - **planned** `a11y.mobile` — Android TalkBack and iOS VoiceOver bridges verified on devices · size 2 · M14 · 0.28% of engine
-- **planned** `a11y.editing` — Keyboard/IME, focus and assistive editing flows · size 3 · M8 · 0.42% of engine
-- **planned** `a11y.acceptance` — Assistive-technology and accessibility acceptance · size 3 · M8 · 0.42% of engine
+- **complete** `a11y.editing` — Keyboard/IME, focus and assistive editing flows · size 3 · M8 · 0.42% of engine ([source](../../crates/rustic-bindings/src/page/events/editing.rs), [source](../../crates/rustic-bindings/src/page/events/editing.rs), [source](../../crates/rustic-ipc/src/protocol.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-engine/tests/editing.rs), [test](../../crates/rustic-cli/tests/a11y.rs))
+- **in progress 50.00%** `a11y.acceptance` — Assistive-technology and accessibility acceptance · size 3 · M8 · 0.42% of engine · **external dependency:** Needs screen-reader users (NVDA and Narrator on Windows, VoiceOver on macOS, Orca on Linux) to accept real browsing sessions; automated probes through each platform API run in CI
+  - [x] Automated checks of a running window through AT-SPI, UI Automation and NSAccessibility in CI on Linux, Windows and macOS (x64 and ARM64) ([source](../../.github/workflows/ci.yml), [source](../../tests/a11y/probe.html), [test](../../tools/a11y_probe_linux.py), [test](../../tools/a11y_probe_windows.ps1), [test](../../tools/a11y_probe_macos.py))
+  - [ ] Acceptance sessions with real screen-reader users on each desktop platform (external)
 
 ### DevTools
 

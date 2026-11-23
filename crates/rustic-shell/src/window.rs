@@ -6,10 +6,11 @@ use std::rc::Rc;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{ElementState, KeyEvent, MouseButton, MouseScrollDelta, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
+use crate::accessibility;
 use crate::{Content, ScrollInput, WindowConfig, present, scrolled_by};
 
 struct Shell<C: Content> {
@@ -24,6 +25,13 @@ struct Shell<C: Content> {
     cursor: (f64, f64),
     /// The trusted strip's height in device pixels at the last frame.
     strip: u32,
+    /// The platform accessibility bridge (ADR 0073).
+    adapter: Option<accesskit_winit::Adapter>,
+    proxy: EventLoopProxy<accesskit_winit::Event>,
+    /// An assistive technology is listening: send the tree each frame.
+    accessible: bool,
+    /// The page tree last sent, for mapping actions back.
+    tree: Option<rustic_a11y::AxTree>,
 }
 
 impl<C: Content> Shell<C> {
@@ -82,6 +90,10 @@ impl<C: Content> Shell<C> {
             return self.fail(event_loop, message);
         }
         self.presented += 1;
+        let window = Rc::clone(window);
+        if self.accessible {
+            self.update_accessibility();
+        }
         match self.config.exit_after {
             Some(frames) if self.presented >= frames => event_loop.exit(),
             // A counted run presents its frames without waiting for the
@@ -89,6 +101,22 @@ impl<C: Content> Shell<C> {
             Some(_) => window.request_redraw(),
             None => {}
         }
+    }
+
+    /// Send the page's current tree to the platform bridge.
+    fn update_accessibility(&mut self) {
+        let (Some(window), Some(adapter)) = (&self.window, &mut self.adapter) else {
+            return;
+        };
+        self.tree = self.content.accessibility();
+        let size = window.inner_size();
+        let scale = window.scale_factor();
+        let top = f64::from(self.strip) / scale;
+        let title = &self.config.title;
+        let tree = self.tree.as_ref();
+        adapter.update_if_active(|| {
+            accessibility::tree_update(tree, title, (size.width, size.height), scale, top)
+        });
     }
 
     fn scroll(&mut self, input: ScrollInput) {
@@ -105,18 +133,49 @@ impl<C: Content> Shell<C> {
     }
 }
 
-impl<C: Content> ApplicationHandler for Shell<C> {
+impl<C: Content> ApplicationHandler<accesskit_winit::Event> for Shell<C> {
+    fn user_event(&mut self, _: &ActiveEventLoop, event: accesskit_winit::Event) {
+        match event.window_event {
+            accesskit_winit::WindowEvent::InitialTreeRequested => {
+                self.accessible = true;
+                self.update_accessibility();
+            }
+            accesskit_winit::WindowEvent::ActionRequested(request) => {
+                let Some(tree) = &self.tree else {
+                    return;
+                };
+                if let Some((node, action)) = accessibility::page_action(tree, &request) {
+                    if self.content.accessibility_action(node, action) {
+                        if let Some(window) = &self.window {
+                            window.request_redraw();
+                        }
+                    }
+                }
+            }
+            accesskit_winit::WindowEvent::AccessibilityDeactivated => self.accessible = false,
+        }
+    }
+
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
         }
+        // The accessibility adapter must exist before the window is first
+        // shown, so it opens hidden.
         let attributes = Window::default_attributes()
             .with_title(self.config.title.clone())
-            .with_inner_size(LogicalSize::new(self.config.size.0, self.config.size.1));
+            .with_inner_size(LogicalSize::new(self.config.size.0, self.config.size.1))
+            .with_visible(false);
         let window = match event_loop.create_window(attributes) {
             Ok(window) => Rc::new(window),
             Err(error) => return self.fail(event_loop, format!("cannot open a window: {error}")),
         };
+        self.adapter = Some(accesskit_winit::Adapter::with_event_loop_proxy(
+            event_loop,
+            &window,
+            self.proxy.clone(),
+        ));
+        window.set_visible(true);
         let surface = softbuffer::Context::new(Rc::clone(&window))
             .and_then(|context| softbuffer::Surface::new(&context, Rc::clone(&window)));
         match surface {
@@ -130,6 +189,9 @@ impl<C: Content> ApplicationHandler for Shell<C> {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
+        if let (Some(window), Some(adapter)) = (&self.window, &mut self.adapter) {
+            adapter.process_event(window, &event);
+        }
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
@@ -194,9 +256,14 @@ impl<C: Content> ApplicationHandler for Shell<C> {
 
 /// Open the window and run its event loop on this thread until it closes.
 pub fn run(config: WindowConfig, content: impl Content) -> Result<(), String> {
-    let event_loop =
-        EventLoop::new().map_err(|error| format!("cannot reach the window system: {error}"))?;
+    let event_loop = EventLoop::<accesskit_winit::Event>::with_user_event()
+        .build()
+        .map_err(|error| format!("cannot reach the window system: {error}"))?;
     let mut shell = Shell {
+        adapter: None,
+        proxy: event_loop.create_proxy(),
+        accessible: false,
+        tree: None,
         config,
         content,
         window: None,

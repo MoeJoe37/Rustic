@@ -534,6 +534,7 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
     let mut output = None;
     let mut frames = 1usize;
     let mut report_scroll = false;
+    let mut report_a11y = false;
     let mut live = false;
     let (mut scale, mut zoom, mut window) = (1.0, 1.0, (1280.0, 720.0));
     let mut rest = Vec::new();
@@ -556,6 +557,7 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
                     .ok_or("--scale requires a number")?;
             }
             Some("--report-scroll") => report_scroll = true,
+            Some("--report-a11y") => report_a11y = true,
             // A broker starts a live page in a renderer (TD-182).
             Some("--live") => live = true,
             Some("--frames") => {
@@ -600,6 +602,7 @@ pub(crate) fn parse_render_args(args: &[OsString]) -> Result<RenderArgs, String>
     }
     limits.frames = frames;
     limits.report_scroll = report_scroll;
+    limits.report_a11y = report_a11y;
     if live && !limits.run_scripts {
         return Err("--live needs --run-scripts".into());
     }
@@ -728,6 +731,7 @@ fn view_command(args: &[OsString]) -> u8 {
         permissions: chrome::Permissions::default(),
         shown: None,
         strip_width: 0.0,
+        tree: None,
     };
     match rustic_shell::run(config, page) {
         Ok(()) => 0,
@@ -748,6 +752,8 @@ struct ViewPage {
     shown: Option<rustic_url::Url>,
     /// The strip's width in CSS pixels at the last frame (for clicks).
     strip_width: f64,
+    /// The page's accessibility tree from the last frame (ADR 0073).
+    tree: Option<rustic_a11y::AxTree>,
 }
 
 impl rustic_shell::Content for ViewPage {
@@ -771,6 +777,7 @@ impl rustic_shell::Content for ViewPage {
             "--scroll".to_owned(),
             format!("{},{}", scroll.0, scroll.1),
             "--report-scroll".to_owned(),
+            "--report-a11y".to_owned(),
             "--output".to_owned(),
             "view.png".to_owned(),
         ]
@@ -788,6 +795,14 @@ impl rustic_shell::Content for ViewPage {
             .and_then(|at| at.split_once(','))
             .and_then(|(x, y)| Some((x.parse::<f64>().ok()?, y.parse::<f64>().ok()?)))
             .filter(|&(x, y)| x.is_finite() && y.is_finite() && x >= 0.0 && y >= 0.0);
+        // The tree is hostile input too: decoded within limits, or none.
+        self.tree = output
+            .split(|&byte| byte == b'\n')
+            .find_map(|line| line.strip_prefix(b"a11y "))
+            .and_then(decode_hex)
+            .and_then(|bytes| {
+                rustic_a11y::wire::decode(&bytes, rustic_a11y::TreeLimits::default()).ok()
+            });
         Ok(rustic_shell::Painted {
             surface,
             scroll: reported.unwrap_or(scroll),
@@ -796,6 +811,10 @@ impl rustic_shell::Content for ViewPage {
 
     fn chrome_height(&self) -> f64 {
         f64::from(chrome::height(&self.permissions))
+    }
+
+    fn accessibility(&mut self) -> Option<rustic_a11y::AxTree> {
+        self.tree.clone()
     }
 
     fn chrome(&mut self, width: u32, scale: f64) -> Result<Option<rustic_raster::Surface>, String> {
@@ -841,6 +860,17 @@ impl rustic_shell::Content for ViewPage {
                 .answer(chrome::Answer::Dismiss, std::time::Instant::now())
                 .is_some()
     }
+}
+
+/// Bytes from lowercase or uppercase hex digits; `None` for anything else.
+fn decode_hex(text: &[u8]) -> Option<Vec<u8>> {
+    if text.len() % 2 != 0 {
+        return None;
+    }
+    let digit = |c: u8| (c as char).to_digit(16).map(|d| d as u8);
+    text.chunks(2)
+        .map(|pair| Some(digit(pair[0])? << 4 | digit(pair[1])?))
+        .collect()
 }
 
 /// `render --frames N`: paint N rendering opportunities incrementally

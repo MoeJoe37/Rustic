@@ -1,4 +1,4 @@
-//! `rustic dump-a11y` (a11y.semantics, ADR 0070): the accessibility tree
+//! `rustic dump-a11y` (a11y.semantics, ADR 0073): the accessibility tree
 //! of a laid-out page, through the sandboxed renderer like every document
 //! command, with layout bounds, hidden content left out and script state.
 
@@ -124,5 +124,52 @@ fn live_pages_answer_assistive_technology_and_ime_input() {
         .output()
         .unwrap();
     assert_eq!(missing.status.code(), Some(1));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn render_reports_the_tree_the_window_hands_to_the_platform_bridge() {
+    // `rustic view` asks each frame's renderer for `--report-a11y`; the
+    // line it prints decodes, within the broker's limits, to the same tree.
+    let (dir, path) = page(
+        "report",
+        "<!doctype html><title>Report</title><h1>Hi</h1>\
+         <div role=checkbox aria-checked=true tabindex=0>Remember</div>",
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_rustic"))
+        .args([
+            "render",
+            "--scroll",
+            "0,0",
+            "--report-scroll",
+            "--report-a11y",
+            "--output",
+        ])
+        .arg(dir.join("out.png"))
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let hex = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("a11y "))
+        .expect("an a11y line");
+    let bytes: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|at| u8::from_str_radix(&hex[at..at + 2], 16).unwrap())
+        .collect();
+    let tree = rustic_a11y::wire::decode(&bytes, rustic_a11y::TreeLimits::default()).unwrap();
+    let dumped = tree.dump(1 << 20).unwrap();
+    assert!(dumped.starts_with("document \"Report\""), "{dumped}");
+    assert!(dumped.contains("heading \"Hi\" level=1"), "{dumped}");
+    assert!(
+        dumped.contains("checkbox \"Remember\" focusable checked=true"),
+        "{dumped}"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

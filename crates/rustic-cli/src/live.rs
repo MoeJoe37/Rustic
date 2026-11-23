@@ -38,7 +38,7 @@ enum Step {
     Zoom(f64),
     /// Print the RGBA of the last frame's device pixel.
     Probe(u32, u32),
-    /// Print the page's accessibility tree (ADR 0070).
+    /// Print the page's accessibility tree (ADR 0073).
     Accessibility,
     /// An IME composition step for the focused element.
     Compose(CompositionPhase, String),

@@ -624,7 +624,7 @@ impl<'a> LivePage<'a> {
         self.exchange(&input).map(drop)
     }
 
-    /// Deliver an IME composition step to the focused element (ADR 0070);
+    /// Deliver an IME composition step to the focused element (ADR 0073);
     /// over-long text is dropped.
     pub fn composition(
         &mut self,
@@ -642,7 +642,7 @@ impl<'a> LivePage<'a> {
     }
 
     /// Deliver an assistive technology's request for accessibility node
-    /// `node` (ADR 0070).
+    /// `node` (ADR 0073).
     pub fn assistive(
         &mut self,
         node: u64,
@@ -658,7 +658,7 @@ impl<'a> LivePage<'a> {
     }
 
     /// The page's accessibility tree now, decoded as hostile input
-    /// (ADR 0070); `None` when the renderer sent none or an invalid one.
+    /// (ADR 0073); `None` when the renderer sent none or an invalid one.
     pub fn accessibility(&mut self) -> Result<Option<rustic_a11y::AxTree>, String> {
         Ok(match self.exchange(&PageInput::Accessibility)? {
             Answer::Accessibility(bytes) => {
@@ -1597,6 +1597,12 @@ fn serve(
                             && at
                                 .bytes()
                                 .all(|b| b.is_ascii_digit() || matches!(b, b'.' | b',' | b'-'))
+                    }) || line.strip_prefix("a11y ").is_some_and(|hex| {
+                        // The encoded accessibility tree (ADR 0073), bounded
+                        // like the IPC message that carries it.
+                        !hex.is_empty()
+                            && hex.len() <= 2 * rustic_ipc::protocol::MAX_ACCESSIBILITY_BYTES
+                            && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
                     })
                 })
                 .map(|line| format!("{line}\n"))

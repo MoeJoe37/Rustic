@@ -5,6 +5,16 @@ ignore = [
     # (wgpu 26's Metal backend, Apple only; ADR 0071). wgpu 27 replaces
     # metal with objc2-metal but needs a newer MSRV.
     { id = "RUSTSEC-2024-0436", reason = "paste (proc-macro) under metal 0.32 for wgpu 26, Apple only; leaves with the wgpu upgrade" },
+    # The Linux AT-SPI bridge of AccessKit 0.25 (ADR 0073, TD-199).
+    # quick-xml 0.38 comes only through zbus_xml under zbus-lockstep, whose
+    # `#[validate]` checks expand to `#[cfg(test)]` tests of atspi-common:
+    # Rustic never parses XML with it. The zvariant family is unmaintained
+    # upstream with no replacement release that accesskit_unix accepts yet.
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.38 via zbus_xml/zbus-lockstep, reached only by atspi-common's own tests; no XML is parsed at run time (TD-199)" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.38 NsReader, same test-only path as RUSTSEC-2026-0194 (TD-199)" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant unmaintained, no vulnerability; AT-SPI D-Bus encoding under accesskit_unix, Linux only (TD-199)" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names unmaintained, no vulnerability; under accesskit_unix, Linux only (TD-199)" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive unmaintained, no vulnerability; under accesskit_unix, Linux only (TD-199)" },
 ]
 
 [licenses]

@@ -58,7 +58,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | --- | --- | --- |
 | M8 browser shell (DevTools, UI-01; was "M7 browser shell and isolation") | TD-15, TD-152, TD-130, TD-166, TD-196 | Diagnostics, error locations, Window/browsing-context scope and profile locking for the real browser shell |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
+| M8 (hosts, GPU and platform services) | TD-173, TD-183, TD-184, TD-185, TD-186, TD-175, TD-177, TD-178, TD-181, TD-191, TD-197, TD-199, TD-42, TD-46, TD-51, TD-52, TD-53, TD-59, TD-81, TD-85 | Native font services, color management, raster quality and the frame-time gate |
 | M9, CSS, layout and paint | TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
@@ -263,6 +263,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-196 | Deliberate | Browser shell | Only the active tab has a live page: background tabs keep their last frame and load again when shown (scripts restart), because a profile is opened per thread | Open, M8 browser shell (before the M10 beta) |
 | TD-197 | Deliberate | Desktop host | IME composition reaches the browser's own fields only, and CI exercises it with synthetic events through the host's handler, not with the platforms' input methods; text and composition events are not sent to pages | Open, M8 (a11y.editing) / M10 |
 | TD-198 | Deliberate | Network / CLI | Frame and popup documents are read whole in the broker before their renderer parses them; only top-level documents stream | Open, M12 |
+| TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M8 (a11y.bridges) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3051,6 +3052,20 @@ frame body delays its first parse and the broker holds the whole body.
 document as streamed, as `navigate` does, then read it through
 `DocumentChunk` in the frame's renderer.
 **Trigger:** M12 page-load work, or frames measured in `perf.harness`.
+
+### TD-199 — Ignored advisories in the AT-SPI dependency graph
+
+`accesskit_unix` 0.23 (ADR 0073) depends on atspi-common 0.13, which
+pulls zbus-lockstep 0.5, zbus_xml 5 and quick-xml 0.38. Two quick-xml
+advisories (quadratic duplicate-attribute check, unbounded namespace
+allocation) apply to XML parsing; here that code runs only in
+atspi-common's `#[cfg(test)]` signature checks, so no XML reaches it in
+Rustic. zvariant, zvariant_derive and zbus_names are flagged unmaintained
+with no vulnerability. `deny.toml` ignores the five IDs with these
+reasons. **Pay:** move to an AccessKit release whose Unix adapter drops
+zbus-lockstep and the unmaintained crates (with the winit upgrade it needs),
+then remove the ignores. **Trigger:** such a release, a vulnerability in
+the zvariant family, or any run-time XML parsing in this graph.
 ### TD-183 — macOS profile breadth: sysctl reads and pre-main code
 
 The Seatbelt profiles (ADR 0063) allow `sysctl-read` of every name,

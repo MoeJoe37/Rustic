@@ -88,7 +88,11 @@ try {
         if ($node.Name) { $line += " `"$($node.Name)`"" }
         if ($node.Focusable) { $line += ' focusable' }
         if ($node.Toggle) { $line += " toggle=$($node.Toggle)" }
-        $line += " $([int]$node.Width)x$([int]$node.Height)"
+        # An element with no on-screen box (a 0x0 image) reports an empty
+        # rectangle whose sides are infinite.
+        $width = if ([double]::IsInfinity($node.Width) -or [double]::IsNaN($node.Width)) { 0 } else { [int]$node.Width }
+        $height = if ([double]::IsInfinity($node.Height) -or [double]::IsNaN($node.Height)) { 0 } else { [int]$node.Height }
+        $line += " ${width}x${height}"
         Write-Output $line
     }
     $missing = @($expected | Where-Object { -not (Test-Found $nodes $_[0] $_[1]) })

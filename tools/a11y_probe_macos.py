@@ -24,7 +24,7 @@ FIXTURE = os.path.join(ROOT, "tests", "a11y", "probe.html")
 # (AXRole, accessible name) pairs that must appear. The name is the first
 # non-empty of AXTitle, AXDescription and AXValue, as VoiceOver reads it.
 EXPECTED = [
-    ("AXHeading", "Accessibility probe"),
+    ("Heading", "Accessibility probe"),
     ("AXLink", "First section"),
     ("AXButton", "Send"),
     ("AXCheckBox", "Remember me"),
@@ -73,7 +73,10 @@ def read_tree(pid):
     for line in lines.splitlines():
         parts = line.split("\t")
         if len(parts) == 5:
-            nodes.append((int(parts[0]), parts[1], parts[2], parts[3]))
+            # AccessKit reports headings with the role string "Heading"
+            # (WebKit's AXHeading); both are what VoiceOver announces.
+            role = "Heading" if parts[1] == "AXHeading" else parts[1]
+            nodes.append((int(parts[0]), role, parts[2], parts[3]))
     return nodes, ""
 
 

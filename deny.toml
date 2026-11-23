@@ -1,5 +1,11 @@
 [advisories]
 yanked = "deny"
+ignore = [
+    # Unmaintained, no vulnerability: a build-time macro under metal 0.32
+    # (wgpu 26's Metal backend, Apple only; ADR 0071). wgpu 27 replaces
+    # metal with objc2-metal but needs a newer MSRV.
+    { id = "RUSTSEC-2024-0436", reason = "paste (proc-macro) under metal 0.32 for wgpu 26, Apple only; leaves with the wgpu upgrade" },
+]
 
 [licenses]
 # ISC: ring, rustls-webpki, untrusted. CDLA-Permissive-2.0: the Android

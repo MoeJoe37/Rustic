@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "9c1a88458b204d2941c7d0aac719912c05ee6c1d042ff2ae6e5aaf65284b17ff",
-  "percent": "43.62",
+  "source_fingerprint": "3de806135c6f18045b05200ebdc865ac7a2906b03826873a4d8abc44daa3f81c",
+  "percent": "44.59",
   "verified_percent": "42.21",
-  "partial_percent": "1.41",
+  "partial_percent": "2.38",
   "completed": 98,
-  "in_progress": 7,
+  "in_progress": 9,
   "total": 226,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -87,9 +87,9 @@
       "share": "8.12",
       "completed": 2,
       "total": 18,
-      "percent": "19.12",
+      "percent": "30.95",
       "verified_percent": "13.13",
-      "partial_percent": "5.99"
+      "partial_percent": "17.82"
     },
     {
       "id": "M9",
@@ -6741,9 +6741,58 @@
           "label": "Desktop GPU adapters and CPU fallback",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Vulkan, Metal and Direct3D 12 through wgpu in the GPU process with CPU fallback (ADR 0071)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-gpu/src/lib.rs",
+                  "marker": "pub fn composite"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-gpu/src/lib.rs",
+                  "marker": "const SHADER"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/gpu.rs",
+                  "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
+                }
+              ]
+            },
+            {
+              "label": "Driver access for the confined GPU process: Linux profile",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/broker.rs",
+                  "marker": "--dev-bind-try"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-sandbox/src/seccomp.rs",
+                  "marker": "fn the_gpu_filter_adds_anonymous_memory_files_only"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/gpu.rs",
+                  "marker": "fn the_sandboxed_gpu_process_cannot_reach_files_network_or_programs"
+                }
+              ]
+            },
+            {
+              "label": "Driver access for the confined GPU process: Windows AppContainer and macOS Seatbelt GPU profiles, verified on GPU hardware (TD-186)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "66.66",
           "engine_share": "0.69"
         },
         {
@@ -6792,11 +6841,27 @@
             },
             {
               "label": "GPU device loss and resource recovery in the hardware backend",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-cli/src/gpuproc.rs",
+                  "marker": "pub const MAX_DEVICE_OPENS"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-gpu/tests/parity.rs",
+                  "marker": "fn bad_layers_are_refused_and_a_lost_device_reopens"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-cli/tests/gpu.rs",
+                  "marker": "fn the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device"
+                }
+              ]
             }
           ],
-          "credit": "33.33",
+          "credit": "66.66",
           "engine_share": "0.46"
         },
         {
@@ -6804,20 +6869,43 @@
           "label": "GPU/reference parity, performance and energy gates",
           "size": 3,
           "milestone": "M8",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Byte-exact GPU/reference parity gate, required in Linux CI on lavapipe",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-gpu/tests/parity.rs",
+                  "marker": "fn gpu_composition_is_byte_identical_to_the_cpu_reference"
+                },
+                {
+                  "kind": "source",
+                  "path": ".github/workflows/ci.yml",
+                  "marker": "RUSTIC_REQUIRE_GPU=1"
+                }
+              ]
+            },
+            {
+              "label": "Frame-time and energy gates for GPU compositing on hardware",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "50.00",
           "engine_share": "0.69"
         }
       ],
       "points": 13,
       "completed": 1,
-      "in_progress": 1,
+      "in_progress": 3,
       "total": 5,
-      "contribution": "0.84",
-      "percent": "28.20",
+      "contribution": "1.80",
+      "percent": "60.25",
       "verified_percent": "23.07",
-      "partial_percent": "5.13"
+      "partial_percent": "37.18"
     },
     {
       "id": "platform",

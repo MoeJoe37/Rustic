@@ -75,6 +75,9 @@ fn reference(page: &Surface, layers: &[Layer<'_>]) -> Surface {
     out
 }
 
+/// A frame's size and the rectangle it fills.
+type LayerCase = ((u32, u32), (u32, u32, u32, u32));
+
 #[test]
 fn gpu_composition_is_byte_identical_to_the_cpu_reference() {
     let Some(gpu) = open() else {
@@ -83,7 +86,7 @@ fn gpu_composition_is_byte_identical_to_the_cpu_reference() {
     let mut bytes = Bytes(0x9E37_79B9_7F4A_7C15);
     // Odd sizes, frames smaller than their rectangles (edge pixels
     // repeat), overlapping layers, zero coverage, empty rectangles.
-    let cases: &[((u32, u32), &[((u32, u32), (u32, u32, u32, u32))])] = &[
+    let cases: &[((u32, u32), &[LayerCase])] = &[
         ((1, 1), &[((1, 1), (0, 0, 1, 1))]),
         (
             (37, 23),

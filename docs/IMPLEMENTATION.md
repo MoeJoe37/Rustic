@@ -203,8 +203,9 @@ See [JS.md](JS.md#mathsumprecise-m9) for the contract and reproduction command.
 </details>
 
 <details>
-<summary>Desktop alpha (M8, current): 4 sections</summary>
+<summary>Desktop alpha (M8, current): 5 sections</summary>
 
+- [UI-05 — Hardware compositor (wgpu)](#ui-05--hardware-compositor-wgpu)
 - [TD-182 — Long-lived renderer per page](#td-182--long-lived-renderer-per-page)
 - [UI-05 — GPU process](#ui-05--gpu-process)
 - [UI-02 — Desktop window](#ui-02--desktop-window)
@@ -2606,6 +2607,30 @@ passing file. The source and test evidence completes the catalog's Intl
 service step. The existing 128 KiB limit test still passes after removing temporary
 global and Date prototype shape transitions at realm startup. The ARM64
 benchmark record is from QEMU emulation (TD-125).
+
+## UI-05 — Hardware compositor (wgpu)
+
+Added 2026-11-23 (`crates/rustic-gpu`, the `Device` in
+`rustic-cli/src/gpuproc.rs`, the GPU confinement in
+`rustic-cli/src/broker.rs` and `rustic_sandbox::seccomp`,
+[ADR 0071](adr/0071-gpu-backend.md)). The GPU process composites frame
+layers on a GPU through wgpu 26 (Vulkan, Metal, Direct3D 12). A WGSL
+compute shader runs `Surface::add_frame`'s integer arithmetic, so the
+result is the CPU reference's bytes.
+
+| Contract | Behavior | Regression evidence |
+| --- | --- | --- |
+| Parity | Byte-identical to the CPU reference for odd sizes, overlapping layers, partial and zero coverage, frames smaller than their rectangles; compared exactly, no tolerance | `gpu_composition_is_byte_identical_to_the_cpu_reference`, `the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device` |
+| Adapter choice | `RUSTIC_GPU` unset: hardware adapters only; `any`: software ones too (lavapipe, WARP); `cpu`: none. No adapter composites on the CPU, not an error | `the_hardware_compositor_matches_the_reference_and_recovers_a_lost_device` |
+| Device loss | A lost device is reopened and the composition retried once; at most 3 device opens per process, then the CPU; other device errors composite that frame on the CPU; no device error panics | `bad_layers_are_refused_and_a_lost_device_reopens` |
+| Input | Layers outside the page or with the wrong coverage length are refused on the device as on the CPU | `bad_layers_are_refused_and_a_lost_device_reopens` |
+| Linux confinement | bubblewrap adds `/dev/dri` and the sysfs paths drivers probe, read-only; the GPU seccomp filter adds only `memfd_create` and `ftruncate` | `the_gpu_filter_adds_anonymous_memory_files_only`, `the_sandboxed_gpu_process_cannot_reach_files_network_or_programs` |
+
+Test hook `RUSTIC_TEST_GPU_DEVICE` (`report`, `lose-on:N`). CI installs
+lavapipe on Linux and sets `RUSTIC_REQUIRE_GPU=1`, so the parity tests
+cannot pass by skipping. Open: Windows and macOS confined GPU processes
+have no driver access (TD-186), pixels still cross the pipe (TD-184), the
+window is presented by the broker (TD-185).
 
 ## TD-182 — Long-lived renderer per page
 

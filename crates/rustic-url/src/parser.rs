@@ -9,6 +9,10 @@ use crate::encoding::{self, EncodeSet};
 use crate::record::default_port;
 use crate::{Host, ParseError, Url, UrlPath, ValidationError, ipv4, ipv6};
 
+mod setter;
+
+pub use setter::UrlComponent;
+
 /// Resource limits for one parse; units count bytes and retained path segments.
 ///
 /// These are not total process-memory limits. Temporary work is linear in the
@@ -160,6 +164,11 @@ impl<'p> Run<'p> {
                 url.query = Some(encoding::encode_legacy_query(&raw, encoding));
             }
         }
+        self.validate_record(&url)?;
+        Ok(url)
+    }
+
+    fn validate_record(&self, url: &Url) -> Result<(), ParseError> {
         self.checkpoint()?;
         if url.serialized_len()? > self.limits.max_serialized_bytes {
             return Err(ParseError::LimitExceeded);
@@ -168,7 +177,7 @@ impl<'p> Run<'p> {
         {
             return Err(ParseError::LimitExceeded);
         }
-        Ok(url)
+        Ok(())
     }
 
     fn dispatch(&mut self, input: &str, base: Option<&Url>) -> Result<Url, ParseError> {

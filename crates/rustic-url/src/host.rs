@@ -86,6 +86,13 @@ impl Host {
     pub(crate) fn is_empty(&self) -> bool {
         matches!(self.0, HostKind::Empty)
     }
+
+    pub(crate) fn heap_bytes(&self) -> usize {
+        match &self.0 {
+            HostKind::Domain(value) | HostKind::Opaque(value) => value.capacity(),
+            _ => 0,
+        }
+    }
 }
 
 impl fmt::Debug for Host {

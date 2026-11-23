@@ -373,8 +373,24 @@
           "label": "URL setters and URLSearchParams",
           "size": 2,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/parser/setter.rs",
+              "marker": "pub fn with_component"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/url.rs",
+              "marker": "fn pinned_url_setters_pass_through_the_window_bindings"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/url.rs",
+              "marker": "fn search_params_conversion_sort_and_iteration_keep_pair_order_and_live_state"
+            }
+          ]
         },
         {
           "id": "url.encoding",

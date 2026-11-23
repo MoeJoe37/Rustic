@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 48.45%** = 44.57% verified complete + 3.88% partial credit. 106/227 capabilities complete, 14 in progress.
+**Overall completion: 48.59%** = 44.70% verified complete + 3.89% partial credit. 107/227 capabilities complete, 14 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `92f17895914ada7ececfd58fbe14436376f6ebdbfe2b21b7668d097a8af8954c`.
+Catalog: `engine-v4`. Source fingerprint: `edc250e2ed03b4a19600906587f7da6a27bcfd273aa0345376497a6618f8868b`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `92f17895914ada7ececfd58fbe14436376f6e
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 9/18 | 77.60% | 41.25% | 8.12% |
-| M9 Compatibility expansion | 1/53 | 3.66% | 1.07% | 22.18% |
+| M9 Compatibility expansion | 2/53 | 4.26% | 1.67% | 22.18% |
 | M10 Embedding & beta release | 0/7 | 0.00% | 0.00% | 2.55% |
 | M11 Web platform parity | 0/30 | 0.82% | 0.00% | 14.76% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -30,7 +30,7 @@ Catalog: `engine-v4`. Source fingerprint: `92f17895914ada7ececfd58fbe14436376f6e
 | Subsystem | Completed | In progress | Progress | Verified | Engine weight | Engine points |
 | --- | --- | --- | --- | --- | --- | --- |
 | Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
-| URLs & encoding | 9/12 | 0 | 76.66% | 76.66% | 2% | 1.53 |
+| URLs & encoding | 10/12 | 0 | 83.33% | 83.33% | 2% | 1.66 |
 | DOM | 8/10 | 1 | 80.14% | 76.47% | 4% | 3.20 |
 | HTML | 10/11 | 0 | 78.37% | 78.37% | 5% | 3.91 |
 | CSS & style | 8/10 | 2 | 84.18% | 79.59% | 6% | 5.05 |
@@ -78,7 +78,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `url.idna` — Unicode IDNA and data adapter · size 3 · M1 · 0.20% of engine ([source](../../crates/rustic-url/src/idna/mod.rs), [source](../../crates/rustic-url/src/host.rs), [test](../../crates/rustic-url/tests/idna.rs), [test](../../crates/rustic-url/tests/idna.rs))
 - **complete** `url.file` — File URL and platform rules · size 2 · M1 · 0.13% of engine ([source](../../crates/rustic-url/src/parser.rs), [test](../../crates/rustic-url/tests/url.rs))
 - **planned** `url.blob` — Blob registry and origin rules · size 2 · M9 · 0.13% of engine
-- **planned** `url.setters` — URL setters and URLSearchParams · size 2 · M9 · 0.13% of engine
+- **complete** `url.setters` — URL setters and URLSearchParams · size 2 · M9 · 0.13% of engine ([source](../../crates/rustic-url/src/parser/setter.rs), [test](../../crates/rustic-bindings/tests/url.rs), [test](../../crates/rustic-bindings/tests/url.rs))
 - **complete** `url.encoding` — Required legacy decoders and charset selection · size 5 · M6 · 0.33% of engine ([source](../../crates/rustic-encoding/src/decoder.rs), [test](../../crates/rustic-encoding/tests/encoding.rs), [source](../../crates/rustic-css/src/decode.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-url/src/encoding.rs), [test](../../crates/rustic-url/tests/query_encoding.rs), [source](../../crates/rustic-engine/src/inline_scripts.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/network.rs), [test](../../crates/rustic-cli/tests/network.rs))
 - **complete** `url.restart` — Encoding sniff/restart integration · size 2 · M6 · 0.13% of engine ([source](../../crates/rustic-html/src/local_encoding.rs), [test](../../crates/rustic-html/src/local_encoding.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/network.rs))
 - **complete** `url.diagnostics` — Validation-error diagnostics and source locations · size 1 · M1 · 0.06% of engine ([source](../../crates/rustic-url/src/diagnostics.rs), [test](../../crates/rustic-url/tests/diagnostics.rs))

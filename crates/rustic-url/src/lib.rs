@@ -3,8 +3,9 @@
 //! Supports special network schemes with ASCII and Unicode (UTS #46 IDNA)
 //! domains, IPv4/IPv6, `file:` URLs with Windows drive-letter rules, generic
 //! hierarchical URLs and opaque paths. [`UrlParser::parse_with_diagnostics`]
-//! also reports standard validation errors with byte offsets. Blob URLs, legacy
-//! query encodings and URL setters are not implemented. Parsing does not touch the file system,
+//! also reports standard validation errors with byte offsets. Component setters
+//! use [`UrlParser::with_component`]. Blob URL registries remain future work.
+//! Parsing does not touch the file system,
 //! load resources, authorize navigation, or assign a document's inherited origin.
 //!
 //! ```
@@ -35,5 +36,5 @@ pub use error::ParseError;
 pub use form::{parse_form, serialize_form};
 pub use host::Host;
 pub use origin::Origin;
-pub use parser::{UrlLimits, UrlParser};
+pub use parser::{UrlComponent, UrlLimits, UrlParser};
 pub use record::{Url, UrlPath};

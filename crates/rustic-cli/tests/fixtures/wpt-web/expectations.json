@@ -2991,5 +2991,474 @@
       "name": "A 0ms timeout should not be clamped to 1ms",
       "status": "PASS"
     }
+  ],
+  "url/url-searchparams.any.js": [
+    {
+      "name": "URL.searchParams getter",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.searchParams updating, clearing",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.searchParams setter, invalid values",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.searchParams and URL.search setters, update propagation",
+      "status": "PASS"
+    }
+  ],
+  "url/url-statics-canparse.any.js": [
+    {
+      "name": "URL.canParse(undefined, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.canParse(aaa:b, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.canParse(undefined, aaa:b)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.canParse(undefined, https://test:test/)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.canParse(aaa:/b, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.canParse(undefined, aaa:/b)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.canParse(https://test:test, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.canParse(a, https://b/)",
+      "status": "PASS"
+    }
+  ],
+  "url/url-statics-parse.any.js": [
+    {
+      "name": "URL.parse(undefined, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.parse(aaa:b, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.parse(undefined, aaa:b)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.parse(aaa:/b, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.parse(undefined, aaa:/b)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.parse(https://test:test, undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.parse(a, https://b/)",
+      "status": "PASS"
+    },
+    {
+      "name": "URL.parse() should return a unique object",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-append.any.js": [
+    {
+      "name": "Append same name",
+      "status": "PASS"
+    },
+    {
+      "name": "Append empty strings",
+      "status": "PASS"
+    },
+    {
+      "name": "Append null",
+      "status": "PASS"
+    },
+    {
+      "name": "Append multiple",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-constructor.any.js": [
+    {
+      "name": "Basic URLSearchParams construction",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, no arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, remove leading \"?\"",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, DOMException as argument",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, empty string as argument",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, {} as argument",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, string.",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, object.",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams constructor, FormData.",
+      "status": "FAIL",
+      "message": "FormData is not defined"
+    },
+    {
+      "name": "Parse +",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse encoded +",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse space",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse %20",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse \\0",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse %00",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse \u2384",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse %e2%8e%84",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse \ud83d\udca9",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse %f0%9f%92%a9",
+      "status": "PASS"
+    },
+    {
+      "name": "Constructor with sequence of sequences of strings",
+      "status": "PASS"
+    },
+    {
+      "name": "Construct with object with +",
+      "status": "PASS"
+    },
+    {
+      "name": "Construct with object with two keys",
+      "status": "PASS"
+    },
+    {
+      "name": "Construct with array with two keys",
+      "status": "PASS"
+    },
+    {
+      "name": "Construct with 2 unpaired surrogates (no trailing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Construct with 3 unpaired surrogates (no leading)",
+      "status": "PASS"
+    },
+    {
+      "name": "Construct with object with NULL, non-ASCII, and surrogate keys",
+      "status": "PASS"
+    },
+    {
+      "name": "Custom [Symbol.iterator]",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-delete.any.js": [
+    {
+      "name": "Delete basics",
+      "status": "PASS"
+    },
+    {
+      "name": "Deleting appended multiple",
+      "status": "PASS"
+    },
+    {
+      "name": "Deleting all params removes ? from URL",
+      "status": "PASS"
+    },
+    {
+      "name": "Removing non-existent param removes ? from URL",
+      "status": "PASS"
+    },
+    {
+      "name": "Changing the query of a URL with an opaque path with trailing spaces",
+      "status": "PASS"
+    },
+    {
+      "name": "Changing the query of a URL with an opaque path with trailing spaces and a fragment",
+      "status": "PASS"
+    },
+    {
+      "name": "Two-argument delete()",
+      "status": "PASS"
+    },
+    {
+      "name": "Two-argument delete() respects undefined as second arg",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-foreach.any.js": [
+    {
+      "name": "ForEach Check",
+      "status": "PASS"
+    },
+    {
+      "name": "For-of Check",
+      "status": "PASS"
+    },
+    {
+      "name": "empty",
+      "status": "PASS"
+    },
+    {
+      "name": "delete next param during iteration",
+      "status": "PASS"
+    },
+    {
+      "name": "delete current param during iteration",
+      "status": "PASS"
+    },
+    {
+      "name": "delete every param seen during iteration",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-get.any.js": [
+    {
+      "name": "Get basics",
+      "status": "PASS"
+    },
+    {
+      "name": "More get() basics",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-getall.any.js": [
+    {
+      "name": "getAll() basics",
+      "status": "PASS"
+    },
+    {
+      "name": "getAll() multiples",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-has.any.js": [
+    {
+      "name": "Has basics",
+      "status": "PASS"
+    },
+    {
+      "name": "has() following delete()",
+      "status": "PASS"
+    },
+    {
+      "name": "Two-argument has()",
+      "status": "PASS"
+    },
+    {
+      "name": "Two-argument has() respects undefined as second arg",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-set.any.js": [
+    {
+      "name": "Set basics",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams.set",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-size.any.js": [
+    {
+      "name": "URLSearchParams's size and deletion",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams's size and addition",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams's size when obtained from a URL",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams's size when obtained from a URL and using .search",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-sort.any.js": [
+    {
+      "name": "Parse and sort: z=b&a=b&z=a&a=a",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: z=b&a=b&z=a&a=a",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse and sort: \ufffd=x&\ufffc&\ufffd=a",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: \ufffd=x&\ufffc&\ufffd=a",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse and sort: \ufb03&\ud83c\udf08",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: \ufb03&\ud83c\udf08",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse and sort: \u00e9&e\ufffd&e\u0301",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: \u00e9&e\ufffd&e\u0301",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse and sort: z=z&a=a&z=y&a=b&z=x&a=c&z=w&a=d&z=v&a=e&z=u&a=f&z=t&a=g",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: z=z&a=a&z=y&a=b&z=x&a=c&z=w&a=d&z=v&a=e&z=u&a=f&z=t&a=g",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse and sort: bbb&bb&aaa&aa=x&aa=y",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: bbb&bb&aaa&aa=x&aa=y",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse and sort: z=z&=f&=t&=x",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: z=z&=f&=t&=x",
+      "status": "PASS"
+    },
+    {
+      "name": "Parse and sort: a\ud83c\udf08&a\ud83d\udca9",
+      "status": "PASS"
+    },
+    {
+      "name": "URL parse and sort: a\ud83c\udf08&a\ud83d\udca9",
+      "status": "PASS"
+    },
+    {
+      "name": "Sorting non-existent params removes ? from URL",
+      "status": "PASS"
+    }
+  ],
+  "url/urlsearchparams-stringifier.any.js": [
+    {
+      "name": "Serialize space",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize empty value",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize empty name",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize empty name and value",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize +",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize =",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize &",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize *-._",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize %",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize \\0",
+      "status": "PASS"
+    },
+    {
+      "name": "Serialize \ud83d\udca9",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams.toString",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams connected to URL",
+      "status": "PASS"
+    },
+    {
+      "name": "URLSearchParams must not do newline normalization",
+      "status": "PASS"
+    }
   ]
 }

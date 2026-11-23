@@ -33,6 +33,7 @@ mod popups;
 mod resize_observer;
 mod scrolling;
 mod selectors;
+mod url;
 mod web_storage;
 mod window;
 
@@ -272,6 +273,7 @@ struct Page {
     fetch: RefCell<Option<Rc<dyn fetch::FetchHost>>>,
     fetch_records: ObjectId,
     headers_iterator: ObjectId,
+    urls: url::Objects,
     /// `window.navigator` and its `userActivation`.
     navigator: (Value, Value),
     /// (last activation time, sticky activation).
@@ -618,6 +620,7 @@ fn install_page(
     web_storage::install(agent)?;
     encoding::install(agent)?;
     let headers_iterator = fetch::install(agent)?;
+    let urls = url::install(agent)?;
     let navigator = activation::install(agent)?;
     popups::install(agent)?;
     scrolling::install_window(agent)?;
@@ -651,6 +654,7 @@ fn install_page(
         fetch: RefCell::new(None),
         fetch_records,
         headers_iterator,
+        urls,
         navigator,
         activation: std::cell::Cell::new((None, false)),
         now: std::cell::Cell::new(std::time::Duration::ZERO),

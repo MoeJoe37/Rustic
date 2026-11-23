@@ -83,6 +83,7 @@ instead of rewriting the history of a decision.
 | [0073](0073-accessibility.md) | Accessibility: tree built in the renderer (HTML-AAM, ARIA, AccName) and sent over IPC as a bounded wire message; AccessKit 0.25 bridges (UI Automation, NSAccessibility, AT-SPI) in the shell; editing, selection and IME composition in the engine | Accepted (desktop; real screen-reader acceptance external) |
 | [0074](0074-browser-shell-and-native-hosts.md) | UI-01 browser shell (tabs, history, address entry, find, zoom, trusted strip) on live pages; host input, IME and lifecycle; system fonts per OS and collection members | Accepted |
 | [0075](0075-web-text-encoding.md) | Window text encoding, Web IDL byte views and GC-owned native binding state | Accepted for M9 `web.encoding` |
+| [0076](0076-window-url-and-search-params.md) | URL state overrides and one shared URL and search parameter snapshot | Accepted for M9 `url.setters` |
 
 ## Records by area
 

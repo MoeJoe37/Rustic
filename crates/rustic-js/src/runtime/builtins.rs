@@ -362,6 +362,17 @@ impl Agent {
         let Some(method) = method else {
             return self.type_error("value is not iterable");
         };
+        self.iterate_values_with_method(iterable, method, each)
+    }
+
+    /// Iterate values with a previously retrieved `@@iterator` method.
+    /// Union conversions use this to avoid calling the getter twice.
+    pub fn iterate_values_with_method(
+        &mut self,
+        iterable: Value,
+        method: Value,
+        each: impl FnMut(&mut Agent, Value) -> JsResult<bool>,
+    ) -> JsResult<()> {
         iterate(self, iterable, method, each)
     }
 }

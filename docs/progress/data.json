@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "92f17895914ada7ececfd58fbe14436376f6ebdbfe2b21b7668d097a8af8954c",
-  "percent": "48.45",
-  "verified_percent": "44.57",
-  "partial_percent": "3.88",
-  "completed": 106,
+  "source_fingerprint": "edc250e2ed03b4a19600906587f7da6a27bcfd273aa0345376497a6618f8868b",
+  "percent": "48.59",
+  "verified_percent": "44.70",
+  "partial_percent": "3.89",
+  "completed": 107,
   "in_progress": 14,
   "total": 227,
   "fully_complete": false,
@@ -95,10 +95,10 @@
       "id": "M9",
       "label": "Compatibility expansion",
       "share": "22.18",
-      "completed": 1,
+      "completed": 2,
       "total": 53,
-      "percent": "3.66",
-      "verified_percent": "1.07",
+      "percent": "4.26",
+      "verified_percent": "1.67",
       "partial_percent": "2.59"
     },
     {
@@ -501,9 +501,25 @@
           "label": "URL setters and URLSearchParams",
           "size": 2,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-url/src/parser/setter.rs",
+              "marker": "pub fn with_component"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/url.rs",
+              "marker": "fn pinned_url_setters_pass_through_the_window_bindings"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/url.rs",
+              "marker": "fn search_params_conversion_sort_and_iteration_keep_pair_order_and_live_state"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.13"
         },
         {
@@ -662,12 +678,12 @@
         }
       ],
       "points": 30,
-      "completed": 9,
+      "completed": 10,
       "in_progress": 0,
       "total": 12,
-      "contribution": "1.53",
-      "percent": "76.66",
-      "verified_percent": "76.66",
+      "contribution": "1.66",
+      "percent": "83.33",
+      "verified_percent": "83.33",
       "partial_percent": "0.00"
     },
     {

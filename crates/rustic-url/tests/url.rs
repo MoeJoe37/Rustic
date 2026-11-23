@@ -1,10 +1,49 @@
 use std::collections::HashSet;
 
 use rustic_base::CancellationToken;
-use rustic_url::{Origin, ParseError, Url, UrlLimits, UrlParser, UrlPath};
+use rustic_url::{Origin, ParseError, Url, UrlComponent, UrlLimits, UrlParser, UrlPath};
 
 fn parse(input: &str) -> Url {
     Url::parse(input, None).unwrap()
+}
+
+#[test]
+fn component_updates_share_parser_limits_and_leave_the_original_record_intact() {
+    let base = parse("https://x.test/a?old#old");
+    let token = CancellationToken::default();
+    let parser = UrlParser::new(
+        UrlLimits {
+            max_input_bytes: 32,
+            max_serialized_bytes: 30,
+            max_path_segments: 2,
+        },
+        token.clone(),
+    );
+    assert_eq!(
+        parser
+            .with_component(&base, UrlComponent::Pathname, "b/./c")
+            .unwrap()
+            .serialize(),
+        "https://x.test/b/c?old#old"
+    );
+    assert_eq!(
+        parser.with_component(&base, UrlComponent::Pathname, "b/c/d"),
+        Err(ParseError::LimitExceeded)
+    );
+    assert_eq!(
+        parser.with_component(&base, UrlComponent::Search, "?'翻"),
+        Err(ParseError::LimitExceeded)
+    );
+    assert_eq!(
+        parser.with_component(&base, UrlComponent::Hash, &"a".repeat(33)),
+        Err(ParseError::LimitExceeded)
+    );
+    token.cancel();
+    assert_eq!(
+        parser.with_component(&base, UrlComponent::Host, "new.test"),
+        Err(ParseError::Cancelled)
+    );
+    assert_eq!(base.serialize(), "https://x.test/a?old#old");
 }
 
 #[test]

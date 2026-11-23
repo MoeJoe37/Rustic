@@ -3,8 +3,8 @@
 ## Implemented scope
 
 `rustic-url` owns an original Rust URL record/parser and process-local origin
-model. It depends only on `rustic-base`; no existing URL parser, browser engine,
-JavaScript runtime or third-party Rust package supplies its implementation.
+model. It uses `rustic-base` and `rustic-encoding`. Rustic supplies the parser,
+URL record, and encoding implementation.
 Parsing performs no DNS lookup, network access, file access or navigation.
 
 Implemented in the initial DOC-02a slice:
@@ -45,13 +45,34 @@ follow the standard's non-strict rule and are only lowercased. Unicode
 paths/queries/fragments use UTF-8 percent encoding; non-special opaque hosts do
 not use IDNA.
 
-Pending: strict (`beStrict`) domain validation for conformance checkers and the
-`domain-to-ASCII` validation error, blob registry and origin rules,
-URL setters and URLSearchParams. There is no public browser `URL` binding yet.
+Pending: strict (`beStrict`) domain validation for conformance checkers, the
+`domain-to-ASCII` validation error, and blob URL registries and origin rules.
 Queries of special URLs can be encoded in a legacy document encoding with
 `UrlParser::with_query_encoding` ([ENCODING.md](ENCODING.md)).
 Successful parsing does not mean a scheme is navigable, secure, allowed by policy,
 or supported by the future network service. FTP syntax support is not an FTP client.
+
+## Window URL and search parameters
+
+`URL` exposes parsing with an optional base, `URL.canParse()`, `URL.parse()`,
+component getters and setters, and serialization. `UrlParser::with_component`
+shares the parser's host, port, path and encoding rules. It returns a replacement
+record and makes the original available for reuse even if limits or cancellation
+prevent a change.
+
+`URLSearchParams` accepts a query string, iterable of pairs, or a record. It
+preserves duplicates and order, sorts stably by UTF-16 code units, and provides
+live iterators and `forEach`. `url.searchParams` retains its identity when
+`href` or `search` changes. Mutating those parameters updates `url.search`
+using UTF-8 form serialization. [ADR 0076](adr/0076-window-url-and-search-params.md)
+describes how the binding keeps the URL and its parameters in sync.
+
+The Window binding runs all 278 rows of `url/resources/setters_tests.json`
+from [WPT revision cb97c571](https://github.com/web-platform-tests/wpt/blob/cb97c571c3b1947e08b8615eeb4028a2794b23a4/url/resources/setters_tests.json).
+The checked-in fixture's SHA-256 is
+`62e4b14bdaddd66b0f7d99bf066aed1c4a588667f4aa97bf26da212134fc24bf`.
+The Window WPT runner also covers 110 subtests across 14 files for static
+methods and search parameters. The FormData-input test awaits FormData.
 
 ## File URLs
 

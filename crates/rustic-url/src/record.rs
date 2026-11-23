@@ -66,6 +66,23 @@ impl Url {
         self.fragment.as_deref()
     }
 
+    /// Capacity of the allocations owned by this record, in bytes.
+    pub fn heap_bytes(&self) -> usize {
+        let path = match &self.path {
+            UrlPath::Segments(path) => {
+                path.capacity() * size_of::<String>()
+                    + path.iter().map(String::capacity).sum::<usize>()
+            }
+            UrlPath::Opaque(path) => path.capacity(),
+        };
+        path + self.scheme.capacity()
+            + self.username.capacity()
+            + self.password.capacity()
+            + self.host.as_ref().map_or(0, Host::heap_bytes)
+            + self.query.as_ref().map_or(0, String::capacity)
+            + self.fragment.as_ref().map_or(0, String::capacity)
+    }
+
     /// URL path serialization without query/fragment or the protective `/.` prefix.
     pub fn pathname(&self) -> String {
         let mut output = String::new();

@@ -9,10 +9,12 @@
 //! State lives in prototype-less private arrays in a weak map, keyed by
 //! the script object. Header lists are byte strings stored as Latin-1 JS
 //! strings. Bodies are complete byte strings: `text()`, `json()` and
-//! `bodyUsed`, `arrayBuffer()` and `bytes()` work. Streams, Blob and
+//! `bodyUsed`, `arrayBuffer()`, `blob()` and `bytes()` work. Streams and
 //! FormData remain part of TD-169.
 
+use std::borrow::Cow;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 use rustic_js::runtime::{
     Abrupt, Agent, ErrorKind, JsResult, NativeFn, ObjectId, PropertyKey, Value,
@@ -87,6 +89,7 @@ const BODY_TEXT: u8 = 0;
 const BODY_JSON: u8 = 1;
 const BODY_BUFFER: u8 = 2;
 const BODY_BYTES: u8 = 3;
+const BODY_BLOB: u8 = 4;
 
 // Header guards (Fetch §5.1).
 const GUARD_NONE: f64 = 0.0;
@@ -706,11 +709,12 @@ enum BodyInit {
     Text(String),
     Bytes(ObjectId),
     SearchParams(Value),
+    Blob(Rc<super::blob::Data>),
 }
 
 struct ExtractedBody {
     bytes: Vec<u8>,
-    content_type: Option<&'static [u8]>,
+    content_type: Option<Cow<'static, [u8]>>,
 }
 
 impl BodyInit {
@@ -724,6 +728,9 @@ impl BodyInit {
         if super::url::is_search_params(agent, body) {
             return Ok(Self::SearchParams(body));
         }
+        if let Some(blob) = super::blob::find(agent, body) {
+            return Ok(Self::Blob(blob));
+        }
         to_usv_string(agent, body).map(Self::Text)
     }
 
@@ -732,7 +739,7 @@ impl BodyInit {
             Self::Empty => return Ok(None),
             Self::Text(text) => (
                 text.into_bytes(),
-                Some(b"text/plain;charset=UTF-8".as_slice()),
+                Some(Cow::Borrowed(b"text/plain;charset=UTF-8".as_slice())),
             ),
             Self::Bytes(source) => {
                 let length = agent.web_buffer_bytes(source).len();
@@ -747,8 +754,23 @@ impl BodyInit {
             }
             Self::SearchParams(value) => (
                 super::url::serialize_search_params(agent, value)?.into_bytes(),
-                Some(b"application/x-www-form-urlencoded;charset=UTF-8".as_slice()),
+                Some(Cow::Borrowed(
+                    b"application/x-www-form-urlencoded;charset=UTF-8".as_slice(),
+                )),
             ),
+            Self::Blob(blob) => {
+                let bytes = agent.with_host_memory(blob.bytes.len(), |_| {
+                    let mut bytes = Vec::new();
+                    bytes
+                        .try_reserve_exact(blob.bytes.len())
+                        .map_err(|_| Abrupt::OutOfMemory)?;
+                    bytes.extend_from_slice(&blob.bytes);
+                    Ok(bytes)
+                })?;
+                let content_type = (!blob.media_type.is_empty())
+                    .then(|| Cow::Owned(blob.media_type.as_bytes().to_vec()));
+                (bytes, content_type)
+            }
         };
         Ok(Some(ExtractedBody {
             bytes,
@@ -935,7 +957,7 @@ fn request_state(agent: &mut Agent, input: Value, init: Value) -> JsResult<Reque
                 ));
             }
             let body = body.extract(agent)?.expect("provided Request body");
-            append_body_content_type(&mut state.headers, body.content_type);
+            append_body_content_type(&mut state.headers, body.content_type.as_deref());
             state.body = Some(body.bytes);
         }
         Ok(())
@@ -1123,7 +1145,7 @@ fn construct_response(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<V
         if matches!(status, 101 | 103 | 204 | 205 | 304) {
             return Err(type_error(agent, "a null-body status cannot have a body"));
         }
-        append_body_content_type(&mut list, body.content_type);
+        append_body_content_type(&mut list, body.content_type.as_deref());
     }
     new_response(
         agent,
@@ -1242,6 +1264,13 @@ fn install_body_methods<const RESPONSE_BODY: bool>(
         "bytes",
         consume_body::<RESPONSE_BODY, BODY_BYTES>,
         0,
+    )?;
+    define_method(
+        agent,
+        proto,
+        "blob",
+        consume_body::<RESPONSE_BODY, BODY_BLOB>,
+        0,
     )
 }
 
@@ -1273,6 +1302,16 @@ fn consume_body<const RESPONSE_BODY: bool, const FORMAT: u8>(
         match FORMAT {
             BODY_BUFFER => return agent.new_web_array_buffer(owner, &bytes),
             BODY_BYTES => return agent.new_web_uint8_array(owner, &bytes),
+            BODY_BLOB => {
+                let slot = if RESPONSE_BODY {
+                    R_HEADERS_RESPONSE
+                } else {
+                    R_HEADERS_REQUEST
+                };
+                let headers = record.get(agent, slot)?;
+                let content_type = body_mime_type(agent, headers)?;
+                return super::blob::from_bytes(agent, bytes, content_type);
+            }
             _ => {}
         }
         let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
@@ -1288,7 +1327,24 @@ fn consume_body<const RESPONSE_BODY: bool, const FORMAT: u8>(
     Ok(Value::object(promise))
 }
 
-fn settle(agent: &mut Agent, promise: ObjectId, outcome: JsResult<Value>) -> JsResult<()> {
+fn body_mime_type(agent: &mut Agent, headers: Value) -> JsResult<String> {
+    let header_record = record(agent, headers, HEADERS)?;
+    let (_, headers) = read_list(agent, header_record)?;
+    let mut content_types = rustic_net::Headers::new();
+    for (name, value) in headers {
+        if name.eq_ignore_ascii_case("content-type") {
+            let _ = content_types.append(&name, &value);
+        }
+    }
+    Ok(rustic_net::mime::extract_mime_type(&content_types)
+        .map_or_else(String::new, |mime| mime.to_string()))
+}
+
+pub(super) fn settle(
+    agent: &mut Agent,
+    promise: ObjectId,
+    outcome: JsResult<Value>,
+) -> JsResult<()> {
     match outcome {
         Ok(value) => agent.resolve_host_promise(promise, value),
         Err(Abrupt::Throw(reason)) => {

@@ -1,4 +1,197 @@
 {
+  "FileAPI/blob/Blob-array-buffer.any.js": [
+    {
+      "name": "Blob.arrayBuffer()",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.arrayBuffer() empty Blob data",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.arrayBuffer() non-ascii input",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.arrayBuffer() non-unicode input",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.arrayBuffer() concurrent reads",
+      "status": "PASS"
+    }
+  ],
+  "FileAPI/blob/Blob-bytes.any.js": [
+    {
+      "name": "Blob.bytes()",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.bytes() empty Blob data",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.bytes() non-ascii input",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.bytes() non-unicode input",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.bytes() concurrent reads",
+      "status": "PASS"
+    }
+  ],
+  "FileAPI/blob/Blob-constructor-endings.any.js": [
+    {
+      "name": "Valid \"endings\" value: \"transparent\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Valid \"endings\" value: \"native\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid \"endings\" value: null",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid \"endings\" value: \"\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid \"endings\" value: \"invalidEnumValue\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid \"endings\" value: \"Transparent\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid \"endings\" value: \"NATIVE\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid \"endings\" value: 0",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid \"endings\" value: {}",
+      "status": "PASS"
+    },
+    {
+      "name": "Exception propagation from options",
+      "status": "PASS"
+    },
+    {
+      "name": "The \"endings\" options property is used",
+      "status": "PASS"
+    }
+  ],
+  "FileAPI/blob/Blob-newobject.any.js": [
+    {
+      "name": "Blob.stream() returns [NewObject]",
+      "status": "FAIL",
+      "message": "value is not a function"
+    },
+    {
+      "name": "Blob.text() returns [NewObject]",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.arrayBuffer() returns [NewObject]",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.bytes() returns [NewObject]",
+      "status": "PASS"
+    }
+  ],
+  "FileAPI/blob/Blob-slice-overflow.any.js": [
+    {
+      "name": "slice start is negative, relativeStart will be max((size + start), 0)",
+      "status": "PASS"
+    },
+    {
+      "name": "slice start is greater than blob size, relativeStart will be min(start, size)",
+      "status": "PASS"
+    },
+    {
+      "name": "slice end is negative, relativeEnd will be max((size + end), 0)",
+      "status": "PASS"
+    },
+    {
+      "name": "slice end is greater than blob size, relativeEnd will be min(end, size)",
+      "status": "PASS"
+    }
+  ],
+  "FileAPI/blob/Blob-text.any.js": [
+    {
+      "name": "Blob.text()",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() empty blob data",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() multi-element array in constructor",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() non-unicode",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() different charset param in type option",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() different charset param with non-ascii input",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() invalid utf-8 input",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() strips a UTF-8 byte order mark",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() strips only one UTF-8 byte order mark",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() does not sniff a UTF-16LE byte order mark",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() does not sniff a UTF-16BE byte order mark",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() strips a UTF-8 byte order mark split across blob parts",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() does not strip a UTF-8 byte order mark in a later blob part",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() decodes a UTF-8 sequence split across blob parts",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() replaces a truncated UTF-8 sequence at the end",
+      "status": "PASS"
+    },
+    {
+      "name": "Blob.text() concurrent reads",
+      "status": "PASS"
+    }
+  ],
   "css/cssom-view/GetBoundingRect.html": [
     {
       "name": "getBoundingClientRect",
@@ -2584,8 +2777,7 @@
     },
     {
       "name": "Request has blob method",
-      "status": "FAIL",
-      "message": "assert_true: request has blob method expected true got false"
+      "status": "PASS"
     },
     {
       "name": "Request has formData method",
@@ -2752,6 +2944,84 @@
     {
       "name": "Test that Response.headers has the [SameObject] extended attribute",
       "status": "PASS"
+    }
+  ],
+  "fetch/api/response/response-init-contenttype.any.js": [
+    {
+      "name": "Default Content-Type for Response with empty body",
+      "status": "PASS"
+    },
+    {
+      "name": "Default Content-Type for Response with Blob body (no type set)",
+      "status": "PASS"
+    },
+    {
+      "name": "Default Content-Type for Response with Blob body (empty type)",
+      "status": "PASS"
+    },
+    {
+      "name": "Default Content-Type for Response with Blob body (set type)",
+      "status": "PASS"
+    },
+    {
+      "name": "Default Content-Type for Response with buffer source body",
+      "status": "PASS"
+    },
+    {
+      "name": "Default Content-Type for Response with FormData body",
+      "status": "FAIL",
+      "message": "promise_test: Unhandled rejection with value: object \"ReferenceError: FormData is not defined\""
+    },
+    {
+      "name": "Default Content-Type for Response with URLSearchParams body",
+      "status": "PASS"
+    },
+    {
+      "name": "Default Content-Type for Response with string body",
+      "status": "PASS"
+    },
+    {
+      "name": "Default Content-Type for Response with ReadableStream body",
+      "status": "FAIL",
+      "message": "ReadableStream is not defined"
+    },
+    {
+      "name": "Can override Content-Type for Response with empty body",
+      "status": "PASS"
+    },
+    {
+      "name": "Can override Content-Type for Response with Blob body (no type set)",
+      "status": "PASS"
+    },
+    {
+      "name": "Can override Content-Type for Response with Blob body (empty type)",
+      "status": "PASS"
+    },
+    {
+      "name": "Can override Content-Type for Response with Blob body (set type)",
+      "status": "PASS"
+    },
+    {
+      "name": "Can override Content-Type for Response with buffer source body",
+      "status": "PASS"
+    },
+    {
+      "name": "Can override Content-Type for Response with FormData body",
+      "status": "FAIL",
+      "message": "FormData is not defined"
+    },
+    {
+      "name": "Can override Content-Type for Response with URLSearchParams body",
+      "status": "PASS"
+    },
+    {
+      "name": "Can override Content-Type for Response with string body",
+      "status": "PASS"
+    },
+    {
+      "name": "Can override Content-Type for Response with ReadableStream body",
+      "status": "FAIL",
+      "message": "ReadableStream is not defined"
     }
   ],
   "fetch/api/response/response-static-error.any.js": [

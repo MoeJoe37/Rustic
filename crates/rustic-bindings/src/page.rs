@@ -17,6 +17,7 @@ use crate::{DomGcError, DomHeap, dom_exception};
 
 mod activation;
 mod attributes;
+mod blob;
 mod character_data;
 mod collections;
 mod computed_style;
@@ -619,6 +620,7 @@ fn install_page(
     let window = window::install(agent, scheduler.is_some())?;
     web_storage::install(agent)?;
     encoding::install(agent)?;
+    blob::install(agent)?;
     let headers_iterator = fetch::install(agent)?;
     let urls = url::install(agent)?;
     let navigator = activation::install(agent)?;

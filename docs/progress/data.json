@@ -1,13 +1,13 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "40477418ad5c1875e42c4623022cbd93ffb02e65355f04039a11f0233e966127",
-  "percent": "48.59",
-  "verified_percent": "44.70",
+  "source_fingerprint": "71ba5cb0c0a7bb2cd71b2628b9bef45bd37e192f5fb7d3d07df1c9bedb4fe215",
+  "percent": "48.66",
+  "verified_percent": "44.77",
   "partial_percent": "3.89",
-  "completed": 107,
+  "completed": 108,
   "in_progress": 15,
-  "total": 227,
+  "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
   "milestones": [
@@ -54,7 +54,7 @@
     {
       "id": "M5",
       "label": "Scripted documents",
-      "share": "4.74",
+      "share": "4.60",
       "completed": 11,
       "total": 11,
       "percent": "100.00",
@@ -94,12 +94,12 @@
     {
       "id": "M9",
       "label": "Compatibility expansion",
-      "share": "22.18",
-      "completed": 2,
-      "total": 53,
-      "percent": "4.26",
-      "verified_percent": "1.67",
-      "partial_percent": "2.59"
+      "share": "22.35",
+      "completed": 3,
+      "total": 54,
+      "percent": "5.19",
+      "verified_percent": "2.63",
+      "partial_percent": "2.56"
     },
     {
       "id": "M10",
@@ -114,12 +114,12 @@
     {
       "id": "M11",
       "label": "Web platform parity",
-      "share": "14.76",
+      "share": "14.74",
       "completed": 0,
       "total": 30,
-      "percent": "0.82",
+      "percent": "0.83",
       "verified_percent": "0.00",
-      "partial_percent": "0.82"
+      "partial_percent": "0.83"
     },
     {
       "id": "M12",
@@ -4673,7 +4673,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.59"
+          "engine_share": "0.56"
         },
         {
           "id": "web.window",
@@ -4864,7 +4864,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.59"
+          "engine_share": "0.56"
         },
         {
           "id": "web.scheduler",
@@ -4935,7 +4935,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.35"
+          "engine_share": "0.34"
         },
         {
           "id": "web.scripts",
@@ -5016,7 +5016,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.35"
+          "engine_share": "0.34"
         },
         {
           "id": "web.input",
@@ -5072,7 +5072,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.59"
+          "engine_share": "0.56"
         },
         {
           "id": "web.observers",
@@ -5143,7 +5143,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.35"
+          "engine_share": "0.34"
         },
         {
           "id": "web.encoding",
@@ -5169,7 +5169,33 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.23"
+          "engine_share": "0.22"
+        },
+        {
+          "id": "web.blob_data",
+          "label": "Window Blob construction, slicing and buffered reads",
+          "size": 2,
+          "milestone": "M9",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/blob.rs",
+              "marker": "fn slice_index"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn blob_construction_slicing_and_fetch_preserve_immutable_bytes_and_mime"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "FileAPI/blob/Blob-array-buffer.any.js"
+            }
+          ],
+          "credit": "100.00",
+          "engine_share": "0.22"
         },
         {
           "id": "web.streams",
@@ -5179,7 +5205,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.59"
+          "engine_share": "0.56"
         },
         {
           "id": "web.conformance",
@@ -5220,7 +5246,7 @@
             }
           ],
           "credit": "100.00",
-          "engine_share": "0.35"
+          "engine_share": "0.34"
         },
         {
           "id": "web.platform",
@@ -5230,7 +5256,7 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.59"
+          "engine_share": "0.56"
         },
         {
           "id": "web.performance",
@@ -5240,16 +5266,16 @@
           "status": "planned",
           "evidence": [],
           "credit": "0.00",
-          "engine_share": "0.35"
+          "engine_share": "0.34"
         }
       ],
-      "points": 42,
-      "completed": 8,
+      "points": 44,
+      "completed": 9,
       "in_progress": 0,
-      "total": 11,
-      "contribution": "3.45",
-      "percent": "69.04",
-      "verified_percent": "69.04",
+      "total": 12,
+      "contribution": "3.52",
+      "percent": "70.45",
+      "verified_percent": "70.45",
       "partial_percent": "0.00"
     },
     {

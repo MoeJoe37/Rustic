@@ -4,6 +4,7 @@
 import argparse
 from collections import Counter
 import hashlib
+from html import escape
 import json
 from pathlib import Path
 import posixpath
@@ -26,7 +27,6 @@ ANY_PAGE = (
     b"<!doctype html><meta charset=utf-8>"
     b"<script src=testharness.js></script>"
     b"<script src=report.js></script>"
-    b"<script src=case.js></script>"
 )
 
 
@@ -95,13 +95,22 @@ def supported_meta(line: bytes) -> bool:
 def window_page(path: Path, directory: Path, support: list[str] = ()) -> bytes:
     source = path.read_bytes()
     if path.name.endswith(".any.js"):
-        # This selection uses the ordinary Window variant without script or
-        # timeout directives. Fail if a future import needs one.
+        case_directory = path.parent.relative_to(UPSTREAM).as_posix()
+        scripts = []
+        script_prefix = b"// META: script="
         for line in source.splitlines():
-            if line.startswith(b"// META:") and not supported_meta(line):
+            if line.startswith(script_prefix):
+                reference = line[len(script_prefix):].decode("utf-8").strip()
+                name = posixpath.normpath(reference.removeprefix("/") if reference.startswith("/")
+                                         else posixpath.join(case_directory, reference))
+                if name not in support:
+                    raise ValueError(f"{path.name}: unpinned helper script {reference!r}")
+                basename = escape(Path(name).name, quote=True)
+                scripts.append(f'<script src="{basename}"></script>'.encode("utf-8"))
+            elif line.startswith(b"// META:") and not supported_meta(line):
                 raise ValueError(f"{path.name}: unsupported META directive {line!r}")
         (directory / "case.js").write_bytes(source)
-        return ANY_PAGE
+        return ANY_PAGE + b"".join(scripts) + b"<script src=case.js></script>"
     if path.suffix != ".html":
         raise ValueError(f"{path.name}: unrecognized WPT fixture")
     for before, after in (
@@ -196,8 +205,9 @@ def run(binary: Path, cases: list[str], driver: str = "automate") -> dict:
         shutil.copyfile(FIXTURES / "report.js", directory / "report.js")
         # Every case shares one directory, so a helper's basename must be unique.
         names = [Path(name).name for name in support]
-        if len(set(names)) != len(names):
-            raise ValueError("support file basenames must be unique")
+        reserved = {"case.html", "case.js", "report.js", "testharness.js"}
+        if len(set(names)) != len(names) or reserved.intersection(names):
+            raise ValueError("support file basenames must be unique and avoid runner filenames")
         for name in support:
             shutil.copyfile(UPSTREAM / name, directory / Path(name).name)
         return {name: run_case(binary, name, directory, support, driver) for name in cases}

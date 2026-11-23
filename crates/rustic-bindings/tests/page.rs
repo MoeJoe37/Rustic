@@ -176,6 +176,61 @@ fn fetch_binary_and_search_params_bodies_snapshot_the_input_and_consume_once() {
 }
 
 #[test]
+fn blob_construction_slicing_and_fetch_preserve_immutable_bytes_and_mime() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        let checked;
+        function eq(a, b) { if (a !== b) throw `${a} != ${b}`; }
+        async function exercise() {
+            const backing = Uint8Array.of(7,65,66,8);
+            const suffix = new Blob(['é\uD800']);
+            const blob = new Blob([new DataView(backing.buffer, 1, 2), suffix, 42], {type: 'TEXT/PLAIN'});
+            backing.fill(0);
+            eq(blob.size, 9);
+            eq(blob.type, 'text/plain');
+            eq(await blob.text(), 'ABé\uFFFD42');
+            const bytes = await blob.bytes(); bytes[0] = 0;
+            const buffer = await blob.arrayBuffer();
+            eq(new Uint8Array(buffer)[0], 65);
+            eq(await blob.slice(-2, undefined, 'X/CUSTOM').text(), '42');
+            eq(blob.slice(-2, undefined, 'X/CUSTOM').type, 'x/custom');
+            eq(blob.slice(5, 1, 'a\n').type, '');
+            eq(blob.slice(5, 1).size, 0);
+            eq(await new Blob(['abcd']).slice(0.5, 2.5).text(), 'ab');
+            eq(blob.slice(Infinity).size, 0);
+            eq(blob.slice(-Infinity).size, blob.size);
+
+            const detached = Uint8Array.of(65);
+            const noBytes = new Blob([detached, 'Z'], { get type() { detached.buffer.transfer(); return ''; }});
+            eq(await noBytes.text(), 'Z');
+            const bom = new Blob([Uint8Array.of(0xEF,0xBB,0xBF,65)]);
+            eq(await bom.text(), 'A');
+            eq((await bom.bytes()).length, 4);
+
+            const response = new Response(blob);
+            eq(response.headers.get('content-type'), 'text/plain');
+            response.headers.set('content-type', 'Text/HTML; Charset=UTF-8');
+            const changed = await response.blob();
+            eq(changed instanceof Blob, true);
+            eq(changed.type, 'text/html;charset=UTF-8');
+            eq(await changed.text(), 'ABé\uFFFD42');
+            eq(response.bodyUsed, true);
+            const request = new Request('https://example.test/', {method: 'POST', body:suffix});
+            eq(request.headers.get('content-type'), null);
+            eq(await (await request.blob()).text(), 'é\uFFFD');
+            eq((await new Response().blob()).size, 0);
+        }
+        exercise().then(() => { checked = 'pass'; }, e => { checked = String(e); });
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    let value = agent.evaluate("checked").unwrap().as_string().unwrap();
+    assert_eq!(agent.heap.string(value).to_text(), "pass");
+}
+
+#[test]
 fn dom_rects_are_branded_and_keep_their_values_through_reentry() {
     let document = Document::new(DocumentLimits::default()).unwrap();
     let tree = Rc::new(Tree(RefCell::new(document)));

@@ -2945,6 +2945,15 @@ and share the consumption state of `text()` and `json()`.
 covers mutation, detachment, MIME defaults and body consumption. The pinned
 `request-structure.any.js` check for `Request.arrayBuffer()` now passes.
 
+Window `Blob` accepts strings, buffer sources and other Blobs. It copies
+input views, normalizes optional line endings and media type, and supports
+byte-range slicing. Its `text()`, `arrayBuffer()` and `bytes()` methods
+return new promises and can read the same Blob repeatedly. Fetch accepts
+a Blob as input for either body class. `blob()` consumes a body using the
+MIME type extracted from the current headers. The pinned Window tests
+cover buffered reads, object identity, integer clamping and default MIME
+types. Stream methods, File and FormData have separate coverage gaps.
+
 ## NET-04 — Partitioned HTTP cache
 
 Added 2026-11-20 (`rustic_net::http_cache`), used by every `Fetcher`

@@ -3,6 +3,12 @@
   "upstream_revision": "cb97c571c3b1947e08b8615eeb4028a2794b23a4",
   "variant": "top-level local Window",
   "cases": [
+    "FileAPI/blob/Blob-array-buffer.any.js",
+    "FileAPI/blob/Blob-bytes.any.js",
+    "FileAPI/blob/Blob-constructor-endings.any.js",
+    "FileAPI/blob/Blob-newobject.any.js",
+    "FileAPI/blob/Blob-slice-overflow.any.js",
+    "FileAPI/blob/Blob-text.any.js",
     "css/cssom-view/GetBoundingRect.html",
     "css/cssom-view/cssom-getBoundingClientRect-001.html",
     "css/cssom-view/cssom-getBoundingClientRect-002.html",
@@ -62,6 +68,7 @@
     "fetch/api/request/request-structure.any.js",
     "fetch/api/response/response-error.any.js",
     "fetch/api/response/response-init-001.any.js",
+    "fetch/api/response/response-init-contenttype.any.js",
     "fetch/api/response/response-static-error.any.js",
     "html/webappapis/animation-frames/callback-handle.html",
     "html/webappapis/animation-frames/callback-invoked.html",
@@ -101,11 +108,19 @@
     "url/urlsearchparams-stringifier.any.js"
   ],
   "support": [
+    "FileAPI/support/Blob.js",
     "dom/constants.js",
     "dom/nodes/mutationobservers.js",
     "dom/nodes/pre-insertion-validation-notfound.js"
   ],
   "sha256": {
+    "FileAPI/blob/Blob-array-buffer.any.js": "eb5ac8ab115dfb3f91202132c144b33c1e530a456f463324066dbe11ade2f60b",
+    "FileAPI/blob/Blob-bytes.any.js": "a305534e59646650d71826a838e499a57da1c2ea60ebb3fdb899f1ea0d6a5964",
+    "FileAPI/blob/Blob-constructor-endings.any.js": "cc415449b0acdff21d39a63adfd7731afbe3c38dcfce5fbb2f110b2d1cfe6ae3",
+    "FileAPI/blob/Blob-newobject.any.js": "64257c4adfd0ff059fb492605a62e921ff17b63c9b66c3a87d94c1626a9c3444",
+    "FileAPI/blob/Blob-slice-overflow.any.js": "5da17f7ad6fa2e15a0ae6e8435f9cfd0413b64a39ea337bedd99e915048d8d5d",
+    "FileAPI/blob/Blob-text.any.js": "30903a3cf782cb650bfd87401584c385ac8178bbb752a557504d417674725f99",
+    "FileAPI/support/Blob.js": "a1152b82af45d952c56f8b6f82c3a87e9ac58f834114a9813778418bfa7df25d",
     "LICENSE.md": "5fac07febb0e2a97fb0d7b0def149ec08b642e1ba4b9c345283ab1cbd2af6570",
     "css/cssom-view/GetBoundingRect.html": "66fde87cef05f36478f162b1cdec79613ef49cc37663fd11ac8b779c58b83237",
     "css/cssom-view/cssom-getBoundingClientRect-001.html": "04e89e24b880e9bdb50c1f9f7833a7c8522f035eb1a2df322b4d8b31d4fe1f63",
@@ -169,6 +184,7 @@
     "fetch/api/request/request-structure.any.js": "26cde26a2993ef04ca1c97ace296720c770838c752cfd7c4ea67e63e4868ab61",
     "fetch/api/response/response-error.any.js": "f5c0863dd92f0e973c4fda128ec9d869cf36a226bd891f387e3faa01e29389cd",
     "fetch/api/response/response-init-001.any.js": "a4f53fc2c718a3a6d9f2692f6778e88dc74f7c938940ba47ffc4ac5dd9096482",
+    "fetch/api/response/response-init-contenttype.any.js": "0812b00fb59a414652e82cea3b9f858204edb4646f6d9cb724a87c375fd3898e",
     "fetch/api/response/response-static-error.any.js": "d55c1c97d9db34123e02a73b44965e31bb638b75ef38cbaf1fe01b0050c49355",
     "html/webappapis/animation-frames/callback-handle.html": "2c607974886b6bf5f17fc8af90bcf014e2040ea1c8d5defb8e239df4086ed7ba",
     "html/webappapis/animation-frames/callback-invoked.html": "d361ecd270ea8e44fa40469c9554b41d46b0092a23cf21572df7cb709ee76916",

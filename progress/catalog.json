@@ -4788,6 +4788,30 @@
           ]
         },
         {
+          "id": "web.blob_data",
+          "label": "Window Blob construction, slicing and buffered reads",
+          "size": 2,
+          "milestone": "M9",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/blob.rs",
+              "marker": "fn slice_index"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn blob_construction_slicing_and_fetch_preserve_immutable_bytes_and_mime"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "FileAPI/blob/Blob-array-buffer.any.js"
+            }
+          ]
+        },
+        {
           "id": "web.streams",
           "label": "Streams, messaging and structured clone",
           "size": 5,

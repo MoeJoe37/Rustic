@@ -3341,8 +3341,10 @@ host traps, cancellation and mismatched results. Replaying the pinned table
 selection with five numeric provider bindings matched 1,881 invocations,
 including 1,098 additional bulk table cases using imported functions. A
 separate numeric, control and memory replay matched 16,108 invocations.
-The JavaScript bridge, reference-valued host calls and shared imported
-state remain open. [ADR 0079](adr/0079-wasm-function-imports.md)
+Window links numeric JavaScript callbacks by function index.
+Reference-valued host calls and shared imported state remain open.
+[ADR 0079](adr/0079-wasm-function-imports.md),
+[ADR 0083](adr/0083-wasm-js-function-imports.md)
 
 ### WASM-06 — Window module compilation and MIME/CSP
 

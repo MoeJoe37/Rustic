@@ -277,6 +277,8 @@ struct Page {
     fetch: RefCell<Option<Rc<dyn fetch::FetchHost>>>,
     wasm_compilation: RefCell<WasmCompilationPolicy>,
     wasm_links: ObjectId,
+    wasm_calls: ObjectId,
+    wasm_call_depth: std::cell::Cell<u8>,
     fetch_records: ObjectId,
     headers_iterator: ObjectId,
     urls: url::Objects,
@@ -637,6 +639,8 @@ fn install_page(
     agent.root(Value::object(fetch_records))?;
     let wasm_links = agent.new_weak_map()?;
     agent.root(Value::object(wasm_links))?;
+    let wasm_calls = agent.new_weak_map()?;
+    agent.root(Value::object(wasm_calls))?;
     let events = events::Events::new(agent)?;
     let rects = agent.new_weak_map()?;
     agent.root(Value::object(rects))?;
@@ -664,6 +668,8 @@ fn install_page(
         fetch: RefCell::new(None),
         wasm_compilation: RefCell::new(WasmCompilationPolicy::default()),
         wasm_links,
+        wasm_calls,
+        wasm_call_depth: std::cell::Cell::new(0),
         fetch_records,
         headers_iterator,
         urls,

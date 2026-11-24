@@ -6,10 +6,10 @@ use super::super::events::PrivateArray;
 use super::*;
 
 const INSTANCE: &str = "WebAssembly.Instance";
-const LINK_ERROR: &str = "WebAssembly.LinkError";
-const RUNTIME_ERROR: &str = "WebAssembly.RuntimeError";
+pub(super) const LINK_ERROR: &str = "WebAssembly.LinkError";
+pub(super) const RUNTIME_ERROR: &str = "WebAssembly.RuntimeError";
 
-pub(super) type Runtime = RefCell<Instance<'static, 'static>>;
+pub(super) type Runtime = Instance<'static, 'static>;
 
 pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
     let proto = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
@@ -103,27 +103,48 @@ fn source_job(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 }
 
 fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) -> JsResult<Value> {
-    if !module.imports.is_empty() {
-        if imports == Value::UNDEFINED {
-            return agent.type_error("the WebAssembly module requires imports");
-        }
-        return Err(wasm_error(
-            agent,
-            LINK_ERROR,
-            "JavaScript WebAssembly imports require a wider instance profile",
-        ));
+    if !module.imports.is_empty() && imports == Value::UNDEFINED {
+        return agent.type_error("the WebAssembly module requires imports");
     }
+    let bindings = PrivateArray::new(agent, &[])?;
+    with_root(agent, bindings.value(), |agent| {
+        with_root(agent, Value::object(proto), |agent| {
+            instantiate_module(agent, module, imports, bindings, proto)
+        })
+    })
+}
+
+fn instantiate_module(
+    agent: &mut Agent,
+    module: &Module,
+    imports: Value,
+    bindings: PrivateArray,
+    proto: ObjectId,
+) -> JsResult<Value> {
     let token = agent.cancellation().unwrap_or_default();
     let (runtime, allocation) = compilation_work(agent, module.bytes.len(), |agent| {
         // The branded module owns immutable bytes that passed the same validation limits.
         let validated = checked(&module.bytes, &Options::default(), &token)
             .map_err(|error| error.throw(agent))?;
         let declarations = validated.module().declarations();
+        host::link(agent, &validated, imports, bindings)?;
+        let imported = declarations.imports.len();
         for export in &declarations.exports {
             let supported = match export.value.target {
                 ExportIndex::Function(index) => {
-                    let function = &validated.module().functions()[index as usize].value;
-                    let signature = &declarations.types[function.type_index as usize].value;
+                    let index = index as usize;
+                    let type_index = match declarations.imports.get(index) {
+                        Some(entry) => match entry.value.ty {
+                            ImportType::Function(ty) => ty,
+                            _ => unreachable!("only function imports were linked"),
+                        },
+                        None => {
+                            validated.module().functions()[index - imported]
+                                .value
+                                .type_index
+                        }
+                    };
+                    let signature = &declarations.types[type_index as usize].value;
                     signature
                         .params
                         .iter()
@@ -162,14 +183,17 @@ fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) ->
             + limits.memory_bytes
             + limits.table_elements * 2 * size_of::<usize>();
         let runtime = agent.with_host_memory(allocation, |agent| {
-            Instance::instantiate_owned(validated, limits, &token)
-                .map_err(|error| execution_error(agent, error, true))
+            host::with_dispatch(agent, bindings, true, |dispatch| {
+                Instance::instantiate_owned_with_host(validated, limits, &token, dispatch)
+            })
         })?;
         Ok((runtime, allocation))
     })?;
-    let object =
-        Value::object(agent.new_host_state(INSTANCE, proto, RefCell::new(runtime), allocation)?);
+    let object = Value::object(agent.new_host_state(INSTANCE, proto, runtime, allocation)?);
     with_root(agent, object, |agent| {
+        with_page(agent, |agent, page| {
+            agent.weak_map_set(page.wasm_calls, object, bindings.value())
+        })?;
         let exports = Value::object(agent.new_object_with(None)?);
         with_root(agent, exports, |agent| {
             populate_exports(
@@ -177,6 +201,7 @@ fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) ->
                 object,
                 exports.as_object().expect("exports object"),
                 module,
+                bindings,
             )?;
             with_page(agent, |agent, page| {
                 agent.weak_map_set(page.wasm_links, object, exports)
@@ -191,6 +216,7 @@ fn populate_exports(
     instance: Value,
     exports: ObjectId,
     module: &Module,
+    bindings: PrivateArray,
 ) -> JsResult<()> {
     let runtime = find(agent, instance).expect("new WebAssembly instance");
     let mut entries = HashMap::new();
@@ -203,13 +229,15 @@ fn populate_exports(
                 entries.try_reserve(1).map_err(|_| OutOfMemory)?;
                 let value = match item.target {
                     ExportIndex::Function(index) => {
-                        function_export(agent, instance, &runtime, name, index)?
+                        let imported = bindings.get(agent, index)?;
+                        if host::function_record(agent, imported)?.is_some() {
+                            imported
+                        } else {
+                            function_export(agent, instance, &runtime, index)?
+                        }
                     }
                     ExportIndex::Global(index) => {
-                        let ty = runtime
-                            .borrow()
-                            .global_type(index)
-                            .expect("exported global");
+                        let ty = runtime.global_type(index).expect("exported global");
                         global::export(agent, instance, index, ty)?
                     }
                     _ => unreachable!("admitted exports checked before instantiation"),
@@ -233,23 +261,27 @@ fn function_export(
     agent: &mut Agent,
     instance: Value,
     runtime: &Runtime,
-    name: &str,
     index: u32,
 ) -> JsResult<Value> {
     let size = runtime
-        .borrow()
-        .function_type(name)
+        .function_type_at(index)
         .expect("export signature")
         .params
         .len();
     let size = u32::try_from(size).map_err(|_| OutOfMemory)?;
-    let name = agent.string(name)?;
-    Ok(Value::object(agent.new_host_closure(
-        call,
-        &index.to_string(),
-        size,
-        &[instance, name],
-    )?))
+    let record = PrivateArray::new(agent, &[instance, Value::number(f64::from(index))])?;
+    with_root(agent, record.value(), |agent| {
+        let function = Value::object(agent.new_host_closure(
+            call,
+            &index.to_string(),
+            size,
+            &[record.value()],
+        )?);
+        with_page(agent, |agent, page| {
+            agent.weak_map_set(page.wasm_calls, function, record.value())
+        })?;
+        Ok(function)
+    })
 }
 
 pub(super) fn find(agent: &Agent, value: Value) -> Option<Rc<Runtime>> {
@@ -266,35 +298,22 @@ fn exports(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 }
 
 fn call(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
-    let state = find(agent, agent.host_capture(0)).expect("export function owner");
-    let name = agent.host_capture(1).as_string().expect("export name");
-    let name = agent.heap.string(name).to_text();
-    // Conversion can invoke JS that calls the same instance.
-    let mut params = Vec::new();
-    {
-        let runtime = state.borrow();
-        let types = &runtime
-            .function_type(&name)
-            .expect("export is present")
-            .params;
-        params
-            .try_reserve_exact(types.len())
-            .map_err(|_| OutOfMemory)?;
-        params.extend_from_slice(types);
-    }
+    let record = PrivateArray::from_value(agent.host_capture(0)).expect("export function record");
+    let (instance, function) = host::function_parts(agent, record)?;
+    let runtime = find(agent, instance).expect("export function owner");
+    let types = &runtime
+        .function_type_at(function)
+        .expect("export is present")
+        .params;
     let mut input = Vec::new();
     input
-        .try_reserve_exact(params.len())
+        .try_reserve_exact(types.len())
         .map_err(|_| OutOfMemory)?;
-    for (index, ty) in params.into_iter().enumerate() {
+    for (index, &ty) in types.iter().enumerate() {
         agent.check_native_work()?;
         input.push(to_wasm(agent, arg(args, index), ty)?);
     }
-    let token = agent.cancellation().unwrap_or_default();
-    let results = state
-        .borrow_mut()
-        .invoke(&name, &input, &token)
-        .map_err(|error| execution_error(agent, error, false))?;
+    let results = host::invoke(agent, instance, &runtime, function, &input)?;
     match results.as_slice() {
         [] => Ok(Value::UNDEFINED),
         &[one] => to_js(agent, one),
@@ -302,10 +321,12 @@ fn call(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     }
 }
 
-fn execution_error(agent: &mut Agent, error: ExecutionError, linking: bool) -> Abrupt {
+pub(super) fn execution_error(agent: &mut Agent, error: ExecutionError, linking: bool) -> Abrupt {
     match error.kind {
         ExecutionErrorKind::Cancelled => Abrupt::Cancelled,
-        ExecutionErrorKind::UnsupportedModule | ExecutionErrorKind::UnsupportedInstruction
+        ExecutionErrorKind::UnsupportedModule
+        | ExecutionErrorKind::UnsupportedInstruction
+        | ExecutionErrorKind::ImportTypeMismatch
             if linking =>
         {
             wasm_error(agent, LINK_ERROR, &error.to_string())

@@ -1,6 +1,7 @@
 //! Window WebAssembly byte compilation and module metadata.
 
 mod global;
+mod host;
 mod instance;
 
 use std::{cell::RefCell, ops::Range, rc::Rc};

@@ -3834,6 +3834,20 @@
       "status": "PASS"
     }
   ],
+  "wasm/jsapi/constructor/multi-value.any.js": [
+    {
+      "name": "multiple return values from wasm to js",
+      "status": "PASS"
+    },
+    {
+      "name": "multiple return values inside wasm",
+      "status": "PASS"
+    },
+    {
+      "name": "multiple return values from js to wasm",
+      "status": "PASS"
+    }
+  ],
   "wasm/jsapi/constructor/toStringTag.any.js": [
     {
       "name": "@@toStringTag exists on the namespace object with the appropriate descriptor",

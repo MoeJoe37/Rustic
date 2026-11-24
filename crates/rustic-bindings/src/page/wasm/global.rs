@@ -122,7 +122,6 @@ fn get_value(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let value = match &global.storage {
         Storage::Local(value) => value.get(),
         Storage::Exported(index) => owner(agent, this)?
-            .borrow()
             .global_value(*index)
             .expect("numeric exported global"),
     };
@@ -140,7 +139,7 @@ fn set_value(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
         Storage::Local(slot) => slot.set(value),
         Storage::Exported(index) => {
             let instance = owner(agent, this)?;
-            let updated = instance.borrow_mut().set_global_value(*index, value);
+            let updated = instance.set_global_value(*index, value);
             debug_assert!(updated, "checked global type and mutability");
         }
     }

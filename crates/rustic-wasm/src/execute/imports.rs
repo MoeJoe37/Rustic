@@ -6,6 +6,12 @@ type Callback<'host> = dyn Fn(&[Value], &mut [Value], &CancellationToken) -> Res
     + Sync
     + 'host;
 
+/// Dispatch a declared function import by its zero-based function index.
+/// The host receives typed arguments and correctly typed zero results to
+/// fill. Cancellation is checked before and after the call by the interpreter.
+pub type HostDispatch<'host> =
+    dyn FnMut(usize, &[Value], &mut [Value]) -> Result<(), HostTrap> + 'host;
+
 /// A trap reported by an imported host function.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HostTrap;
@@ -44,7 +50,7 @@ impl<'host> FunctionImport<'host> {
 
 pub(super) struct BoundFunction<'module> {
     pub(super) type_index: u32,
-    pub(super) callback: &'module Callback<'module>,
+    pub(super) callback: Option<&'module Callback<'module>>,
 }
 
 pub(super) fn link<'module>(
@@ -88,7 +94,41 @@ pub(super) fn link<'module>(
             &mut functions,
             BoundFunction {
                 type_index,
-                callback: binding.callback,
+                callback: Some(binding.callback),
+            },
+            offset,
+        )?;
+    }
+    Ok(functions)
+}
+
+pub(super) fn for_dispatch(
+    declarations: &Declarations<'_>,
+    budget: &mut Budget<'_>,
+) -> Result<Vec<BoundFunction<'static>>, ExecutionError> {
+    let mut functions = Vec::new();
+    for entry in &declarations.imports {
+        let offset = entry.offset;
+        budget.spend(offset, 1)?;
+        let ImportType::Function(type_index) = entry.value.ty else {
+            return Err(error(offset, Fault::UnsupportedModule));
+        };
+        let signature = &declarations.types[type_index as usize].value;
+        budget.spend(offset, signature.params.len() + signature.results.len())?;
+        if !signature
+            .params
+            .iter()
+            .chain(&signature.results)
+            .copied()
+            .all(is_numeric)
+        {
+            return Err(error(offset, Fault::ImportTypeMismatch));
+        }
+        append(
+            &mut functions,
+            BoundFunction {
+                type_index,
+                callback: None,
             },
             offset,
         )?;

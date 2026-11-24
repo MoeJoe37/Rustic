@@ -1508,7 +1508,8 @@ fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions() {
             0,97,115,109,1,0,0,0, 1,4,1,96,0,0, 3,2,1,0, 8,1,0, 10,5,1,3,0,0,11
         ));
         throws(TypeError, () => new WebAssembly.Instance(imported));
-        throws(WebAssembly.LinkError, () => new WebAssembly.Instance(imported, {}));
+        throws(TypeError, () => new WebAssembly.Instance(imported, {}));
+        throws(WebAssembly.LinkError, () => new WebAssembly.Instance(imported, {m:{}}));
         throws(WebAssembly.RuntimeError, () => new WebAssembly.Instance(badStart));
 
         const empty = Uint8Array.of(0,97,115,109,1,0,0,0);
@@ -1518,7 +1519,7 @@ fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions() {
         const response = new Response(empty, {headers: {'content-type':'application/wasm'}});
         WebAssembly.instantiateStreaming(response).then(x => results.push(x.instance instanceof WebAssembly.Instance && response.bodyUsed));
         WebAssembly.instantiate(empty, 12).catch(e => results.push(e instanceof TypeError));
-        WebAssembly.instantiate(imported, {}).catch(e => results.push(e instanceof WebAssembly.LinkError));
+        WebAssembly.instantiate(imported, {m:{}}).catch(e => results.push(e instanceof WebAssembly.LinkError));
         WebAssembly.instantiate(badStart).catch(e => results.push(e instanceof WebAssembly.RuntimeError));
     "#).unwrap();
     agent.run_jobs().unwrap();
@@ -1578,5 +1579,99 @@ fn wasm_numeric_globals_share_live_state_with_exported_functions() {
             )
             .unwrap(),
         Value::TRUE,
+    );
+}
+
+#[test]
+fn wasm_numeric_function_imports_preserve_link_order_reentry_and_exceptions() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        function caught(run) {
+            try { run(); } catch (error) { return error; }
+            throw 'expected exception';
+        }
+        const bytes = Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,9,2,96,1,127,1,127,96,0,0,
+            2,17,2,1,109,2,102,110,0,0,1,109,4,105,110,105,116,0,1,
+            3,4,3,0,0,1,
+            6,6,1,127,1,65,0,11,
+            7,46,5,7,102,111,114,119,97,114,100,0,2,4,98,117,109,112,0,3,
+            6,109,97,114,107,101,114,3,0,8,99,97,108,108,98,97,99,107,0,0,
+            5,97,108,105,97,115,0,0,
+            8,1,4,
+            10,25,3,9,0,32,0,16,0,35,0,106,11,
+            8,0,32,0,36,0,35,0,11,4,0,16,1,11
+        );
+        const mod = new WebAssembly.Module(bytes);
+        let order = [];
+        const sentinel = {origin:'callback'};
+        let mode = '';
+        let exports;
+        function callback(v) {
+            'use strict';
+            assert(this === undefined && typeof v === 'number', 'JS call ABI');
+            if (mode === 'throw') throw sentinel;
+            if (mode === 'recursive') return exports.forward(v);
+            exports.bump(v * 2);
+            return v + 1;
+        }
+        const imports = {
+            get m() {
+                order.push('m');
+                return {
+                    get fn() { order.push('fn'); return callback; },
+                    get init() { order.push('init'); return () => order.push('start'); },
+                };
+            },
+        };
+        exports = new WebAssembly.Instance(mod, imports).exports;
+        assert(order.join() === 'm,fn,m,init,start', 'import read and start order');
+        assert(exports.callback === exports.alias && exports.callback !== callback, 'host wrapper identity');
+        assert(exports.forward(5) === 16 && exports.marker.value === 10, 'same-instance reentry');
+        mode = 'throw';
+        assert(caught(() => exports.forward(1)) === sentinel, 'exact JS exception');
+        mode = 'recursive';
+        const depthError = caught(() => exports.forward(1));
+        assert(depthError instanceof WebAssembly.RuntimeError || depthError instanceof RangeError, 'bounded reentry');
+        mode = '';
+        assert(exports.forward(3) === 10, 'reentry depth recovered');
+        const linked = new WebAssembly.Instance(mod, {m:{fn:exports.bump, init(){}}}).exports;
+        assert(linked.callback === exports.bump && linked.alias === exports.bump, 'direct Wasm identity');
+        assert(linked.forward(29) === 29 && exports.marker.value === 29, 'direct Wasm invocation');
+        const raw = new WebAssembly.Instance(new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,5,1,96,0,1,125, 3,2,1,0, 7,7,1,3,114,97,119,0,0,
+            10,9,1,7,0,67,52,18,192,127,11
+        ))).exports.raw;
+        const bits = new WebAssembly.Instance(new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 1,9,2,96,0,1,125,96,0,1,127,
+            2,9,1,1,109,3,114,97,119,0,0, 3,2,1,1, 7,8,1,4,98,105,116,115,0,1,
+            10,7,1,5,0,16,0,188,11
+        )), {m:{raw}}).exports.bits;
+        assert(bits() === 0x7fc01234, 'Wasm-to-Wasm calls preserve raw NaN bits');
+        const different = new WebAssembly.Instance(new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 1,4,1,96,0,0, 3,2,1,0,
+            7,5,1,1,102,0,0, 10,4,1,2,0,11
+        ))).exports.f;
+        assert(caught(() => new WebAssembly.Instance(mod, {m:{fn:different, init(){}}})) instanceof WebAssembly.LinkError, 'exact link signature');
+        assert(caught(() => new WebAssembly.Instance(mod, {get m(){ throw sentinel; }})) === sentinel, 'getter exception');
+        let outcome = [];
+        WebAssembly.instantiate(mod, {m:{fn:callback, init(){throw sentinel;}}}).catch(error => outcome.push(error === sentinel));
+        WebAssembly.instantiateStreaming(
+            new Response(bytes, {headers:{'content-type':'application/wasm'}}),
+            {m:{get fn(){ const amount = 8; return v => v + amount; }, init(){}}}
+        ).then(({instance}) => outcome.push(instance.exports.forward(5) === 13));
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(
+        agent
+            .evaluate("outcome.length === 2 && outcome.every(Boolean)")
+            .unwrap(),
+        Value::TRUE
     );
 }

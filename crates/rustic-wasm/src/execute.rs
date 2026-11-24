@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, fmt};
 
 use rustic_base::CancellationToken;
 
@@ -15,7 +15,7 @@ mod state;
 mod table;
 
 use imports::BoundFunction;
-pub use imports::{FunctionImport, HostTrap};
+pub use imports::{FunctionImport, HostDispatch, HostTrap};
 use state::State;
 
 /// A WebAssembly number crossing the interpreter boundary.
@@ -221,7 +221,7 @@ impl<'module, 'bytes> NumericInstance<'module, 'bytes> {
         };
         let executable =
             Executable::prepare(module, limits, Profile::NumericOnly, None, &mut budget)?;
-        executable.run_start(&mut State::default(), cancellation)?;
+        executable.run_start(&RefCell::new(State::default()), cancellation, None)?;
         Ok(Self { executable })
     }
 
@@ -232,8 +232,12 @@ impl<'module, 'bytes> NumericInstance<'module, 'bytes> {
         arguments: &[Value],
         cancellation: &CancellationToken,
     ) -> Result<Vec<Value>, ExecutionError> {
-        self.executable
-            .invoke(export, arguments, &mut State::default(), cancellation)
+        self.executable.invoke(
+            export,
+            arguments,
+            &RefCell::new(State::default()),
+            cancellation,
+        )
     }
 }
 
@@ -266,7 +270,7 @@ impl Default for InstanceLimits {
 /// Host calls through [`Self::invoke`] exchange scalar numbers.
 pub struct Instance<'module, 'bytes> {
     executable: Executable<'module, 'bytes>,
-    state: State<'bytes>,
+    state: RefCell<State<'bytes>>,
 }
 
 impl<'module, 'bytes> Instance<'module, 'bytes> {
@@ -309,13 +313,13 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
             imports,
             &mut budget,
         )?;
-        let mut state = State::new(
+        let state = RefCell::new(State::new(
             module.module().declarations(),
             limits,
             &mut budget,
             |bytes, _, _| Ok(Cow::Borrowed(bytes)),
-        )?;
-        executable.run_start(&mut state, cancellation)?;
+        )?);
+        executable.run_start(&state, cancellation, None)?;
         Ok(Self { executable, state })
     }
 
@@ -325,15 +329,26 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         Some(self.executable.function_signature(index))
     }
 
+    /// Read a function's signature by its validated module index.
+    pub fn function_type_at(&self, index: u32) -> Option<&FunctionType> {
+        let index = index as usize;
+        let code = &self.executable;
+        (index < code.imports.len() + code.functions.len()).then(|| code.function_signature(index))
+    }
+
     /// Read a local global declaration's type.
     pub fn global_type(&self, index: u32) -> Option<GlobalType> {
-        self.state.globals.get(index as usize).map(|slot| slot.ty)
+        self.state
+            .borrow()
+            .globals
+            .get(index as usize)
+            .map(|slot| slot.ty)
     }
 
     /// Read a numeric global's current value, or return `None` for an invalid
     /// index or a reference-valued global.
     pub fn global_value(&self, index: u32) -> Option<Value> {
-        match self.state.globals.get(index as usize)?.value {
+        match self.state.borrow().globals.get(index as usize)?.value {
             Slot::Number(value) => Some(value),
             Slot::Ref(_) => None,
         }
@@ -341,8 +356,9 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
 
     /// Write a mutable numeric global. Invalid indices, types and writes to an
     /// immutable global return `false` and leave every global unchanged.
-    pub fn set_global_value(&mut self, index: u32, value: Value) -> bool {
-        let Some(slot) = self.state.globals.get_mut(index as usize) else {
+    pub fn set_global_value(&self, index: u32, value: Value) -> bool {
+        let mut state = self.state.borrow_mut();
+        let Some(slot) = state.globals.get_mut(index as usize) else {
             return false;
         };
         if !slot.ty.mutable || slot.ty.value_type != value.value_type() {
@@ -360,7 +376,31 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         cancellation: &CancellationToken,
     ) -> Result<Vec<Value>, ExecutionError> {
         self.executable
-            .invoke(export, arguments, &mut self.state, cancellation)
+            .invoke(export, arguments, &self.state, cancellation)
+    }
+
+    /// Invoke a function index with a per-call dispatcher for the declared
+    /// numeric host imports. A dispatcher may reenter this instance: no
+    /// interpreter state borrow crosses a call to the host.
+    pub fn invoke_function_with_host(
+        &self,
+        function: u32,
+        arguments: &[Value],
+        cancellation: &CancellationToken,
+        dispatch: &mut HostDispatch<'_>,
+    ) -> Result<Vec<Value>, ExecutionError> {
+        if self.function_type_at(function).is_none() {
+            return Err(error(0, Fault::UnknownExport));
+        }
+        machine::invoke(
+            &self.executable,
+            &self.state,
+            function as usize,
+            arguments,
+            0,
+            cancellation,
+            Some(dispatch),
+        )
     }
 }
 
@@ -376,13 +416,49 @@ impl Instance<'static, 'static> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, ExecutionError> {
+        let instance = Self::prepare_owned(module, limits, cancellation, false)?;
+        instance
+            .executable
+            .run_start(&instance.state, cancellation, None)?;
+        Ok(instance)
+    }
+
+    /// Instantiate an owned module whose numeric function imports are
+    /// supplied by a dispatcher in declaration order. The host validates
+    /// that every declared binding exists before constructing the instance.
+    /// The start function runs with this dispatcher before returning.
+    pub fn instantiate_owned_with_host(
+        module: ValidatedModule<'_>,
+        limits: InstanceLimits,
+        cancellation: &CancellationToken,
+        dispatch: &mut HostDispatch<'_>,
+    ) -> Result<Self, ExecutionError> {
+        let instance = Self::prepare_owned(module, limits, cancellation, true)?;
+        instance
+            .executable
+            .run_start(&instance.state, cancellation, Some(dispatch))?;
+        Ok(instance)
+    }
+
+    fn prepare_owned(
+        module: ValidatedModule<'_>,
+        limits: InstanceLimits,
+        cancellation: &CancellationToken,
+        allow_imports: bool,
+    ) -> Result<Self, ExecutionError> {
         let module = module.into_module();
         let declarations = module.declarations;
         let mut budget = Budget {
             remaining: limits.execution.preparation_work,
             cancellation,
         };
-        check_profile(&declarations, Profile::LocalState, false, &mut budget)?;
+        check_profile(
+            &declarations,
+            Profile::LocalState,
+            allow_imports,
+            &mut budget,
+        )?;
+        let imports = imports::for_dispatch(&declarations, &mut budget)?;
         let exports = prepare_exports(&declarations.exports, &mut budget, |name, offset| {
             let mut owned = String::new();
             owned
@@ -399,7 +475,7 @@ impl Instance<'static, 'static> {
             Profile::LocalState,
             &mut budget,
         )?;
-        let mut state = State::new(
+        let state = RefCell::new(State::new(
             &declarations,
             limits,
             &mut budget,
@@ -412,16 +488,15 @@ impl Instance<'static, 'static> {
                 owned.extend_from_slice(bytes);
                 Ok(Cow::Owned(owned))
             },
-        )?;
+        )?);
         let executable = Executable {
             types: Cow::Owned(declarations.types),
             start: declarations.start.map(|entry| entry.value),
-            imports: Vec::new(),
+            imports,
             functions,
             exports,
             limits: limits.execution,
         };
-        executable.run_start(&mut state, cancellation)?;
         Ok(Self { executable, state })
     }
 }
@@ -479,11 +554,12 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
 
     fn run_start(
         &self,
-        state: &mut State<'bytes>,
+        state: &RefCell<State<'bytes>>,
         cancellation: &CancellationToken,
+        dispatch: Option<&mut HostDispatch<'_>>,
     ) -> Result<(), ExecutionError> {
         if let Some(start) = self.start {
-            machine::invoke(self, state, start as usize, &[], 0, cancellation)?;
+            machine::invoke(self, state, start as usize, &[], 0, cancellation, dispatch)?;
         }
         Ok(())
     }
@@ -492,7 +568,7 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         &self,
         export: &str,
         arguments: &[Value],
-        state: &mut State<'bytes>,
+        state: &RefCell<State<'bytes>>,
         cancellation: &CancellationToken,
     ) -> Result<Vec<Value>, ExecutionError> {
         let entry_work = export.len();
@@ -506,7 +582,15 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
             .exports
             .get(export)
             .ok_or_else(|| error(0, Fault::UnknownExport))?;
-        machine::invoke(self, state, *function, arguments, entry_work, cancellation)
+        machine::invoke(
+            self,
+            state,
+            *function,
+            arguments,
+            entry_work,
+            cancellation,
+            None,
+        )
     }
 
     fn block_arity(&self, block: BlockType) -> (usize, usize) {

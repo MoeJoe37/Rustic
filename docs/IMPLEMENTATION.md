@@ -3376,8 +3376,9 @@ upstream Wasm module builder uses `unescape` for UTF-8 fixture names.
 `Instance::instantiate_owned` consumes validated code, copies retained names
 and passive data, and keeps mutable guest state after the input is released.
 Window exposes `Instance`, `instantiate` and `instantiateStreaming` for
-import-free modules with numeric function and global exports. Exported functions retain
-their instance through the collector. Export aliases share identity.
+modules with numeric function imports and numeric function and global exports.
+Exported functions retain their instance through the collector. Export aliases
+share identity.
 Arguments use JavaScript coercion, `i64` crosses as BigInt, multi-value results
 are arrays, and execution traps surface as `WebAssembly.RuntimeError`.
 Both pinned Instance WPT files pass all six subtests, covering the exports
@@ -3388,8 +3389,8 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-JavaScript imports, memory and table wrappers, reference-valued host calls,
-and the progressive response pipeline remain open.
+Memory and table wrappers, state imports, reference-valued host calls, and the
+progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3399,3 +3400,18 @@ function. Numeric conversion and immutability checks apply before a write.
 Four pinned Global WPT files pass all 132 subtests. Reference-typed globals
 and linking globals between instances remain open.
 [ADR 0082](adr/0082-wasm-numeric-globals.md)
+
+### WASM-06 — Window numeric function imports
+
+Each declared function import reads its module and field from the supplied
+object in declaration order. Callbacks can run in start functions and reenter
+the current instance. The browser applies numeric conversion in both
+directions. A multi-value callback result is consumed as an iterable before
+any result coercion. A JavaScript exception crosses the Wasm frames as the
+original value. Promise instantiation propagates it through rejection.
+
+Linking an existing Wasm function checks its numeric signature. Re-exporting
+the linked function preserves its identity. Calls between instances preserve
+numeric bit patterns, including NaN payloads. The host bounds interoperation
+depth and result iteration. The three subtests in the pinned multi-value
+Window fixture pass. [ADR 0083](adr/0083-wasm-js-function-imports.md)

@@ -19,8 +19,8 @@ pub use binary::{
     scan_module,
 };
 pub use execute::{
-    ExecutionError, ExecutionErrorKind, ExecutionLimits, FunctionImport, HostTrap, Instance,
-    InstanceLimits, NumericInstance, Value,
+    ExecutionError, ExecutionErrorKind, ExecutionLimits, FunctionImport, HostDispatch, HostTrap,
+    Instance, InstanceLimits, NumericInstance, Value,
 };
 pub use instructions::{
     BlockType, Immediate, Instruction, InstructionLimits, Opcode, decode_instructions,

@@ -4,15 +4,17 @@ use crate::Immediate;
 
 pub(super) fn invoke<'bytes>(
     instance: &Executable<'_, 'bytes>,
-    state: &mut State<'bytes>,
+    state: &RefCell<State<'bytes>>,
     function: usize,
     arguments: &[Value],
     entry_work: usize,
     cancellation: &CancellationToken,
+    dispatch: Option<&mut HostDispatch<'_>>,
 ) -> Result<Vec<Value>, ExecutionError> {
     let mut machine = Machine {
         instance,
         state,
+        dispatch,
         calls: Vec::new(),
         controls: Vec::new(),
         locals: Vec::new(),
@@ -82,9 +84,10 @@ struct Control {
     loop_start: Option<(usize, usize)>, // Program counter and loop argument count.
 }
 
-struct Machine<'instance, 'module, 'bytes, 'state, 'token> {
+struct Machine<'instance, 'module, 'bytes, 'state, 'token, 'dispatch, 'host> {
     instance: &'instance Executable<'module, 'bytes>,
-    state: &'state mut State<'bytes>,
+    state: &'state RefCell<State<'bytes>>,
+    dispatch: Option<&'dispatch mut HostDispatch<'host>>,
     calls: Vec<Call>,
     controls: Vec<Control>,
     locals: Vec<Slot>,
@@ -93,7 +96,7 @@ struct Machine<'instance, 'module, 'bytes, 'state, 'token> {
     offset: usize,
 }
 
-impl Machine<'_, '_, '_, '_, '_> {
+impl Machine<'_, '_, '_, '_, '_, '_, '_> {
     fn step(&mut self, instruction: &Instruction, jump: Jump) -> Result<(), ExecutionError> {
         match (instruction.opcode, &instruction.immediate) {
             (Opcode::Core(0x00), _) => return Err(error(self.offset, Fault::Unreachable)),
@@ -154,39 +157,47 @@ impl Machine<'_, '_, '_, '_, '_> {
                 }
             }
             (Opcode::Core(0x23), Immediate::Index(global)) => {
-                self.push(self.state.globals[*global as usize].value)?;
+                let value = self.state.borrow().globals[*global as usize].value;
+                self.push(value)?;
             }
             (Opcode::Core(0x24), Immediate::Index(global)) => {
-                self.state.globals[*global as usize].value = self.pop();
+                let value = self.pop();
+                self.state.borrow_mut().globals[*global as usize].value = value;
             }
             (Opcode::Core(0x25), Immediate::Index(table)) => {
                 let index = self.pop_i32() as u32;
-                let value = self.state.tables.get(*table, index, self.offset)?;
+                let value = self.state.borrow().tables.get(*table, index, self.offset)?;
                 self.push(Slot::Ref(value))?;
             }
             (Opcode::Core(0x26), Immediate::Index(table)) => {
                 let value = self.pop().reference();
                 let index = self.pop_i32() as u32;
-                self.state.tables.set(*table, index, value, self.offset)?;
+                self.state
+                    .borrow_mut()
+                    .tables
+                    .set(*table, index, value, self.offset)?;
             }
             (Opcode::Core(op @ 0x28..=0x3e), Immediate::Memory { memory, offset, .. }) => {
                 let value = (op >= 0x36).then(|| self.pop().number());
                 let address = u64::from(self.pop_i32() as u32) + offset;
-                if let Some(result) = self
-                    .state
-                    .access(op, *memory, address, value, self.offset)?
+                if let Some(result) =
+                    self.state
+                        .borrow_mut()
+                        .access(op, *memory, address, value, self.offset)?
                 {
                     self.push(Slot::Number(result))?;
                 }
             }
             (Opcode::Core(0x3f), Immediate::Index(memory)) => {
-                self.push(Slot::Number(Value::I32(self.state.size(*memory))))?;
+                let size = self.state.borrow().size(*memory);
+                self.push(Slot::Number(Value::I32(size)))?;
             }
             (Opcode::Core(0x40), Immediate::Index(memory)) => {
                 let pages = self.pop_i32() as u32;
-                let result = self
-                    .state
-                    .grow(*memory, pages, self.offset, &mut self.budget)?;
+                let result =
+                    self.state
+                        .borrow_mut()
+                        .grow(*memory, pages, self.offset, &mut self.budget)?;
                 self.push(Slot::Number(Value::I32(result)))?;
             }
             (Opcode::Core(0xd0), Immediate::HeapType(ty)) => {
@@ -208,13 +219,18 @@ impl Machine<'_, '_, '_, '_, '_> {
             }
             (Opcode::Misc(8), Immediate::Indices(data, memory)) => {
                 let transfer = self.pop_transfer();
-                self.state
-                    .init(*data, *memory, transfer, self.offset, &mut self.budget)?;
+                self.state.borrow_mut().init(
+                    *data,
+                    *memory,
+                    transfer,
+                    self.offset,
+                    &mut self.budget,
+                )?;
             }
-            (Opcode::Misc(9), Immediate::Index(data)) => self.state.drop_data(*data),
+            (Opcode::Misc(9), Immediate::Index(data)) => self.state.borrow_mut().drop_data(*data),
             (Opcode::Misc(10), Immediate::Indices(destination, source)) => {
                 let transfer = self.pop_transfer();
-                self.state.copy(
+                self.state.borrow_mut().copy(
                     *destination,
                     *source,
                     transfer,
@@ -225,11 +241,12 @@ impl Machine<'_, '_, '_, '_, '_> {
             (Opcode::Misc(11), Immediate::Index(memory)) => {
                 let transfer = self.pop_transfer();
                 self.state
+                    .borrow_mut()
                     .fill(*memory, transfer, self.offset, &mut self.budget)?;
             }
             (Opcode::Misc(12), Immediate::Indices(element, table)) => {
                 let transfer = self.pop_transfer();
-                self.state.tables.init(
+                self.state.borrow_mut().tables.init(
                     *element,
                     *table,
                     transfer,
@@ -238,11 +255,11 @@ impl Machine<'_, '_, '_, '_, '_> {
                 )?;
             }
             (Opcode::Misc(13), Immediate::Index(element)) => {
-                self.state.tables.drop_element(*element)
+                self.state.borrow_mut().tables.drop_element(*element)
             }
             (Opcode::Misc(14), Immediate::Indices(destination, source)) => {
                 let transfer = self.pop_transfer();
-                self.state.tables.copy(
+                self.state.borrow_mut().tables.copy(
                     *destination,
                     *source,
                     transfer,
@@ -253,20 +270,24 @@ impl Machine<'_, '_, '_, '_, '_> {
             (Opcode::Misc(15), Immediate::Index(table)) => {
                 let count = self.pop_i32() as u32;
                 let value = self.pop().reference();
-                let size =
-                    self.state
-                        .tables
-                        .grow(*table, count, value, self.offset, &mut self.budget)?;
+                let size = self.state.borrow_mut().tables.grow(
+                    *table,
+                    count,
+                    value,
+                    self.offset,
+                    &mut self.budget,
+                )?;
                 self.push(Slot::Number(Value::I32(size)))?;
             }
             (Opcode::Misc(16), Immediate::Index(table)) => {
-                self.push(Slot::Number(Value::I32(self.state.tables.size(*table))))?;
+                let size = self.state.borrow().tables.size(*table);
+                self.push(Slot::Number(Value::I32(size)))?;
             }
             (Opcode::Misc(17), Immediate::Index(table)) => {
                 let count = self.pop_i32() as u32;
                 let value = self.pop().reference();
                 let index = self.pop_i32() as u32;
-                self.state.tables.fill(
+                self.state.borrow_mut().tables.fill(
                     *table,
                     index,
                     count,
@@ -290,7 +311,7 @@ impl Machine<'_, '_, '_, '_, '_> {
 
     fn indirect(&mut self, ty: u32, table: u32) -> Result<usize, ExecutionError> {
         let index = self.pop_i32() as u32;
-        let value = self.state.tables.get(table, index, self.offset)?;
+        let value = self.state.borrow().tables.get(table, index, self.offset)?;
         let Reference::Function(Some(function)) = value else {
             return Err(error(self.offset, Fault::NullReference));
         };
@@ -364,7 +385,7 @@ impl Machine<'_, '_, '_, '_, '_> {
         let offset = self.offset;
         let executable = self.instance;
         let (function, prepared) = match executable.function(function) {
-            Callee::Host(import) => return self.call_host(import),
+            Callee::Host(import) => return self.call_host(function, import),
             Callee::Local(index, local) => (index, local),
         };
         let signature = executable.signature(prepared.function.type_index);
@@ -408,7 +429,11 @@ impl Machine<'_, '_, '_, '_, '_> {
         )
     }
 
-    fn call_host(&mut self, import: &BoundFunction<'_>) -> Result<(), ExecutionError> {
+    fn call_host(
+        &mut self,
+        index: usize,
+        import: &BoundFunction<'_>,
+    ) -> Result<(), ExecutionError> {
         let offset = self.offset;
         let signature = self.instance.signature(import.type_index);
         let params = signature.params.len();
@@ -437,7 +462,13 @@ impl Machine<'_, '_, '_, '_, '_> {
                 .map(|ty| Slot::zero(ty).number()),
         );
 
-        let called = (import.callback)(&arguments, &mut results, self.budget.cancellation);
+        let called = if let Some(callback) = import.callback {
+            callback(&arguments, &mut results, self.budget.cancellation)
+        } else if let Some(dispatch) = self.dispatch.as_mut() {
+            dispatch(index, &arguments, &mut results)
+        } else {
+            Err(HostTrap)
+        };
         self.budget.spend(offset, 0)?;
         called.map_err(|_| error(offset, Fault::HostTrap))?;
         if results

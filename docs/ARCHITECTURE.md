@@ -305,9 +305,13 @@ compilation adapters follow the existing Fetch and document CSP policies.
 Window module objects own byte snapshots and reflection metadata. Numeric
 function and global exports trace their instance and its interpreter state
 through the JS heap. Global wrappers read and write the same slots as guest
-instructions. The interpreter remains available on hosts without
+instructions. A dispatched import runs with its invocation stack owned by
+the interpreter and all guest store borrows released. The realm keeps its
+numeric import bindings and propagates JavaScript exceptions. The interpreter
+remains available on hosts without
 executable-memory permission. [ADR 0080](adr/0080-window-wasm-module-compilation.md),
-[ADR 0081](adr/0081-owned-wasm-instances.md), [ADR 0082](adr/0082-wasm-numeric-globals.md)
+[ADR 0081](adr/0081-owned-wasm-instances.md), [ADR 0082](adr/0082-wasm-numeric-globals.md),
+[ADR 0083](adr/0083-wasm-js-function-imports.md)
 
 Extensions execute under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native

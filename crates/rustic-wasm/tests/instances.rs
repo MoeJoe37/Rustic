@@ -381,7 +381,7 @@ fn owned_instances_outlive_the_source_and_keep_passive_data() {
 fn numeric_global_access_checks_the_index_type_and_mutability_before_writing() {
     let bytes = module(&[(6, &[2, 0x7f, 1, 0x41, 7, 0x0b, 0x7f, 0, 0x41, 9, 0x0b])]);
     let token = CancellationToken::default();
-    let mut instance =
+    let instance =
         Instance::instantiate_owned(validated(&bytes), Default::default(), &token).unwrap();
 
     assert_eq!(instance.global_value(0), Some(Value::I32(7)));

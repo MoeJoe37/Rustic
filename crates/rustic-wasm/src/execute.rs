@@ -4,8 +4,8 @@ use rustic_base::CancellationToken;
 
 use crate::validate::numeric::effect;
 use crate::{
-    BlockType, Declaration, Declarations, Export, ExportIndex, Function, FunctionType, Instruction,
-    Opcode, ValidatedModule, ValueType,
+    BlockType, Declaration, Declarations, Export, ExportIndex, Function, FunctionType, GlobalType,
+    Instruction, Opcode, ValidatedModule, ValueType,
 };
 
 mod imports;
@@ -323,6 +323,33 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
     pub fn function_type(&self, export: &str) -> Option<&FunctionType> {
         let &index = self.executable.exports.get(export)?;
         Some(self.executable.function_signature(index))
+    }
+
+    /// Read a local global declaration's type.
+    pub fn global_type(&self, index: u32) -> Option<GlobalType> {
+        self.state.globals.get(index as usize).map(|slot| slot.ty)
+    }
+
+    /// Read a numeric global's current value, or return `None` for an invalid
+    /// index or a reference-valued global.
+    pub fn global_value(&self, index: u32) -> Option<Value> {
+        match self.state.globals.get(index as usize)?.value {
+            Slot::Number(value) => Some(value),
+            Slot::Ref(_) => None,
+        }
+    }
+
+    /// Write a mutable numeric global. Invalid indices, types and writes to an
+    /// immutable global return `false` and leave every global unchanged.
+    pub fn set_global_value(&mut self, index: u32, value: Value) -> bool {
+        let Some(slot) = self.state.globals.get_mut(index as usize) else {
+            return false;
+        };
+        if !slot.ty.mutable || slot.ty.value_type != value.value_type() {
+            return false;
+        }
+        slot.value = Slot::Number(value);
+        true
     }
 
     /// Invoke a numeric function export with fresh budgets and persistent state.

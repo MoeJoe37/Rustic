@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use rustic_js::runtime::{BigInt, to_int32};
-use rustic_wasm::{
-    ExecutionError, ExecutionErrorKind, Instance, InstanceLimits, Value as WasmValue, ValueType,
-};
+use rustic_wasm::{ExecutionError, ExecutionErrorKind, Instance, InstanceLimits};
 
 use super::super::events::PrivateArray;
 use super::*;
@@ -12,7 +9,7 @@ const INSTANCE: &str = "WebAssembly.Instance";
 const LINK_ERROR: &str = "WebAssembly.LinkError";
 const RUNTIME_ERROR: &str = "WebAssembly.RuntimeError";
 
-type Runtime = RefCell<Instance<'static, 'static>>;
+pub(super) type Runtime = RefCell<Instance<'static, 'static>>;
 
 pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
     let proto = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
@@ -116,17 +113,6 @@ fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) ->
             "JavaScript WebAssembly imports require a wider instance profile",
         ));
     }
-    if module
-        .exports
-        .iter()
-        .any(|item| !matches!(item.target, ExportIndex::Function(_)))
-    {
-        return Err(wasm_error(
-            agent,
-            LINK_ERROR,
-            "this WebAssembly instance supports function exports",
-        ));
-    }
     let token = agent.cancellation().unwrap_or_default();
     let (runtime, allocation) = compilation_work(agent, module.bytes.len(), |agent| {
         // The branded module owns immutable bytes that passed the same validation limits.
@@ -134,21 +120,27 @@ fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) ->
             .map_err(|error| error.throw(agent))?;
         let declarations = validated.module().declarations();
         for export in &declarations.exports {
-            let ExportIndex::Function(index) = export.value.target else {
-                unreachable!("only function exports were admitted");
+            let supported = match export.value.target {
+                ExportIndex::Function(index) => {
+                    let function = &validated.module().functions()[index as usize].value;
+                    let signature = &declarations.types[function.type_index as usize].value;
+                    signature
+                        .params
+                        .iter()
+                        .chain(&signature.results)
+                        .copied()
+                        .all(is_numeric)
+                }
+                ExportIndex::Global(index) => {
+                    is_numeric(declarations.globals[index as usize].value.ty.value_type)
+                }
+                _ => false,
             };
-            let function = &validated.module().functions()[index as usize].value;
-            let signature = &declarations.types[function.type_index as usize].value;
-            if signature
-                .params
-                .iter()
-                .chain(&signature.results)
-                .any(|ty| matches!(ty, ValueType::V128 | ValueType::Ref { .. }))
-            {
+            if !supported {
                 return Err(wasm_error(
                     agent,
                     LINK_ERROR,
-                    "this WebAssembly instance supports numeric function exports",
+                    "this WebAssembly instance supports numeric function and global exports",
                 ));
             }
         }
@@ -187,7 +179,7 @@ fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) ->
                 module,
             )?;
             with_page(agent, |agent, page| {
-                agent.weak_map_set(page.wasm_exports, object, exports)
+                agent.weak_map_set(page.wasm_links, object, exports)
             })
         })?;
         Ok(object)
@@ -201,47 +193,66 @@ fn populate_exports(
     module: &Module,
 ) -> JsResult<()> {
     let runtime = find(agent, instance).expect("new WebAssembly instance");
-    let mut functions = HashMap::new();
+    let mut entries = HashMap::new();
     for item in &module.exports {
         agent.check_native_work()?;
         let name = module.text(&item.name);
-        let ExportIndex::Function(index) = item.target else {
-            unreachable!("only function exports were admitted");
-        };
-        let function = match functions.get(&index) {
-            Some(&function) => function,
+        let value = match entries.get(&item.target) {
+            Some(&value) => value,
             None => {
-                let size = runtime
-                    .borrow()
-                    .function_type(name)
-                    .expect("export signature")
-                    .params
-                    .len();
-                let size = u32::try_from(size).map_err(|_| OutOfMemory)?;
-                let name_value = agent.string(name)?;
-                functions.try_reserve(1).map_err(|_| OutOfMemory)?;
-                let function = Value::object(agent.new_host_closure(
-                    call,
-                    &index.to_string(),
-                    size,
-                    &[instance, name_value],
-                )?);
-                functions.insert(index, function);
-                function
+                entries.try_reserve(1).map_err(|_| OutOfMemory)?;
+                let value = match item.target {
+                    ExportIndex::Function(index) => {
+                        function_export(agent, instance, &runtime, name, index)?
+                    }
+                    ExportIndex::Global(index) => {
+                        let ty = runtime
+                            .borrow()
+                            .global_type(index)
+                            .expect("exported global");
+                        global::export(agent, instance, index, ty)?
+                    }
+                    _ => unreachable!("admitted exports checked before instantiation"),
+                };
+                entries.insert(item.target, value);
+                value
             }
         };
         let key = agent.heap.key(name)?;
         agent.define_property_or_throw(
             exports,
             key,
-            PropertyDescriptor::data_with(function, false, true, false),
+            PropertyDescriptor::data_with(value, false, true, false),
         )?;
     }
     agent.prevent_extensions(exports)?;
     Ok(())
 }
 
-fn find(agent: &Agent, value: Value) -> Option<Rc<Runtime>> {
+fn function_export(
+    agent: &mut Agent,
+    instance: Value,
+    runtime: &Runtime,
+    name: &str,
+    index: u32,
+) -> JsResult<Value> {
+    let size = runtime
+        .borrow()
+        .function_type(name)
+        .expect("export signature")
+        .params
+        .len();
+    let size = u32::try_from(size).map_err(|_| OutOfMemory)?;
+    let name = agent.string(name)?;
+    Ok(Value::object(agent.new_host_closure(
+        call,
+        &index.to_string(),
+        size,
+        &[instance, name],
+    )?))
+}
+
+pub(super) fn find(agent: &Agent, value: Value) -> Option<Rc<Runtime>> {
     agent.host_state(value.as_object()?, INSTANCE)
 }
 
@@ -250,7 +261,7 @@ fn exports(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
         return agent.type_error("invalid WebAssembly.Instance receiver");
     }
     with_page(agent, |agent, page| {
-        Ok(agent.weak_map_get(page.wasm_exports, this))
+        Ok(agent.weak_map_get(page.wasm_links, this))
     })
 }
 
@@ -277,14 +288,7 @@ fn call(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         .map_err(|_| OutOfMemory)?;
     for (index, ty) in params.into_iter().enumerate() {
         agent.check_native_work()?;
-        let value = arg(args, index);
-        input.push(match ty {
-            ValueType::I32 => WasmValue::I32(to_int32(agent.to_number(value)?)),
-            ValueType::I64 => WasmValue::I64(agent.to_bigint64(value)?),
-            ValueType::F32 => WasmValue::F32((agent.to_number(value)? as f32).to_bits()),
-            ValueType::F64 => WasmValue::F64(agent.to_number(value)?.to_bits()),
-            _ => unreachable!("numeric export signature"),
-        });
+        input.push(to_wasm(agent, arg(args, index), ty)?);
     }
     let token = agent.cancellation().unwrap_or_default();
     let results = state
@@ -295,15 +299,6 @@ fn call(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         [] => Ok(Value::UNDEFINED),
         &[one] => to_js(agent, one),
         _ => sequence(agent, results.into_iter(), to_js),
-    }
-}
-
-fn to_js(agent: &mut Agent, value: WasmValue) -> JsResult<Value> {
-    match value {
-        WasmValue::I32(value) => Ok(Value::number(f64::from(value))),
-        WasmValue::I64(value) => agent.bigint_value(BigInt::from_i64(value)),
-        WasmValue::F32(value) => Ok(Value::number(f64::from(f32::from_bits(value)))),
-        WasmValue::F64(value) => Ok(Value::number(f64::from_bits(value))),
     }
 }
 

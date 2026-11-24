@@ -9,12 +9,17 @@ const PAGE: usize = 65_536;
 
 #[derive(Default)]
 pub(super) struct State<'bytes> {
-    pub(super) globals: Vec<Slot>,
+    pub(super) globals: Vec<GlobalSlot>,
     pub(super) tables: Tables,
     memories: Vec<Memory>,
     data: Vec<Cow<'bytes, [u8]>>,
     memory_limit: usize,
     memory_bytes: usize,
+}
+
+pub(super) struct GlobalSlot {
+    pub(super) ty: GlobalType,
+    pub(super) value: Slot,
 }
 
 struct Memory {
@@ -51,7 +56,14 @@ impl<'bytes> State<'bytes> {
                 limits.execution.values,
                 budget,
             )?;
-            append(&mut state.globals, value, entry.offset)?;
+            append(
+                &mut state.globals,
+                GlobalSlot {
+                    ty: entry.value.ty,
+                    value,
+                },
+                entry.offset,
+            )?;
         }
         state.tables = Tables::new(declarations, &state.globals, limits, budget)?;
         for entry in &declarations.memories {
@@ -254,7 +266,7 @@ impl<'bytes> State<'bytes> {
 }
 
 pub(super) fn constant(
-    globals: &[Slot],
+    globals: &[GlobalSlot],
     instructions: &[Instruction],
     stack_limit: usize,
     budget: &mut Budget<'_>,
@@ -265,7 +277,7 @@ pub(super) fn constant(
         budget.spend(offset, 1)?;
         let value = match (instruction.opcode, &instruction.immediate) {
             (Opcode::Core(0x0b), _) => break,
-            (Opcode::Core(0x23), Immediate::Index(index)) => globals[*index as usize],
+            (Opcode::Core(0x23), Immediate::Index(index)) => globals[*index as usize].value,
             (Opcode::Core(0xd0), Immediate::HeapType(ty)) => Slot::Ref(Reference::null(*ty)),
             (Opcode::Core(0xd2), Immediate::Index(index)) => {
                 Slot::Ref(Reference::Function(Some(*index)))

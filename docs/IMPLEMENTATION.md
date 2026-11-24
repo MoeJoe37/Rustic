@@ -3376,7 +3376,7 @@ upstream Wasm module builder uses `unescape` for UTF-8 fixture names.
 `Instance::instantiate_owned` consumes validated code, copies retained names
 and passive data, and keeps mutable guest state after the input is released.
 Window exposes `Instance`, `instantiate` and `instantiateStreaming` for
-import-free modules with numeric function exports. Exported functions retain
+import-free modules with numeric function and global exports. Exported functions retain
 their instance through the collector. Export aliases share identity.
 Arguments use JavaScript coercion, `i64` crosses as BigInt, multi-value results
 are arrays, and execution traps surface as `WebAssembly.RuntimeError`.
@@ -3388,6 +3388,14 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-JavaScript imports, exported state wrappers, reference-valued host calls,
+JavaScript imports, memory and table wrappers, reference-valued host calls,
 and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
+
+Window implements numeric `WebAssembly.Global` construction, `value` and
+`valueOf`. Numeric global exports have stable identity across aliases and
+expose the interpreter's live storage, including mutations after the start
+function. Numeric conversion and immutability checks apply before a write.
+Four pinned Global WPT files pass all 132 subtests. Reference-typed globals
+and linking globals between instances remain open.
+[ADR 0082](adr/0082-wasm-numeric-globals.md)

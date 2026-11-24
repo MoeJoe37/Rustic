@@ -1529,3 +1529,54 @@ fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions() {
         Value::TRUE,
     );
 }
+
+#[test]
+fn wasm_numeric_globals_share_live_state_with_exported_functions() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    assert_eq!(
+        agent
+            .evaluate(
+                r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        const source = Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,6,1,96,1,127,1,127,
+            3,2,1,0,
+            6,11,2,127,1,65,7,11,127,0,65,9,11,
+            7,35,4,3,97,100,100,0,0,6,115,104,97,114,101,100,3,0,
+            5,97,108,105,97,115,3,0,8,99,111,110,115,116,97,110,116,3,1,
+            10,13,1,11,0,35,0,32,0,106,36,0,35,0,11
+        );
+        const mod = new WebAssembly.Module(source);
+        const independent = new WebAssembly.Instance(mod).exports;
+        let exports = new WebAssembly.Instance(mod).exports;
+        const shared = exports.shared;
+        assert(shared instanceof WebAssembly.Global && shared === exports.alias, 'identity');
+        assert(shared.valueOf() === 7 && exports.constant.value === 9, 'initial values');
+        let coerced = false;
+        let rejected = false;
+        try { exports.constant.value = {valueOf() { coerced = true; return 1; }}; }
+        catch (error) { rejected = error instanceof TypeError; }
+        assert(rejected && !coerced && exports.constant.value === 9, 'immutable without coercion');
+        shared.value = 100;
+        assert(exports.add(4) === 104 && shared.value === 104, 'bidirectional mutation');
+        shared.value = {valueOf() { return exports.add(1) + 1; }};
+        assert(shared.value === 106 && independent.shared.value === 7, 'reentrancy and isolation');
+        exports = null;
+        shared.value = 15;
+        assert(shared.value === 15, 'global keeps the instance alive');
+        class Scalar extends WebAssembly.Global {}
+        const scalar = new Scalar({value:'i64', mutable:true});
+        assert(scalar instanceof Scalar && scalar.value === 0n, 'standalone subclass');
+        scalar.value = 1n << 63n;
+        assert(scalar.value === -(1n << 63n), 'signed i64');
+        true
+    "#,
+            )
+            .unwrap(),
+        Value::TRUE,
+    );
+}

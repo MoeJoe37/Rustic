@@ -376,3 +376,25 @@ fn owned_instances_outlive_the_source_and_keep_passive_data() {
     assert_eq!(run(&mut instance, "read", &[]), 42);
     assert!(instance.function_type("missing").is_none());
 }
+
+#[test]
+fn numeric_global_access_checks_the_index_type_and_mutability_before_writing() {
+    let bytes = module(&[(6, &[2, 0x7f, 1, 0x41, 7, 0x0b, 0x7f, 0, 0x41, 9, 0x0b])]);
+    let token = CancellationToken::default();
+    let mut instance =
+        Instance::instantiate_owned(validated(&bytes), Default::default(), &token).unwrap();
+
+    assert_eq!(instance.global_value(0), Some(Value::I32(7)));
+    assert_eq!(instance.global_value(1), Some(Value::I32(9)));
+    assert_eq!(instance.global_value(2), None);
+    assert!(instance.global_type(0).unwrap().mutable);
+    assert!(!instance.global_type(1).unwrap().mutable);
+    assert_eq!(instance.global_type(2), None);
+    assert!(!instance.set_global_value(0, Value::I64(100)));
+    assert!(!instance.set_global_value(1, Value::I32(100)));
+    assert!(!instance.set_global_value(2, Value::I32(100)));
+    assert_eq!(instance.global_value(0), Some(Value::I32(7)));
+    assert_eq!(instance.global_value(1), Some(Value::I32(9)));
+    assert!(instance.set_global_value(0, Value::I32(100)));
+    assert_eq!(instance.global_value(0), Some(Value::I32(100)));
+}

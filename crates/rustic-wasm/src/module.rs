@@ -85,7 +85,7 @@ pub struct Import<'a> {
 }
 
 /// Index space and index selected by an export.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ExportIndex {
     /// Function index.
     Function(u32),

@@ -276,7 +276,7 @@ struct Page {
     storage_objects: RefCell<[Option<(Value, rustic_js::runtime::HostRoot)>; 2]>,
     fetch: RefCell<Option<Rc<dyn fetch::FetchHost>>>,
     wasm_compilation: RefCell<WasmCompilationPolicy>,
-    wasm_exports: ObjectId,
+    wasm_links: ObjectId,
     fetch_records: ObjectId,
     headers_iterator: ObjectId,
     urls: url::Objects,
@@ -635,8 +635,8 @@ fn install_page(
     agent.root(Value::object(headers_iterator))?;
     let fetch_records = agent.new_weak_map()?;
     agent.root(Value::object(fetch_records))?;
-    let wasm_exports = agent.new_weak_map()?;
-    agent.root(Value::object(wasm_exports))?;
+    let wasm_links = agent.new_weak_map()?;
+    agent.root(Value::object(wasm_links))?;
     let events = events::Events::new(agent)?;
     let rects = agent.new_weak_map()?;
     agent.root(Value::object(rects))?;
@@ -663,7 +663,7 @@ fn install_page(
         storage_objects: RefCell::new([None, None]),
         fetch: RefCell::new(None),
         wasm_compilation: RefCell::new(WasmCompilationPolicy::default()),
-        wasm_exports,
+        wasm_links,
         fetch_records,
         headers_iterator,
         urls,

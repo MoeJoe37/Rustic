@@ -4254,6 +4254,11 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_numeric_globals_share_live_state_with_exported_functions"
             }
           ]
         },
@@ -4289,6 +4294,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
               "marker": "\"wasm/jsapi/constructor/compile.any.js\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "\"wasm/jsapi/global/value-get-set.any.js\""
             }
           ]
         }

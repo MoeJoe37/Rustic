@@ -89,6 +89,7 @@ instead of rewriting the history of a decision.
 | [0079](0079-wasm-function-imports.md) | Explicit typed function bindings and the WebAssembly callback boundary | Accepted for M9 |
 | [0080](0080-window-wasm-module-compilation.md) | Realm-owned WebAssembly modules, buffered compilation, and document CSP | Accepted for M9 |
 | [0081](0081-owned-wasm-instances.md) | Owned Wasm instance state and traced numeric JavaScript function exports | Accepted for M9 |
+| [0082](0082-wasm-numeric-globals.md) | Live numeric global wrappers and guest slot ownership | Accepted for M9 |
 
 ## Records by area
 

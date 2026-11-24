@@ -154,10 +154,10 @@ impl Machine<'_, '_, '_, '_, '_> {
                 }
             }
             (Opcode::Core(0x23), Immediate::Index(global)) => {
-                self.push(self.state.globals[*global as usize])?;
+                self.push(self.state.globals[*global as usize].value)?;
             }
             (Opcode::Core(0x24), Immediate::Index(global)) => {
-                self.state.globals[*global as usize] = self.pop();
+                self.state.globals[*global as usize].value = self.pop();
             }
             (Opcode::Core(0x25), Immediate::Index(table)) => {
                 let index = self.pop_i32() as u32;

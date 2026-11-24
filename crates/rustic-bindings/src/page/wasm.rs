@@ -1,17 +1,18 @@
 //! Window WebAssembly byte compilation and module metadata.
 
+mod global;
 mod instance;
 
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
 use rustic_base::CancellationToken;
 use rustic_js::runtime::{
-    Abrupt, Agent, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor, PropertyKey,
-    Value,
+    Abrupt, Agent, BigInt, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor,
+    PropertyKey, Value, to_int32,
 };
 use rustic_wasm::{
     BinaryErrorKind, DecodeLimits, ExportIndex, ImportType, ValidatedModule, ValidationErrorKind,
-    decode_module, validate_module,
+    Value as WasmValue, ValueType, decode_module, validate_module,
 };
 
 use super::{
@@ -94,6 +95,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     define_method(agent, namespace, "validate", validate, 1)?;
     define_method(agent, namespace, "compile", compile, 1)?;
     define_method(agent, namespace, "compileStreaming", compile_streaming, 1)?;
+    global::install(agent, namespace)?;
     instance::install(agent, namespace)?;
 
     let module = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
@@ -171,6 +173,32 @@ fn tag(agent: &mut Agent, object: ObjectId, name: &str) -> JsResult<()> {
 
 fn arg(args: &[Value], index: usize) -> Value {
     args.get(index).copied().unwrap_or(Value::UNDEFINED)
+}
+
+fn is_numeric(ty: ValueType) -> bool {
+    matches!(
+        ty,
+        ValueType::I32 | ValueType::I64 | ValueType::F32 | ValueType::F64
+    )
+}
+
+fn to_wasm(agent: &mut Agent, value: Value, ty: ValueType) -> JsResult<WasmValue> {
+    Ok(match ty {
+        ValueType::I32 => WasmValue::I32(to_int32(agent.to_number(value)?)),
+        ValueType::I64 => WasmValue::I64(agent.to_bigint64(value)?),
+        ValueType::F32 => WasmValue::F32((agent.to_number(value)? as f32).to_bits()),
+        ValueType::F64 => WasmValue::F64(agent.to_number(value)?.to_bits()),
+        _ => unreachable!("numeric Wasm host value"),
+    })
+}
+
+fn to_js(agent: &mut Agent, value: WasmValue) -> JsResult<Value> {
+    match value {
+        WasmValue::I32(value) => Ok(Value::number(f64::from(value))),
+        WasmValue::I64(value) => agent.bigint_value(BigInt::from_i64(value)),
+        WasmValue::F32(value) => Ok(Value::number(f64::from(f32::from_bits(value)))),
+        WasmValue::F64(value) => Ok(Value::number(f64::from_bits(value))),
+    }
 }
 
 fn options(agent: &mut Agent, value: Value) -> JsResult<Options> {

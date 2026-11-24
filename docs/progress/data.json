@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "2eb197ef0bc6630841aeb4b27ed0a5b27862232304dfeb015b2d7bcd15673dbd",
+  "source_fingerprint": "ef637cb51f367c897ae3d035248bef12963bb38303a3c4b6fc17789dc7e99fe4",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
@@ -4608,6 +4608,11 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_numeric_globals_share_live_state_with_exported_functions"
             }
           ],
           "credit": "0.00",
@@ -4649,6 +4654,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
               "marker": "\"wasm/jsapi/constructor/compile.any.js\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "\"wasm/jsapi/global/value-get-set.any.js\""
             }
           ],
           "credit": "0.00",

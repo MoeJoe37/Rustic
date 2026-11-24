@@ -4102,6 +4102,542 @@
       "status": "PASS"
     }
   ],
+  "wasm/jsapi/global/constructor.any.js": [
+    {
+      "name": "name",
+      "status": "PASS"
+    },
+    {
+      "name": "length",
+      "status": "PASS"
+    },
+    {
+      "name": "No arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Calling",
+      "status": "PASS"
+    },
+    {
+      "name": "Order of evaluation",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid descriptor argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid type argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Construct v128 global",
+      "status": "PASS"
+    },
+    {
+      "name": "i64 with default",
+      "status": "PASS"
+    },
+    {
+      "name": "Default value for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value undefined for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value null for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value true for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value false for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value 2 for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value \"3\" for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning string for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning string for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning number for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning number for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "BigInt value for type i32",
+      "status": "PASS"
+    },
+    {
+      "name": "Default value for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value undefined for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value null for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value true for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value false for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value 2 for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value \"3\" for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning string for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning string for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning number for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning number for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "BigInt value for type f32",
+      "status": "PASS"
+    },
+    {
+      "name": "Default value for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value undefined for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value null for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value true for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value false for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value 2 for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value \"3\" for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning string for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning string for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning number for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning number for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "BigInt value for type f64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value undefined for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value true for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value false for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value \"3\" for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value 123n for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning string for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning string for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with toString returning bigint for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Explicit value object with valueOf returning bigint for type i64",
+      "status": "PASS"
+    },
+    {
+      "name": "Pass non-bigint as i64 Global value: null",
+      "status": "PASS"
+    },
+    {
+      "name": "Pass non-bigint as i64 Global value: 666",
+      "status": "PASS"
+    },
+    {
+      "name": "Pass non-bigint as i64 Global value: object \"5\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Pass non-bigint as i64 Global value: object \"[object Object]\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Pass non-bigint as i64 Global value: symbol \"Symbol()\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/global/toString.any.js": [
+    {
+      "name": "Object.prototype.toString on an Global",
+      "status": "PASS"
+    },
+    {
+      "name": "@@toStringTag exists on the prototype with the appropriate descriptor",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/global/value-get-set.any.js": [
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 with ToNumber side-effects (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 with ToNumber side-effects (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 with ToNumber side-effects (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 with ToNumber side-effects (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 with ToNumber side-effects (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i32 with ToNumber side-effects (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i32 (true)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i32 (one)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i32 (string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i32 (true on prototype)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 with ToNumber side-effects (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 with ToNumber side-effects (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 with ToNumber side-effects (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 with ToNumber side-effects (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 with ToNumber side-effects (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable i64 with ToNumber side-effects (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i64 (true)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i64 (one)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i64 (string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable i64 (true on prototype)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 with ToNumber side-effects (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 with ToNumber side-effects (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 with ToNumber side-effects (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 with ToNumber side-effects (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 with ToNumber side-effects (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f32 with ToNumber side-effects (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f32 (true)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f32 (one)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f32 (string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f32 (true on prototype)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 with ToNumber side-effects (missing)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 with ToNumber side-effects (undefined)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 with ToNumber side-effects (null)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 with ToNumber side-effects (false)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 with ToNumber side-effects (empty string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Immutable f64 with ToNumber side-effects (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f64 (true)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f64 (one)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f64 (string)",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutable f64 (true on prototype)",
+      "status": "PASS"
+    },
+    {
+      "name": "i64 mutability",
+      "status": "PASS"
+    },
+    {
+      "name": "Calling setter without argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/global/valueOf.any.js": [
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    }
+  ],
   "wasm/jsapi/instance/exports.any.js": [
     {
       "name": "Branding",

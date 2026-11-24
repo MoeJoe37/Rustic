@@ -1,4 +1,4 @@
-use super::state::{Transfer, checked_range, constant};
+use super::state::{GlobalSlot, Transfer, checked_range, constant};
 use super::*;
 use crate::{Declarations, ElementItems, ElementMode};
 
@@ -20,7 +20,7 @@ struct Table {
 impl Tables {
     pub(super) fn new(
         declarations: &Declarations<'_>,
-        globals: &[Slot],
+        globals: &[GlobalSlot],
         limits: InstanceLimits,
         budget: &mut Budget<'_>,
     ) -> Result<Self, ExecutionError> {
@@ -255,7 +255,7 @@ impl Tables {
 fn element_value(
     items: &ElementItems,
     index: usize,
-    globals: &[Slot],
+    globals: &[GlobalSlot],
     stack_limit: usize,
     offset: usize,
     budget: &mut Budget<'_>,

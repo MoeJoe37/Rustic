@@ -110,8 +110,10 @@ pub(super) fn for_dispatch(
     for entry in &declarations.imports {
         let offset = entry.offset;
         budget.spend(offset, 1)?;
-        let ImportType::Function(type_index) = entry.value.ty else {
-            return Err(error(offset, Fault::UnsupportedModule));
+        let type_index = match entry.value.ty {
+            ImportType::Function(index) => index,
+            ImportType::Global(_) => continue,
+            _ => return Err(error(offset, Fault::UnsupportedModule)),
         };
         let signature = &declarations.types[type_index as usize].value;
         budget.spend(offset, signature.params.len() + signature.results.len())?;

@@ -16,6 +16,7 @@ mod table;
 
 use imports::BoundFunction;
 pub use imports::{FunctionImport, HostDispatch, HostTrap};
+pub use state::NumericGlobal;
 use state::State;
 
 /// A WebAssembly number crossing the interpreter boundary.
@@ -315,6 +316,7 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         )?;
         let state = RefCell::new(State::new(
             module.module().declarations(),
+            &[],
             limits,
             &mut budget,
             |bytes, _, _| Ok(Cow::Borrowed(bytes)),
@@ -336,19 +338,19 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         (index < code.imports.len() + code.functions.len()).then(|| code.function_signature(index))
     }
 
-    /// Read a local global declaration's type.
+    /// Read a global declaration's type.
     pub fn global_type(&self, index: u32) -> Option<GlobalType> {
         self.state
             .borrow()
             .globals
             .get(index as usize)
-            .map(|slot| slot.ty)
+            .map(|slot| slot.ty())
     }
 
     /// Read a numeric global's current value, or return `None` for an invalid
     /// index or a reference-valued global.
     pub fn global_value(&self, index: u32) -> Option<Value> {
-        match self.state.borrow().globals.get(index as usize)?.value {
+        match self.state.borrow().globals.get(index as usize)?.value() {
             Slot::Number(value) => Some(value),
             Slot::Ref(_) => None,
         }
@@ -361,11 +363,22 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         let Some(slot) = state.globals.get_mut(index as usize) else {
             return false;
         };
-        if !slot.ty.mutable || slot.ty.value_type != value.value_type() {
+        let ty = slot.ty();
+        if !ty.mutable || ty.value_type != value.value_type() {
             return false;
         }
-        slot.value = Slot::Number(value);
+        slot.write_guest(Slot::Number(value));
         true
+    }
+
+    /// Share a numeric global with the host or another instance.
+    /// Local storage is promoted once, preserving its value and mutability.
+    pub fn share_numeric_global(&self, index: u32) -> Option<NumericGlobal> {
+        self.state
+            .borrow_mut()
+            .globals
+            .get_mut(index as usize)?
+            .share()
     }
 
     /// Invoke a numeric function export with fresh budgets and persistent state.
@@ -416,24 +429,25 @@ impl Instance<'static, 'static> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, ExecutionError> {
-        let instance = Self::prepare_owned(module, limits, cancellation, false)?;
+        let instance = Self::prepare_owned(module, limits, cancellation, false, &[])?;
         instance
             .executable
             .run_start(&instance.state, cancellation, None)?;
         Ok(instance)
     }
 
-    /// Instantiate an owned module whose numeric function imports are
-    /// supplied by a dispatcher in declaration order. The host validates
-    /// that every declared binding exists before constructing the instance.
+    /// Instantiate an owned module with numeric globals and function imports.
+    /// Supply globals in global index order, and dispatch functions in their
+    /// separate function index space. The host resolves callable bindings.
     /// The start function runs with this dispatcher before returning.
     pub fn instantiate_owned_with_host(
         module: ValidatedModule<'_>,
         limits: InstanceLimits,
         cancellation: &CancellationToken,
+        globals: &[NumericGlobal],
         dispatch: &mut HostDispatch<'_>,
     ) -> Result<Self, ExecutionError> {
-        let instance = Self::prepare_owned(module, limits, cancellation, true)?;
+        let instance = Self::prepare_owned(module, limits, cancellation, true, globals)?;
         instance
             .executable
             .run_start(&instance.state, cancellation, Some(dispatch))?;
@@ -445,6 +459,7 @@ impl Instance<'static, 'static> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
         allow_imports: bool,
+        globals: &[NumericGlobal],
     ) -> Result<Self, ExecutionError> {
         let module = module.into_module();
         let declarations = module.declarations;
@@ -477,6 +492,7 @@ impl Instance<'static, 'static> {
         )?;
         let state = RefCell::new(State::new(
             &declarations,
+            globals,
             limits,
             &mut budget,
             |bytes, offset, budget| {

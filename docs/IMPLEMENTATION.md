@@ -3342,7 +3342,7 @@ selection with five numeric provider bindings matched 1,881 invocations,
 including 1,098 additional bulk table cases using imported functions. A
 separate numeric, control and memory replay matched 16,108 invocations.
 Window links numeric JavaScript callbacks by function index.
-Reference-valued host calls and shared imported state remain open.
+Reference-valued host calls and shared memory and table bindings remain open.
 [ADR 0079](adr/0079-wasm-function-imports.md),
 [ADR 0083](adr/0083-wasm-js-function-imports.md)
 
@@ -3378,7 +3378,7 @@ upstream Wasm module builder uses `unescape` for UTF-8 fixture names.
 `Instance::instantiate_owned` consumes validated code, copies retained names
 and passive data, and keeps mutable guest state after the input is released.
 Window exposes `Instance`, `instantiate` and `instantiateStreaming` for
-modules with numeric function imports and numeric function and global exports.
+modules with numeric function and global imports and exports.
 Exported functions retain their instance through the collector. Export aliases
 share identity.
 Arguments use JavaScript coercion, `i64` crosses as BigInt, multi-value results
@@ -3391,7 +3391,7 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Memory and table wrappers, state imports, reference-valued host calls, and the
+Memory and table imports and wrappers, reference-valued host calls, and the
 progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
@@ -3400,7 +3400,7 @@ Window implements numeric `WebAssembly.Global` construction, `value` and
 expose the interpreter's live storage, including mutations after the start
 function. Numeric conversion and immutability checks apply before a write.
 Four pinned Global WPT files pass all 132 subtests. Reference-typed globals
-and linking globals between instances remain open.
+remain open.
 [ADR 0082](adr/0082-wasm-numeric-globals.md)
 
 ### WASM-06 — Window numeric function imports
@@ -3417,3 +3417,24 @@ the linked function preserves its identity. Calls between instances preserve
 numeric bit patterns, including NaN payloads. The host bounds interoperation
 depth and result iteration. The three subtests in the pinned multi-value
 Window fixture pass. [ADR 0083](adr/0083-wasm-js-function-imports.md)
+
+### WASM-06 — Window numeric global imports
+
+A numeric `WebAssembly.Global` links by identity and exact type and
+mutability. Its re-exports use the original JavaScript wrapper. Standalone
+globals and globals exported from another instance both share live storage
+with their consumers. An immutable numeric import also accepts a Number
+for the 32-bit integer and floating-point types or a BigInt for `i64`.
+That primitive is snapshotted for the instance and can initialize local
+globals. Function and global import indices are independent.
+
+`instantiate(module, imports)` reads imports before it returns its promise
+and runs start later. The byte and Fetch response overloads read imports
+after compilation. Replacing an import property after the lookup leaves
+the selected binding intact. A write to a selected mutable global remains
+visible to the guest. [ADR 0084](adr/0084-shared-numeric-wasm-globals.md)
+
+The pinned `Instance` and `instantiate` constructor fixtures pass 68 of
+86 subtests, including numeric imports and synchronous Module lookup.
+Their 18 expected failures cover memory and table constructors or exports,
+which need the remaining state wrappers.

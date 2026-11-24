@@ -157,12 +157,12 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                 }
             }
             (Opcode::Core(0x23), Immediate::Index(global)) => {
-                let value = self.state.borrow().globals[*global as usize].value;
+                let value = self.state.borrow().globals[*global as usize].value();
                 self.push(value)?;
             }
             (Opcode::Core(0x24), Immediate::Index(global)) => {
                 let value = self.pop();
-                self.state.borrow_mut().globals[*global as usize].value = value;
+                self.state.borrow_mut().globals[*global as usize].write_guest(value);
             }
             (Opcode::Core(0x25), Immediate::Index(table)) => {
                 let index = self.pop_i32() as u32;

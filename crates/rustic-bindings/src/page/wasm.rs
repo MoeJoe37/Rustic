@@ -41,7 +41,7 @@ struct Module {
 struct Import {
     module: Range<usize>,
     name: Range<usize>,
-    kind: &'static str,
+    ty: ImportType,
 }
 
 struct Export {
@@ -557,17 +557,10 @@ fn metadata(
     for entry in &declarations.imports {
         token.check().map_err(|_| Abrupt::Cancelled)?;
         let import = &entry.value;
-        let kind = match import.ty {
-            ImportType::Function(_) => "function",
-            ImportType::Table(_) => "table",
-            ImportType::Memory(_) => "memory",
-            ImportType::Global(_) => "global",
-            ImportType::Tag(_) => "tag",
-        };
         imports.push(Import {
             module: range(bytes, import.module.as_bytes()),
             name: range(bytes, import.name.as_bytes()),
-            kind,
+            ty: import.ty,
         });
     }
     for entry in &declarations.exports {
@@ -613,7 +606,16 @@ fn imports(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
             &[
                 ("module", module.text(&record.module)),
                 ("name", module.text(&record.name)),
-                ("kind", record.kind),
+                (
+                    "kind",
+                    match record.ty {
+                        ImportType::Function(_) => "function",
+                        ImportType::Table(_) => "table",
+                        ImportType::Memory(_) => "memory",
+                        ImportType::Global(_) => "global",
+                        ImportType::Tag(_) => "tag",
+                    },
+                ),
             ],
         )
     })

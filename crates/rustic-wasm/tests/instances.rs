@@ -398,3 +398,35 @@ fn numeric_global_access_checks_the_index_type_and_mutability_before_writing() {
     assert!(instance.set_global_value(0, Value::I32(100)));
     assert_eq!(instance.global_value(0), Some(Value::I32(100)));
 }
+
+#[test]
+fn owned_global_bindings_preserve_live_values_and_validate_types() {
+    let bytes = module(&[(2, &[1, 1, b'm', 1, b'g', 3, 0x7f, 1])]);
+    let token = CancellationToken::default();
+    let instantiate = |globals: &[rustic_wasm::NumericGlobal]| {
+        Instance::instantiate_owned_with_host(
+            validated(&bytes),
+            Default::default(),
+            &token,
+            globals,
+            &mut |_, _, _| unreachable!("module has no function imports or start"),
+        )
+    };
+    assert_eq!(instantiate(&[]).err().unwrap().kind, Fault::MissingImport);
+    let wrong = rustic_wasm::NumericGlobal::new(Value::I64(7), true);
+    assert_eq!(
+        instantiate(&[wrong]).err().unwrap().kind,
+        Fault::ImportTypeMismatch
+    );
+    let cell = rustic_wasm::NumericGlobal::new(Value::I32(7), true);
+    let first = instantiate(std::slice::from_ref(&cell)).unwrap();
+    let second = instantiate(std::slice::from_ref(&cell)).unwrap();
+    assert_eq!(first.global_value(0), Some(Value::I32(7)));
+    assert!(first.set_global_value(0, Value::I32(11)));
+    let reexport = second.share_numeric_global(0).unwrap();
+    assert_eq!(reexport.get(), Value::I32(11));
+    assert!(reexport.set(Value::I32(19)));
+    assert!(!reexport.set(Value::I64(22)));
+    assert_eq!(cell.get(), Value::I32(19));
+    assert_eq!(first.global_value(0), Some(Value::I32(19)));
+}

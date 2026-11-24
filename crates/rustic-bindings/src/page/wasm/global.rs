@@ -1,20 +1,8 @@
-use std::cell::Cell;
-
-use rustic_wasm::GlobalType;
+use rustic_wasm::{GlobalType, NumericGlobal};
 
 use super::*;
 
 const GLOBAL: &str = "WebAssembly.Global";
-
-struct Global {
-    ty: GlobalType,
-    storage: Storage,
-}
-
-enum Storage {
-    Local(Cell<WasmValue>),
-    Exported(u32),
-}
 
 pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
     let proto = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
@@ -71,29 +59,17 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         to_wasm(agent, initial, value_type)?
     };
     let proto = agent.host_prototype_from_new_target(GLOBAL, target)?;
-    let state = Global {
-        ty: GlobalType {
-            value_type,
-            mutable,
-        },
-        storage: Storage::Local(Cell::new(initial)),
-    };
-    Ok(Value::object(
-        agent.new_host_state(GLOBAL, proto, state, 0)?,
-    ))
+    let state = NumericGlobal::new(initial, mutable);
+    Ok(Value::object(agent.new_host_state(
+        GLOBAL,
+        proto,
+        state,
+        NumericGlobal::storage_bytes(),
+    )?))
 }
 
-pub(super) fn export(
-    agent: &mut Agent,
-    instance: Value,
-    index: u32,
-    ty: GlobalType,
-) -> JsResult<Value> {
+pub(super) fn export(agent: &mut Agent, instance: Value, state: NumericGlobal) -> JsResult<Value> {
     let proto = prototype(agent, GLOBAL)?;
-    let state = Global {
-        ty,
-        storage: Storage::Exported(index),
-    };
     let global = Value::object(agent.new_host_state(GLOBAL, proto, state, 0)?);
     with_root(agent, global, |agent| {
         with_page(agent, |agent, page| {
@@ -103,45 +79,39 @@ pub(super) fn export(
     Ok(global)
 }
 
-fn state(agent: &mut Agent, this: Value) -> JsResult<Rc<Global>> {
-    match this.as_object().and_then(|id| agent.host_state(id, GLOBAL)) {
+pub(super) fn find(agent: &Agent, value: Value) -> Option<Rc<NumericGlobal>> {
+    agent.host_state(value.as_object()?, GLOBAL)
+}
+
+pub(super) fn accepts_import(agent: &Agent, value: Value, ty: GlobalType) -> bool {
+    is_numeric(ty.value_type)
+        && (find(agent, value).is_some()
+            || match ty.value_type {
+                ValueType::I64 => agent.type_of(value) == "bigint",
+                _ => value.as_number().is_some(),
+            })
+}
+
+fn state(agent: &mut Agent, this: Value) -> JsResult<Rc<NumericGlobal>> {
+    match find(agent, this) {
         Some(global) => Ok(global),
         None => agent.type_error("invalid WebAssembly.Global receiver"),
     }
 }
 
-fn owner(agent: &mut Agent, global: Value) -> JsResult<Rc<instance::Runtime>> {
-    with_page(agent, |agent, page| {
-        let instance = agent.weak_map_get(page.wasm_links, global);
-        Ok(instance::find(agent, instance).expect("exported global owner"))
-    })
-}
-
 fn get_value(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    let global = state(agent, this)?;
-    let value = match &global.storage {
-        Storage::Local(value) => value.get(),
-        Storage::Exported(index) => owner(agent, this)?
-            .global_value(*index)
-            .expect("numeric exported global"),
-    };
+    let value = state(agent, this)?.get();
     to_js(agent, value)
 }
 
 fn set_value(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let global = state(agent, this)?;
-    if !global.ty.mutable {
+    let ty = global.ty();
+    if !ty.mutable {
         return agent.type_error("cannot set an immutable WebAssembly.Global");
     }
-    // Conversion may run JS that accesses the same global.
-    let value = to_wasm(agent, arg(args, 0), global.ty.value_type)?;
-    match &global.storage {
-        Storage::Local(slot) => slot.set(value),
-        Storage::Exported(index) => {
-            let instance = owner(agent, this)?;
-            let updated = instance.set_global_value(*index, value);
-            debug_assert!(updated, "checked global type and mutability");
-        }
-    }
+    let value = to_wasm(agent, arg(args, 0), ty.value_type)?;
+    let updated = global.set(value);
+    debug_assert!(updated, "checked numeric global conversion");
     Ok(Value::UNDEFINED)
 }

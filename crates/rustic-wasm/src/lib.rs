@@ -20,7 +20,7 @@ pub use binary::{
 };
 pub use execute::{
     ExecutionError, ExecutionErrorKind, ExecutionLimits, FunctionImport, HostDispatch, HostTrap,
-    Instance, InstanceLimits, NumericInstance, Value,
+    Instance, InstanceLimits, NumericGlobal, NumericInstance, Value,
 };
 pub use instructions::{
     BlockType, Immediate, Instruction, InstructionLimits, Opcode, decode_instructions,

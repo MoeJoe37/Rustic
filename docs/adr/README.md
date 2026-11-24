@@ -91,6 +91,7 @@ instead of rewriting the history of a decision.
 | [0081](0081-owned-wasm-instances.md) | Owned Wasm instance state and traced numeric JavaScript function exports | Accepted for M9 |
 | [0082](0082-wasm-numeric-globals.md) | Live numeric global wrappers and guest slot ownership | Accepted for M9 |
 | [0083](0083-wasm-js-function-imports.md) | Reentrant numeric function imports and traced Window bindings | Accepted for M9 |
+| [0084](0084-shared-numeric-wasm-globals.md) | Shared numeric Wasm globals and ordered JavaScript import snapshots | Accepted for M9 |
 
 ## Records by area
 

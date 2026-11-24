@@ -1675,3 +1675,103 @@ fn wasm_numeric_function_imports_preserve_link_order_reentry_and_exceptions() {
         Value::TRUE
     );
 }
+
+#[test]
+fn wasm_numeric_global_imports_share_cells_and_snapshot_primitive_values() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        const provider = new WebAssembly.Instance(new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 6,6,1,127,1,65,7,11, 7,5,1,1,103,3,0
+        )));
+        const shared = provider.exports.g;
+        const source = Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,12,3,96,0,1,127,96,1,127,0,96,0,0,
+            2,28,4,1,109,1,103,3,127,1, 1,109,1,102,0,0,
+            1,109,1,107,3,127,0, 1,109,1,98,3,126,0,
+            3,4,3,0,1,2,
+            6,6,1,127,0,35,1,11,
+            7,36,6,1,103,3,0, 4,115,97,109,101,3,0, 3,98,105,103,3,2,
+            4,115,110,97,112,3,3, 2,103,111,0,1, 3,115,101,116,0,2,
+            8,1,3,
+            10,29,3,10,0,16,0,35,0,106,35,1,106,11,
+            6,0,32,0,36,0,11, 9,0,35,0,65,1,106,36,0,11
+        );
+        const module = new WebAssembly.Module(source);
+        let coerced = false;
+        function rejects(override) {
+            try {
+                new WebAssembly.Instance(module, {m:{g:shared, f:() => 5, k:9, b:0n, ...override}});
+            } catch(e) {
+                return e instanceof WebAssembly.LinkError;
+            }
+            return false;
+        }
+        assert(rejects({g:7}), 'mutable imports require a mutable Global');
+        assert(rejects({g:new WebAssembly.Global({value:'i32'}, 7)}), 'exact mutability');
+        assert(rejects({g:new WebAssembly.Global({value:'f64',mutable:true}, 7)}), 'exact type');
+        assert(rejects({k:{valueOf() { coerced = true; return 9; }}}), 'no object coercion');
+        assert(rejects({b:2}) && !coerced && shared.value === 7, 'no start on failed link');
+
+        let order = [];
+        let k = 2**32 + 9;
+        const namespace = {
+            get g() { order.push('g'); return shared; },
+            get f() { order.push('f'); return () => 5; },
+            get k() { order.push('k'); return k; },
+            get b() { order.push('b'); return 2n**63n + 4n; },
+        };
+        let result = false;
+        const pending = WebAssembly.instantiate(module, {
+            get m() { order.push('m'); return namespace; },
+        });
+        assert(order.join() === 'm,g,m,f,m,k,m,b', 'ordered synchronous lookup');
+        assert(shared.value === 7, 'start remains deferred');
+        k = 99;
+        shared.value = 8;
+        pending.then(instance => {
+            const exports = instance.exports;
+            assert(exports.g === shared && exports.same === shared, 're-export identity');
+            assert(exports.go() === 23 && exports.snap.value === 9, 'primitive snapshot and initializer');
+            assert(exports.big.value === -(2n**63n) + 4n, 'BigInt import');
+            exports.set(30);
+            assert(provider.exports.g.value === 30, 'guest writes reach provider');
+            const second = new WebAssembly.Instance(module, {m:{g:shared, f:() => 0, k:2, b:11n}}).exports;
+            assert(exports.g.value === 31, 'second start updates the shared slot');
+            second.set(4);
+            assert(exports.go() === 18 && second.go() === 6, 'same slot across independent instances');
+            result = true;
+        });
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(agent.evaluate("result").unwrap(), Value::TRUE);
+}
+
+#[test]
+fn wasm_module_import_lookup_charges_for_long_names_before_reading_properties() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    let module = agent
+        .evaluate(
+            r#"
+        const name = new Uint8Array(1024).fill(109);
+        new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 1,4,1,96,0,0,
+            2,135,8,1,128,8,...name,1,102,0,0
+        ));
+    "#,
+        )
+        .unwrap();
+    let instantiate = agent.evaluate("WebAssembly.instantiate").unwrap();
+    let imports = agent.evaluate("({})").unwrap();
+    agent.set_step_budget(Some(8));
+    assert!(matches!(
+        agent.call_from_host(instantiate, Value::UNDEFINED, &[module, imports]),
+        Err(rustic_js::runtime::Abrupt::Cancelled)
+    ));
+}

@@ -39,7 +39,10 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let module = module(agent, arg(args, 0))?;
     let imports = import_object(agent, arg(args, 1))?;
     let proto = agent.host_prototype_from_new_target(INSTANCE, target)?;
-    start(agent, &module, imports, proto)
+    with_root(agent, Value::object(proto), |agent| {
+        let resolved = host::read_imports(agent, &module, imports)?;
+        start(agent, &module, resolved, proto)
+    })
 }
 
 fn instantiate(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
@@ -50,7 +53,9 @@ fn instantiate(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
             .as_object()
             .is_some_and(|id| agent.host_state::<Module>(id, MODULE).is_some())
         {
-            let context = PrivateArray::new(agent, &[source, imports])?;
+            let module = module(agent, source)?;
+            let resolved = host::read_imports(agent, &module, imports)?;
+            let context = PrivateArray::new(agent, &[source, resolved.value()])?;
             agent.react_to_host_value(Value::UNDEFINED, instance_job, context.value())
         } else {
             let compiled = compile(agent, Value::UNDEFINED, &[source, arg(args, 2)])?;
@@ -79,17 +84,18 @@ fn instance_job(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
     let context =
         PrivateArray::from_value(agent.host_capture(0)).expect("private instance context");
     let compiled = context.get(agent, 0)?;
-    let imports = context.get(agent, 1)?;
+    let resolved = PrivateArray::from_value(context.get(agent, 1)?).expect("resolved imports");
     let module = module(agent, compiled)?;
     let proto = prototype(agent, INSTANCE)?;
-    start(agent, &module, imports, proto)
+    start(agent, &module, resolved, proto)
 }
 
 fn source_job(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let compiled = arg(args, 0);
     let module = module(agent, compiled)?;
     let proto = prototype(agent, INSTANCE)?;
-    let instance = start(agent, &module, agent.host_capture(0), proto)?;
+    let resolved = host::read_imports(agent, &module, agent.host_capture(0))?;
+    let instance = start(agent, &module, resolved, proto)?;
     let result = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
     for (name, value) in [("module", compiled), ("instance", instance)] {
         let key = agent.heap.key(name)?;
@@ -102,14 +108,20 @@ fn source_job(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     Ok(Value::object(result))
 }
 
-fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) -> JsResult<Value> {
-    if !module.imports.is_empty() && imports == Value::UNDEFINED {
-        return agent.type_error("the WebAssembly module requires imports");
-    }
-    let bindings = PrivateArray::new(agent, &[])?;
-    with_root(agent, bindings.value(), |agent| {
-        with_root(agent, Value::object(proto), |agent| {
-            instantiate_module(agent, module, imports, bindings, proto)
+fn start(
+    agent: &mut Agent,
+    module: &Module,
+    resolved: PrivateArray,
+    proto: ObjectId,
+) -> JsResult<Value> {
+    with_root(agent, resolved.value(), |agent| {
+        let functions = PrivateArray::new(agent, &[])?;
+        with_root(agent, functions.value(), |agent| {
+            let globals = PrivateArray::new(agent, &[])?;
+            with_root(agent, globals.value(), |agent| {
+                let bindings = host::Bindings { functions, globals };
+                instantiate_module(agent, module, resolved, bindings, proto)
+            })
         })
     })
 }
@@ -117,8 +129,8 @@ fn start(agent: &mut Agent, module: &Module, imports: Value, proto: ObjectId) ->
 fn instantiate_module(
     agent: &mut Agent,
     module: &Module,
-    imports: Value,
-    bindings: PrivateArray,
+    resolved: PrivateArray,
+    bindings: host::Bindings,
     proto: ObjectId,
 ) -> JsResult<Value> {
     let token = agent.cancellation().unwrap_or_default();
@@ -127,33 +139,30 @@ fn instantiate_module(
         let validated = checked(&module.bytes, &Options::default(), &token)
             .map_err(|error| error.throw(agent))?;
         let declarations = validated.module().declarations();
-        host::link(agent, &validated, imports, bindings)?;
-        let imported = declarations.imports.len();
+        let global_cells = host::link(agent, &validated, resolved, bindings)?;
+        let imported_functions = bindings.functions.len(agent)? as usize;
         for export in &declarations.exports {
             let supported = match export.value.target {
                 ExportIndex::Function(index) => {
-                    let index = index as usize;
-                    let type_index = match declarations.imports.get(index) {
-                        Some(entry) => match entry.value.ty {
-                            ImportType::Function(ty) => ty,
-                            _ => unreachable!("only function imports were linked"),
-                        },
-                        None => {
-                            validated.module().functions()[index - imported]
-                                .value
-                                .type_index
+                    match (index as usize).checked_sub(imported_functions) {
+                        Some(local) => {
+                            let function = &validated.module().functions()[local].value;
+                            let signature = &declarations.types[function.type_index as usize].value;
+                            signature
+                                .params
+                                .iter()
+                                .chain(&signature.results)
+                                .copied()
+                                .all(is_numeric)
                         }
-                    };
-                    let signature = &declarations.types[type_index as usize].value;
-                    signature
-                        .params
-                        .iter()
-                        .chain(&signature.results)
-                        .copied()
-                        .all(is_numeric)
+                        None => true,
+                    }
                 }
                 ExportIndex::Global(index) => {
-                    is_numeric(declarations.globals[index as usize].value.ty.value_type)
+                    match (index as usize).checked_sub(global_cells.len()) {
+                        Some(local) => is_numeric(declarations.globals[local].value.ty.value_type),
+                        None => true,
+                    }
                 }
                 _ => false,
             };
@@ -183,16 +192,26 @@ fn instantiate_module(
             + limits.memory_bytes
             + limits.table_elements * 2 * size_of::<usize>();
         let runtime = agent.with_host_memory(allocation, |agent| {
-            host::with_dispatch(agent, bindings, true, |dispatch| {
-                Instance::instantiate_owned_with_host(validated, limits, &token, dispatch)
+            host::with_dispatch(agent, bindings.functions, true, |dispatch| {
+                Instance::instantiate_owned_with_host(
+                    validated,
+                    limits,
+                    &token,
+                    &global_cells,
+                    dispatch,
+                )
             })
         })?;
         Ok((runtime, allocation))
     })?;
     let object = Value::object(agent.new_host_state(INSTANCE, proto, runtime, allocation)?);
     with_root(agent, object, |agent| {
+        let record = PrivateArray::new(
+            agent,
+            &[bindings.functions.value(), bindings.globals.value()],
+        )?;
         with_page(agent, |agent, page| {
-            agent.weak_map_set(page.wasm_calls, object, bindings.value())
+            agent.weak_map_set(page.wasm_calls, object, record.value())
         })?;
         let exports = Value::object(agent.new_object_with(None)?);
         with_root(agent, exports, |agent| {
@@ -216,7 +235,7 @@ fn populate_exports(
     instance: Value,
     exports: ObjectId,
     module: &Module,
-    bindings: PrivateArray,
+    bindings: host::Bindings,
 ) -> JsResult<()> {
     let runtime = find(agent, instance).expect("new WebAssembly instance");
     let mut entries = HashMap::new();
@@ -229,7 +248,7 @@ fn populate_exports(
                 entries.try_reserve(1).map_err(|_| OutOfMemory)?;
                 let value = match item.target {
                     ExportIndex::Function(index) => {
-                        let imported = bindings.get(agent, index)?;
+                        let imported = bindings.functions.get(agent, index)?;
                         if host::function_record(agent, imported)?.is_some() {
                             imported
                         } else {
@@ -237,8 +256,15 @@ fn populate_exports(
                         }
                     }
                     ExportIndex::Global(index) => {
-                        let ty = runtime.global_type(index).expect("exported global");
-                        global::export(agent, instance, index, ty)?
+                        let imported = bindings.globals.get(agent, index)?;
+                        if imported != Value::UNDEFINED {
+                            imported
+                        } else {
+                            let state = runtime
+                                .share_numeric_global(index)
+                                .expect("numeric exported global");
+                            global::export(agent, instance, state)?
+                        }
                     }
                     _ => unreachable!("admitted exports checked before instantiation"),
                 };
@@ -327,6 +353,7 @@ pub(super) fn execution_error(agent: &mut Agent, error: ExecutionError, linking:
         ExecutionErrorKind::UnsupportedModule
         | ExecutionErrorKind::UnsupportedInstruction
         | ExecutionErrorKind::ImportTypeMismatch
+        | ExecutionErrorKind::MissingImport
             if linking =>
         {
             wasm_error(agent, LINK_ERROR, &error.to_string())

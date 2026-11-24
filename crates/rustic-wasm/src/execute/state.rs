@@ -1,9 +1,9 @@
-use std::ops::Range;
+use std::{cell::Cell, ops::Range, rc::Rc};
 
 use super::table::Tables;
 use super::*;
 use crate::validate::numeric::memory_access;
-use crate::{Declarations, Immediate};
+use crate::{Declarations, Immediate, ImportType};
 
 const PAGE: usize = 65_536;
 
@@ -17,9 +17,101 @@ pub(super) struct State<'bytes> {
     memory_bytes: usize,
 }
 
-pub(super) struct GlobalSlot {
-    pub(super) ty: GlobalType,
-    pub(super) value: Slot,
+/// A thread-confined numeric global shared with a host or other instances.
+#[derive(Clone, Debug)]
+pub struct NumericGlobal(Rc<GlobalCell>);
+
+#[derive(Debug)]
+struct GlobalCell {
+    value: Cell<Value>,
+    mutable: bool,
+}
+
+impl NumericGlobal {
+    /// Allocate an independent global with the type of its initial value.
+    pub fn new(value: Value, mutable: bool) -> Self {
+        Self(Rc::new(GlobalCell {
+            value: Cell::new(value),
+            mutable,
+        }))
+    }
+
+    /// Heap bytes retained by one shared allocation, including its counts.
+    pub const fn storage_bytes() -> usize {
+        size_of::<GlobalCell>() + 2 * size_of::<usize>()
+    }
+
+    /// Read the numeric type and mutability.
+    pub fn ty(&self) -> GlobalType {
+        GlobalType {
+            value_type: self.get().value_type(),
+            mutable: self.0.mutable,
+        }
+    }
+
+    /// Read the current value.
+    pub fn get(&self) -> Value {
+        self.0.value.get()
+    }
+
+    /// Replace the value if the cell is mutable and the numeric type matches.
+    pub fn set(&self, value: Value) -> bool {
+        let ty = self.ty();
+        if !ty.mutable || ty.value_type != value.value_type() {
+            return false;
+        }
+        self.0.value.set(value);
+        true
+    }
+}
+
+pub(super) enum GlobalSlot {
+    Local { ty: GlobalType, value: Slot },
+    Shared(NumericGlobal),
+}
+
+impl GlobalSlot {
+    pub(super) fn ty(&self) -> GlobalType {
+        match self {
+            Self::Local { ty, .. } => *ty,
+            Self::Shared(global) => global.ty(),
+        }
+    }
+
+    pub(super) fn value(&self) -> Slot {
+        match self {
+            Self::Local { value, .. } => *value,
+            Self::Shared(global) => Slot::Number(global.get()),
+        }
+    }
+
+    pub(super) fn write_guest(&mut self, value: Slot) {
+        match self {
+            Self::Local { value: slot, .. } => *slot = value,
+            Self::Shared(global) => {
+                let updated = global.set(value.number());
+                debug_assert!(updated, "validated numeric global write");
+            }
+        }
+    }
+
+    pub(super) fn share(&mut self) -> Option<NumericGlobal> {
+        match self {
+            Self::Shared(global) => Some(global.clone()),
+            Self::Local {
+                ty,
+                value: Slot::Number(value),
+            } => {
+                let global = NumericGlobal::new(*value, ty.mutable);
+                *self = Self::Shared(global.clone());
+                Some(global)
+            }
+            Self::Local {
+                value: Slot::Ref(_),
+                ..
+            } => None,
+        }
+    }
 }
 
 struct Memory {
@@ -36,6 +128,7 @@ pub(super) struct Transfer {
 impl<'bytes> State<'bytes> {
     pub(super) fn new<'input>(
         declarations: &Declarations<'input>,
+        mut imports: &[NumericGlobal],
         limits: InstanceLimits,
         budget: &mut Budget<'_>,
         mut retain_data: impl FnMut(
@@ -48,6 +141,27 @@ impl<'bytes> State<'bytes> {
             memory_limit: limits.memory_bytes,
             ..Self::default()
         };
+        for entry in &declarations.imports {
+            let ImportType::Global(ty) = entry.value.ty else {
+                continue;
+            };
+            budget.spend(entry.offset, 1)?;
+            let Some((global, remaining)) = imports.split_first() else {
+                return Err(error(entry.offset, Fault::MissingImport));
+            };
+            if ty != global.ty() {
+                return Err(error(entry.offset, Fault::ImportTypeMismatch));
+            }
+            append(
+                &mut state.globals,
+                GlobalSlot::Shared(global.clone()),
+                entry.offset,
+            )?;
+            imports = remaining;
+        }
+        if !imports.is_empty() {
+            return Err(error(0, Fault::ImportTypeMismatch));
+        }
         for entry in &declarations.globals {
             budget.spend(entry.offset, 1)?;
             let value = constant(
@@ -58,7 +172,7 @@ impl<'bytes> State<'bytes> {
             )?;
             append(
                 &mut state.globals,
-                GlobalSlot {
+                GlobalSlot::Local {
                     ty: entry.value.ty,
                     value,
                 },
@@ -277,7 +391,7 @@ pub(super) fn constant(
         budget.spend(offset, 1)?;
         let value = match (instruction.opcode, &instruction.immediate) {
             (Opcode::Core(0x0b), _) => break,
-            (Opcode::Core(0x23), Immediate::Index(index)) => globals[*index as usize].value,
+            (Opcode::Core(0x23), Immediate::Index(index)) => globals[*index as usize].value(),
             (Opcode::Core(0xd0), Immediate::HeapType(ty)) => Slot::Ref(Reference::null(*ty)),
             (Opcode::Core(0xd2), Immediate::Index(index)) => {
                 Slot::Ref(Reference::Function(Some(*index)))

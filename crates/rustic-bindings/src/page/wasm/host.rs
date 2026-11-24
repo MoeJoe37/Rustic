@@ -1,4 +1,4 @@
-use rustic_wasm::{ExecutionError, ExecutionErrorKind, HostDispatch, HostTrap};
+use rustic_wasm::{ExecutionError, ExecutionErrorKind, HostDispatch, HostTrap, NumericGlobal};
 
 use super::super::events::PrivateArray;
 use super::instance::{LINK_ERROR, RUNTIME_ERROR, Runtime, execution_error, find};
@@ -9,70 +9,112 @@ use super::*;
 const MAX_HOST_DEPTH: u8 = 32;
 const MAX_RESULT_ITERATIONS: usize = 1_000_000;
 
+#[derive(Clone, Copy)]
+pub(super) struct Bindings {
+    pub functions: PrivateArray,
+    pub globals: PrivateArray,
+}
+
+pub(super) fn read_imports(
+    agent: &mut Agent,
+    module: &Module,
+    imports: Value,
+) -> JsResult<PrivateArray> {
+    if !module.imports.is_empty() && imports == Value::UNDEFINED {
+        return agent.type_error("the WebAssembly module requires imports");
+    }
+    let resolved = PrivateArray::new(agent, &[])?;
+    with_root(agent, resolved.value(), |agent| {
+        for (index, import) in module.imports.iter().enumerate() {
+            let name_bytes = (import.module.len() + import.name.len()) as u64;
+            agent.spend_native_work(name_bytes.div_ceil(64).max(1))?;
+            let key = agent.heap.key(module.text(&import.module))?;
+            let namespace = agent.get_v(imports, key)?;
+            let Some(namespace) = namespace.as_object() else {
+                return agent.type_error("WebAssembly import namespace must be an object");
+            };
+            let key = agent.heap.key(module.text(&import.name))?;
+            let value = agent.get(namespace, key)?;
+            let accepted = match import.ty {
+                ImportType::Function(_) => agent.is_callable(value),
+                ImportType::Global(ty) => global::accepts_import(agent, value, ty),
+                _ => false,
+            };
+            if !accepted {
+                return Err(wasm_error(agent, LINK_ERROR, "invalid WebAssembly import"));
+            }
+            resolved.set(agent, u32::try_from(index).map_err(|_| OutOfMemory)?, value)?;
+        }
+        Ok(resolved)
+    })
+}
+
 pub(super) fn link(
     agent: &mut Agent,
     validated: &ValidatedModule<'_>,
-    imports: Value,
-    bindings: PrivateArray,
-) -> JsResult<()> {
+    resolved: PrivateArray,
+    bindings: Bindings,
+) -> JsResult<Vec<NumericGlobal>> {
     let declarations = validated.module().declarations();
+    let mut globals = Vec::new();
+    let mut functions = 0u32;
     for (index, entry) in declarations.imports.iter().enumerate() {
         agent.check_native_work()?;
-        let import = &entry.value;
-        let ImportType::Function(ty) = import.ty else {
-            return Err(wasm_error(
-                agent,
-                LINK_ERROR,
-                "only function imports are supported",
-            ));
-        };
-        let expected = &declarations.types[ty as usize].value;
-        if !expected
-            .params
-            .iter()
-            .chain(&expected.results)
-            .copied()
-            .all(is_numeric)
-        {
-            return Err(wasm_error(
-                agent,
-                LINK_ERROR,
-                "only numeric function imports are supported",
-            ));
-        }
-        let key = agent.heap.key(import.module)?;
-        let namespace = agent.get_v(imports, key)?;
-        let Some(namespace) = namespace.as_object() else {
-            return agent.type_error("WebAssembly import namespace must be an object");
-        };
-        let key = agent.heap.key(import.name)?;
-        let function = agent.get(namespace, key)?;
-        if !agent.is_callable(function) {
-            return Err(wasm_error(
-                agent,
-                LINK_ERROR,
-                "WebAssembly function import is not callable",
-            ));
-        }
-        if let Some(record) = function_record(agent, function)? {
-            let (owner, function) = function_parts(agent, record)?;
-            let runtime = find(agent, owner).expect("export owner");
-            let actual = runtime
-                .function_type_at(function)
-                .expect("export signature");
-            agent.spend_native_work((expected.params.len() + expected.results.len()) as u64)?;
-            if actual != expected {
-                return Err(wasm_error(
-                    agent,
-                    LINK_ERROR,
-                    "WebAssembly function signature mismatch",
-                ));
+        let value = resolved.get(agent, u32::try_from(index).map_err(|_| OutOfMemory)?)?;
+        match entry.value.ty {
+            ImportType::Function(ty) => {
+                let expected = &declarations.types[ty as usize].value;
+                let size = expected.params.len() + expected.results.len();
+                agent.spend_native_work(size as u64)?;
+                if !expected
+                    .params
+                    .iter()
+                    .chain(&expected.results)
+                    .copied()
+                    .all(is_numeric)
+                {
+                    return Err(wasm_error(
+                        agent,
+                        LINK_ERROR,
+                        "only numeric function imports are supported",
+                    ));
+                }
+                if let Some(record) = function_record(agent, value)? {
+                    let (owner, function) = function_parts(agent, record)?;
+                    let runtime = find(agent, owner).expect("export owner");
+                    let actual = runtime
+                        .function_type_at(function)
+                        .expect("export signature");
+                    if actual != expected {
+                        return Err(wasm_error(
+                            agent,
+                            LINK_ERROR,
+                            "WebAssembly function signature mismatch",
+                        ));
+                    }
+                }
+                bindings.functions.set(agent, functions, value)?;
+                functions = functions.checked_add(1).ok_or(OutOfMemory)?;
             }
+            ImportType::Global(ty) => {
+                globals.try_reserve(1).map_err(|_| OutOfMemory)?;
+                if let Some(global) = global::find(agent, value) {
+                    let index = u32::try_from(globals.len()).map_err(|_| OutOfMemory)?;
+                    bindings.globals.set(agent, index, value)?;
+                    globals.push((*global).clone());
+                } else {
+                    // A primitive import is an independent immutable cell. The
+                    // interpreter checks the declared mutability before start.
+                    globals.push(NumericGlobal::new(
+                        to_wasm(agent, value, ty.value_type)?,
+                        false,
+                    ));
+                }
+            }
+            _ => unreachable!("only functions and numeric globals reach linking"),
         }
-        let index = u32::try_from(index).map_err(|_| OutOfMemory)?;
-        bindings.set(agent, index, function)?;
     }
-    Ok(())
+    Ok(globals)
 }
 
 pub(super) fn function_record(
@@ -123,12 +165,13 @@ pub(super) fn invoke(
     function: u32,
     arguments: &[WasmValue],
 ) -> JsResult<Vec<WasmValue>> {
-    let bindings = with_page(agent, |agent, page| {
+    let record = with_page(agent, |agent, page| {
         Ok(
             PrivateArray::from_value(agent.weak_map_get(page.wasm_calls, instance))
                 .expect("instance bindings"),
         )
     })?;
+    let bindings = PrivateArray::from_value(record.get(agent, 0)?).expect("function bindings");
     let token = agent.cancellation().unwrap_or_default();
     with_dispatch(agent, bindings, false, |dispatch| {
         runtime.invoke_function_with_host(function, arguments, &token, dispatch)

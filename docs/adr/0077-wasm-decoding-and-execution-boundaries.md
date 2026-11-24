@@ -41,9 +41,10 @@ Bulk operations check their ranges and charge work before modifying guest state.
 Function references resolve within their instance. Indirect calls check table
 bounds, null entries and signature equality for the supported function types.
 Reference slots are internal to the interpreter. Rust calls exchange scalar
-numbers, and host imports will use an embedding adapter. A later compilation
-tier requires its own executable memory and platform review. Every host retains
-the interpreter.
+numbers through explicit function bindings described in
+[ADR 0079](0079-wasm-function-imports.md). A later compilation tier requires
+its own executable memory and platform review. Every host retains the
+interpreter.
 
 ## Alternatives and consequences
 

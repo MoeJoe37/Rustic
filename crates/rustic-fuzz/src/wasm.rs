@@ -1,8 +1,8 @@
 use rustic_base::CancellationToken;
 use rustic_wasm::{
-    BinaryLimits, DecodeLimits, ExecutionLimits, ExportIndex, Instance, InstanceLimits,
-    InstructionLimits, Opcode, ValidatedModule, ValidationLimits, decode_instructions,
-    decode_module, scan_module, validate_module,
+    BinaryLimits, DecodeLimits, ExecutionLimits, ExportIndex, FunctionImport, FunctionType,
+    ImportType, Instance, InstanceLimits, InstructionLimits, Opcode, ValidatedModule,
+    ValidationLimits, Value, decode_instructions, decode_module, scan_module, validate_module,
 };
 
 use crate::Target;
@@ -28,6 +28,8 @@ pub(crate) fn seeds() -> impl Iterator<Item = Vec<u8>> {
         b"\0asm\x01\0\0\0\x01\x05\x01\x60\0\x01\x7f\x03\x02\x01\0\x05\x03\x01\0\x01\x07\x07\x01\x03run\0\0\x0a\x09\x01\x07\0\x41\0\x2d\0\0\x0b\x0b\x07\x01\0\x41\0\x0b\x01*",
         // An active table element supplies a matching indirect call target.
         b"\0asm\x01\0\0\0\x01\x05\x01\x60\0\x01\x7f\x03\x03\x02\0\0\x04\x04\x01\x70\0\x01\x07\x07\x01\x03run\0\0\x09\x07\x01\0\x41\0\x0b\x01\x01\x0a\x0e\x02\x07\0\x41\0\x11\0\0\x0b\x04\0\x41\x2a\x0b",
+        // An exported function calls the one import supplied by the harness.
+        b"\0asm\x01\0\0\0\x01\x04\x01\x60\0\0\x02\x07\x01\x01m\x01f\0\0\x03\x02\x01\0\x07\x07\x01\x03run\0\x01\x0a\x06\x01\x04\0\x10\0\x0b",
     ];
     modules
         .iter()
@@ -128,7 +130,14 @@ fn check_execution(
         memory_bytes: 2 * 65_536,
         table_elements: 256,
     };
-    let mut instance = match Instance::instantiate(validated, limits, token) {
+    let signature = FunctionType {
+        params: Vec::new(),
+        results: Vec::new(),
+    };
+    let empty = |_: &[Value], _: &mut [Value], _: &CancellationToken| Ok(());
+    let imports = [FunctionImport::new("m", "f", &signature, &empty)];
+    let mut instance = match Instance::instantiate_with_imports(validated, limits, &imports, token)
+    {
         Ok(instance) => instance,
         Err(error) if error.offset <= input_len => return Ok(()),
         Err(error) => return Err(format!("instantiation error outside input: {error}")),
@@ -138,8 +147,18 @@ fn check_execution(
         let ExportIndex::Function(index) = export.value.target else {
             continue;
         };
-        let function = &module.functions()[index as usize];
-        let ty = &declarations.types[function.value.type_index as usize].value;
+        let index = index as usize;
+        let type_index = if let Some(import) = declarations.imports.get(index) {
+            let ImportType::Function(ty) = import.value.ty else {
+                return Err("linked a non-function import".to_owned());
+            };
+            ty
+        } else {
+            module.functions()[index - declarations.imports.len()]
+                .value
+                .type_index
+        };
+        let ty = &declarations.types[type_index as usize].value;
         if !ty.params.is_empty() {
             continue;
         }

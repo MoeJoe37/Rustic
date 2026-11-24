@@ -7,11 +7,14 @@ use crate::{
     BlockType, ExportIndex, Function, FunctionType, Instruction, Opcode, ValidatedModule, ValueType,
 };
 
+mod imports;
 mod machine;
 mod numeric;
 mod state;
 mod table;
 
+use imports::BoundFunction;
+pub use imports::{FunctionImport, HostTrap};
 use state::State;
 
 /// A WebAssembly number crossing the interpreter boundary.
@@ -112,6 +115,16 @@ pub enum ExecutionErrorKind {
     ArgumentType,
     /// The function returns a value outside the host numeric API.
     ResultType,
+    /// The embedder supplied more than one binding for the same import name.
+    DuplicateImportBinding,
+    /// The embedder did not supply a required function import.
+    MissingImport,
+    /// A function import's binding has an incompatible or nonnumeric signature.
+    ImportTypeMismatch,
+    /// An imported host function returned a trap.
+    HostTrap,
+    /// An imported host function wrote a result of the wrong type.
+    HostResultType,
     /// The host cancelled preparation or execution.
     Cancelled,
     /// A work or stack budget was exhausted.
@@ -205,7 +218,8 @@ impl<'module, 'bytes> NumericInstance<'module, 'bytes> {
             remaining: limits.preparation_work,
             cancellation,
         };
-        let executable = Executable::prepare(module, limits, Profile::NumericOnly, &mut budget)?;
+        let executable =
+            Executable::prepare(module, limits, Profile::NumericOnly, None, &mut budget)?;
         executable.run_start(&mut State::default(), cancellation)?;
         Ok(Self { executable })
     }
@@ -261,12 +275,39 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, ExecutionError> {
+        Self::instantiate_linked(module, limits, None, cancellation)
+    }
+
+    /// Link declared function imports to explicit bindings, then instantiate.
+    ///
+    /// Every declared import must name a supplied numeric function with the
+    /// exact signature. Bindings remain borrowed for the instance's lifetime.
+    pub fn instantiate_with_imports(
+        module: &'module ValidatedModule<'bytes>,
+        limits: InstanceLimits,
+        imports: &[FunctionImport<'module>],
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ExecutionError> {
+        Self::instantiate_linked(module, limits, Some(imports), cancellation)
+    }
+
+    fn instantiate_linked(
+        module: &'module ValidatedModule<'bytes>,
+        limits: InstanceLimits,
+        imports: Option<&[FunctionImport<'module>]>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ExecutionError> {
         let mut budget = Budget {
             remaining: limits.execution.preparation_work,
             cancellation,
         };
-        let executable =
-            Executable::prepare(module, limits.execution, Profile::LocalState, &mut budget)?;
+        let executable = Executable::prepare(
+            module,
+            limits.execution,
+            Profile::LocalState,
+            imports,
+            &mut budget,
+        )?;
         let mut state = State::new(module.module().declarations(), limits, &mut budget)?;
         executable.run_start(&mut state, cancellation)?;
         Ok(Self { executable, state })
@@ -292,6 +333,7 @@ enum Profile {
 
 struct Executable<'module, 'bytes> {
     module: &'module ValidatedModule<'bytes>,
+    imports: Vec<BoundFunction<'module>>,
     functions: Vec<PreparedFunction<'module>>,
     exports: HashMap<&'bytes str, usize>,
     limits: ExecutionLimits,
@@ -302,13 +344,18 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         module: &'module ValidatedModule<'bytes>,
         limits: ExecutionLimits,
         profile: Profile,
+        imports: Option<&[FunctionImport<'module>]>,
         budget: &mut Budget<'_>,
     ) -> Result<Self, ExecutionError> {
         let decoded = module.module();
         let declarations = decoded.declarations();
         budget.spend(0, 0)?;
         let always_unsupported = [
-            declarations.imports.first().map(|entry| entry.offset),
+            declarations
+                .imports
+                .first()
+                .filter(|_| imports.is_none())
+                .map(|entry| entry.offset),
             declarations.tags.first().map(|entry| entry.offset),
         ];
         let stateful = [
@@ -336,6 +383,10 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
                 return Err(error(entry.offset, Fault::UnsupportedModule));
             }
         }
+        let imports = match imports {
+            Some(bindings) => imports::link(declarations, bindings, budget)?,
+            None => Vec::new(),
+        };
         let mut functions = Vec::new();
         for entry in decoded.functions() {
             let signature = &declarations.types[entry.value.type_index as usize].value;
@@ -356,6 +407,7 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         }
         Ok(Self {
             module,
+            imports,
             functions,
             exports,
             limits,
@@ -407,6 +459,36 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
 
     fn signature(&self, index: u32) -> &FunctionType {
         &self.module.module().declarations().types[index as usize].value
+    }
+
+    fn function(&self, index: usize) -> Callee<'_, 'module> {
+        if let Some(import) = self.imports.get(index) {
+            Callee::Host(import)
+        } else {
+            let local = index - self.imports.len();
+            Callee::Local(local, &self.functions[local])
+        }
+    }
+}
+
+enum Callee<'code, 'module> {
+    Host(&'code BoundFunction<'module>),
+    Local(usize, &'code PreparedFunction<'module>),
+}
+
+impl<'module> Callee<'_, 'module> {
+    fn signature(&self) -> &'module FunctionType {
+        match self {
+            Self::Host(import) => import.signature,
+            Self::Local(_, local) => local.signature,
+        }
+    }
+
+    fn type_index(&self) -> u32 {
+        match self {
+            Self::Host(import) => import.type_index,
+            Self::Local(_, local) => local.function.type_index,
+        }
     }
 }
 

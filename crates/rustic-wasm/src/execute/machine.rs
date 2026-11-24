@@ -23,7 +23,7 @@ pub(super) fn invoke<'bytes>(
         },
         offset: 0,
     };
-    let signature = instance.functions[function].signature;
+    let signature = instance.function(function).signature();
     if arguments.len() != signature.params.len() {
         return Err(error(0, Fault::ArgumentType));
     }
@@ -294,10 +294,10 @@ impl Machine<'_, '_, '_, '_, '_> {
         let Reference::Function(Some(function)) = value else {
             return Err(error(self.offset, Fault::NullReference));
         };
-        let prepared = &self.instance.functions[function as usize];
-        if prepared.function.type_index != ty {
+        let callee = self.instance.function(function as usize);
+        if callee.type_index() != ty {
             let expected = self.instance.signature(ty);
-            let actual = prepared.signature;
+            let actual = callee.signature();
             if actual.params.len() != expected.params.len()
                 || actual.results.len() != expected.results.len()
             {
@@ -314,7 +314,7 @@ impl Machine<'_, '_, '_, '_, '_> {
 
     fn tail_call(&mut self, function: usize) -> Result<(), ExecutionError> {
         let index = self.current().control_base;
-        let count = self.instance.functions[function].signature.params.len();
+        let count = self.instance.function(function).signature().params.len();
         self.keep_at(self.controls[index].height, count)?;
         self.pop_call();
         self.call(function)
@@ -362,7 +362,11 @@ impl Machine<'_, '_, '_, '_, '_> {
 
     fn call(&mut self, function: usize) -> Result<(), ExecutionError> {
         let offset = self.offset;
-        let prepared = &self.instance.functions[function];
+        let executable = self.instance;
+        let (function, prepared) = match executable.function(function) {
+            Callee::Host(import) => return self.call_host(import),
+            Callee::Local(index, local) => (index, local),
+        };
         let params = prepared.signature.params.len();
         let local_base = self.locals.len();
         let height = self.operands.len() - params;
@@ -401,6 +405,50 @@ impl Machine<'_, '_, '_, '_, '_> {
             },
             offset,
         )
+    }
+
+    fn call_host(&mut self, import: &BoundFunction<'_>) -> Result<(), ExecutionError> {
+        let offset = self.offset;
+        let signature = import.signature;
+        let params = signature.params.len();
+        let result_count = signature.results.len();
+        let additional = result_count.saturating_sub(params);
+        let start = self.operands.len() - params;
+        self.check_values(additional)?;
+        self.budget.spend(offset, params + result_count)?;
+        self.operands
+            .try_reserve(additional)
+            .map_err(|_| error(offset, Fault::LimitExceeded))?;
+        let mut arguments = Vec::new();
+        arguments
+            .try_reserve_exact(params)
+            .map_err(|_| error(offset, Fault::LimitExceeded))?;
+        arguments.extend(self.operands[start..].iter().copied().map(Slot::number));
+        let mut results = Vec::new();
+        results
+            .try_reserve_exact(result_count)
+            .map_err(|_| error(offset, Fault::LimitExceeded))?;
+        results.extend(
+            signature
+                .results
+                .iter()
+                .copied()
+                .map(|ty| Slot::zero(ty).number()),
+        );
+
+        let called = (import.callback)(&arguments, &mut results, self.budget.cancellation);
+        self.budget.spend(offset, 0)?;
+        called.map_err(|_| error(offset, Fault::HostTrap))?;
+        if results
+            .iter()
+            .zip(&signature.results)
+            .any(|(&value, &ty)| value.value_type() != ty)
+        {
+            return Err(error(offset, Fault::HostResultType));
+        }
+        self.operands.truncate(start);
+        self.operands.extend(results.into_iter().map(Slot::Number));
+        Ok(())
     }
 
     fn pop_call(&mut self) {

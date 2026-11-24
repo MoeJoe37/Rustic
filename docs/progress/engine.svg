@@ -4,7 +4,7 @@
 <rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
-<text x="24.00" y="60" fill="#8b949e" font-size="12">115/228 capabilities complete · 11 in progress · 25 subsystems · engine-v4</text>
+<text x="24.00" y="60" fill="#8b949e" font-size="12">115/228 capabilities complete · 12 in progress · 25 subsystems · engine-v4</text>
 <text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">50.03%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
@@ -670,8 +670,9 @@
 <rect x="631.76" y="816" width="31.53" height="14" rx="2" fill="#30363d"/>
 <rect x="632.26" y="816.5" width="30.53" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
-<g><title>Streaming Web API, MIME/CSP and capability-safe imports: planned, size 3, M9</title>
+<g><title>Streaming Web API, MIME/CSP and capability-safe imports: in progress, size 3, M9, 0.00% verified</title>
 <rect x="665.29" y="816" width="31.53" height="14" rx="2" fill="#30363d"/>
+<rect x="665.79" y="816.5" width="30.53" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
 <g><title>Required reference/GC, exception, SIMD, shared-memory and baseline features: planned, size 8, M9</title>
 <rect x="698.82" y="816" width="87.41" height="14" rx="2" fill="#30363d"/>
@@ -1210,6 +1211,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot 05a62a6c28ba</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot c4a4c6bad6b7</text>
 </g>
 </svg>

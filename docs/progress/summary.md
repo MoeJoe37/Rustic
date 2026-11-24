@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 50.03%** = 48.43% verified complete + 1.60% partial credit. 115/228 capabilities complete, 11 in progress.
+**Overall completion: 50.03%** = 48.43% verified complete + 1.60% partial credit. 115/228 capabilities complete, 12 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `05a62a6c28ba45c6bde4a43d1d1a3197aad30d89e836522c1f281bd90eb3fa9c`.
+Catalog: `engine-v4`. Source fingerprint: `c4a4c6bad6b74c4319c493d1f0e69c1665e1c86a0ac49cdf845836e48fed3b53`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -38,7 +38,7 @@ Catalog: `engine-v4`. Source fingerprint: `05a62a6c28ba45c6bde4a43d1d1a3197aad30
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
-| WebAssembly | 0/8 | 4 | 0.00% | 0.00% | 3% | 0.00 |
+| WebAssembly | 0/8 | 5 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 9/12 | 0 | 70.45% | 70.45% | 5% | 3.52 |
 | Media & real-time | 0/9 | 0 | 0.00% | 0.00% | 5% | 0.00 |
 | Graphics web APIs | 0/6 | 0 | 0.00% | 0.00% | 4% | 0.00 |
@@ -201,7 +201,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **in progress 0.00%** `wasm.validate` — Complete selected type/instruction/module validation · size 3 · M9 · 0.26% of engine ([source](../../crates/rustic-wasm/src/validate.rs), [test](../../crates/rustic-wasm/tests/validation.rs), [test](../../crates/rustic-wasm/tests/validation.rs))
 - **in progress 0.00%** `wasm.execute` — Original interpreter, numerics, control flow and traps · size 5 · M9 · 0.44% of engine ([source](../../crates/rustic-wasm/src/execute.rs), [test](../../crates/rustic-wasm/tests/execution.rs), [test](../../crates/rustic-wasm/tests/execution.rs), [test](../../crates/rustic-wasm/tests/tables.rs))
 - **in progress 0.00%** `wasm.instances` — Memories, tables, globals, instances and resource limits · size 3 · M9 · 0.26% of engine ([source](../../crates/rustic-wasm/src/execute.rs), [test](../../crates/rustic-wasm/tests/instances.rs), [test](../../crates/rustic-wasm/tests/instances.rs), [test](../../crates/rustic-wasm/tests/tables.rs))
-- **planned** `wasm.web` — Streaming Web API, MIME/CSP and capability-safe imports · size 3 · M9 · 0.26% of engine
+- **in progress 0.00%** `wasm.web` — Streaming Web API, MIME/CSP and capability-safe imports · size 3 · M9 · 0.26% of engine ([source](../../crates/rustic-wasm/src/execute.rs), [test](../../crates/rustic-wasm/tests/imports.rs), [test](../../crates/rustic-wasm/tests/imports.rs))
 - **planned** `wasm.features` — Required reference/GC, exception, SIMD, shared-memory and baseline features · size 8 · M9 · 0.70% of engine
 - **planned** `wasm.accelerate` — Reviewed acceleration with interpreter fallback on mobile/desktop · size 5 · M9 · 0.44% of engine
 - **planned** `wasm.conformance` — Core/JS/Web suites, fuzzing and five-platform acceptance · size 5 · M9 · 0.44% of engine

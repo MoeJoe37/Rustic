@@ -4213,8 +4213,24 @@
           "label": "Streaming Web API, MIME/CSP and capability-safe imports",
           "size": 3,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/execute.rs",
+              "marker": "pub fn instantiate_with_imports"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/imports.rs",
+              "marker": "fn binding_failures_precede_the_start_callback_and_have_a_source_offset"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/imports.rs",
+              "marker": "fn callbacks_observe_cancellation_and_cannot_put_mistyped_values_on_the_stack"
+            }
+          ]
         },
         {
           "id": "wasm.features",

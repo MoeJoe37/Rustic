@@ -3318,8 +3318,7 @@ Function references carry local function indexes inside the guest. The
 interpreter carries references through globals, locals, control flow and
 function calls. `call_indirect` and `return_call_indirect` check the table
 entry and the callee's signature and distinguish bounds, null and signature
-traps. Function exports invoked from Rust exchange scalar numbers. Host
-imports, host reference identities and linked state still need an adapter.
+traps. Function exports invoked from Rust exchange scalar numbers.
 
 The table tests cover equivalent signature indexes, indirect tail calls,
 initialization order, segment lifetime, allocation limits, and failed writes.
@@ -3328,3 +3327,19 @@ A local replay of 13 files from the pinned suite matched 783 invocations and
 requiring linked modules, reference-valued host invocations or wider types and
 instructions were outside that run.
 [Pinned core suite](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core)
+
+### WASM-05/06 — Numeric host function bindings
+
+`Instance::instantiate_with_imports` links explicitly supplied Rust callbacks
+by exact module and field names. It checks every declared import and signature
+before applying segments or running start. Linked functions can serve as
+exports and table entries. Direct and indirect calls use the same argument,
+result, budget and cancellation checks.
+
+The import tests cover start, re-exports, ordinary and tail calls, bad bindings,
+host traps, cancellation and mismatched results. Replaying the pinned table
+selection with five numeric provider bindings matched 1,881 invocations,
+including 1,098 additional bulk table cases using imported functions. A
+separate numeric, control and memory replay matched 16,108 invocations.
+The JavaScript bridge, reference-valued host calls and shared imported
+state remain open. [ADR 0079](adr/0079-wasm-function-imports.md)

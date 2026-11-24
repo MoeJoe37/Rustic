@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "05a62a6c28ba45c6bde4a43d1d1a3197aad30d89e836522c1f281bd90eb3fa9c",
+  "source_fingerprint": "c4a4c6bad6b74c4319c493d1f0e69c1665e1c86a0ac49cdf845836e48fed3b53",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
   "completed": 115,
-  "in_progress": 11,
+  "in_progress": 12,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -4567,8 +4567,24 @@
           "label": "Streaming Web API, MIME/CSP and capability-safe imports",
           "size": 3,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-wasm/src/execute.rs",
+              "marker": "pub fn instantiate_with_imports"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/imports.rs",
+              "marker": "fn binding_failures_precede_the_start_callback_and_have_a_source_offset"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/imports.rs",
+              "marker": "fn callbacks_observe_cancellation_and_cannot_put_mistyped_values_on_the_stack"
+            }
+          ],
           "credit": "0.00",
           "engine_share": "0.26"
         },
@@ -4605,7 +4621,7 @@
       ],
       "points": 34,
       "completed": 0,
-      "in_progress": 4,
+      "in_progress": 5,
       "total": 8,
       "contribution": "0.00",
       "percent": "0.00",

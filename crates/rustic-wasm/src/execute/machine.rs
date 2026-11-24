@@ -29,6 +29,7 @@ pub(super) fn invoke<'bytes>(
     }
     machine.budget.spend(0, entry_work)?;
     machine.budget.spend(0, arguments.len())?;
+    machine.budget.spend(0, signature.results.len())?;
     machine.check_values(arguments.len())?;
     if arguments
         .iter()
@@ -37,11 +38,21 @@ pub(super) fn invoke<'bytes>(
     {
         return Err(error(0, Fault::ArgumentType));
     }
+    if !signature.results.iter().copied().all(is_numeric) {
+        return Err(error(0, Fault::ResultType));
+    }
+    machine.check_values(signature.results.len())?;
+    let mut results = Vec::new();
+    results
+        .try_reserve_exact(signature.results.len())
+        .map_err(|_| error(0, Fault::LimitExceeded))?;
     machine
         .operands
         .try_reserve_exact(arguments.len())
         .map_err(|_| error(0, Fault::LimitExceeded))?;
-    machine.operands.extend_from_slice(arguments);
+    machine
+        .operands
+        .extend(arguments.iter().copied().map(Slot::Number));
     machine.call(function)?;
     while let Some(current) = machine.calls.last_mut() {
         let pc = current.pc;
@@ -52,7 +63,8 @@ pub(super) fn invoke<'bytes>(
         machine.budget.spend(instruction.offset, 1)?;
         machine.step(instruction, function.jumps[pc])?;
     }
-    Ok(machine.operands)
+    results.extend(machine.operands.into_iter().map(Slot::number));
+    Ok(results)
 }
 
 struct Call {
@@ -75,8 +87,8 @@ struct Machine<'instance, 'module, 'bytes, 'state, 'token> {
     state: &'state mut State<'bytes>,
     calls: Vec<Call>,
     controls: Vec<Control>,
-    locals: Vec<Value>,
-    operands: Vec<Value>,
+    locals: Vec<Slot>,
+    operands: Vec<Slot>,
     budget: Budget<'token>,
     offset: usize,
 }
@@ -114,14 +126,15 @@ impl Machine<'_, '_, '_, '_, '_> {
             }
             (Opcode::Core(0x10), Immediate::Index(function)) => self.call(*function as usize)?,
             (Opcode::Core(0x12), Immediate::Index(function)) => {
-                let index = self.current().control_base;
-                let count = self.instance.functions[*function as usize]
-                    .signature
-                    .params
-                    .len();
-                self.keep_at(self.controls[index].height, count)?;
-                self.pop_call();
-                self.call(*function as usize)?;
+                self.tail_call(*function as usize)?
+            }
+            (op @ Opcode::Core(0x11 | 0x13), Immediate::Indices(ty, table)) => {
+                let function = self.indirect(*ty, *table)?;
+                if op == Opcode::Core(0x13) {
+                    self.tail_call(function)?;
+                } else {
+                    self.call(function)?;
+                }
             }
             (Opcode::Core(0x1a), _) => {
                 self.pop();
@@ -146,25 +159,52 @@ impl Machine<'_, '_, '_, '_, '_> {
             (Opcode::Core(0x24), Immediate::Index(global)) => {
                 self.state.globals[*global as usize] = self.pop();
             }
+            (Opcode::Core(0x25), Immediate::Index(table)) => {
+                let index = self.pop_i32() as u32;
+                let value = self.state.tables.get(*table, index, self.offset)?;
+                self.push(Slot::Ref(value))?;
+            }
+            (Opcode::Core(0x26), Immediate::Index(table)) => {
+                let value = self.pop().reference();
+                let index = self.pop_i32() as u32;
+                self.state.tables.set(*table, index, value, self.offset)?;
+            }
             (Opcode::Core(op @ 0x28..=0x3e), Immediate::Memory { memory, offset, .. }) => {
-                let value = (op >= 0x36).then(|| self.pop());
+                let value = (op >= 0x36).then(|| self.pop().number());
                 let address = u64::from(self.pop_i32() as u32) + offset;
                 if let Some(result) = self
                     .state
                     .access(op, *memory, address, value, self.offset)?
                 {
-                    self.push(result)?;
+                    self.push(Slot::Number(result))?;
                 }
             }
             (Opcode::Core(0x3f), Immediate::Index(memory)) => {
-                self.push(Value::I32(self.state.size(*memory)))?;
+                self.push(Slot::Number(Value::I32(self.state.size(*memory))))?;
             }
             (Opcode::Core(0x40), Immediate::Index(memory)) => {
                 let pages = self.pop_i32() as u32;
                 let result = self
                     .state
                     .grow(*memory, pages, self.offset, &mut self.budget)?;
-                self.push(Value::I32(result))?;
+                self.push(Slot::Number(Value::I32(result)))?;
+            }
+            (Opcode::Core(0xd0), Immediate::HeapType(ty)) => {
+                self.push(Slot::Ref(Reference::null(*ty)))?;
+            }
+            (Opcode::Core(0xd1), _) => {
+                let is_null = self.pop().reference().is_null();
+                self.push(Slot::Number(Value::I32(i32::from(is_null))))?;
+            }
+            (Opcode::Core(0xd2), Immediate::Index(function)) => {
+                self.push(Slot::Ref(Reference::Function(Some(*function))))?;
+            }
+            (Opcode::Core(0xd4), _) => {
+                let value = self.pop().reference();
+                if value.is_null() {
+                    return Err(error(self.offset, Fault::NullReference));
+                }
+                self.push(Slot::Ref(value))?;
             }
             (Opcode::Misc(8), Immediate::Indices(data, memory)) => {
                 let transfer = self.pop_transfer();
@@ -187,13 +227,58 @@ impl Machine<'_, '_, '_, '_, '_> {
                 self.state
                     .fill(*memory, transfer, self.offset, &mut self.budget)?;
             }
+            (Opcode::Misc(12), Immediate::Indices(element, table)) => {
+                let transfer = self.pop_transfer();
+                self.state.tables.init(
+                    *element,
+                    *table,
+                    transfer,
+                    self.offset,
+                    &mut self.budget,
+                )?;
+            }
+            (Opcode::Misc(13), Immediate::Index(element)) => {
+                self.state.tables.drop_element(*element)
+            }
+            (Opcode::Misc(14), Immediate::Indices(destination, source)) => {
+                let transfer = self.pop_transfer();
+                self.state.tables.copy(
+                    *destination,
+                    *source,
+                    transfer,
+                    self.offset,
+                    &mut self.budget,
+                )?;
+            }
+            (Opcode::Misc(15), Immediate::Index(table)) => {
+                let count = self.pop_i32() as u32;
+                let value = self.pop().reference();
+                let size =
+                    self.state
+                        .tables
+                        .grow(*table, count, value, self.offset, &mut self.budget)?;
+                self.push(Slot::Number(Value::I32(size)))?;
+            }
+            (Opcode::Misc(16), Immediate::Index(table)) => {
+                self.push(Slot::Number(Value::I32(self.state.tables.size(*table))))?;
+            }
+            (Opcode::Misc(17), Immediate::Index(table)) => {
+                let count = self.pop_i32() as u32;
+                let value = self.pop().reference();
+                let index = self.pop_i32() as u32;
+                self.state.tables.fill(
+                    *table,
+                    index,
+                    count,
+                    value,
+                    &mut self.budget,
+                    self.offset,
+                )?;
+            }
             (opcode, immediate) => {
-                let (params, _) = effect(opcode).expect("prepared numeric instruction");
-                let start = self.operands.len() - params.len();
-                let result = numeric::evaluate(opcode, immediate, &self.operands[start..])
+                let result = numeric::apply(opcode, immediate, &mut self.operands)
                     .map_err(|kind| error(self.offset, kind))?;
-                self.operands.truncate(start);
-                self.push(result)?;
+                self.push(Slot::Number(result))?;
             }
         }
         Ok(())
@@ -201,6 +286,38 @@ impl Machine<'_, '_, '_, '_, '_> {
 
     fn current(&mut self) -> &mut Call {
         self.calls.last_mut().expect("open call")
+    }
+
+    fn indirect(&mut self, ty: u32, table: u32) -> Result<usize, ExecutionError> {
+        let index = self.pop_i32() as u32;
+        let value = self.state.tables.get(table, index, self.offset)?;
+        let Reference::Function(Some(function)) = value else {
+            return Err(error(self.offset, Fault::NullReference));
+        };
+        let prepared = &self.instance.functions[function as usize];
+        if prepared.function.type_index != ty {
+            let expected = self.instance.signature(ty);
+            let actual = prepared.signature;
+            if actual.params.len() != expected.params.len()
+                || actual.results.len() != expected.results.len()
+            {
+                return Err(error(self.offset, Fault::IndirectCallTypeMismatch));
+            }
+            self.budget
+                .spend(self.offset, actual.params.len() + actual.results.len())?;
+            if actual != expected {
+                return Err(error(self.offset, Fault::IndirectCallTypeMismatch));
+            }
+        }
+        Ok(function as usize)
+    }
+
+    fn tail_call(&mut self, function: usize) -> Result<(), ExecutionError> {
+        let index = self.current().control_base;
+        let count = self.instance.functions[function].signature.params.len();
+        self.keep_at(self.controls[index].height, count)?;
+        self.pop_call();
+        self.call(function)
     }
 
     fn open(&mut self, opcode: Opcode, block: BlockType, jump: Jump) -> Result<(), ExecutionError> {
@@ -264,7 +381,7 @@ impl Machine<'_, '_, '_, '_, '_> {
             self.budget.spend(offset, 1)?;
             self.locals.resize(
                 self.locals.len() + group.count as usize,
-                Value::zero(group.value_type),
+                Slot::zero(group.value_type),
             );
         }
         let control_base = self.controls.len();
@@ -323,20 +440,17 @@ impl Machine<'_, '_, '_, '_, '_> {
         append(&mut self.controls, frame, self.offset)
     }
 
-    fn push(&mut self, value: Value) -> Result<(), ExecutionError> {
+    fn push(&mut self, value: Slot) -> Result<(), ExecutionError> {
         self.check_values(1)?;
         append(&mut self.operands, value, self.offset)
     }
 
-    fn pop(&mut self) -> Value {
+    fn pop(&mut self) -> Slot {
         self.operands.pop().expect("validated stack operand")
     }
 
     fn pop_i32(&mut self) -> i32 {
-        let Value::I32(value) = self.pop() else {
-            unreachable!("validated i32 control operand");
-        };
-        value
+        self.pop().i32()
     }
 
     fn pop_transfer(&mut self) -> Transfer {

@@ -1,4 +1,4 @@
-use super::{Fault, Value};
+use super::{Fault, Slot, Value, effect};
 use crate::{Immediate, Opcode};
 
 macro_rules! read_number {
@@ -130,7 +130,23 @@ macro_rules! float_ops {
     }};
 }
 
-pub(super) fn evaluate(op: Opcode, imm: &Immediate, args: &[Value]) -> Result<Value, Fault> {
+pub(super) fn apply(
+    op: Opcode,
+    immediate: &Immediate,
+    operands: &mut Vec<Slot>,
+) -> Result<Value, Fault> {
+    let (params, _) = effect(op).ok_or(Fault::UnsupportedInstruction)?;
+    let start = operands.len() - params.len();
+    let mut args = [Value::I32(0); 2];
+    for (argument, &slot) in args.iter_mut().zip(&operands[start..]) {
+        *argument = slot.number();
+    }
+    let result = evaluate(op, immediate, &args[..params.len()])?;
+    operands.truncate(start);
+    Ok(result)
+}
+
+fn evaluate(op: Opcode, imm: &Immediate, args: &[Value]) -> Result<Value, Fault> {
     use Value::{F32, F64, I32, I64};
 
     let value = match (op, imm) {

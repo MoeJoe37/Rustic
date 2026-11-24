@@ -1,5 +1,6 @@
 use std::ops::Range;
 
+use super::table::Tables;
 use super::*;
 use crate::validate::numeric::memory_access;
 use crate::{Declarations, Immediate};
@@ -8,7 +9,8 @@ const PAGE: usize = 65_536;
 
 #[derive(Default)]
 pub(super) struct State<'bytes> {
-    pub(super) globals: Vec<Value>,
+    pub(super) globals: Vec<Slot>,
+    pub(super) tables: Tables,
     memories: Vec<Memory>,
     data: Vec<&'bytes [u8]>,
     memory_limit: usize,
@@ -38,13 +40,15 @@ impl<'bytes> State<'bytes> {
         };
         for entry in &declarations.globals {
             budget.spend(entry.offset, 1)?;
-            if !is_numeric(entry.value.ty.value_type) {
-                return Err(error(entry.offset, Fault::UnsupportedModule));
-            }
-            let value =
-                state.constant(&entry.value.initializer, limits.execution.values, budget)?;
+            let value = constant(
+                &state.globals,
+                &entry.value.initializer,
+                limits.execution.values,
+                budget,
+            )?;
             append(&mut state.globals, value, entry.offset)?;
         }
+        state.tables = Tables::new(declarations, &state.globals, limits, budget)?;
         for entry in &declarations.memories {
             let offset = entry.offset;
             let len = (entry.value.min as usize)
@@ -65,17 +69,20 @@ impl<'bytes> State<'bytes> {
             budget.spend(entry.offset, 1)?;
             let bytes = entry.value.bytes;
             let passive = if let Some(active) = &entry.value.active {
-                let Value::I32(address) =
-                    state.constant(&active.offset, limits.execution.values, budget)?
-                else {
-                    unreachable!("validated i32 segment offset");
-                };
+                let address = constant(
+                    &state.globals,
+                    &active.offset,
+                    limits.execution.values,
+                    budget,
+                )?
+                .i32();
                 let memory = &mut state.memories[active.target as usize].bytes;
                 let range = checked_range(
                     memory.len(),
                     u64::from(address as u32),
                     bytes.len(),
                     entry.offset,
+                    Fault::MemoryOutOfBounds,
                 )?;
                 budget.spend(entry.offset, bytes.len())?;
                 memory[range].copy_from_slice(bytes);
@@ -86,37 +93,6 @@ impl<'bytes> State<'bytes> {
             append(&mut state.data, passive, entry.offset)?;
         }
         Ok(state)
-    }
-
-    fn constant(
-        &self,
-        instructions: &[Instruction],
-        stack_limit: usize,
-        budget: &mut Budget<'_>,
-    ) -> Result<Value, ExecutionError> {
-        let mut values = Vec::new();
-        for instruction in instructions {
-            let offset = instruction.offset;
-            budget.spend(offset, 1)?;
-            let value = match (instruction.opcode, &instruction.immediate) {
-                (Opcode::Core(0x0b), _) => break,
-                (Opcode::Core(0x23), Immediate::Index(index)) => self.globals[*index as usize],
-                (op, immediate) => {
-                    let (params, _) =
-                        effect(op).ok_or_else(|| error(offset, Fault::UnsupportedInstruction))?;
-                    let start = values.len() - params.len();
-                    let result = numeric::evaluate(op, immediate, &values[start..])
-                        .map_err(|kind| error(offset, kind))?;
-                    values.truncate(start);
-                    result
-                }
-            };
-            if values.len() >= stack_limit {
-                return Err(error(offset, Fault::LimitExceeded));
-            }
-            append(&mut values, value, offset)?;
-        }
-        Ok(values.pop().expect("validated numeric constant expression"))
     }
 
     pub(super) fn size(&self, memory: u32) -> i32 {
@@ -167,7 +143,7 @@ impl<'bytes> State<'bytes> {
         let bytes = &mut self.memories[memory as usize].bytes;
         let (_, alignment) = memory_access(op);
         let len = 1 << alignment;
-        let range = checked_range(bytes.len(), address, len, offset)?;
+        let range = checked_range(bytes.len(), address, len, offset, Fault::MemoryOutOfBounds)?;
         let mut buffer = [0u8; 8];
         if let Some(value) = store {
             let bits = match value {
@@ -206,7 +182,12 @@ impl<'bytes> State<'bytes> {
     ) -> Result<(), ExecutionError> {
         let source = self.data[data as usize];
         let destination = &mut self.memories[memory as usize].bytes;
-        let (src, dst) = transfer.ranges(source.len(), destination.len(), offset)?;
+        let (src, dst) = transfer.ranges(
+            source.len(),
+            destination.len(),
+            offset,
+            Fault::MemoryOutOfBounds,
+        )?;
         budget.spend(offset, transfer.size as usize)?;
         destination[dst].copy_from_slice(&source[src]);
         Ok(())
@@ -229,6 +210,7 @@ impl<'bytes> State<'bytes> {
             self.memories[source].bytes.len(),
             self.memories[destination].bytes.len(),
             offset,
+            Fault::MemoryOutOfBounds,
         )?;
         budget.spend(offset, transfer.size as usize)?;
         if destination == source {
@@ -258,6 +240,7 @@ impl<'bytes> State<'bytes> {
             u64::from(transfer.destination),
             transfer.size as usize,
             offset,
+            Fault::MemoryOutOfBounds,
         )?;
         budget.spend(offset, transfer.size as usize)?;
         bytes[range].fill(transfer.source as u8);
@@ -265,12 +248,42 @@ impl<'bytes> State<'bytes> {
     }
 }
 
+pub(super) fn constant(
+    globals: &[Slot],
+    instructions: &[Instruction],
+    stack_limit: usize,
+    budget: &mut Budget<'_>,
+) -> Result<Slot, ExecutionError> {
+    let mut values = Vec::new();
+    for instruction in instructions {
+        let offset = instruction.offset;
+        budget.spend(offset, 1)?;
+        let value = match (instruction.opcode, &instruction.immediate) {
+            (Opcode::Core(0x0b), _) => break,
+            (Opcode::Core(0x23), Immediate::Index(index)) => globals[*index as usize],
+            (Opcode::Core(0xd0), Immediate::HeapType(ty)) => Slot::Ref(Reference::null(*ty)),
+            (Opcode::Core(0xd2), Immediate::Index(index)) => {
+                Slot::Ref(Reference::Function(Some(*index)))
+            }
+            (op, immediate) => Slot::Number(
+                numeric::apply(op, immediate, &mut values).map_err(|kind| error(offset, kind))?,
+            ),
+        };
+        if values.len() >= stack_limit {
+            return Err(error(offset, Fault::LimitExceeded));
+        }
+        append(&mut values, value, offset)?;
+    }
+    Ok(values.pop().expect("validated constant expression"))
+}
+
 impl Transfer {
-    fn ranges(
+    pub(super) fn ranges(
         &self,
         source_len: usize,
         destination_len: usize,
         offset: usize,
+        kind: Fault,
     ) -> Result<(Range<usize>, Range<usize>), ExecutionError> {
         Ok((
             checked_range(
@@ -278,27 +291,30 @@ impl Transfer {
                 u64::from(self.source),
                 self.size as usize,
                 offset,
+                kind,
             )?,
             checked_range(
                 destination_len,
                 u64::from(self.destination),
                 self.size as usize,
                 offset,
+                kind,
             )?,
         ))
     }
 }
 
-fn checked_range(
-    memory_len: usize,
+pub(super) fn checked_range(
+    len: usize,
     address: u64,
     bytes: usize,
     offset: usize,
+    kind: Fault,
 ) -> Result<Range<usize>, ExecutionError> {
-    let start = usize::try_from(address).map_err(|_| error(offset, Fault::MemoryOutOfBounds))?;
+    let start = usize::try_from(address).map_err(|_| error(offset, kind))?;
     let end = start
         .checked_add(bytes)
-        .filter(|&end| end <= memory_len)
-        .ok_or_else(|| error(offset, Fault::MemoryOutOfBounds))?;
+        .filter(|&end| end <= len)
+        .ok_or_else(|| error(offset, kind))?;
     Ok(start..end)
 }

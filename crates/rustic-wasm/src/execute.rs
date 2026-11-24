@@ -10,6 +10,7 @@ use crate::{
 mod machine;
 mod numeric;
 mod state;
+mod table;
 
 use state::State;
 
@@ -36,29 +37,81 @@ impl Value {
             Self::F64(_) => ValueType::F64,
         }
     }
+}
 
+#[derive(Clone, Copy)]
+enum Slot {
+    Number(Value),
+    Ref(Reference),
+}
+
+impl Slot {
     fn zero(ty: ValueType) -> Self {
         match ty {
-            ValueType::I32 => Self::I32(0),
-            ValueType::I64 => Self::I64(0),
-            ValueType::F32 => Self::F32(0),
-            ValueType::F64 => Self::F64(0),
-            _ => unreachable!("preparation checked numeric locals"),
+            ValueType::I32 => Self::Number(Value::I32(0)),
+            ValueType::I64 => Self::Number(Value::I64(0)),
+            ValueType::F32 => Self::Number(Value::F32(0)),
+            ValueType::F64 => Self::Number(Value::F64(0)),
+            ValueType::Ref { heap_type, .. } => Self::Ref(Reference::null(heap_type)),
+            ValueType::V128 => unreachable!("validated scalar locals"),
         }
+    }
+
+    fn number(self) -> Value {
+        match self {
+            Self::Number(value) => value,
+            Self::Ref(_) => unreachable!("validated numeric operand"),
+        }
+    }
+
+    fn reference(self) -> Reference {
+        match self {
+            Self::Ref(value) => value,
+            Self::Number(_) => unreachable!("validated reference operand"),
+        }
+    }
+
+    fn i32(self) -> i32 {
+        let Value::I32(value) = self.number() else {
+            unreachable!("validated i32 operand");
+        };
+        value
     }
 }
 
-/// Why the numeric interpreter rejected a module, invocation, or instruction.
+#[derive(Clone, Copy)]
+enum Reference {
+    Function(Option<u32>),
+    NullExtern,
+}
+
+impl Reference {
+    fn null(heap_type: i64) -> Self {
+        match heap_type {
+            -16 => Self::Function(None),
+            -17 => Self::NullExtern,
+            _ => unreachable!("validated abstract reference type"),
+        }
+    }
+
+    fn is_null(self) -> bool {
+        matches!(self, Self::Function(None) | Self::NullExtern)
+    }
+}
+
+/// Why the interpreter rejected a module, invocation, or instruction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExecutionErrorKind {
-    /// The module declares state, imports, or types outside the numeric profile.
+    /// The module declares state, imports, or types outside the instance profile.
     UnsupportedModule,
-    /// An instruction needs support outside the numeric profile.
+    /// An instruction needs support outside the instance profile.
     UnsupportedInstruction,
     /// The specified function export does not exist.
     UnknownExport,
     /// The supplied arguments do not match the function signature.
     ArgumentType,
+    /// The function returns a value outside the host numeric API.
+    ResultType,
     /// The host cancelled preparation or execution.
     Cancelled,
     /// A work or stack budget was exhausted.
@@ -73,6 +126,12 @@ pub enum ExecutionErrorKind {
     InvalidConversionToInteger,
     /// A load, store or segment operation accessed bytes outside an allocation.
     MemoryOutOfBounds,
+    /// A table index or element range lies outside its allocation.
+    TableOutOfBounds,
+    /// An instruction required a non-null reference.
+    NullReference,
+    /// The selected function did not match the signature of the indirect call.
+    IndirectCallTypeMismatch,
 }
 
 use ExecutionErrorKind as Fault;
@@ -170,6 +229,8 @@ pub struct InstanceLimits {
     pub execution: ExecutionLimits,
     /// Maximum total bytes of linear memory across this instance.
     pub memory_bytes: usize,
+    /// Maximum total entries in tables and retained passive element segments.
+    pub table_elements: usize,
 }
 
 impl Default for InstanceLimits {
@@ -177,16 +238,17 @@ impl Default for InstanceLimits {
         Self {
             execution: ExecutionLimits::default(),
             memory_bytes: 32 * 1024 * 1024,
+            table_elements: 1_000_000,
         }
     }
 }
 
-/// An executable instance with local numeric globals and 32-bit linear memory.
+/// An executable instance with local globals, 32-bit linear memories and tables.
 ///
 /// State changes remain visible across invocations, including changes made
-/// before a trap. Each instance owns its memories and globals. This profile
-/// supports local declarations, passive and active data segments, and numeric
-/// functions. Host imports, tables and reference values require a wider profile.
+/// before a trap. Function references stay within the instance. An external
+/// reference can hold null until the host bridge supplies external identities.
+/// Host calls through [`Self::invoke`] exchange scalar numbers.
 pub struct Instance<'module, 'bytes> {
     executable: Executable<'module, 'bytes>,
     state: State<'bytes>,
@@ -210,7 +272,7 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         Ok(Self { executable, state })
     }
 
-    /// Invoke a function export with fresh execution budgets and persistent state.
+    /// Invoke a numeric function export with fresh budgets and persistent state.
     pub fn invoke(
         &mut self,
         export: &str,
@@ -247,11 +309,11 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         budget.spend(0, 0)?;
         let always_unsupported = [
             declarations.imports.first().map(|entry| entry.offset),
-            declarations.tables.first().map(|entry| entry.offset),
             declarations.tags.first().map(|entry| entry.offset),
-            declarations.elements.first().map(|entry| entry.offset),
         ];
         let stateful = [
+            declarations.tables.first().map(|entry| entry.offset),
+            declarations.elements.first().map(|entry| entry.offset),
             declarations.memories.first().map(|entry| entry.offset),
             declarations.globals.first().map(|entry| entry.offset),
             declarations.data.first().map(|entry| entry.offset),
@@ -270,14 +332,15 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
                 entry.offset,
                 1 + entry.value.params.len() + entry.value.results.len(),
             )?;
-            if !types.copied().all(is_numeric) {
+            if profile == Profile::NumericOnly && !types.copied().all(is_numeric) {
                 return Err(error(entry.offset, Fault::UnsupportedModule));
             }
         }
         let mut functions = Vec::new();
         for entry in decoded.functions() {
             let signature = &declarations.types[entry.value.type_index as usize].value;
-            let prepared = PreparedFunction::new(&entry.value, signature, entry.offset, budget)?;
+            let prepared =
+                PreparedFunction::new(&entry.value, signature, entry.offset, profile, budget)?;
             append(&mut functions, prepared, entry.offset)?;
         }
         let mut exports = HashMap::new();
@@ -336,10 +399,14 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
             BlockType::Empty => (0, 0),
             BlockType::Result(_) => (0, 1),
             BlockType::TypeIndex(index) => {
-                let ty = &self.module.module().declarations().types[index as usize].value;
+                let ty = self.signature(index);
                 (ty.params.len(), ty.results.len())
             }
         }
+    }
+
+    fn signature(&self, index: u32) -> &FunctionType {
+        &self.module.module().declarations().types[index as usize].value
     }
 }
 
@@ -368,13 +435,14 @@ impl<'a> PreparedFunction<'a> {
         function: &'a Function,
         signature: &'a FunctionType,
         offset: usize,
+        profile: Profile,
         budget: &mut Budget<'_>,
     ) -> Result<Self, ExecutionError> {
         budget.spend(offset, 1 + function.instructions.len())?;
         let mut locals = 0usize;
         for group in &function.locals {
             budget.spend(offset, 1)?;
-            if !is_numeric(group.value_type) {
+            if profile == Profile::NumericOnly && !is_numeric(group.value_type) {
                 return Err(error(offset, Fault::UnsupportedModule));
             }
             locals = locals
@@ -403,10 +471,15 @@ impl<'a> PreparedFunction<'a> {
                     0x00 | 0x01 | 0x0c..=0x10 | 0x12 | 0x1a..=0x1c | 0x20..=0x24 | 0x28..=0x40,
                 )
                 | Opcode::Misc(8..=11) => {}
+                Opcode::Core(0x11 | 0x13 | 0x25..=0x26 | 0xd0..=0xd2 | 0xd4)
+                | Opcode::Misc(12..=17)
+                    if profile == Profile::LocalState => {}
                 opcode if effect(opcode).is_some() => {}
                 _ => return Err(error(instruction.offset, Fault::UnsupportedInstruction)),
             }
-            prepare_types(instruction)?;
+            if profile == Profile::NumericOnly {
+                prepare_numeric_types(instruction)?;
+            }
         }
         Ok(Self {
             function,
@@ -417,7 +490,7 @@ impl<'a> PreparedFunction<'a> {
     }
 }
 
-fn prepare_types(instruction: &Instruction) -> Result<(), ExecutionError> {
+fn prepare_numeric_types(instruction: &Instruction) -> Result<(), ExecutionError> {
     use crate::Immediate;
     let types_supported = match &instruction.immediate {
         Immediate::Block(BlockType::Result(ty)) => is_numeric(*ty),

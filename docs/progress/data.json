@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "f68577a2ac55a8200d95fc954ae4689042551d6f69628765fc736e200a65e8e6",
+  "source_fingerprint": "05a62a6c28ba45c6bde4a43d1d1a3197aad30d89e836522c1f281bd90eb3fa9c",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
@@ -4521,6 +4521,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/execution.rs",
               "marker": "fn numeric_evaluation_preserves_bits_and_traps_at_wasm_boundaries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn indirect_calls_accept_equivalent_signatures_and_distinguish_table_traps"
             }
           ],
           "credit": "0.00",
@@ -4547,6 +4552,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/instances.rs",
               "marker": "fn bulk_memory_checks_both_ranges_before_copy_and_drops_segments"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn table_updates_obey_segment_lifetimes_overlap_and_allocation_limits"
             }
           ],
           "credit": "0.00",

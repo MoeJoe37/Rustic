@@ -3293,8 +3293,7 @@ growth share a total byte cap. Bulk work and initialization consume their
 respective execution or preparation budgets.
 
 `crates/rustic-wasm/tests/instances.rs` covers initialization order, isolated
-instances, range failures, segment lifetime and allocation limits. Tables,
-indirect execution, reference values and host imports remain open.
+instances, range failures, segment lifetime and allocation limits.
 [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)
 
 A local run of the pinned core suite used WABT 1.0.42 to generate binaries
@@ -3305,4 +3304,27 @@ matched 5,871 invocations and 20 instantiation traps and rejected 510
 malformed or invalid binaries. The run used a 64 MiB instance cap for the
 memory-growth fixtures and excluded cases that required linked imports or
 types and instructions outside the implemented profiles.
+[Pinned core suite](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core)
+
+### WASM-03/04 — Tables, references and indirect calls
+
+Local instances now initialize 32-bit tables and active element segments before
+calling start. Passive segments retain their entries until `elem.drop`. The
+interpreter implements indexed get and set, size and growth, copy, fill and
+`table.init`. Tables and retained passive entries share an instance-wide entry
+budget. Copy, fill and initialization check ranges and work before mutation.
+
+Function references carry local function indexes inside the guest. The
+interpreter carries references through globals, locals, control flow and
+function calls. `call_indirect` and `return_call_indirect` check the table
+entry and the callee's signature and distinguish bounds, null and signature
+traps. Function exports invoked from Rust exchange scalar numbers. Host
+imports, host reference identities and linked state still need an adapter.
+
+The table tests cover equivalent signature indexes, indirect tail calls,
+initialization order, segment lifetime, allocation limits, and failed writes.
+A local replay of 13 files from the pinned suite matched 783 invocations and
+8 instantiation traps and rejected 136 malformed or invalid modules. Cases
+requiring linked modules, reference-valued host invocations or wider types and
+instructions were outside that run.
 [Pinned core suite](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core)

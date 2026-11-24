@@ -26,6 +26,8 @@ pub(crate) fn seeds() -> impl Iterator<Item = Vec<u8>> {
         b"\0asm\x01\0\0\0\x01\x04\x01\x60\0\0\x03\x02\x01\0\x07\x07\x01\x03run\0\0\x0a\x09\x01\x07\0\x03\x40\x0c\0\x0b\x0b",
         // An exported load reads bytes applied during instantiation.
         b"\0asm\x01\0\0\0\x01\x05\x01\x60\0\x01\x7f\x03\x02\x01\0\x05\x03\x01\0\x01\x07\x07\x01\x03run\0\0\x0a\x09\x01\x07\0\x41\0\x2d\0\0\x0b\x0b\x07\x01\0\x41\0\x0b\x01*",
+        // An active table element supplies a matching indirect call target.
+        b"\0asm\x01\0\0\0\x01\x05\x01\x60\0\x01\x7f\x03\x03\x02\0\0\x04\x04\x01\x70\0\x01\x07\x07\x01\x03run\0\0\x09\x07\x01\0\x41\0\x0b\x01\x01\x0a\x0e\x02\x07\0\x41\0\x11\0\0\x0b\x04\0\x41\x2a\x0b",
     ];
     modules
         .iter()
@@ -124,6 +126,7 @@ fn check_execution(
             control_frames: 64,
         },
         memory_bytes: 2 * 65_536,
+        table_elements: 256,
     };
     let mut instance = match Instance::instantiate(validated, limits, token) {
         Ok(instance) => instance,

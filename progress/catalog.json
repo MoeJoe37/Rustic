@@ -4171,6 +4171,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/execution.rs",
               "marker": "fn numeric_evaluation_preserves_bits_and_traps_at_wasm_boundaries"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn indirect_calls_accept_equivalent_signatures_and_distinguish_table_traps"
             }
           ]
         },
@@ -4195,6 +4200,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/instances.rs",
               "marker": "fn bulk_memory_checks_both_ranges_before_copy_and_drops_segments"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn table_updates_obey_segment_lifetimes_overlap_and_allocation_limits"
             }
           ]
         },

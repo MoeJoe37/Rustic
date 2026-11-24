@@ -32,13 +32,18 @@ and stack budgets apply to the start function and every export call. Trap
 diagnostics retain byte offsets because the interpreter reads the validated
 instructions directly.
 
-Each local instance owns its numeric globals and linear memories. Instantiation
-evaluates global initializers, zeroes memory, applies active data segments and
-runs the start function before exposing the instance. Memory allocation and
-growth share an aggregate byte cap. Bulk memory operations validate both ranges
-and charge their byte work before modifying guest state. Host imports will be
-supplied through an embedding adapter. A later compilation tier requires its
-own executable memory and platform review. Every host retains the interpreter.
+Each local instance owns its globals, memories and tables. Instantiation
+evaluates initializers, applies active element and data segments, then runs
+the start function before exposing the instance. Memory allocations share
+a byte cap. Tables and retained passive element segments share an entry cap.
+Bulk operations check their ranges and charge work before modifying guest state.
+
+Function references resolve within their instance. Indirect calls check table
+bounds, null entries and signature equality for the supported function types.
+Reference slots are internal to the interpreter. Rust calls exchange scalar
+numbers, and host imports will use an embedding adapter. A later compilation
+tier requires its own executable memory and platform review. Every host retains
+the interpreter.
 
 ## Alternatives and consequences
 
@@ -62,8 +67,8 @@ Tests check framing and declaration encodings, initializer visibility, operand
 types, branch targets, index spaces, cancellation and cumulative budgets.
 Execution tests exercise numerical results and traps, recursive and tail calls,
 loop and block branches, start traps, and work and stack limits. Instance tests
-cover initialization order, independent state, checked memory ranges, bounded
-growth and bulk memory operations. The `wasm-binary` fuzz target exercises
+cover initialization order, independent state, checked ranges, bounded growth,
+bulk operations and indirect call traps. The `wasm-binary` fuzz target exercises
 decoding, validation, instantiation and bounded execution on mutated modules.
 Revisit the representation when concrete
 reference types need subtype and canonical identity information, or when

@@ -55,9 +55,12 @@ def support_files(manifest: dict) -> list[str]:
     support = manifest.get("support", [])
     if sorted(set(support)) != support:
         raise ValueError("support files must be sorted and unique")
+    if set(support) & set(manifest["cases"]):
+        raise ValueError("a support file cannot also be a case")
     for name in support:
-        if not name.endswith(".js") or set(support) & set(manifest["cases"]):
-            raise ValueError(f"{name}: a support file must be a script, not a case")
+        if (not name.endswith(".js") or "\\" in name or ":" in name
+                or any(part in ("", ".", "..") for part in name.split("/"))):
+            raise ValueError(f"{name}: expected a relative support script path")
     return support
 
 
@@ -105,8 +108,8 @@ def window_page(path: Path, directory: Path, support: list[str] = ()) -> bytes:
                                          else posixpath.join(case_directory, reference))
                 if name not in support:
                     raise ValueError(f"{path.name}: unpinned helper script {reference!r}")
-                basename = escape(Path(name).name, quote=True)
-                scripts.append(f'<script src="{basename}"></script>'.encode("utf-8"))
+                source_path = escape(f"support/{name}", quote=True)
+                scripts.append(f'<script src="{source_path}"></script>'.encode("utf-8"))
             elif line.startswith(b"// META:") and not supported_meta(line):
                 raise ValueError(f"{path.name}: unsupported META directive {line!r}")
         (directory / "case.js").write_bytes(source)
@@ -120,14 +123,14 @@ def window_page(path: Path, directory: Path, support: list[str] = ()) -> bytes:
         if source.count(before) != 1:
             raise ValueError(f"{path.name}: expected exactly one reference to {before!r}")
         source = source.replace(before, after)
-    # Helper scripts are copied flat beside the page; rewrite each reference
-    # that resolves to a pinned support file, wherever it lives upstream.
+    # Keep the upstream directory hierarchy under support/ so helpers
+    # with the same basename can appear in one case.
     case_directory = path.parent.relative_to(UPSTREAM).as_posix()
     for name in support:
         relative = posixpath.relpath(name, case_directory).encode()
         pattern = re.compile(rb'src=(["\']?)' + re.escape(relative) + rb'\1(?=[\s>])')
         source = pattern.sub(lambda match: b"src=" + match.group(1)
-                             + Path(name).name.encode() + match.group(1), source)
+                             + f"support/{name}".encode() + match.group(1), source)
     return source
 
 
@@ -203,13 +206,10 @@ def run(binary: Path, cases: list[str], driver: str = "automate") -> dict:
         directory = Path(temp)
         shutil.copyfile(UPSTREAM / HARNESS, directory / "testharness.js")
         shutil.copyfile(FIXTURES / "report.js", directory / "report.js")
-        # Every case shares one directory, so a helper's basename must be unique.
-        names = [Path(name).name for name in support]
-        reserved = {"case.html", "case.js", "report.js", "testharness.js"}
-        if len(set(names)) != len(names) or reserved.intersection(names):
-            raise ValueError("support file basenames must be unique and avoid runner filenames")
         for name in support:
-            shutil.copyfile(UPSTREAM / name, directory / Path(name).name)
+            target = directory / "support" / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(UPSTREAM / name, target)
         return {name: run_case(binary, name, directory, support, driver) for name in cases}
 
 

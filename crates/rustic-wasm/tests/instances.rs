@@ -409,6 +409,7 @@ fn owned_global_bindings_preserve_live_values_and_validate_types() {
             Default::default(),
             &token,
             globals,
+            &[],
             &mut |_, _, _| unreachable!("module has no function imports or start"),
         )
     };
@@ -429,4 +430,59 @@ fn owned_global_bindings_preserve_live_values_and_validate_types() {
     assert!(!reexport.set(Value::I64(22)));
     assert_eq!(cell.get(), Value::I32(19));
     assert_eq!(first.global_value(0), Some(Value::I32(19)));
+}
+
+#[test]
+fn imported_memory_preserves_segment_prefixes_and_copies_across_aliased_indices() {
+    use rustic_wasm::LinearMemory;
+
+    let memory = LinearMemory::new(1, Some(2), 2 * PAGE).unwrap();
+    let token = CancellationToken::default();
+    let imports = &[2, 1, b'm', 1, b'a', 2, 0, 1, 1, b'm', 1, b'b', 2, 0, 1];
+    let trap = module(&[
+        (2, imports),
+        (
+            11,
+            &[
+                2, 0, 0x41, 0, 0x0b, 3, 1, 2, 3, 0, 0x41, 0x80, 0x80, 0x04, 0x0b, 1, 99,
+            ],
+        ),
+    ]);
+    let bindings = &[memory.clone(), memory.clone()];
+    let instance = |bytes: &[u8]| {
+        Instance::instantiate_owned_with_host(
+            validated(bytes),
+            Default::default(),
+            &token,
+            &[],
+            bindings,
+            &mut |_, _, _| unreachable!("no imported functions"),
+        )
+    };
+    assert_eq!(
+        instance(&trap).err().unwrap().kind,
+        Fault::MemoryOutOfBounds
+    );
+    assert_eq!(&memory.buffer().read().unwrap()[..4], &[1, 2, 3, 0]);
+
+    let copy = module(&[
+        (1, &[1, 0x60, 0, 0]),
+        (2, imports),
+        (3, &[1, 0]),
+        (7, &[1, 4, b'c', b'o', b'p', b'y', 0, 0]),
+        (
+            10,
+            &[1, 12, 0, 0x41, 1, 0x41, 0, 0x41, 3, 0xfc, 10, 1, 0, 0x0b],
+        ),
+    ]);
+    instance(&copy)
+        .unwrap()
+        .invoke("copy", &[], &token)
+        .unwrap();
+    assert_eq!(&memory.buffer().read().unwrap()[..4], &[1, 1, 2, 3]);
+    let old = memory.buffer();
+    assert_eq!(memory.grow(2, |_| Ok::<_, ()>(())).unwrap(), None);
+    assert!(old.read().is_some());
+    assert_eq!(memory.grow(0, |_| Ok::<_, ()>(())).unwrap(), Some(1));
+    assert!(old.read().is_none());
 }

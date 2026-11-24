@@ -748,7 +748,7 @@ impl BodyInit {
                     let mut copy = Vec::new();
                     copy.try_reserve_exact(length)
                         .map_err(|_| Abrupt::OutOfMemory)?;
-                    copy.extend_from_slice(agent.web_buffer_bytes(source));
+                    copy.extend_from_slice(&agent.web_buffer_bytes(source));
                     Ok(copy)
                 })?;
                 (copy, None)

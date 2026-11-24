@@ -184,7 +184,7 @@ fn collect(agent: &mut Agent, parts: Vec<Part>, native: bool) -> JsResult<Vec<u8
         for part in parts {
             match part {
                 Part::Blob(data) => bytes.extend_from_slice(&data.bytes),
-                Part::Buffer(source) => bytes.extend_from_slice(agent.web_buffer_bytes(source)),
+                Part::Buffer(source) => bytes.extend_from_slice(&agent.web_buffer_bytes(source)),
                 Part::Text(text) if native => bytes.extend(native_bytes(text.as_bytes())),
                 Part::Text(text) => bytes.extend(text.into_bytes()),
             }

@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "bb4e47a644762195fb00e2ca8d93a9c11a9786c12916324b0c61ad6e597b845f",
+  "source_fingerprint": "da06465ce5e1000519bcd300675cdf3004b46fd2d03abd0d816b074a2929ebaf",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
@@ -4628,6 +4628,16 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/instances.rs",
               "marker": "fn owned_global_bindings_preserve_live_values_and_validate_types"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_fixed_memories_share_live_bytes_and_detach_views_on_successful_growth"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn imported_memory_preserves_segment_prefixes_and_copies_across_aliased_indices"
             }
           ],
           "credit": "0.00",
@@ -4684,6 +4694,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
               "marker": "\"wasm/jsapi/constructor/instantiate.any.js\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "\"wasm/jsapi/memory/grow.any.js\""
             }
           ],
           "credit": "0.00",

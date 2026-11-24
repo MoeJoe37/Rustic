@@ -304,9 +304,12 @@ fn decode(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
         if let Some(source) = source {
             for start in (0..length).step_by(WORK_CHUNK) {
                 agent.check_native_work()?;
-                let bytes =
-                    &agent.web_buffer_bytes(source)[start..(start + WORK_CHUNK).min(length)];
-                if next.decoder.decode(bytes, false, &mut output).is_err() {
+                let decoded = {
+                    let bytes = agent.web_buffer_bytes(source);
+                    let end = (start + WORK_CHUNK).min(length);
+                    next.decoder.decode(&bytes[start..end], false, &mut output)
+                };
+                if decoded.is_err() {
                     state.borrow_mut().start();
                     return agent.type_error("malformed encoded text");
                 }

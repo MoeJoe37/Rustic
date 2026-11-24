@@ -497,8 +497,12 @@ impl Marker<'_> {
                         self.value(v);
                     }
                 }
-                // Bytes hold no references.
-                Some(Internal::ArrayBuffer(_) | Internal::HostState { .. }) => {}
+                Some(Internal::ArrayBuffer(data)) => {
+                    if let Some(owner) = data.wasm_owner() {
+                        self.value(Value::object(owner));
+                    }
+                }
+                Some(Internal::HostState { .. }) => {}
                 // The target is weak: cleared after marking if nothing
                 // else reaches it.
                 Some(Internal::WeakRef(_)) => self.weak_refs.push(index),
@@ -537,7 +541,7 @@ fn object_footprint(object: &Object) -> usize {
             Some(Internal::Bound { args, .. }) => 8 * args.len(),
             Some(Internal::Arguments { slots, .. }) => 4 * slots.len(),
             Some(Internal::ModuleNamespace(exports, _)) => std::mem::size_of_val(exports.as_ref()),
-            Some(Internal::ArrayBuffer(data)) => data.bytes.as_ref().map_or(0, Vec::len),
+            Some(Internal::ArrayBuffer(data)) => data.storage_bytes(),
             Some(Internal::Table(table)) => table.footprint(),
             Some(Internal::Helper(helper)) => {
                 std::mem::size_of::<super::object::Helper>() + 8 * helper.items.len()

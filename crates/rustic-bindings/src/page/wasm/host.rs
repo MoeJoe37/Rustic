@@ -1,4 +1,6 @@
-use rustic_wasm::{ExecutionError, ExecutionErrorKind, HostDispatch, HostTrap, NumericGlobal};
+use rustic_wasm::{
+    ExecutionError, ExecutionErrorKind, HostDispatch, HostTrap, LinearMemory, NumericGlobal,
+};
 
 use super::super::events::PrivateArray;
 use super::instance::{LINK_ERROR, RUNTIME_ERROR, Runtime, execution_error, find};
@@ -13,6 +15,13 @@ const MAX_RESULT_ITERATIONS: usize = 1_000_000;
 pub(super) struct Bindings {
     pub functions: PrivateArray,
     pub globals: PrivateArray,
+    pub memories: PrivateArray,
+}
+
+#[derive(Default)]
+pub(super) struct LinkedState {
+    pub globals: Vec<NumericGlobal>,
+    pub memories: Vec<LinearMemory>,
 }
 
 pub(super) fn read_imports(
@@ -38,6 +47,7 @@ pub(super) fn read_imports(
             let accepted = match import.ty {
                 ImportType::Function(_) => agent.is_callable(value),
                 ImportType::Global(ty) => global::accepts_import(agent, value, ty),
+                ImportType::Memory(_) => memory::find(agent, value).is_some(),
                 _ => false,
             };
             if !accepted {
@@ -54,9 +64,10 @@ pub(super) fn link(
     validated: &ValidatedModule<'_>,
     resolved: PrivateArray,
     bindings: Bindings,
-) -> JsResult<Vec<NumericGlobal>> {
+) -> JsResult<LinkedState> {
     let declarations = validated.module().declarations();
-    let mut globals = Vec::new();
+    let mut linked = LinkedState::default();
+    let globals = &mut linked.globals;
     let mut functions = 0u32;
     for (index, entry) in declarations.imports.iter().enumerate() {
         agent.check_native_work()?;
@@ -111,10 +122,18 @@ pub(super) fn link(
                     ));
                 }
             }
-            _ => unreachable!("only functions and numeric globals reach linking"),
+            ImportType::Memory(_) => {
+                let memory = memory::find(agent, value).expect("resolved Memory");
+                let memories = &mut linked.memories;
+                memories.try_reserve(1).map_err(|_| OutOfMemory)?;
+                let index = u32::try_from(memories.len()).map_err(|_| OutOfMemory)?;
+                bindings.memories.set(agent, index, value)?;
+                memories.push((*memory).clone());
+            }
+            _ => unreachable!("only function, memory and numeric global bindings reach linking"),
         }
     }
-    Ok(globals)
+    Ok(linked)
 }
 
 pub(super) fn function_record(

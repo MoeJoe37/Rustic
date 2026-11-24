@@ -1,10 +1,18 @@
 //! ArrayBuffer (§25.1) and DataView (§25.3), and the element codec they
 //! share with typed arrays (`typed_array.rs`).
 //!
-//! A buffer's bytes are one `Vec<u8>` charged to the heap budget. Element
+//! An ordinary buffer owns its bytes. A Wasm buffer views one generation
+//! of linear memory charged to its owning wrapper or instance. Element
 //! values are stored little-endian on every target, so a typed array reads
 //! the same bytes on a big-endian host (the specification leaves the
 //! order to the implementation).
+
+use std::{
+    cell::Ref,
+    ops::{Deref, Range},
+};
+
+use rustic_base::FixedBytes;
 
 use super::{arg, install_constructor, install_methods, method, prototype_from_new_target};
 use crate::runtime::agent::{Agent, ErrorKind, JsResult};
@@ -23,12 +31,81 @@ pub(crate) const MAX_BUFFER_BYTES: usize = i32::MAX as usize;
 pub(crate) struct BufferData {
     /// The bytes; `None` once detached.
     pub bytes: Option<Vec<u8>>,
+    wasm: Option<Box<WasmBuffer>>,
     /// `[[ArrayBufferMaxByteLength]]` of a resizable or growable buffer.
     pub max: Option<usize>,
     /// A SharedArrayBuffer: never detached, and it only grows.
     pub shared: bool,
     /// Whether the byte storage can be written or detached.
     pub immutable: bool,
+}
+
+#[derive(Clone, Debug)]
+struct WasmBuffer {
+    bytes: FixedBytes,
+    owner: ObjectId,
+}
+
+impl WasmBuffer {
+    // A detached buffer still retains its generation's empty metadata.
+    const STORAGE_BYTES: usize = size_of::<Self>() + FixedBytes::storage_bytes();
+}
+
+/// Bytes borrowed from an attached buffer or view while no script runs.
+pub struct BufferBytes<'a>(BufferRead<'a>);
+
+enum BufferRead<'a> {
+    Inline(&'a [u8]),
+    Wasm(Ref<'a, [u8]>),
+}
+
+impl Deref for BufferBytes<'_> {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        match &self.0 {
+            BufferRead::Inline(bytes) => bytes,
+            BufferRead::Wasm(bytes) => bytes,
+        }
+    }
+}
+
+impl BufferBytes<'_> {
+    fn range(self, range: Range<usize>) -> Self {
+        Self(match self.0 {
+            BufferRead::Inline(bytes) => BufferRead::Inline(&bytes[range]),
+            BufferRead::Wasm(bytes) => BufferRead::Wasm(Ref::map(bytes, |bytes| &bytes[range])),
+        })
+    }
+}
+
+impl BufferData {
+    fn read(&self) -> Option<BufferBytes<'_>> {
+        let read = match &self.wasm {
+            Some(wasm) => BufferRead::Wasm(wasm.bytes.read()?),
+            None => BufferRead::Inline(self.bytes.as_deref()?),
+        };
+        Some(BufferBytes(read))
+    }
+
+    fn write(&mut self, write: impl FnOnce(&mut [u8])) {
+        if let Some(wasm) = &self.wasm {
+            write(&mut wasm.bytes.write().expect("attached Wasm buffer"));
+        } else {
+            write(self.bytes.as_deref_mut().expect("attached ArrayBuffer"));
+        }
+    }
+
+    pub(crate) fn wasm_owner(&self) -> Option<ObjectId> {
+        let wasm = self.wasm.as_ref()?;
+        wasm.bytes.read()?;
+        Some(wasm.owner)
+    }
+
+    pub(crate) fn storage_bytes(&self) -> usize {
+        self.bytes.as_ref().map_or(0, Vec::len)
+            + usize::from(self.wasm.is_some()) * WasmBuffer::STORAGE_BYTES
+    }
 }
 
 /// The element type of a typed array or a DataView accessor.
@@ -233,7 +310,7 @@ impl Agent {
     /// The bytes of a converted buffer source while no script can run.
     /// Detachment after conversion (for example by a dictionary getter)
     /// leaves an empty byte sequence.
-    pub fn web_buffer_bytes(&self, source: ObjectId) -> &[u8] {
+    pub fn web_buffer_bytes(&self, source: ObjectId) -> BufferBytes<'_> {
         let (buffer, offset, length) = match self.heap.object(source).internal() {
             Some(Internal::ArrayBuffer(_)) => (source, 0, None),
             Some(Internal::DataView {
@@ -247,19 +324,17 @@ impl Agent {
                 kind,
                 length,
             }) => (*buffer, *offset, length.map(|length| length * kind.size())),
-            _ => return &[],
+            _ => return BufferBytes(BufferRead::Inline(&[])),
         };
-        let Some(bytes) = self
-            .buffer_data(buffer)
-            .and_then(|data| data.bytes.as_deref())
-        else {
-            return &[];
+        let Some(bytes) = self.array_buffer_bytes(buffer) else {
+            return BufferBytes(BufferRead::Inline(&[]));
         };
-        match length {
-            Some(length) => bytes.get(offset..offset + length),
-            None => bytes.get(offset..),
+        let end = length.map_or(Some(bytes.len()), |length| offset.checked_add(length));
+        if let Some(end) = end.filter(|&end| end <= bytes.len() && offset <= end) {
+            bytes.range(offset..end)
+        } else {
+            BufferBytes(BufferRead::Inline(&[]))
         }
-        .unwrap_or_default()
     }
 
     /// Fill the prefix of a converted Uint8Array. The caller determines
@@ -277,11 +352,9 @@ impl Agent {
             return self.type_error("destination no longer covers the bytes");
         }
         self.require_mutable_buffer(view.buffer)?;
-        let target = self
-            .buffer_data_mut(view.buffer)
-            .and_then(|data| data.bytes.as_mut())
-            .expect("an in-bounds Uint8Array");
-        target[view.offset..view.offset + bytes.len()].copy_from_slice(bytes);
+        self.buffer_data_mut(view.buffer)
+            .expect("an in-bounds Uint8Array")
+            .write(|target| target[view.offset..view.offset + bytes.len()].copy_from_slice(bytes));
         Ok(())
     }
 
@@ -341,16 +414,13 @@ impl Agent {
 
     /// The byte length of buffer `o`; `None` when it is detached.
     pub(crate) fn buffer_len(&self, o: ObjectId) -> Option<usize> {
-        self.buffer_data(o)?.bytes.as_ref().map(Vec::len)
+        self.array_buffer_bytes(o).map(|bytes| bytes.len())
     }
 
     /// Read `size` bytes at `at` as little-endian bits. The caller has
     /// checked the range.
     pub(crate) fn buffer_read(&self, o: ObjectId, at: usize, size: usize) -> u64 {
-        let bytes = self
-            .buffer_data(o)
-            .and_then(|d| d.bytes.as_ref())
-            .expect("an attached buffer");
+        let bytes = self.array_buffer_bytes(o).expect("an attached buffer");
         let mut raw = [0u8; 8];
         raw[..size].copy_from_slice(&bytes[at..at + size]);
         u64::from_le_bytes(raw)
@@ -366,11 +436,9 @@ impl Agent {
         bits: u64,
     ) -> JsResult<()> {
         self.require_mutable_buffer(o)?;
-        let bytes = self
-            .buffer_data_mut(o)
-            .and_then(|d| d.bytes.as_mut())
-            .expect("an attached buffer");
-        bytes[at..at + size].copy_from_slice(&bits.to_le_bytes()[..size]);
+        self.buffer_data_mut(o)
+            .expect("an attached buffer")
+            .write(|bytes| bytes[at..at + size].copy_from_slice(&bits.to_le_bytes()[..size]));
         Ok(())
     }
 
@@ -450,6 +518,7 @@ impl Agent {
         let mut object = Object::new(Class::ArrayBuffer, Some(prototype));
         object.extra_mut().internal = Some(Internal::ArrayBuffer(Box::new(BufferData {
             bytes: Some(vec![0; length]),
+            wasm: None,
             max,
             shared,
             immutable: false,
@@ -482,7 +551,7 @@ impl Agent {
     pub fn detach_array_buffer(&mut self, buffer: ObjectId) -> bool {
         match self
             .buffer_data_mut(buffer)
-            .filter(|data| !data.shared && !data.immutable)
+            .filter(|data| !data.shared && !data.immutable && data.wasm.is_none())
         {
             Some(data) => {
                 // A detached resizable buffer still reports `resizable`.
@@ -494,8 +563,35 @@ impl Agent {
     }
 
     /// The bytes of an attached ArrayBuffer.
-    pub fn array_buffer_bytes(&self, buffer: ObjectId) -> Option<&[u8]> {
-        self.buffer_data(buffer)?.bytes.as_deref()
+    pub fn array_buffer_bytes(&self, buffer: ObjectId) -> Option<BufferBytes<'_>> {
+        self.buffer_data(buffer)?.read()
+    }
+
+    /// Wrap a Wasm fixed-length generation in the owner's realm. The
+    /// attached buffer traces the owner that pays for the backing bytes.
+    pub fn new_wasm_array_buffer(&mut self, owner: ObjectId, bytes: FixedBytes) -> JsResult<Value> {
+        if bytes
+            .read()
+            .is_none_or(|bytes| bytes.len() > MAX_BUFFER_BYTES)
+        {
+            return Err(self.throw(ErrorKind::RangeError, "invalid Wasm ArrayBuffer length"));
+        }
+        self.heap
+            .charge(size_of::<crate::runtime::Extra>() + WasmBuffer::STORAGE_BYTES)?;
+        let previous = self.heap.realm;
+        self.switch_realm(self.heap.object(owner).realm);
+        let prototype = self.intrinsics.array_buffer_prototype;
+        let mut object = Object::new(Class::ArrayBuffer, Some(prototype));
+        object.extra_mut().internal = Some(Internal::ArrayBuffer(Box::new(BufferData {
+            bytes: None,
+            wasm: Some(Box::new(WasmBuffer { bytes, owner })),
+            max: None,
+            shared: false,
+            immutable: false,
+        })));
+        let result = self.heap.alloc_object(object);
+        self.switch_realm(previous);
+        Ok(Value::object(result?))
     }
 }
 
@@ -721,11 +817,9 @@ fn buffer_byte_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<V
 fn buffer_max_byte_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let buffer = this_buffer(agent, this, "maxByteLength")?;
     let data = agent.buffer_data(buffer).expect("checked above");
-    let length = match (&data.bytes, data.max) {
-        (None, _) => 0,
-        (Some(_), Some(max)) => max,
-        (Some(bytes), None) => bytes.len(),
-    };
+    let length = data
+        .read()
+        .map_or(0, |bytes| data.max.unwrap_or(bytes.len()));
     Ok(Value::number(length as f64))
 }
 
@@ -810,11 +904,10 @@ fn buffer_slice(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
     let end = last.min(current);
     if first < end {
         let source = agent.array_buffer_bytes(buffer).expect("attached")[first..end].to_vec();
-        let target = agent
+        agent
             .buffer_data_mut(new)
-            .and_then(|d| d.bytes.as_mut())
-            .expect("attached");
-        target[..source.len()].copy_from_slice(&source);
+            .expect("attached")
+            .write(|target| target[..source.len()].copy_from_slice(&source));
     }
     Ok(created)
 }
@@ -866,9 +959,13 @@ fn copy_and_detach(
     } else {
         Some(to_byte_index(agent, requested)?)
     };
-    let Some(data) = agent.buffer_data(buffer).filter(|d| d.bytes.is_some()) else {
+    let data = agent.buffer_data(buffer).expect("branded above");
+    if data.read().is_none() {
         return detached_error(agent);
-    };
+    }
+    if data.wasm.is_some() {
+        return agent.type_error("WebAssembly memory buffers cannot be transferred");
+    }
     let max = data.max.filter(|_| preserve);
     let new_length = new_length.expect("attached buffers have a length");
     let prototype = agent.intrinsics.array_buffer_prototype;
@@ -876,6 +973,7 @@ fn copy_and_detach(
     let source = agent.array_buffer_bytes(buffer).expect("attached");
     let count = source.len().min(new_length);
     let copy = source[..count].to_vec();
+    drop(source);
     agent
         .buffer_data_mut(new)
         .and_then(|d| d.bytes.as_mut())

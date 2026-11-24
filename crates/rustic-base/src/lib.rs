@@ -15,6 +15,7 @@ mod clock;
 mod diagnostic;
 mod geometry;
 mod id;
+mod linear_buffer;
 mod redact;
 mod revision;
 mod source;
@@ -32,6 +33,7 @@ pub use geometry::{
     SurfaceAllocation, SurfaceError, SurfaceLimits,
 };
 pub use id::{DocumentId, IdExhausted, IdSequence, NodeId};
+pub use linear_buffer::{FixedBytes, LinearBuffer};
 pub use redact::{DiagnosticValue, EscapedText, REDACTED, RedactionPolicy, Sensitivity};
 pub use revision::{LocationError, RevisionExhausted, SourceId, SourceLocation, SourceRevision};
 pub use source::{InvalidSpan, SourceSpan};

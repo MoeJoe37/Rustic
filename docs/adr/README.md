@@ -92,6 +92,7 @@ instead of rewriting the history of a decision.
 | [0082](0082-wasm-numeric-globals.md) | Live numeric global wrappers and guest slot ownership | Accepted for M9 |
 | [0083](0083-wasm-js-function-imports.md) | Reentrant numeric function imports and traced Window bindings | Accepted for M9 |
 | [0084](0084-shared-numeric-wasm-globals.md) | Shared numeric Wasm globals and ordered JavaScript import snapshots | Accepted for M9 |
+| [0085](0085-wasm-fixed-memory-buffers.md) | Unshared Wasm linear memory and fixed-length buffer generations | Accepted for M9 |
 
 ## Records by area
 

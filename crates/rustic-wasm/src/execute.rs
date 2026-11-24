@@ -10,12 +10,14 @@ use crate::{
 
 mod imports;
 mod machine;
+mod memory;
 mod numeric;
 mod state;
 mod table;
 
 use imports::BoundFunction;
 pub use imports::{FunctionImport, HostDispatch, HostTrap};
+pub use memory::{LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES};
 pub use state::NumericGlobal;
 use state::State;
 
@@ -317,6 +319,7 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         let state = RefCell::new(State::new(
             module.module().declarations(),
             &[],
+            &[],
             limits,
             &mut budget,
             |bytes, _, _| Ok(Cow::Borrowed(bytes)),
@@ -381,6 +384,11 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
             .share()
     }
 
+    /// Retain a handle to a memory in this instance's memory index space.
+    pub fn memory(&self, index: u32) -> Option<LinearMemory> {
+        self.state.borrow().memories.get(index as usize).cloned()
+    }
+
     /// Invoke a numeric function export with fresh budgets and persistent state.
     pub fn invoke(
         &mut self,
@@ -429,25 +437,26 @@ impl Instance<'static, 'static> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, ExecutionError> {
-        let instance = Self::prepare_owned(module, limits, cancellation, false, &[])?;
+        let instance = Self::prepare_owned(module, limits, cancellation, false, &[], &[])?;
         instance
             .executable
             .run_start(&instance.state, cancellation, None)?;
         Ok(instance)
     }
 
-    /// Instantiate an owned module with numeric globals and function imports.
-    /// Supply globals in global index order, and dispatch functions in their
-    /// separate function index space. The host resolves callable bindings.
+    /// Instantiate an owned module with function, memory and numeric global imports.
+    /// Supply memories and globals in their own index spaces, and dispatch
+    /// functions in function index order. The host resolves callable bindings.
     /// The start function runs with this dispatcher before returning.
     pub fn instantiate_owned_with_host(
         module: ValidatedModule<'_>,
         limits: InstanceLimits,
         cancellation: &CancellationToken,
         globals: &[NumericGlobal],
+        memories: &[LinearMemory],
         dispatch: &mut HostDispatch<'_>,
     ) -> Result<Self, ExecutionError> {
-        let instance = Self::prepare_owned(module, limits, cancellation, true, globals)?;
+        let instance = Self::prepare_owned(module, limits, cancellation, true, globals, memories)?;
         instance
             .executable
             .run_start(&instance.state, cancellation, Some(dispatch))?;
@@ -460,6 +469,7 @@ impl Instance<'static, 'static> {
         cancellation: &CancellationToken,
         allow_imports: bool,
         globals: &[NumericGlobal],
+        memories: &[LinearMemory],
     ) -> Result<Self, ExecutionError> {
         let module = module.into_module();
         let declarations = module.declarations;
@@ -493,6 +503,7 @@ impl Instance<'static, 'static> {
         let state = RefCell::new(State::new(
             &declarations,
             globals,
+            memories,
             limits,
             &mut budget,
             |bytes, offset, budget| {

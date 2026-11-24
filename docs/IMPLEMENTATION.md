@@ -3342,7 +3342,7 @@ selection with five numeric provider bindings matched 1,881 invocations,
 including 1,098 additional bulk table cases using imported functions. A
 separate numeric, control and memory replay matched 16,108 invocations.
 Window links numeric JavaScript callbacks by function index.
-Reference-valued host calls and shared memory and table bindings remain open.
+Reference-valued host calls, table bindings and threaded memories remain open.
 [ADR 0079](adr/0079-wasm-function-imports.md),
 [ADR 0083](adr/0083-wasm-js-function-imports.md)
 
@@ -3378,7 +3378,8 @@ upstream Wasm module builder uses `unescape` for UTF-8 fixture names.
 `Instance::instantiate_owned` consumes validated code, copies retained names
 and passive data, and keeps mutable guest state after the input is released.
 Window exposes `Instance`, `instantiate` and `instantiateStreaming` for
-modules with numeric function and global imports and exports.
+modules with numeric function, numeric global and unshared 32-bit memory
+imports and exports.
 Exported functions retain their instance through the collector. Export aliases
 share identity.
 Arguments use JavaScript coercion, `i64` crosses as BigInt, multi-value results
@@ -3391,8 +3392,8 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Memory and table imports and wrappers, reference-valued host calls, and the
-progressive response pipeline remain open.
+Table imports and wrappers, memory64, shared memories, resizable Wasm buffers,
+reference-valued host calls and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3434,7 +3435,26 @@ after compilation. Replacing an import property after the lookup leaves
 the selected binding intact. A write to a selected mutable global remains
 visible to the guest. [ADR 0084](adr/0084-shared-numeric-wasm-globals.md)
 
-The pinned `Instance` and `instantiate` constructor fixtures pass 68 of
-86 subtests, including numeric imports and synchronous Module lookup.
-Their 18 expected failures cover memory and table constructors or exports,
-which need the remaining state wrappers.
+The pinned `Instance` and `instantiate` constructor fixtures exercise
+numeric imports, memory links and synchronous Module lookup. They now pass
+71 of 86 subtests. The remaining 15 exercise table constructors or exports.
+
+### WASM-06 — Window unshared 32-bit memory bindings
+
+`WebAssembly.Memory` supports construction, `grow`, `buffer` and
+`toFixedLengthBuffer`. JavaScript views and guest instructions use the same
+backing bytes. Re-exporting an imported memory preserves its wrapper.
+Successful growth, including zero pages, detaches the previous fixed-length
+buffer. The next buffer preserves the old contents and exposes a zeroed tail.
+Failed growth leaves the current view attached.
+
+Linking checks the current minimum and declared maximum. Memory owned by one
+instance shares an aggregate growth budget, including growth through any
+exported wrapper. Browser-owned allocations are capped at 8 MiB per standalone
+memory or per instance's locally allocated memories. Imported allocations
+remain charged to their owner. [ADR 0085](adr/0085-wasm-fixed-memory-buffers.md)
+
+Five pinned memory fixtures pass 49 of 51 subtests. The two expected
+failures require shared memory growth or conversion to a resizable buffer.
+The pinned runner preserves helper paths so the general Wasm and memory
+assertion scripts can load together under their original basenames.

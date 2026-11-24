@@ -1775,3 +1775,62 @@ fn wasm_module_import_lookup_charges_for_long_names_before_reading_properties() 
         Err(rustic_js::runtime::Abrupt::Cancelled)
     ));
 }
+
+#[test]
+fn wasm_fixed_memories_share_live_bytes_and_detach_views_on_successful_growth() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    let outcome = agent.evaluate(r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        const code = Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,11,2,96,1,127,1,127,96,2,127,127,0, 3,4,3,0,1,0,
+            5,4,1,1,1,3,
+            7,37,5,3,109,101,109,2,0, 5,97,108,105,97,115,2,0,
+            4,108,111,97,100,0,0, 5,115,116,111,114,101,0,1, 4,103,114,111,119,0,2,
+            10,26,3,7,0,32,0,45,0,0,11, 9,0,32,0,32,1,58,0,0,11, 6,0,32,0,64,0,11,
+            11,7,1,0,65,0,11,1,5
+        );
+        const consumer = new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 2,11,1,1,109,3,109,101,109,2,1,2,3,
+            7,7,1,3,109,101,109,2,0
+        ));
+        const {mem, alias, load, store, grow} = new WebAssembly.Instance(new WebAssembly.Module(code)).exports;
+        assert(mem instanceof WebAssembly.Memory && mem === alias, 'local memory alias');
+        assert(rejects(WebAssembly.LinkError, () => new WebAssembly.Instance(consumer, {m:{mem}})), 'minimum');
+        const old = mem.buffer;
+        const bytes = new Uint8Array(old);
+        assert(old === alias.buffer && old === mem.toFixedLengthBuffer() && old.byteLength === 65536, 'fixed buffer');
+        assert(bytes[0] === 5, 'active data');
+        new DataView(old).setUint8(1, 44);
+        assert(load(1) === 44, 'JS write visible to guest');
+        store(0, 39);
+        assert(bytes[0] === 39, 'guest write visible to JS');
+        assert(rejects(TypeError, () => old.transfer()) && old === mem.buffer, 'protected detachment');
+        assert(grow(1) === 1 && old.detached && bytes.length === 0, 'guest growth detaches views');
+        const larger = mem.buffer;
+        assert(larger !== old && larger.byteLength === 131072, 'replacement buffer');
+        assert(new Uint8Array(larger)[0] === 39 && load(65536) === 0, 'prefix and zeroed tail');
+        const linked = new WebAssembly.Instance(consumer, {m:{mem}});
+        assert(linked.exports.mem === mem, 'memory import and re-export identity');
+        const tooWide = new WebAssembly.Memory({initial:2,maximum:4});
+        assert(rejects(WebAssembly.LinkError, () => new WebAssembly.Instance(consumer, {m:{mem:tooWide}})), 'maximum');
+        assert(rejects(RangeError, () => linked.exports.mem.grow(2)) && mem.buffer === larger && !larger.detached, 'failed host growth');
+        assert(linked.exports.mem.grow(0) === 2 && larger.detached, 'zero host growth detaches');
+        assert(load(0) === 39, 'retained value after refresh');
+        const onlyBuffer = (new WebAssembly.Memory({initial:1,maximum:1})).buffer;
+        new Uint8Array(onlyBuffer)[0] = 17;
+        assert(new DataView(onlyBuffer).getUint8(0) === 17, 'attached buffer keeps its owner');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}

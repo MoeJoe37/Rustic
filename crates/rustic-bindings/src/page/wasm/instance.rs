@@ -119,8 +119,15 @@ fn start(
         with_root(agent, functions.value(), |agent| {
             let globals = PrivateArray::new(agent, &[])?;
             with_root(agent, globals.value(), |agent| {
-                let bindings = host::Bindings { functions, globals };
-                instantiate_module(agent, module, resolved, bindings, proto)
+                let memories = PrivateArray::new(agent, &[])?;
+                with_root(agent, memories.value(), |agent| {
+                    let bindings = host::Bindings {
+                        functions,
+                        globals,
+                        memories,
+                    };
+                    instantiate_module(agent, module, resolved, bindings, proto)
+                })
             })
         })
     })
@@ -139,7 +146,7 @@ fn instantiate_module(
         let validated = checked(&module.bytes, &Options::default(), &token)
             .map_err(|error| error.throw(agent))?;
         let declarations = validated.module().declarations();
-        let global_cells = host::link(agent, &validated, resolved, bindings)?;
+        let state = host::link(agent, &validated, resolved, bindings)?;
         let imported_functions = bindings.functions.len(agent)? as usize;
         for export in &declarations.exports {
             let supported = match export.value.target {
@@ -159,18 +166,19 @@ fn instantiate_module(
                     }
                 }
                 ExportIndex::Global(index) => {
-                    match (index as usize).checked_sub(global_cells.len()) {
+                    match (index as usize).checked_sub(state.globals.len()) {
                         Some(local) => is_numeric(declarations.globals[local].value.ty.value_type),
                         None => true,
                     }
                 }
+                ExportIndex::Memory(_) => true,
                 _ => false,
             };
             if !supported {
                 return Err(wasm_error(
                     agent,
                     LINK_ERROR,
-                    "this WebAssembly instance supports numeric function and global exports",
+                    "this WebAssembly instance supports numeric function, memory and global exports",
                 ));
             }
         }
@@ -178,7 +186,7 @@ fn instantiate_module(
             memory_bytes: if declarations.memories.is_empty() {
                 0
             } else {
-                8 * 1024 * 1024
+                memory::MEMORY_LIMIT
             },
             table_elements: if declarations.tables.is_empty() && declarations.elements.is_empty() {
                 0
@@ -197,7 +205,8 @@ fn instantiate_module(
                     validated,
                     limits,
                     &token,
-                    &global_cells,
+                    &state.globals,
+                    &state.memories,
                     dispatch,
                 )
             })
@@ -208,7 +217,11 @@ fn instantiate_module(
     with_root(agent, object, |agent| {
         let record = PrivateArray::new(
             agent,
-            &[bindings.functions.value(), bindings.globals.value()],
+            &[
+                bindings.functions.value(),
+                bindings.globals.value(),
+                bindings.memories.value(),
+            ],
         )?;
         with_page(agent, |agent, page| {
             agent.weak_map_set(page.wasm_calls, object, record.value())
@@ -264,6 +277,15 @@ fn populate_exports(
                                 .share_numeric_global(index)
                                 .expect("numeric exported global");
                             global::export(agent, instance, state)?
+                        }
+                    }
+                    ExportIndex::Memory(index) => {
+                        let imported = bindings.memories.get(agent, index)?;
+                        if imported != Value::UNDEFINED {
+                            imported
+                        } else {
+                            let state = runtime.memory(index).expect("exported memory");
+                            memory::export(agent, instance, state)?
                         }
                     }
                     _ => unreachable!("admitted exports checked before instantiation"),

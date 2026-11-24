@@ -112,7 +112,7 @@ pub(super) fn for_dispatch(
         budget.spend(offset, 1)?;
         let type_index = match entry.value.ty {
             ImportType::Function(index) => index,
-            ImportType::Global(_) => continue,
+            ImportType::Global(_) | ImportType::Memory(_) => continue,
             _ => return Err(error(offset, Fault::UnsupportedModule)),
         };
         let signature = &declarations.types[type_index as usize].value;

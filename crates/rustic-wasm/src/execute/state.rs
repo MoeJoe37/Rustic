@@ -1,20 +1,17 @@
 use std::{cell::Cell, ops::Range, rc::Rc};
 
+use super::memory::MemoryPool;
 use super::table::Tables;
 use super::*;
 use crate::validate::numeric::memory_access;
 use crate::{Declarations, Immediate, ImportType};
 
-const PAGE: usize = 65_536;
-
 #[derive(Default)]
 pub(super) struct State<'bytes> {
     pub(super) globals: Vec<GlobalSlot>,
     pub(super) tables: Tables,
-    memories: Vec<Memory>,
+    pub(super) memories: Vec<LinearMemory>,
     data: Vec<Cow<'bytes, [u8]>>,
-    memory_limit: usize,
-    memory_bytes: usize,
 }
 
 /// A thread-confined numeric global shared with a host or other instances.
@@ -114,11 +111,6 @@ impl GlobalSlot {
     }
 }
 
-struct Memory {
-    bytes: Vec<u8>,
-    max_pages: usize,
-}
-
 pub(super) struct Transfer {
     pub(super) destination: u32,
     pub(super) source: u32,
@@ -129,6 +121,7 @@ impl<'bytes> State<'bytes> {
     pub(super) fn new<'input>(
         declarations: &Declarations<'input>,
         mut imports: &[NumericGlobal],
+        mut imported_memories: &[LinearMemory],
         limits: InstanceLimits,
         budget: &mut Budget<'_>,
         mut retain_data: impl FnMut(
@@ -137,10 +130,7 @@ impl<'bytes> State<'bytes> {
             &mut Budget<'_>,
         ) -> Result<Cow<'bytes, [u8]>, ExecutionError>,
     ) -> Result<Self, ExecutionError> {
-        let mut state = Self {
-            memory_limit: limits.memory_bytes,
-            ..Self::default()
-        };
+        let mut state = Self::default();
         for entry in &declarations.imports {
             let ImportType::Global(ty) = entry.value.ty else {
                 continue;
@@ -180,22 +170,30 @@ impl<'bytes> State<'bytes> {
             )?;
         }
         state.tables = Tables::new(declarations, &state.globals, limits, budget)?;
-        for entry in &declarations.memories {
-            let offset = entry.offset;
-            let len = (entry.value.min as usize)
-                .checked_mul(PAGE)
-                .filter(|&len| len <= state.memory_limit - state.memory_bytes)
-                .ok_or_else(|| error(offset, Fault::LimitExceeded))?;
-            budget.spend(offset, 1 + len)?;
-            let mut bytes = Vec::new();
-            bytes
-                .try_reserve_exact(len)
-                .map_err(|_| error(offset, Fault::LimitExceeded))?;
-            bytes.resize(len, 0);
-            let max_pages = entry.value.max.unwrap_or(65_536) as usize;
-            append(&mut state.memories, Memory { bytes, max_pages }, offset)?;
-            state.memory_bytes += len;
+        for entry in &declarations.imports {
+            let ImportType::Memory(ty) = entry.value.ty else {
+                continue;
+            };
+            budget.spend(entry.offset, 1)?;
+            let Some((memory, remaining)) = imported_memories.split_first() else {
+                return Err(error(entry.offset, Fault::MissingImport));
+            };
+            if !memory.matches(ty) {
+                return Err(error(entry.offset, Fault::ImportTypeMismatch));
+            }
+            append(&mut state.memories, memory.clone(), entry.offset)?;
+            imported_memories = remaining;
         }
+        if !imported_memories.is_empty() {
+            return Err(error(0, Fault::ImportTypeMismatch));
+        }
+        let pool = MemoryPool::new(limits.memory_bytes);
+        for entry in &declarations.memories {
+            let memory = LinearMemory::local(entry.value, &pool, entry.offset, budget)?;
+            append(&mut state.memories, memory, entry.offset)?;
+        }
+        let mut active_segments = Vec::new();
+        let mut segment_trap = None;
         for entry in &declarations.data {
             budget.spend(entry.offset, 1)?;
             let bytes = entry.value.bytes;
@@ -207,27 +205,46 @@ impl<'bytes> State<'bytes> {
                     budget,
                 )?
                 .i32();
-                let memory = &mut state.memories[active.target as usize].bytes;
-                let range = checked_range(
+                let memory = &state.memories[active.target as usize];
+                let range = match checked_range(
                     memory.len(),
                     u64::from(address as u32),
                     bytes.len(),
                     entry.offset,
                     Fault::MemoryOutOfBounds,
-                )?;
+                ) {
+                    Ok(range) => range,
+                    Err(trap) => {
+                        segment_trap = Some(trap);
+                        break;
+                    }
+                };
                 budget.spend(entry.offset, bytes.len())?;
-                memory[range].copy_from_slice(bytes);
+                append(
+                    &mut active_segments,
+                    (active.target, range, bytes),
+                    entry.offset,
+                )?;
                 Cow::Borrowed(&[][..])
             } else {
                 retain_data(bytes, entry.offset, budget)?
             };
             append(&mut state.data, passive, entry.offset)?;
         }
+        // Finish fallible preparation before copying the checked prefix.
+        // A guest bounds trap preserves earlier segment writes.
+        budget.spend(0, 0)?;
+        for (target, range, bytes) in active_segments {
+            state.memories[target as usize].write(|memory| memory[range].copy_from_slice(bytes));
+        }
+        if let Some(trap) = segment_trap {
+            return Err(trap);
+        }
         Ok(state)
     }
 
     pub(super) fn size(&self, memory: u32) -> i32 {
-        (self.memories[memory as usize].bytes.len() / PAGE) as i32
+        self.memories[memory as usize].pages() as i32
     }
 
     pub(super) fn grow(
@@ -237,30 +254,8 @@ impl<'bytes> State<'bytes> {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<i32, ExecutionError> {
-        let memory = &mut self.memories[memory as usize];
-        let old_len = memory.bytes.len();
-        let old_pages = old_len / PAGE;
-        let new_len = old_pages
-            .checked_add(pages as usize)
-            .filter(|&pages| pages <= memory.max_pages)
-            .and_then(|pages| pages.checked_mul(PAGE))
-            .filter(|&len| len - old_len <= self.memory_limit - self.memory_bytes);
-        let Some(new_len) = new_len else {
-            return Ok(-1);
-        };
-        let additional = new_len - old_len;
-        let work = if new_len > memory.bytes.capacity() {
-            new_len
-        } else {
-            additional
-        };
-        budget.spend(offset, work)?;
-        if memory.bytes.try_reserve_exact(additional).is_err() {
-            return Ok(-1);
-        }
-        memory.bytes.resize(new_len, 0);
-        self.memory_bytes += additional;
-        Ok(old_pages as i32)
+        let old = self.memories[memory as usize].grow(pages, |work| budget.spend(offset, work))?;
+        Ok(old.map_or(-1, |pages| pages as i32))
     }
 
     pub(super) fn access(
@@ -271,10 +266,10 @@ impl<'bytes> State<'bytes> {
         store: Option<Value>,
         offset: usize,
     ) -> Result<Option<Value>, ExecutionError> {
-        let bytes = &mut self.memories[memory as usize].bytes;
+        let memory = &self.memories[memory as usize];
         let (_, alignment) = memory_access(op);
         let len = 1 << alignment;
-        let range = checked_range(bytes.len(), address, len, offset, Fault::MemoryOutOfBounds)?;
+        let range = checked_range(memory.len(), address, len, offset, Fault::MemoryOutOfBounds)?;
         let mut buffer = [0u8; 8];
         if let Some(value) = store {
             let bits = match value {
@@ -283,10 +278,10 @@ impl<'bytes> State<'bytes> {
                 Value::F32(bits) => u64::from(bits),
                 Value::F64(bits) => bits,
             };
-            bytes[range].copy_from_slice(&bits.to_le_bytes()[..len]);
+            memory.write(|bytes| bytes[range].copy_from_slice(&bits.to_le_bytes()[..len]));
             return Ok(None);
         }
-        buffer[..len].copy_from_slice(&bytes[range]);
+        memory.read(|bytes| buffer[..len].copy_from_slice(&bytes[range]));
         let bits = u64::from_le_bytes(buffer);
         let value = match op {
             0x28 | 0x2d | 0x2f => Value::I32(bits as i32),
@@ -312,7 +307,7 @@ impl<'bytes> State<'bytes> {
         budget: &mut Budget<'_>,
     ) -> Result<(), ExecutionError> {
         let source = self.data[data as usize].as_ref();
-        let destination = &mut self.memories[memory as usize].bytes;
+        let destination = &self.memories[memory as usize];
         let (src, dst) = transfer.ranges(
             source.len(),
             destination.len(),
@@ -320,7 +315,7 @@ impl<'bytes> State<'bytes> {
             Fault::MemoryOutOfBounds,
         )?;
         budget.spend(offset, transfer.size as usize)?;
-        destination[dst].copy_from_slice(&source[src]);
+        destination.write(|bytes| bytes[dst].copy_from_slice(&source[src]));
         Ok(())
     }
 
@@ -336,24 +331,21 @@ impl<'bytes> State<'bytes> {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<(), ExecutionError> {
-        let (destination, source) = (destination as usize, source as usize);
+        let destination = &self.memories[destination as usize];
+        let source = &self.memories[source as usize];
         let (src, dst) = transfer.ranges(
-            self.memories[source].bytes.len(),
-            self.memories[destination].bytes.len(),
+            source.len(),
+            destination.len(),
             offset,
             Fault::MemoryOutOfBounds,
         )?;
         budget.spend(offset, transfer.size as usize)?;
-        if destination == source {
-            self.memories[destination].bytes.copy_within(src, dst.start);
+        if destination.aliases(source) {
+            destination.write(|bytes| bytes.copy_within(src, dst.start));
         } else {
-            let (before, after) = self.memories.split_at_mut(destination.max(source));
-            let (target, origin) = if destination < source {
-                (&mut before[destination], &after[0])
-            } else {
-                (&mut after[0], &before[source])
-            };
-            target.bytes[dst].copy_from_slice(&origin.bytes[src]);
+            source.read(|input| {
+                destination.write(|output| output[dst].copy_from_slice(&input[src]));
+            });
         }
         Ok(())
     }
@@ -365,16 +357,16 @@ impl<'bytes> State<'bytes> {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<(), ExecutionError> {
-        let bytes = &mut self.memories[memory as usize].bytes;
+        let memory = &self.memories[memory as usize];
         let range = checked_range(
-            bytes.len(),
+            memory.len(),
             u64::from(transfer.destination),
             transfer.size as usize,
             offset,
             Fault::MemoryOutOfBounds,
         )?;
         budget.spend(offset, transfer.size as usize)?;
-        bytes[range].fill(transfer.source as u8);
+        memory.write(|bytes| bytes[range].fill(transfer.source as u8));
         Ok(())
     }
 }

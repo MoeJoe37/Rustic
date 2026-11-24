@@ -3,6 +3,7 @@
 mod global;
 mod host;
 mod instance;
+mod memory;
 
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
@@ -97,6 +98,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     define_method(agent, namespace, "compile", compile, 1)?;
     define_method(agent, namespace, "compileStreaming", compile_streaming, 1)?;
     global::install(agent, namespace)?;
+    memory::install(agent, namespace)?;
     instance::install(agent, namespace)?;
 
     let module = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
@@ -358,7 +360,7 @@ fn validate(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         return Ok(Value::FALSE);
     }
     compilation_work(agent, len, |agent| {
-        match checked(agent.web_buffer_bytes(source), &options, &token) {
+        match checked(&agent.web_buffer_bytes(source), &options, &token) {
             Ok(_) => Ok(Value::TRUE),
             Err(error) if error.cancelled() => Err(Abrupt::Cancelled),
             Err(_) => Ok(Value::FALSE),
@@ -383,18 +385,18 @@ fn compilation_scratch(length: usize) -> usize {
 }
 
 fn snapshot(agent: &mut Agent, source: ObjectId) -> JsResult<Vec<u8>> {
-    let bytes = agent.web_buffer_bytes(source);
-    if bytes.len() > MAX_BYTES {
+    if agent.web_buffer_bytes(source).len() > MAX_BYTES {
         return Err(compile_error(
             agent,
             "WebAssembly binary exceeds the input limit",
         ));
     }
+    let bytes = agent.web_buffer_bytes(source);
     let mut stable = Vec::new();
     stable
         .try_reserve_exact(bytes.len())
         .map_err(|_| OutOfMemory)?;
-    stable.extend_from_slice(bytes);
+    stable.extend_from_slice(&bytes);
     Ok(stable)
 }
 

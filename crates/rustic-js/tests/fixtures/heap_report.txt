@@ -13,4 +13,4 @@ fractional number in an array slot: 0
 compiled empty function: 240
 instructions in an empty function: 3
 bytes per instruction, tables included (x100): 2633
-agent with the standard library: 130572
+agent with the standard library: 130900

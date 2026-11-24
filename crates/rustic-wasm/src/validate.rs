@@ -121,6 +121,10 @@ impl<'a> ValidatedModule<'a> {
     pub fn module(&self) -> &DecodedModule<'a> {
         &self.module
     }
+
+    pub(crate) fn into_module(self) -> DecodedModule<'a> {
+        self.module
+    }
 }
 
 /// Validate numeric and multi-value control flow, local and global access,

@@ -3359,8 +3359,7 @@ construction and both compilation entry points independently of string
 evaluation. Validation can run under a compilation restriction. The eight
 pinned Window WPT files cover compilation, validation and module reflection.
 All 120 subtests pass.
-JavaScript instantiation, imported string builtins, and a progressive
-response pipeline remain open.
+Imported string builtins and a progressive response pipeline remain open.
 [ADR 0080](adr/0080-window-wasm-module-compilation.md)
 
 ### ECMAScript Annex B — Legacy percent functions
@@ -3371,3 +3370,24 @@ on decode. Encoding uses the Annex B alphabet and uppercase hex digits.
 The runtime test covers conversion, edge cases and intrinsic descriptors.
 All 35 files in the two pinned Test262 Annex B directories pass. The
 upstream Wasm module builder uses `unescape` for UTF-8 fixture names.
+
+### WASM-05/06 — Owned instances and numeric Window exports
+
+`Instance::instantiate_owned` consumes validated code, copies retained names
+and passive data, and keeps mutable guest state after the input is released.
+Window exposes `Instance`, `instantiate` and `instantiateStreaming` for
+import-free modules with numeric function exports. Exported functions retain
+their instance through the collector. Export aliases share identity.
+Arguments use JavaScript coercion, `i64` crosses as BigInt, multi-value results
+are arrays, and execution traps surface as `WebAssembly.RuntimeError`.
+Both pinned Instance WPT files pass all six subtests, covering the exports
+getter and string tag. A network integration test covers streaming
+instantiation under enforced and report-only CSP.
+
+The standard-library heap baseline grew by 328 bytes for the Annex B
+`escape` and `unescape` function objects and their properties. The standalone
+ECMAScript agent still has no Window Wasm objects.
+
+JavaScript imports, exported state wrappers, reference-valued host calls,
+and the progressive response pipeline remain open.
+[ADR 0081](adr/0081-owned-wasm-instances.md)

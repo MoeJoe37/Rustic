@@ -1,5 +1,7 @@
 //! Window WebAssembly byte compilation and module metadata.
 
+mod instance;
+
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
 use rustic_base::CancellationToken;
@@ -42,7 +44,7 @@ struct Import {
 
 struct Export {
     name: Range<usize>,
-    kind: &'static str,
+    target: ExportIndex,
 }
 
 struct Custom {
@@ -92,6 +94,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     define_method(agent, namespace, "validate", validate, 1)?;
     define_method(agent, namespace, "compile", compile, 1)?;
     define_method(agent, namespace, "compileStreaming", compile_streaming, 1)?;
+    instance::install(agent, namespace)?;
 
     let module = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
     tag(agent, module, MODULE)?;
@@ -245,8 +248,12 @@ fn construct_error<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) 
 }
 
 pub(super) fn compile_error(agent: &mut Agent, message: &str) -> Abrupt {
+    wasm_error(agent, COMPILE_ERROR, message)
+}
+
+fn wasm_error(agent: &mut Agent, interface: &'static str, message: &str) -> Abrupt {
     let result = (|| {
-        let proto = prototype(agent, COMPILE_ERROR)?;
+        let proto = prototype(agent, interface)?;
         let error = agent.new_error_object_with(proto)?;
         let message = agent.string(message)?;
         agent.define_property_or_throw(
@@ -338,8 +345,12 @@ fn compilation_work<T>(
     agent.spend_native_work((length as u64).div_ceil(64).max(1))?;
     // The decoder retains slot metadata for byte-sized instructions as well
     // as declarations and indices. Its vector limits bound the upper charge.
-    let scratch = (length * 128).min(MAX_DECODER_SCRATCH);
+    let scratch = compilation_scratch(length);
     agent.with_host_memory(scratch, work)
+}
+
+fn compilation_scratch(length: usize) -> usize {
+    (length * 128).min(MAX_DECODER_SCRATCH)
 }
 
 fn snapshot(agent: &mut Agent, source: ObjectId) -> JsResult<Vec<u8>> {
@@ -391,7 +402,7 @@ fn compile(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 
 fn compile_job(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
     let context = agent
-        .host_reaction_context()
+        .host_capture(0)
         .as_object()
         .expect("private compile context");
     let input: Rc<Input> = agent
@@ -422,7 +433,7 @@ fn compile_streaming(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Va
 
 fn stream_job(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let context = agent
-        .host_reaction_context()
+        .host_capture(0)
         .as_object()
         .expect("private stream context");
     let options: Rc<Options> = agent
@@ -533,16 +544,9 @@ fn metadata(
     for entry in &declarations.exports {
         token.check().map_err(|_| Abrupt::Cancelled)?;
         let export = &entry.value;
-        let kind = match export.target {
-            ExportIndex::Function(_) => "function",
-            ExportIndex::Table(_) => "table",
-            ExportIndex::Memory(_) => "memory",
-            ExportIndex::Global(_) => "global",
-            ExportIndex::Tag(_) => "tag",
-        };
         exports.push(Export {
             name: range(bytes, export.name.as_bytes()),
-            kind,
+            target: export.target,
         });
     }
     for section in module.custom_sections() {
@@ -589,9 +593,16 @@ fn imports(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
 fn exports(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let module = module(agent, arg(args, 0))?;
     sequence(agent, module.exports.iter(), |agent, record| {
+        let kind = match record.target {
+            ExportIndex::Function(_) => "function",
+            ExportIndex::Table(_) => "table",
+            ExportIndex::Memory(_) => "memory",
+            ExportIndex::Global(_) => "global",
+            ExportIndex::Tag(_) => "tag",
+        };
         descriptor(
             agent,
-            &[("name", module.text(&record.name)), ("kind", record.kind)],
+            &[("name", module.text(&record.name)), ("kind", kind)],
         )
     })
 }

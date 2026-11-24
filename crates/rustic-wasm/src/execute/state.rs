@@ -12,7 +12,7 @@ pub(super) struct State<'bytes> {
     pub(super) globals: Vec<Slot>,
     pub(super) tables: Tables,
     memories: Vec<Memory>,
-    data: Vec<&'bytes [u8]>,
+    data: Vec<Cow<'bytes, [u8]>>,
     memory_limit: usize,
     memory_bytes: usize,
 }
@@ -29,10 +29,15 @@ pub(super) struct Transfer {
 }
 
 impl<'bytes> State<'bytes> {
-    pub(super) fn new(
-        declarations: &Declarations<'bytes>,
+    pub(super) fn new<'input>(
+        declarations: &Declarations<'input>,
         limits: InstanceLimits,
         budget: &mut Budget<'_>,
+        mut retain_data: impl FnMut(
+            &'input [u8],
+            usize,
+            &mut Budget<'_>,
+        ) -> Result<Cow<'bytes, [u8]>, ExecutionError>,
     ) -> Result<Self, ExecutionError> {
         let mut state = Self {
             memory_limit: limits.memory_bytes,
@@ -86,9 +91,9 @@ impl<'bytes> State<'bytes> {
                 )?;
                 budget.spend(entry.offset, bytes.len())?;
                 memory[range].copy_from_slice(bytes);
-                &[]
+                Cow::Borrowed(&[][..])
             } else {
-                bytes
+                retain_data(bytes, entry.offset, budget)?
             };
             append(&mut state.data, passive, entry.offset)?;
         }
@@ -180,7 +185,7 @@ impl<'bytes> State<'bytes> {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<(), ExecutionError> {
-        let source = self.data[data as usize];
+        let source = self.data[data as usize].as_ref();
         let destination = &mut self.memories[memory as usize].bytes;
         let (src, dst) = transfer.ranges(
             source.len(),
@@ -194,7 +199,7 @@ impl<'bytes> State<'bytes> {
     }
 
     pub(super) fn drop_data(&mut self, data: u32) {
-        self.data[data as usize] = &[];
+        self.data[data as usize] = Cow::Borrowed(&[]);
     }
 
     pub(super) fn copy(

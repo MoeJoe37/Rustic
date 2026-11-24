@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "ef81ae3c487f983bf8be4baa0181332f3f1ace0c8c9d1cf100f527bac39a8e4d",
+  "source_fingerprint": "2eb197ef0bc6630841aeb4b27ed0a5b27862232304dfeb015b2d7bcd15673dbd",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
@@ -4557,6 +4557,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/tables.rs",
               "marker": "fn table_updates_obey_segment_lifetimes_overlap_and_allocation_limits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn owned_instances_outlive_the_source_and_keep_passive_data"
             }
           ],
           "credit": "0.00",
@@ -4598,6 +4603,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/network.rs",
               "marker": "fn document_csp_gates_wasm_compilation_with_its_own_source_keyword"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions"
             }
           ],
           "credit": "0.00",

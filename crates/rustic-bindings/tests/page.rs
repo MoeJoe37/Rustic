@@ -1452,3 +1452,80 @@ fn wasm_validation_charges_native_work_and_propagates_cancellation() {
         Err(rustic_js::runtime::Abrupt::Cancelled)
     ));
 }
+
+#[test]
+fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        function assert(result, reason) { if (!result) throw reason; }
+        function throws(type, run) {
+            try { run(); } catch (error) { if (error instanceof type) return; throw error; }
+            throw 'expected ' + type.name;
+        }
+        const source = Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,15,3,96,1,127,1,127,96,1,126,2,126,124,96,0,0,
+            3,5,4,0,1,2,2,
+            6,6,1,127,1,65,7,11,
+            7,29,4,3,97,100,100,0,0,5,97,108,105,97,115,0,0,
+            4,112,97,105,114,0,1,4,116,114,97,112,0,2,
+            8,1,3,
+            10,38,4,
+               11,0,35,0,32,0,106,36,0,35,0,11,
+               13,0,32,0,68,0,0,0,0,0,0,0,128,11,
+               3,0,0,11,
+               6,0,65,9,36,0,11
+        );
+        const mod = new WebAssembly.Module(source);
+        source.fill(0);
+        class Derived extends WebAssembly.Instance {}
+        const first = new Derived(mod);
+        const second = new WebAssembly.Instance(mod);
+        const exp = first.exports;
+        assert(first instanceof Derived && first.exports === exp, 'instance identity');
+        assert(Object.getPrototypeOf(exp) === null && Object.isFrozen(exp), 'exports shape');
+        assert(exp.add === exp.alias && exp.add.name === '0' && exp.add.length === 1, 'alias identity');
+        const saved = (new WebAssembly.Instance(mod)).exports.add;
+        assert(saved(1) === 10, 'export roots its instance');
+        assert(exp.add(2**32 + 3) === 12, 'i32 coercion');
+        assert(exp.add({valueOf(){ return exp.add(1); }}) === 26, 'reentrant conversion');
+        assert(second.exports.add(0) === 9, 'independent state and start');
+        const pair = exp.pair(-123n);
+        assert(Array.isArray(pair) && pair[0] === -123n && Object.is(pair[1], -0), 'multi-value');
+        throws(TypeError, () => exp.pair(12));
+        throws(TypeError, () => new exp.add(1));
+        throws(WebAssembly.RuntimeError, exp.trap);
+        throws(TypeError, () => WebAssembly.Instance.prototype.exports);
+        throws(TypeError, () => new WebAssembly.Instance(source));
+
+        const imported = new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 1,4,1,96,0,0, 2,7,1,1,109,1,102,0,0
+        ));
+        const badStart = new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 1,4,1,96,0,0, 3,2,1,0, 8,1,0, 10,5,1,3,0,0,11
+        ));
+        throws(TypeError, () => new WebAssembly.Instance(imported));
+        throws(WebAssembly.LinkError, () => new WebAssembly.Instance(imported, {}));
+        throws(WebAssembly.RuntimeError, () => new WebAssembly.Instance(badStart));
+
+        const empty = Uint8Array.of(0,97,115,109,1,0,0,0);
+        let results = [];
+        WebAssembly.instantiate(mod).then(i => results.push(i.exports.add(1) === 10));
+        WebAssembly.instantiate(empty).then(x => results.push(x.module instanceof WebAssembly.Module && x.instance instanceof WebAssembly.Instance));
+        const response = new Response(empty, {headers: {'content-type':'application/wasm'}});
+        WebAssembly.instantiateStreaming(response).then(x => results.push(x.instance instanceof WebAssembly.Instance && response.bodyUsed));
+        WebAssembly.instantiate(empty, 12).catch(e => results.push(e instanceof TypeError));
+        WebAssembly.instantiate(imported, {}).catch(e => results.push(e instanceof WebAssembly.LinkError));
+        WebAssembly.instantiate(badStart).catch(e => results.push(e instanceof WebAssembly.RuntimeError));
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(
+        agent
+            .evaluate("results.length === 6 && results.every(x => x)")
+            .unwrap(),
+        Value::TRUE,
+    );
+}

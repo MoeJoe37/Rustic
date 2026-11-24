@@ -777,9 +777,11 @@ fn document_csp_gates_wasm_compilation_with_its_own_source_keyword() {
         catch(e) { flags.push(e.name); }
         try { eval("1"); flags.push("eval"); }
         catch(e) { flags.push(e.name); }
-        WebAssembly.compileStreaming(fetch("/binary")).then(
-            () => flags.push("stream"), e => flags.push(e.name)
-        ).then(() => document.getElementById("result").textContent = flags.join("/"));
+        Promise.all([
+            WebAssembly.compileStreaming(fetch("/binary")).then(() => "stream", e => e.name),
+            WebAssembly.instantiateStreaming(fetch("/binary")).then(
+                x => x.instance instanceof WebAssembly.Instance ? "instance" : "invalid", e => e.name)
+        ]).then(values => document.getElementById("result").textContent = flags.concat(values).join("/"));
     </script>"#;
     let headers = |csp| {
         [
@@ -830,10 +832,13 @@ fn document_csp_gates_wasm_compilation_with_its_own_source_keyword() {
     .unwrap();
     let grant = format!("http://a.test={}", server.address());
     for (path, expected) in [
-        ("blocked", "true/CompileError/EvalError/CompileError"),
-        ("wasm", "true/module/EvalError/stream"),
-        ("both", "true/module/eval/stream"),
-        ("report", "true/module/eval/stream"),
+        (
+            "blocked",
+            "true/CompileError/EvalError/CompileError/CompileError",
+        ),
+        ("wasm", "true/module/EvalError/stream/instance"),
+        ("both", "true/module/eval/stream/instance"),
+        ("report", "true/module/eval/stream/instance"),
     ] {
         let url = format!("http://a.test/{path}");
         let output = rustic(&["dump-dom", "--run-scripts", "--allow-origin", &grant, &url]);

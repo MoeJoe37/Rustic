@@ -664,8 +664,7 @@ impl Agent {
     ) -> JsResult<Value> {
         let intrinsic = Value::object(self.intrinsics.promise);
         let result = new_capability(self, intrinsic)?;
-        let function = closure(self, handler, "", 1, 1)?;
-        set_capture(self, function, 0, context);
+        let function = self.new_host_closure(handler, "", 1, &[context])?;
         let result_root = self.root(result.promise)?;
         let handler_value = Value::object(function);
         let handler_root = match self.root(handler_value) {
@@ -685,16 +684,6 @@ impl Agent {
         self.unroot(handler_root);
         self.unroot(result_root);
         outcome
-    }
-
-    /// The captured value of a currently running host promise reaction.
-    pub fn host_reaction_context(&self) -> Value {
-        self.active_function()
-            .and_then(|function| match self.heap.object(function).internal() {
-                Some(Internal::Captures(values)) => values.first().copied(),
-                _ => None,
-            })
-            .unwrap_or(Value::UNDEFINED)
     }
 
     /// A new pending `%Promise%` that only the host settles, for host

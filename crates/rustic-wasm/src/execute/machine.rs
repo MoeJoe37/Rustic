@@ -23,7 +23,7 @@ pub(super) fn invoke<'bytes>(
         },
         offset: 0,
     };
-    let signature = instance.function(function).signature();
+    let signature = instance.function_signature(function);
     if arguments.len() != signature.params.len() {
         return Err(error(0, Fault::ArgumentType));
     }
@@ -297,7 +297,7 @@ impl Machine<'_, '_, '_, '_, '_> {
         let callee = self.instance.function(function as usize);
         if callee.type_index() != ty {
             let expected = self.instance.signature(ty);
-            let actual = callee.signature();
+            let actual = self.instance.signature(callee.type_index());
             if actual.params.len() != expected.params.len()
                 || actual.results.len() != expected.results.len()
             {
@@ -314,7 +314,7 @@ impl Machine<'_, '_, '_, '_, '_> {
 
     fn tail_call(&mut self, function: usize) -> Result<(), ExecutionError> {
         let index = self.current().control_base;
-        let count = self.instance.function(function).signature().params.len();
+        let count = self.instance.function_signature(function).params.len();
         self.keep_at(self.controls[index].height, count)?;
         self.pop_call();
         self.call(function)
@@ -367,7 +367,8 @@ impl Machine<'_, '_, '_, '_, '_> {
             Callee::Host(import) => return self.call_host(import),
             Callee::Local(index, local) => (index, local),
         };
-        let params = prepared.signature.params.len();
+        let signature = executable.signature(prepared.function.type_index);
+        let params = signature.params.len();
         let local_base = self.locals.len();
         let height = self.operands.len() - params;
         if self.calls.len() >= self.instance.limits.calls {
@@ -391,7 +392,7 @@ impl Machine<'_, '_, '_, '_, '_> {
         let control_base = self.controls.len();
         self.push_control(Control {
             height,
-            results: prepared.signature.results.len(),
+            results: signature.results.len(),
             end: prepared.function.instructions.len() - 1,
             loop_start: None,
         })?;
@@ -409,7 +410,7 @@ impl Machine<'_, '_, '_, '_, '_> {
 
     fn call_host(&mut self, import: &BoundFunction<'_>) -> Result<(), ExecutionError> {
         let offset = self.offset;
-        let signature = import.signature;
+        let signature = self.instance.signature(import.type_index);
         let params = signature.params.len();
         let result_count = signature.results.len();
         let additional = result_count.saturating_sub(params);

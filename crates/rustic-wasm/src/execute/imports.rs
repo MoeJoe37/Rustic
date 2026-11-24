@@ -43,13 +43,12 @@ impl<'host> FunctionImport<'host> {
 }
 
 pub(super) struct BoundFunction<'module> {
-    pub(super) signature: &'module FunctionType,
     pub(super) type_index: u32,
     pub(super) callback: &'module Callback<'module>,
 }
 
 pub(super) fn link<'module>(
-    declarations: &'module Declarations<'_>,
+    declarations: &Declarations<'_>,
     bindings: &[FunctionImport<'module>],
     budget: &mut Budget<'_>,
 ) -> Result<Vec<BoundFunction<'module>>, ExecutionError> {
@@ -88,7 +87,6 @@ pub(super) fn link<'module>(
         append(
             &mut functions,
             BoundFunction {
-                signature,
                 type_index,
                 callback: binding.callback,
             },

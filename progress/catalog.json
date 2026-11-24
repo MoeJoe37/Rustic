@@ -4205,6 +4205,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/tables.rs",
               "marker": "fn table_updates_obey_segment_lifetimes_overlap_and_allocation_limits"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn owned_instances_outlive_the_source_and_keep_passive_data"
             }
           ]
         },
@@ -4244,6 +4249,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/network.rs",
               "marker": "fn document_csp_gates_wasm_compilation_with_its_own_source_keyword"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_instances_keep_export_identity_owned_state_and_numeric_conversions"
             }
           ]
         },

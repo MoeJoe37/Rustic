@@ -4102,6 +4102,34 @@
       "status": "PASS"
     }
   ],
+  "wasm/jsapi/instance/exports.any.js": [
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting (sloppy mode)",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting (strict mode)",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/instance/toString.any.js": [
+    {
+      "name": "Object.prototype.toString on an Instance",
+      "status": "PASS"
+    },
+    {
+      "name": "@@toStringTag exists on the prototype with the appropriate descriptor",
+      "status": "PASS"
+    }
+  ],
   "wasm/jsapi/module/constructor.any.js": [
     {
       "name": "name",

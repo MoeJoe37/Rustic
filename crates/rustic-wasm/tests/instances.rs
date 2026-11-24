@@ -348,3 +348,31 @@ fn initialization_checks_aggregate_allocation_bounds_and_segment_ends() {
         Fault::MemoryOutOfBounds
     );
 }
+
+#[test]
+fn owned_instances_outlive_the_source_and_keep_passive_data() {
+    let token = CancellationToken::default();
+    let mut instance = {
+        let types = &[1, 0x60, 0, 1, 0x7f];
+        let bytes = program(
+            types,
+            &[(5, &[1, 0, 1])],
+            &[Function {
+                name: "read",
+                ty: 0,
+                code: &[
+                    0x41, 0, 0x41, 0, 0x41, 1, 0xfc, 8, 0, 0, 0x41, 0, 0x2d, 0, 0,
+                ],
+            }],
+            None,
+            Some(&[1, 1, 1, 42]),
+        );
+        Instance::instantiate_owned(validated(&bytes), Default::default(), &token).unwrap()
+    };
+    assert_eq!(
+        instance.function_type("read").unwrap().results,
+        [rustic_wasm::ValueType::I32],
+    );
+    assert_eq!(run(&mut instance, "read", &[]), 42);
+    assert!(instance.function_type("missing").is_none());
+}

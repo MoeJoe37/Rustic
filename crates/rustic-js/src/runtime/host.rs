@@ -17,6 +17,41 @@ pub(crate) const HOST_INTERFACE_BYTES: usize =
     size_of::<((u16, &'static str), ObjectId)>() + size_of::<usize>();
 
 impl Agent {
+    /// Create a non-constructing native function with GC-traced private values.
+    pub fn new_host_closure(
+        &mut self,
+        behavior: NativeFn,
+        name: &str,
+        length: u32,
+        captures: &[Value],
+    ) -> JsResult<ObjectId> {
+        let bytes = captures
+            .len()
+            .checked_mul(size_of::<Value>())
+            .and_then(|bytes| bytes.checked_add(size_of::<super::object::Extra>()))
+            .ok_or(OutOfMemory)?;
+        let mut slots = Vec::new();
+        slots
+            .try_reserve_exact(captures.len())
+            .map_err(|_| OutOfMemory)?;
+        slots.extend_from_slice(captures);
+        let function = self.new_native_function(behavior, name, length)?;
+        self.heap.charge(bytes)?;
+        self.heap.object_mut(function).extra_mut().internal =
+            Some(Internal::Captures(slots.into_boxed_slice()));
+        Ok(function)
+    }
+
+    /// Read a private captured value of the currently running native function.
+    pub fn host_capture(&self, index: usize) -> Value {
+        self.active_function()
+            .and_then(|function| match self.heap.object(function).internal() {
+                Some(Internal::Captures(values)) => values.get(index).copied(),
+                _ => None,
+            })
+            .unwrap_or(Value::UNDEFINED)
+    }
+
     /// Allocate a branded ordinary object with bounded, JS-reference-free
     /// native state. `extra_bytes` covers any storage owned by the state
     /// beyond the value itself. The object owns the state until collection.

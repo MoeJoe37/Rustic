@@ -3,7 +3,7 @@
 use crate::{Instruction, Section, ValueType};
 
 /// A declaration and its absolute byte offset in the module.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Declaration<T> {
     /// Offset of the declaration's first byte.
     pub offset: usize,
@@ -12,7 +12,7 @@ pub struct Declaration<T> {
 }
 
 /// A function signature, including multi-value results.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FunctionType {
     /// Parameters in call order.
     pub params: Vec<ValueType>,
@@ -176,7 +176,7 @@ pub struct DataSegment<'a> {
 }
 
 /// A function body after instruction decoding.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Function {
     /// Index of the function signature.
     pub type_index: u32,

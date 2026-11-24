@@ -302,10 +302,11 @@ deferred until compatibility and profiling justify its security and maintenance
 cost. WebAssembly is a required separate original runtime with bounded decoding,
 validation, execution/traps and explicit imports. Its JS identity/tracing and Web
 compilation adapters follow the existing Fetch and document CSP policies.
-Window module objects own their byte snapshots and reflection metadata.
-[ADR 0080](adr/0080-window-wasm-module-compilation.md) records the compilation
-boundary. The interpreter remains available on hosts without executable-memory
-permission. See WASM-01–08 in [PRODUCT.md](PRODUCT.md).
+Window module objects own byte snapshots and reflection metadata. Numeric
+function exports trace their instance and its interpreter state through the
+JS heap. The interpreter remains available on hosts without executable-memory
+permission. [ADR 0080](adr/0080-window-wasm-module-compilation.md),
+[ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Extensions execute under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native

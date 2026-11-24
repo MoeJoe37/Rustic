@@ -1,10 +1,11 @@
-use std::{collections::HashMap, fmt};
+use std::{borrow::Cow, collections::HashMap, fmt};
 
 use rustic_base::CancellationToken;
 
 use crate::validate::numeric::effect;
 use crate::{
-    BlockType, ExportIndex, Function, FunctionType, Instruction, Opcode, ValidatedModule, ValueType,
+    BlockType, Declaration, Declarations, Export, ExportIndex, Function, FunctionType, Instruction,
+    Opcode, ValidatedModule, ValueType,
 };
 
 mod imports;
@@ -308,9 +309,20 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
             imports,
             &mut budget,
         )?;
-        let mut state = State::new(module.module().declarations(), limits, &mut budget)?;
+        let mut state = State::new(
+            module.module().declarations(),
+            limits,
+            &mut budget,
+            |bytes, _, _| Ok(Cow::Borrowed(bytes)),
+        )?;
         executable.run_start(&mut state, cancellation)?;
         Ok(Self { executable, state })
+    }
+
+    /// Look up a function export's signature without entering the instance.
+    pub fn function_type(&self, export: &str) -> Option<&FunctionType> {
+        let &index = self.executable.exports.get(export)?;
+        Some(self.executable.function_signature(index))
     }
 
     /// Invoke a numeric function export with fresh budgets and persistent state.
@@ -325,6 +337,68 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
     }
 }
 
+impl Instance<'static, 'static> {
+    /// Consume a validated module and retain the code and local instance state.
+    ///
+    /// The original input can be released after this call. Function bodies
+    /// and types move into the instance. Export names and retained passive
+    /// data are copied against the preparation budget. Borrowed callbacks
+    /// use [`Self::instantiate_with_imports`].
+    pub fn instantiate_owned(
+        module: ValidatedModule<'_>,
+        limits: InstanceLimits,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, ExecutionError> {
+        let module = module.into_module();
+        let declarations = module.declarations;
+        let mut budget = Budget {
+            remaining: limits.execution.preparation_work,
+            cancellation,
+        };
+        check_profile(&declarations, Profile::LocalState, false, &mut budget)?;
+        let exports = prepare_exports(&declarations.exports, &mut budget, |name, offset| {
+            let mut owned = String::new();
+            owned
+                .try_reserve_exact(name.len())
+                .map_err(|_| error(offset, Fault::LimitExceeded))?;
+            owned.push_str(name);
+            Ok(Cow::Owned(owned))
+        })?;
+        let functions = prepare_functions(
+            module
+                .functions
+                .into_iter()
+                .map(|entry| (entry.offset, Cow::Owned(entry.value))),
+            Profile::LocalState,
+            &mut budget,
+        )?;
+        let mut state = State::new(
+            &declarations,
+            limits,
+            &mut budget,
+            |bytes, offset, budget| {
+                budget.spend(offset, bytes.len())?;
+                let mut owned = Vec::new();
+                owned
+                    .try_reserve_exact(bytes.len())
+                    .map_err(|_| error(offset, Fault::LimitExceeded))?;
+                owned.extend_from_slice(bytes);
+                Ok(Cow::Owned(owned))
+            },
+        )?;
+        let executable = Executable {
+            types: Cow::Owned(declarations.types),
+            start: declarations.start.map(|entry| entry.value),
+            imports: Vec::new(),
+            functions,
+            exports,
+            limits: limits.execution,
+        };
+        executable.run_start(&mut state, cancellation)?;
+        Ok(Self { executable, state })
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Profile {
     NumericOnly,
@@ -332,10 +406,11 @@ enum Profile {
 }
 
 struct Executable<'module, 'bytes> {
-    module: &'module ValidatedModule<'bytes>,
+    types: Cow<'module, [Declaration<FunctionType>]>,
+    start: Option<u32>,
     imports: Vec<BoundFunction<'module>>,
     functions: Vec<PreparedFunction<'module>>,
-    exports: HashMap<&'bytes str, usize>,
+    exports: HashMap<Cow<'bytes, str>, usize>,
     limits: ExecutionLimits,
 }
 
@@ -349,64 +424,25 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
     ) -> Result<Self, ExecutionError> {
         let decoded = module.module();
         let declarations = decoded.declarations();
-        budget.spend(0, 0)?;
-        let always_unsupported = [
-            declarations
-                .imports
-                .first()
-                .filter(|_| imports.is_none())
-                .map(|entry| entry.offset),
-            declarations.tags.first().map(|entry| entry.offset),
-        ];
-        let stateful = [
-            declarations.tables.first().map(|entry| entry.offset),
-            declarations.elements.first().map(|entry| entry.offset),
-            declarations.memories.first().map(|entry| entry.offset),
-            declarations.globals.first().map(|entry| entry.offset),
-            declarations.data.first().map(|entry| entry.offset),
-        ];
-        let unsupported = always_unsupported.into_iter().chain(
-            stateful
-                .into_iter()
-                .filter(|_| profile == Profile::NumericOnly),
-        );
-        if let Some(offset) = unsupported.flatten().min() {
-            return Err(error(offset, Fault::UnsupportedModule));
-        }
-        for entry in &declarations.types {
-            let types = entry.value.params.iter().chain(&entry.value.results);
-            budget.spend(
-                entry.offset,
-                1 + entry.value.params.len() + entry.value.results.len(),
-            )?;
-            if profile == Profile::NumericOnly && !types.copied().all(is_numeric) {
-                return Err(error(entry.offset, Fault::UnsupportedModule));
-            }
-        }
+        check_profile(declarations, profile, imports.is_some(), budget)?;
         let imports = match imports {
             Some(bindings) => imports::link(declarations, bindings, budget)?,
             None => Vec::new(),
         };
-        let mut functions = Vec::new();
-        for entry in decoded.functions() {
-            let signature = &declarations.types[entry.value.type_index as usize].value;
-            let prepared =
-                PreparedFunction::new(&entry.value, signature, entry.offset, profile, budget)?;
-            append(&mut functions, prepared, entry.offset)?;
-        }
-        let mut exports = HashMap::new();
-        for entry in &declarations.exports {
-            budget.spend(entry.offset, 1 + entry.value.name.len())?;
-            let ExportIndex::Function(index) = entry.value.target else {
-                continue;
-            };
-            exports
-                .try_reserve(1)
-                .map_err(|_| error(entry.offset, Fault::LimitExceeded))?;
-            exports.insert(entry.value.name, index as usize);
-        }
+        let functions = prepare_functions(
+            decoded
+                .functions()
+                .iter()
+                .map(|entry| (entry.offset, Cow::Borrowed(&entry.value))),
+            profile,
+            budget,
+        )?;
+        let exports = prepare_exports(&declarations.exports, budget, |name, _| {
+            Ok(Cow::Borrowed(name))
+        })?;
         Ok(Self {
-            module,
+            types: Cow::Borrowed(&declarations.types),
+            start: declarations.start.as_ref().map(|entry| entry.value),
             imports,
             functions,
             exports,
@@ -419,8 +455,8 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         state: &mut State<'bytes>,
         cancellation: &CancellationToken,
     ) -> Result<(), ExecutionError> {
-        if let Some(start) = &self.module.module().declarations().start {
-            machine::invoke(self, state, start.value as usize, &[], 0, cancellation)?;
+        if let Some(start) = self.start {
+            machine::invoke(self, state, start as usize, &[], 0, cancellation)?;
         }
         Ok(())
     }
@@ -458,7 +494,11 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
     }
 
     fn signature(&self, index: u32) -> &FunctionType {
-        &self.module.module().declarations().types[index as usize].value
+        &self.types[index as usize].value
+    }
+
+    fn function_signature(&self, index: usize) -> &FunctionType {
+        self.signature(self.function(index).type_index())
     }
 
     fn function(&self, index: usize) -> Callee<'_, 'module> {
@@ -476,20 +516,89 @@ enum Callee<'code, 'module> {
     Local(usize, &'code PreparedFunction<'module>),
 }
 
-impl<'module> Callee<'_, 'module> {
-    fn signature(&self) -> &'module FunctionType {
-        match self {
-            Self::Host(import) => import.signature,
-            Self::Local(_, local) => local.signature,
-        }
-    }
-
+impl Callee<'_, '_> {
     fn type_index(&self) -> u32 {
         match self {
             Self::Host(import) => import.type_index,
             Self::Local(_, local) => local.function.type_index,
         }
     }
+}
+
+fn check_profile(
+    declarations: &Declarations<'_>,
+    profile: Profile,
+    allow_imports: bool,
+    budget: &mut Budget<'_>,
+) -> Result<(), ExecutionError> {
+    budget.spend(0, 0)?;
+    let always_unsupported = [
+        declarations
+            .imports
+            .first()
+            .filter(|_| !allow_imports)
+            .map(|entry| entry.offset),
+        declarations.tags.first().map(|entry| entry.offset),
+    ];
+    let stateful = [
+        declarations.tables.first().map(|entry| entry.offset),
+        declarations.elements.first().map(|entry| entry.offset),
+        declarations.memories.first().map(|entry| entry.offset),
+        declarations.globals.first().map(|entry| entry.offset),
+        declarations.data.first().map(|entry| entry.offset),
+    ];
+    let unsupported = always_unsupported.into_iter().chain(
+        stateful
+            .into_iter()
+            .filter(|_| profile == Profile::NumericOnly),
+    );
+    if let Some(offset) = unsupported.flatten().min() {
+        return Err(error(offset, Fault::UnsupportedModule));
+    }
+    for entry in &declarations.types {
+        let types = entry.value.params.iter().chain(&entry.value.results);
+        budget.spend(
+            entry.offset,
+            1 + entry.value.params.len() + entry.value.results.len(),
+        )?;
+        if profile == Profile::NumericOnly && !types.copied().all(is_numeric) {
+            return Err(error(entry.offset, Fault::UnsupportedModule));
+        }
+    }
+    Ok(())
+}
+
+fn prepare_functions<'a>(
+    functions: impl Iterator<Item = (usize, Cow<'a, Function>)>,
+    profile: Profile,
+    budget: &mut Budget<'_>,
+) -> Result<Vec<PreparedFunction<'a>>, ExecutionError> {
+    let mut prepared = Vec::new();
+    for (offset, function) in functions {
+        let function = PreparedFunction::new(function, offset, profile, budget)?;
+        append(&mut prepared, function, offset)?;
+    }
+    Ok(prepared)
+}
+
+fn prepare_exports<'input, 'output>(
+    entries: &[Declaration<Export<'input>>],
+    budget: &mut Budget<'_>,
+    mut name: impl FnMut(&'input str, usize) -> Result<Cow<'output, str>, ExecutionError>,
+) -> Result<HashMap<Cow<'output, str>, usize>, ExecutionError> {
+    let mut exports = HashMap::new();
+    for entry in entries {
+        let offset = entry.offset;
+        budget.spend(offset, 1 + entry.value.name.len())?;
+        let ExportIndex::Function(index) = entry.value.target else {
+            continue;
+        };
+        exports
+            .try_reserve(1)
+            .map_err(|_| error(offset, Fault::LimitExceeded))?;
+        exports.insert(name(entry.value.name, offset)?, index as usize);
+    }
+    Ok(exports)
 }
 
 fn is_numeric(ty: ValueType) -> bool {
@@ -506,16 +615,14 @@ struct Jump {
 }
 
 struct PreparedFunction<'a> {
-    function: &'a Function,
-    signature: &'a FunctionType,
+    function: Cow<'a, Function>,
     locals: usize,
     jumps: Vec<Jump>,
 }
 
 impl<'a> PreparedFunction<'a> {
     fn new(
-        function: &'a Function,
-        signature: &'a FunctionType,
+        function: Cow<'a, Function>,
         offset: usize,
         profile: Profile,
         budget: &mut Budget<'_>,
@@ -565,7 +672,6 @@ impl<'a> PreparedFunction<'a> {
         }
         Ok(Self {
             function,
-            signature,
             locals,
             jumps,
         })

@@ -1123,6 +1123,11 @@ impl Agent {
 
     /// Poll cancellation and spend one step for work in a host operation.
     pub fn check_native_work(&mut self) -> JsResult<()> {
+        self.spend_native_work(1)
+    }
+
+    /// Poll cancellation and charge a bounded batch of host work.
+    pub fn spend_native_work(&mut self, steps: u64) -> JsResult<()> {
         if self
             .vm
             .cancel
@@ -1132,10 +1137,7 @@ impl Agent {
             return Err(Abrupt::Cancelled);
         }
         if let Some(left) = &mut self.vm.steps_left {
-            if *left == 0 {
-                return Err(Abrupt::Cancelled);
-            }
-            *left -= 1;
+            *left = left.checked_sub(steps).ok_or(Abrupt::Cancelled)?;
         }
         Ok(())
     }

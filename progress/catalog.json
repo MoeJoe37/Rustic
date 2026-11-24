@@ -4229,6 +4229,21 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/imports.rs",
               "marker": "fn callbacks_observe_cancellation_and_cannot_put_mistyped_values_on_the_stack"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/wasm.rs",
+              "marker": "fn compile_streaming"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_compilation_promises_snapshot_input_and_use_branded_response_metadata"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn document_csp_gates_wasm_compilation_with_its_own_source_keyword"
             }
           ]
         },
@@ -4253,8 +4268,19 @@
           "label": "Core/JS/Web suites, fuzzing and five-platform acceptance",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/wasm.rs",
+              "marker": "struct WasmBinaryTarget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "\"wasm/jsapi/constructor/compile.any.js\""
+            }
+          ]
         }
       ]
     },

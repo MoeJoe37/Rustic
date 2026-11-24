@@ -301,9 +301,11 @@ budgets; an infinite script must not freeze browser chrome. JIT compilation is
 deferred until compatibility and profiling justify its security and maintenance
 cost. WebAssembly is a required separate original runtime with bounded decoding,
 validation, execution/traps and explicit imports. Its JS identity/tracing and Web
-streaming/CSP/MIME adapters do not bypass the existing host policy. Maintain an
-interpreter on platforms without executable-memory permission; see WASM-01–08 in
-[PRODUCT.md](PRODUCT.md).
+compilation adapters follow the existing Fetch and document CSP policies.
+Window module objects own their byte snapshots and reflection metadata.
+[ADR 0080](adr/0080-window-wasm-module-compilation.md) records the compilation
+boundary. The interpreter remains available on hosts without executable-memory
+permission. See WASM-01–08 in [PRODUCT.md](PRODUCT.md).
 
 Extensions execute under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native

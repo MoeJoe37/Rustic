@@ -742,6 +742,7 @@ fn load_scripted_network_document(
     if !session.csp().is_empty() {
         load.set_script_policy(Box::new(InlinePolicy(Rc::clone(&session))))?;
         load.set_string_compilation_allowed(session.allows_eval())?;
+        load.set_wasm_compilation_policy(session.csp().check_wasm_compilation())?;
     }
     load.set_fetch_host(Rc::new(crate::network::SessionFetch(Rc::clone(&session))))?;
     if let Some(storage) = session.storage_host().map_err(LoadError::Broker)? {

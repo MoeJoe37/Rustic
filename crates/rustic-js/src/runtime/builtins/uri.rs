@@ -9,6 +9,7 @@ use crate::runtime::value::Value;
 const RESERVED: &[u8] = b";/?:@&=+$,#";
 const UNESCAPED: &[u8] = b"-_.!~*'()";
 const HEX: &[u8; 16] = b"0123456789ABCDEF";
+const LEGACY_UNESCAPED: &[u8] = b"@*_+-./";
 
 fn malformed(agent: &mut Agent) -> Abrupt {
     agent.throw(ErrorKind::UriError, "malformed URI sequence")
@@ -135,6 +136,70 @@ pub(super) fn decode<const COMPONENT: bool>(
         output.extend_from_slice(encoded);
     }
 
+    decoded_string(agent, output)
+}
+
+/// Annex B.2.1.1 `escape`: encode individual UTF-16 code units.
+pub(super) fn escape(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let input = agent.to_string(arg(args, 0))?;
+    agent.heap.flatten(input)?;
+    let mut output = Vec::new();
+    for index in 0..agent.heap.string(input).len() {
+        agent.check_native_work()?;
+        let unit = agent.heap.string(input).unit(index).expect("in range");
+        if let Ok(byte) = u8::try_from(unit) {
+            if byte.is_ascii_alphanumeric() || LEGACY_UNESCAPED.contains(&byte) {
+                reserve_encoded(agent, &mut output, 1)?;
+                output.push(byte);
+            } else {
+                reserve_encoded(agent, &mut output, 3)?;
+                output.extend([b'%', hex(unit >> 4), hex(unit)]);
+            }
+        } else {
+            reserve_encoded(agent, &mut output, 6)?;
+            output.extend([
+                b'%',
+                b'u',
+                hex(unit >> 12),
+                hex(unit >> 8),
+                hex(unit >> 4),
+                hex(unit),
+            ]);
+        }
+    }
+    agent.string_from(JsStr::Latin1(output.into_boxed_slice()))
+}
+
+fn hex(value: u16) -> u8 {
+    HEX[usize::from(value & 0xf)]
+}
+
+/// Annex B.2.1.2 `unescape`: decode percent escapes and preserve malformed text.
+pub(super) fn unescape(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
+    let input = agent.to_string(arg(args, 0))?;
+    agent.heap.flatten(input)?;
+    let mut index = 0;
+    let mut output = Vec::new();
+    while let Some(unit) = agent.heap.string(input).unit(index) {
+        agent.check_native_work()?;
+        let source = agent.heap.string(input);
+        let (value, width) = if unit == u16::from(b'%') {
+            if source.unit(index + 1) == Some(u16::from(b'u')) {
+                hex_units(source, index + 2, 4).map_or((unit, 1), |value| (value, 6))
+            } else {
+                percent_byte(source, index).map_or((unit, 1), |byte| (u16::from(byte), 3))
+            }
+        } else {
+            (unit, 1)
+        };
+        output.try_reserve(1).map_err(|_| OutOfMemory)?;
+        output.push(value);
+        index += width;
+    }
+    decoded_string(agent, output)
+}
+
+fn decoded_string(agent: &mut Agent, output: Vec<u16>) -> JsResult<Value> {
     let contents = if output.iter().all(|&unit| unit <= u16::from(u8::MAX)) {
         let mut bytes = Vec::new();
         bytes
@@ -152,10 +217,13 @@ fn percent_byte(source: &JsStr, start: usize) -> Option<u8> {
     if source.unit(start)? != u16::from(b'%') {
         return None;
     }
-    let digit = |index| {
-        let unit = source.unit(index)?;
-        let value = char::from_u32(u32::from(unit))?.to_digit(16)?;
-        u8::try_from(value).ok()
-    };
-    Some(digit(start.checked_add(1)?)? * 16 + digit(start.checked_add(2)?)?)
+    u8::try_from(hex_units(source, start.checked_add(1)?, 2)?).ok()
+}
+
+fn hex_units(source: &JsStr, start: usize, digits: usize) -> Option<u16> {
+    (0..digits).try_fold(0, |value, offset| {
+        let unit = source.unit(start.checked_add(offset)?)?;
+        let digit = char::from_u32(u32::from(unit))?.to_digit(16)?;
+        Some(value * 16 + u16::try_from(digit).ok()?)
+    })
 }

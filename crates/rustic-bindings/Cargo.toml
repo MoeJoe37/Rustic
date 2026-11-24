@@ -17,6 +17,7 @@ rustic-js = { path = "../rustic-js" }
 rustic-net = { path = "../rustic-net" }
 rustic-style = { path = "../rustic-style" }
 rustic-url = { path = "../rustic-url" }
+rustic-wasm = { path = "../rustic-wasm" }
 
 [lints]
 workspace = true

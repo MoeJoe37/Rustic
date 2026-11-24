@@ -556,6 +556,15 @@ impl<C: Clock> ScriptedDocument<C> {
         Ok(())
     }
 
+    /// Set the document policy for WebAssembly byte compilation.
+    pub fn set_wasm_compilation_policy(
+        &mut self,
+        verdict: page::WasmCompilationPolicy,
+    ) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        page::set_wasm_compilation_policy(agent, verdict).map_err(|_| ScriptStop::OutOfMemory)
+    }
+
     /// Give the document `fetch()`, backed by the host's network session.
     pub fn set_fetch_host(
         &mut self,

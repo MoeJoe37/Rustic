@@ -364,6 +364,17 @@ impl<C: Clock> ClassicScriptLoad<C> {
         })
     }
 
+    /// Set the document policy for WebAssembly byte compilation.
+    pub fn set_wasm_compilation_policy(
+        &mut self,
+        verdict: rustic_bindings::page::WasmCompilationPolicy,
+    ) -> Result<(), ScriptLoadError> {
+        self.inner.with_pending(|pending| {
+            pending.document.set_wasm_compilation_policy(verdict)?;
+            Ok(())
+        })
+    }
+
     /// The shared work token while the load is active.
     pub fn cancellation(&self) -> Option<&CancellationToken> {
         self.inner.cancellation()

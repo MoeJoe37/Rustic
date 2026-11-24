@@ -108,6 +108,9 @@ Current imported test data includes a pinned BSD-licensed WPT URL subset and an
 MIT-licensed html5lib declaration-tokenizer subset. Their per-crate fixture
 directories retain notices, source revisions/digests, selection manifests and
 reproduction tooling. These are offline test expectations, not runtime code.
+The pinned Window Wasm JS API tests include the upstream WPT copy of the V8
+module builder. It generates test binaries and its BSD notice is retained with
+the fixture sources. [V8 license](../third_party/licenses/V8-WPT-LICENSE.txt)
 
 The HTML runtime now uses a generated table of WHATWG named-reference data.
 Its vendored JSON source, source/table digests, snapshot date, reproduction tool

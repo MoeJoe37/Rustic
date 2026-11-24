@@ -1996,6 +1996,7 @@ dependencies = [
  "rustic-net",
  "rustic-style",
  "rustic-url",
+ "rustic-wasm",
 ]
 
 [[package]]

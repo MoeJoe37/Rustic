@@ -1390,6 +1390,58 @@ fn body_mime_type(agent: &mut Agent, headers: Value) -> JsResult<String> {
         .map_or_else(String::new, |mime| mime.to_string()))
 }
 
+pub(super) fn wasm_response_bytes(agent: &mut Agent, response: Value) -> JsResult<Vec<u8>> {
+    let response = record(agent, response, RESPONSE)?;
+    let headers = response.get(agent, R_HEADERS_RESPONSE)?;
+    let headers = record(agent, headers, HEADERS)?;
+    let (_, headers) = read_list(agent, headers)?;
+    let mime = combined(&headers, "content-type").unwrap_or_default();
+    let first = mime.iter().position(|b| !matches!(b, b' ' | b'\t'));
+    let last = mime.iter().rposition(|b| !matches!(b, b' ' | b'\t'));
+    if !first
+        .zip(last)
+        .is_some_and(|(first, last)| mime[first..=last].eq_ignore_ascii_case(b"application/wasm"))
+    {
+        return agent.type_error("WebAssembly responses require application/wasm");
+    }
+    let kind = response.get(agent, 1)?;
+    if !matches!(
+        kind.as_string()
+            .map(|id| agent.heap.string(id).to_text())
+            .as_deref(),
+        Some("basic" | "cors" | "default")
+    ) {
+        return agent.type_error("WebAssembly response is not readable");
+    }
+    let status = response.get(agent, 3)?.as_number().unwrap_or_default();
+    if !(200.0..=299.0).contains(&status) {
+        return agent.type_error("WebAssembly response must have an ok status");
+    }
+    if response.get(agent, R_USED_RESPONSE)? == Value::TRUE {
+        return agent.type_error("the body is already used");
+    }
+    let body = response.get(agent, R_BODY_RESPONSE)?;
+    if body == Value::NULL {
+        return Ok(Vec::new());
+    }
+    response.set(agent, R_USED_RESPONSE, Value::TRUE)?;
+    let text = agent
+        .heap
+        .string(body.as_string().expect("response byte string"));
+    if text.len() > super::wasm::MAX_BYTES {
+        return Err(super::wasm::compile_error(
+            agent,
+            "WebAssembly binary exceeds the input limit",
+        ));
+    }
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(text.len())
+        .map_err(|_| rustic_js::runtime::OutOfMemory)?;
+    bytes.extend(text.units().map(|unit| unit as u8));
+    Ok(bytes)
+}
+
 pub(super) fn settle(
     agent: &mut Agent,
     promise: ObjectId,

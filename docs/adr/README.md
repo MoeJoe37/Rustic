@@ -87,6 +87,7 @@ instead of rewriting the history of a decision.
 | [0077](0077-wasm-decoding-and-execution-boundaries.md) | WebAssembly binary admission, validator boundary and interpreter-first execution | Accepted for WASM-01 foundations |
 | [0078](0078-platform-font-services.md) | DirectWrite and Core Text font services in `rustic-native`; native codec and OS service adapters owned by their capabilities | Accepted for M8 `platform.native` |
 | [0079](0079-wasm-function-imports.md) | Explicit typed function bindings and the WebAssembly callback boundary | Accepted for M9 |
+| [0080](0080-window-wasm-module-compilation.md) | Realm-owned WebAssembly modules, buffered compilation, and document CSP | Accepted for M9 |
 
 ## Records by area
 
@@ -109,7 +110,7 @@ instead of rewriting the history of a decision.
 | Compositor and desktop host (M8) | 0064, 0065, 0068, 0069, 0071, 0074, 0078 |
 | Developer tools and automation (M8) | 0072 |
 | Accessibility and editing (M8) | 0073 |
-| WebAssembly (M9) | 0077, 0079 |
+| WebAssembly (M9) | 0077, 0079, 0080 |
 
 [SCRIPTING.md](../SCRIPTING.md) summarizes how the M5 records fit together.
 

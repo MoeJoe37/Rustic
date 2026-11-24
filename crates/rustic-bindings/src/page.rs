@@ -15,6 +15,8 @@ use rustic_js::runtime::{
 use crate::heap::WrapperKind;
 use crate::{DomGcError, DomHeap, dom_exception};
 
+pub use rustic_net::csp::Verdict as WasmCompilationPolicy;
+
 mod activation;
 mod attributes;
 mod blob;
@@ -35,6 +37,7 @@ mod resize_observer;
 mod scrolling;
 mod selectors;
 mod url;
+mod wasm;
 mod web_storage;
 mod window;
 
@@ -272,6 +275,7 @@ struct Page {
     storage: RefCell<Option<Rc<dyn web_storage::StorageHost>>>,
     storage_objects: RefCell<[Option<(Value, rustic_js::runtime::HostRoot)>; 2]>,
     fetch: RefCell<Option<Rc<dyn fetch::FetchHost>>>,
+    wasm_compilation: RefCell<WasmCompilationPolicy>,
     fetch_records: ObjectId,
     headers_iterator: ObjectId,
     urls: url::Objects,
@@ -621,6 +625,7 @@ fn install_page(
     web_storage::install(agent)?;
     encoding::install(agent)?;
     blob::install(agent)?;
+    wasm::install(agent)?;
     let headers_iterator = fetch::install(agent)?;
     let urls = url::install(agent)?;
     let navigator = activation::install(agent)?;
@@ -654,6 +659,7 @@ fn install_page(
         storage: RefCell::new(None),
         storage_objects: RefCell::new([None, None]),
         fetch: RefCell::new(None),
+        wasm_compilation: RefCell::new(WasmCompilationPolicy::default()),
         fetch_records,
         headers_iterator,
         urls,
@@ -669,6 +675,17 @@ fn install_page(
 pub fn attach_fetch(agent: &mut Agent, host: Rc<dyn FetchHost>) -> JsResult<()> {
     with_page(agent, |_, page| {
         *page.fetch.borrow_mut() = Some(host);
+        Ok(())
+    })
+}
+
+/// Attach the document's CSP verdict for WebAssembly byte compilation.
+pub fn set_wasm_compilation_policy(
+    agent: &mut Agent,
+    verdict: WasmCompilationPolicy,
+) -> JsResult<()> {
+    with_page(agent, |_, page| {
+        *page.wasm_compilation.borrow_mut() = verdict;
         Ok(())
     })
 }

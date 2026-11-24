@@ -180,6 +180,16 @@ impl Agent {
             .is_some()
     }
 
+    /// Convert an IDL `[AllowResizable] AllowSharedBufferSource`.
+    pub fn web_resizable_buffer_source(&mut self, value: Value) -> JsResult<ObjectId> {
+        if let Some(object) = value.as_object() {
+            if self.source_buffer(object).is_some() {
+                return Ok(object);
+            }
+        }
+        self.type_error("expected a buffer source")
+    }
+
     /// Convert an IDL `BufferSource` whose backing store cannot be shared
     /// or resizable.
     pub fn web_unshared_buffer_source(&mut self, value: Value) -> JsResult<ObjectId> {

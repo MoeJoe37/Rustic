@@ -721,3 +721,33 @@ fn with_environments_respect_unscopables_and_property_references_on_primitives()
     assert!(matches!(Value::number(1.0).kind(), Kind::Number(_)));
     let _ = JsStr::empty();
 }
+
+#[test]
+fn annex_b_percent_functions_preserve_utf16_code_units_and_bad_escapes() {
+    let mut agent = agent();
+    agent.heap.set_gc_stress(true);
+    agent
+        .evaluate(
+            r#"
+        function equal(actual, expected) {
+            if (actual !== expected) throw [actual, expected].join(' != ');
+        }
+        equal(escape('Az09@*_+-./ !~,%\x00é€🚀\uDFFF'),
+              'Az09@*_+-./%20%21%7E%2C%25%00%E9%u20AC%uD83D%uDE80%uDFFF');
+        equal(unescape('%e9%u20aC%uD83D%uDE80%uDFFF'), 'é€🚀\uDFFF');
+        equal(unescape('%U00E9%u0Z0A%u12%xy%0%'), '%U00E9%u0Z0A%u12%xy%0%');
+        equal(unescape('%25u0041%25%41'), '%u0041%A');
+        equal(escape(), 'undefined');
+        equal(unescape(), 'undefined');
+        equal(escape({toString(){return '%'}}), '%25');
+        equal(unescape({toString(){return '%41'}}), 'A');
+        equal(escape.length, 1);
+        equal(unescape.length, 1);
+        for (const f of [escape, unescape]) {
+            try { f(Symbol()); throw 'accepted Symbol'; }
+            catch (e) { if (!(e instanceof TypeError)) throw e; }
+        }
+    "#,
+        )
+        .unwrap();
+}

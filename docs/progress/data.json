@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "c4a4c6bad6b74c4319c493d1f0e69c1665e1c86a0ac49cdf845836e48fed3b53",
+  "source_fingerprint": "ef81ae3c487f983bf8be4baa0181332f3f1ace0c8c9d1cf100f527bac39a8e4d",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
   "completed": 115,
-  "in_progress": 12,
+  "in_progress": 13,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -4583,6 +4583,21 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/imports.rs",
               "marker": "fn callbacks_observe_cancellation_and_cannot_put_mistyped_values_on_the_stack"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/wasm.rs",
+              "marker": "fn compile_streaming"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_compilation_promises_snapshot_input_and_use_branded_response_metadata"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/network.rs",
+              "marker": "fn document_csp_gates_wasm_compilation_with_its_own_source_keyword"
             }
           ],
           "credit": "0.00",
@@ -4613,15 +4628,26 @@
           "label": "Core/JS/Web suites, fuzzing and five-platform acceptance",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
+          "status": "in_progress",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-fuzz/src/wasm.rs",
+              "marker": "struct WasmBinaryTarget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "\"wasm/jsapi/constructor/compile.any.js\""
+            }
+          ],
           "credit": "0.00",
           "engine_share": "0.44"
         }
       ],
       "points": 34,
       "completed": 0,
-      "in_progress": 5,
+      "in_progress": 6,
       "total": 8,
       "contribution": "0.00",
       "percent": "0.00",

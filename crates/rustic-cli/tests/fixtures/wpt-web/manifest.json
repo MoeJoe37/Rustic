@@ -106,13 +106,23 @@
     "url/urlsearchparams-set.any.js",
     "url/urlsearchparams-size.any.js",
     "url/urlsearchparams-sort.any.js",
-    "url/urlsearchparams-stringifier.any.js"
+    "url/urlsearchparams-stringifier.any.js",
+    "wasm/jsapi/constructor/compile.any.js",
+    "wasm/jsapi/constructor/toStringTag.any.js",
+    "wasm/jsapi/constructor/validate.any.js",
+    "wasm/jsapi/module/constructor.any.js",
+    "wasm/jsapi/module/customSections.any.js",
+    "wasm/jsapi/module/exports.any.js",
+    "wasm/jsapi/module/imports.any.js",
+    "wasm/jsapi/module/toString.any.js"
   ],
   "support": [
     "FileAPI/support/Blob.js",
     "dom/constants.js",
     "dom/nodes/mutationobservers.js",
-    "dom/nodes/pre-insertion-validation-notfound.js"
+    "dom/nodes/pre-insertion-validation-notfound.js",
+    "wasm/jsapi/assertions.js",
+    "wasm/jsapi/wasm-module-builder.js"
   ],
   "sha256": {
     "FileAPI/blob/Blob-array-buffer.any.js": "eb5ac8ab115dfb3f91202132c144b33c1e530a456f463324066dbe11ade2f60b",
@@ -224,6 +234,16 @@
     "url/urlsearchparams-set.any.js": "41771dec1616c4715c33a2a77b3125483c4bce24998e344222e9b8d1f49d68de",
     "url/urlsearchparams-size.any.js": "cc17292db2bc179bd2629be9867ded0b413de399a6ce1fbf8943d012894cac94",
     "url/urlsearchparams-sort.any.js": "cdfc1ef89cfcefa5fae94ebdeaa2a869c47b47b47d08aba4c7db0b6e44b31fca",
-    "url/urlsearchparams-stringifier.any.js": "14f7b8871fec6a02dbbe324a5f8943932ecb149285e5cc149fdf34ae769d52c0"
+    "url/urlsearchparams-stringifier.any.js": "14f7b8871fec6a02dbbe324a5f8943932ecb149285e5cc149fdf34ae769d52c0",
+    "wasm/jsapi/assertions.js": "797868004d4d224eb015c9619255aaa6de25c381c20896d55550b901a5102e8a",
+    "wasm/jsapi/constructor/compile.any.js": "6aff3892f95aff5bd1a159f833905bc03e49ba27e90c789e973ea9ef9f1b423f",
+    "wasm/jsapi/constructor/toStringTag.any.js": "ff68060329e0736fbf6e9019fc1e2d11db5ceda00d26721bd7b4009275801c9f",
+    "wasm/jsapi/constructor/validate.any.js": "2ec5e14635b3ac3bf90699d4cda676a451de67a2167fa19aa0e08044f35678ee",
+    "wasm/jsapi/module/constructor.any.js": "fbb71743e9d71c3292c854a547f78e5f479f2a20d8fdf268da0059006868a661",
+    "wasm/jsapi/module/customSections.any.js": "b4346db19ac76f2a39331d7ddff09fa444c9ef43716a4ad357999d010ef657c0",
+    "wasm/jsapi/module/exports.any.js": "7e708e1ede4b4fde5bdb651e203ea8b3a0c300a03886ea0964a35f7941fb8842",
+    "wasm/jsapi/module/imports.any.js": "190c33e14201bc561fb362cc755b094f5c3dfc38cbed5a728bb6e684e7760e7b",
+    "wasm/jsapi/module/toString.any.js": "b4542915022b1e0eaafd95e87352f8a03ac627e1f3b00e4e74c3f9640fd937bb",
+    "wasm/jsapi/wasm-module-builder.js": "8eabf2c5fc2595dedc1fa5c1c53c548de6608300687938e409670dcecec86fd4"
   }
 }

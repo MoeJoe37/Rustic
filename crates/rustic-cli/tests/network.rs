@@ -767,3 +767,84 @@ fn documents_stream_into_the_parser_as_they_arrive() {
         }
     }
 }
+
+#[test]
+fn document_csp_gates_wasm_compilation_with_its_own_source_keyword() {
+    let html = br#"<!doctype html><p id=result>pending</p><script nonce=ok>
+        const bytes = Uint8Array.of(0,97,115,109,1,0,0,0);
+        const flags = [String(WebAssembly.validate(bytes))];
+        try { new WebAssembly.Module(bytes); flags.push("module"); }
+        catch(e) { flags.push(e.name); }
+        try { eval("1"); flags.push("eval"); }
+        catch(e) { flags.push(e.name); }
+        WebAssembly.compileStreaming(fetch("/binary")).then(
+            () => flags.push("stream"), e => flags.push(e.name)
+        ).then(() => document.getElementById("result").textContent = flags.join("/"));
+    </script>"#;
+    let headers = |csp| {
+        [
+            ("Content-Type", "text/html"),
+            ("Content-Security-Policy", csp),
+        ]
+    };
+    let server = FixtureServer::start([
+        (
+            "/blocked",
+            Reply::response(200, &headers("script-src 'nonce-ok'"), html),
+        ),
+        (
+            "/wasm",
+            Reply::response(
+                200,
+                &headers("script-src 'nonce-ok' 'wasm-unsafe-eval'"),
+                html,
+            ),
+        ),
+        (
+            "/both",
+            Reply::response(200, &headers("script-src 'nonce-ok' 'unsafe-eval'"), html),
+        ),
+        (
+            "/report",
+            Reply::response(
+                200,
+                &[
+                    ("Content-Type", "text/html"),
+                    (
+                        "Content-Security-Policy-Report-Only",
+                        "script-src 'nonce-ok'",
+                    ),
+                ],
+                html,
+            ),
+        ),
+        (
+            "/binary",
+            Reply::response(
+                200,
+                &[("Content-Type", "application/wasm")],
+                b"\0asm\x01\0\0\0",
+            ),
+        ),
+    ])
+    .unwrap();
+    let grant = format!("http://a.test={}", server.address());
+    for (path, expected) in [
+        ("blocked", "true/CompileError/EvalError/CompileError"),
+        ("wasm", "true/module/EvalError/stream"),
+        ("both", "true/module/eval/stream"),
+        ("report", "true/module/eval/stream"),
+    ] {
+        let url = format!("http://a.test/{path}");
+        let output = rustic(&["dump-dom", "--run-scripts", "--allow-origin", &grant, &url]);
+        assert!(output.status.success(), "{}", stderr(&output));
+        let dump = stdout(&output);
+        assert!(dump.contains(expected), "{path}: {dump}");
+        let console = stderr(&output);
+        assert_eq!(
+            console.contains("wasm-eval"),
+            matches!(path, "blocked" | "report"),
+            "{path}: {console}",
+        );
+    }
+}

@@ -654,6 +654,49 @@ fn species_constructor(agent: &mut Agent, o: ObjectId) -> JsResult<Value> {
 // ---- jobs --------------------------------------------------------------------
 
 impl Agent {
+    /// React to a promise or thenable using an intrinsic promise and a native
+    /// fulfillment handler. Its one captured value is traced by the JS heap.
+    pub fn react_to_host_value(
+        &mut self,
+        source: Value,
+        handler: NativeFn,
+        context: Value,
+    ) -> JsResult<Value> {
+        let intrinsic = Value::object(self.intrinsics.promise);
+        let result = new_capability(self, intrinsic)?;
+        let function = closure(self, handler, "", 1, 1)?;
+        set_capture(self, function, 0, context);
+        let result_root = self.root(result.promise)?;
+        let handler_value = Value::object(function);
+        let handler_root = match self.root(handler_value) {
+            Ok(root) => root,
+            Err(error) => {
+                self.unroot(result_root);
+                return Err(error.into());
+            }
+        };
+        let attached = (|| {
+            let source = promise_resolve(self, intrinsic, source)?;
+            let promise = source.as_object().expect("intrinsic promise");
+            perform_then(self, promise, handler_value, Value::UNDEFINED, Some(result))?;
+            Ok(result.promise)
+        })();
+        let outcome = result.settle_abrupt(self, attached);
+        self.unroot(handler_root);
+        self.unroot(result_root);
+        outcome
+    }
+
+    /// The captured value of a currently running host promise reaction.
+    pub fn host_reaction_context(&self) -> Value {
+        self.active_function()
+            .and_then(|function| match self.heap.object(function).internal() {
+                Some(Internal::Captures(values)) => values.first().copied(),
+                _ => None,
+            })
+            .unwrap_or(Value::UNDEFINED)
+    }
+
     /// A new pending `%Promise%` that only the host settles, for host
     /// operations such as `fetch()` (Web IDL "a new promise").
     pub fn new_host_promise(&mut self) -> JsResult<ObjectId> {

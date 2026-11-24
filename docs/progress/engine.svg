@@ -4,7 +4,7 @@
 <rect width="1000" height="1382" rx="12" fill="#0d1117"/>
 <g font-family="DejaVu Sans,Arial,sans-serif">
 <text x="24.00" y="38" fill="#f0f6fc" font-size="22" font-weight="700">Rustic · engine progress</text>
-<text x="24.00" y="60" fill="#8b949e" font-size="12">115/228 capabilities complete · 12 in progress · 25 subsystems · engine-v4</text>
+<text x="24.00" y="60" fill="#8b949e" font-size="12">115/228 capabilities complete · 13 in progress · 25 subsystems · engine-v4</text>
 <text x="976.00" y="42" fill="#f0f6fc" font-size="32" text-anchor="end" font-weight="700">50.03%</text>
 <text x="976.00" y="60" fill="#8b949e" font-size="11" text-anchor="end">weighted engine completion</text>
 <rect x="24.00" y="76" width="952.00" height="14" rx="4" fill="#21262d"/>
@@ -680,8 +680,9 @@
 <g><title>Reviewed acceleration with interpreter fallback on mobile/desktop: planned, size 5, M9</title>
 <rect x="788.24" y="816" width="53.88" height="14" rx="2" fill="#30363d"/>
 </g>
-<g><title>Core/JS/Web suites, fuzzing and five-platform acceptance: planned, size 5, M9</title>
+<g><title>Core/JS/Web suites, fuzzing and five-platform acceptance: in progress, size 5, M9, 0.00% verified</title>
 <rect x="844.12" y="816" width="53.88" height="14" rx="2" fill="#30363d"/>
+<rect x="844.62" y="816.5" width="52.88" height="13" rx="2" fill="none" stroke="#388bfd"/>
 </g>
 <text x="976.00" y="827" fill="#c9d1d9" font-size="12" text-anchor="end">0.00</text>
 </g>
@@ -1211,6 +1212,6 @@
 <rect x="640" y="1306" width="12" height="12" rx="2" fill="#30363d"/>
 <text x="660.00" y="1317" fill="#c9d1d9" font-size="12">Planned / remaining</text>
 <text x="24.00" y="1344" fill="#c9d1d9" font-size="11">Points: a subsystem's weight × its done fraction; all points sum to the overall percentage. 100% requires every capability and final acceptance on all five platforms.</text>
-<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot c4a4c6bad6b7</text>
+<text x="24.00" y="1364" fill="#8b949e" font-size="11">Weighted delivery progress · not a web-compatibility percentage · source snapshot ef81ae3c487f</text>
 </g>
 </svg>

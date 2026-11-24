@@ -1288,3 +1288,167 @@ fn auxiliary_documents_are_collected_when_their_last_wrapper_dies() {
         Value::TRUE
     );
 }
+
+#[test]
+fn wasm_modules_snapshot_views_and_expose_fresh_ordered_metadata() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        function assert(value, label) { if (!value) throw label; }
+        function throws(type, run) {
+            try { run(); } catch (error) { if (error instanceof type) return; throw error; }
+            throw 'expected ' + type.name;
+        }
+        const raw = [
+            0,97,115,109,1,0,0,0,
+            0,5,1,120,1,2,3,
+            1,4,1,96,0,0,
+            2,7,1,1,109,1,102,0,0,
+            7,5,1,1,102,0,0,
+            0,4,1,120,8,9,
+            0,1,0
+        ];
+        const backing = new Uint8Array(raw.length + 6);
+        backing.set(raw, 3);
+        const view = new DataView(backing.buffer, 3, raw.length);
+        assert(WebAssembly.validate(view) && !WebAssembly.validate(backing), 'view range');
+        const Module = WebAssembly.Module;
+        class Derived extends Module {}
+        const m = new Derived(view);
+        assert(m instanceof Derived && Object.prototype.toString.call(m) === '[object WebAssembly.Module]', 'prototype');
+        assert(Object.prototype.toString.call(WebAssembly) === '[object WebAssembly]', 'namespace');
+        backing.fill(0);
+        const getImports = Module.imports;
+        const first = getImports(m);
+        assert(first instanceof Array && first.length === 1, 'array of imports');
+        assert(first[0].module === 'm' && first[0].name === 'f' && first[0].kind === 'function', 'import shape');
+        first[0].name = 'wrong';
+        assert(getImports(m)[0].name === 'f', 'fresh descriptor');
+        assert(Module.exports(m)[0].name === 'f', 'export name');
+        const x = Module.customSections(m, 'x');
+        assert(x.length === 2 && new Uint8Array(x[0]).join() === '1,2,3' && new Uint8Array(x[1]).join() === '8,9', 'custom order');
+        new Uint8Array(x[0])[0] = 99;
+        assert(new Uint8Array(Module.customSections(m, 'x')[0])[0] === 1, 'fresh data copy');
+        assert(Module.customSections(m, '')[0].byteLength === 0, 'empty custom payload');
+        assert(Module.customSections(m, '\uD800').length === 0, 'DOMString exact comparison');
+        assert(!WebAssembly.validate(new Uint8Array(raw), { builtins: ['same','same'] }), 'duplicate builtins');
+        assert(WebAssembly.validate(new Uint8Array(raw), { builtins: ['unknown'] }), 'unrecognized builtin');
+        assert(!WebAssembly.validate(new Uint8Array(raw), { importedStringConstants: 'm' }), 'matching unsupported string imports');
+        const resizable = new ArrayBuffer(raw.length, {maxByteLength: raw.length + 2});
+        new Uint8Array(resizable).set(raw);
+        assert(WebAssembly.validate(resizable), 'resizable');
+        const detached = resizable.transfer();
+        assert(!WebAssembly.validate(resizable) && WebAssembly.validate(detached), 'detached buffer');
+        throws(TypeError, () => WebAssembly.validate({byteLength: 8}));
+        throws(TypeError, () => Module(new Uint8Array(raw)));
+        throws(TypeError, () => Module.imports(Object.create(Module.prototype)));
+        throws(TypeError, () => Module.customSections(m));
+        throws(WebAssembly.CompileError, () => new Module(view));
+        const e = WebAssembly.CompileError('message', {cause: 2});
+        assert(e instanceof Error && Error.isError(e) && e.cause === 2 && e.message === 'message', 'actual error');
+    "#).unwrap();
+}
+
+#[test]
+fn wasm_compilation_promises_snapshot_input_and_use_branded_response_metadata() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        const bytes = Uint8Array.of(0,97,115,109,1,0,0,0);
+        const source = bytes.slice();
+        let results = [];
+        const compile = WebAssembly.compile(source);
+        source.fill(0);
+        compile.then(m => results.push(m instanceof WebAssembly.Module));
+        WebAssembly.compile(source).catch(e => results.push(e instanceof WebAssembly.CompileError));
+        WebAssembly.compile({}).catch(e => results.push(e instanceof TypeError));
+        const make = (type, status = 200) => new Response(bytes, {status, headers: {'Content-Type': type}});
+        const good = make(' Application/Wasm\t ');
+        Object.defineProperty(good, 'arrayBuffer', {get() { throw 'must use response internal state' }});
+        Object.defineProperty(good, 'headers', {get() { throw 'must use response internal state' }});
+        const wrapped = {then(resolve) { resolve(good); }};
+        WebAssembly.compileStreaming(wrapped).then(m => {
+            results.push(m instanceof WebAssembly.Module && good.bodyUsed);
+            WebAssembly.compileStreaming(good).catch(e => results.push(e instanceof TypeError));
+        });
+        const bad = make('application/wasm;');
+        WebAssembly.compileStreaming(bad).catch(e => results.push(e instanceof TypeError && !bad.bodyUsed));
+        const missing = new Response(bytes);
+        WebAssembly.compileStreaming(missing).catch(e => results.push(e instanceof TypeError && !missing.bodyUsed));
+        const badStatus = make('application/wasm', 404);
+        WebAssembly.compileStreaming(badStatus).catch(e => results.push(e instanceof TypeError && !badStatus.bodyUsed));
+        const forged = {headers: { 'Content-Type': 'application/wasm' }, status: 200, arrayBuffer() { return bytes.buffer; }};
+        WebAssembly.compileStreaming(forged).catch(e => results.push(e instanceof TypeError));
+        const reason = new Error('reject source');
+        WebAssembly.compileStreaming(Promise.reject(reason)).catch(e => results.push(e === reason));
+        const broken = {get then() { throw reason; }};
+        WebAssembly.compileStreaming(broken).catch(e => results.push(e === reason));
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    let outcome = agent
+        .evaluate("results.length === 11 && results.every(x => x)")
+        .unwrap();
+    assert_eq!(outcome, Value::TRUE);
+}
+
+#[test]
+fn wasm_compilation_policy_applies_to_constructor_and_promises() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    page::set_wasm_compilation_policy(
+        &mut agent,
+        rustic_net::csp::Verdict {
+            blocked: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    agent.evaluate(r#"
+        const b = Uint8Array.of(0,97,115,109,1,0,0,0);
+        let allowed = WebAssembly.validate(b) && eval('40 + 2') === 42;
+        let blocked = 0;
+        function failure(e) { if (e instanceof WebAssembly.CompileError) blocked++; }
+        try { new WebAssembly.Module(b); } catch (e) { failure(e); }
+        WebAssembly.compile(b).catch(failure);
+        WebAssembly.compileStreaming(new Response(b, {headers:{'Content-Type': 'application/wasm'}})).catch(failure);
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    assert_eq!(
+        agent.evaluate("allowed && blocked === 3").unwrap(),
+        Value::TRUE
+    );
+}
+
+#[test]
+fn wasm_validation_charges_native_work_and_propagates_cancellation() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    let validate = agent.evaluate("WebAssembly.validate").unwrap();
+    let bytes = agent.evaluate("new ArrayBuffer(4096)").unwrap();
+    let args = &[bytes];
+    agent.set_step_budget(Some(1));
+    assert!(matches!(
+        agent.call_from_host(validate, Value::UNDEFINED, args),
+        Err(rustic_js::runtime::Abrupt::Cancelled)
+    ));
+    agent.set_step_budget(None);
+    assert_eq!(
+        agent
+            .call_from_host(validate, Value::UNDEFINED, args)
+            .unwrap(),
+        Value::FALSE
+    );
+    let token = rustic_base::CancellationToken::default();
+    token.cancel();
+    agent.set_cancellation(Some(token));
+    assert!(matches!(
+        agent.call_from_host(validate, Value::UNDEFINED, args),
+        Err(rustic_js::runtime::Abrupt::Cancelled)
+    ));
+}

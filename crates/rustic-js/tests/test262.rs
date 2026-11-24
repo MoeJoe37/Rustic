@@ -272,6 +272,24 @@ fn test262_uri_decoders_cover_supplementary_scalars() {
 
 #[test]
 #[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
+fn test262_annex_b_percent_functions_match_the_pinned_directories() {
+    let root = PathBuf::from(
+        std::env::var("RUSTIC_TEST262_DIR").expect("RUSTIC_TEST262_DIR names a Test262 checkout"),
+    );
+    for (directory, count) in [
+        ("test/annexB/built-ins/escape", 16),
+        ("test/annexB/built-ins/unescape", 19),
+    ] {
+        let report = rustic_js::test262::execute_tree(&root, directory, RunLimits::default())
+            .expect("pinned Test262 directory");
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert!(report.skipped.is_empty(), "{:?}", report.skipped);
+        assert_eq!(report.passed.len(), count, "{directory}");
+    }
+}
+
+#[test]
+#[ignore = "needs a Test262 checkout in RUSTIC_TEST262_DIR"]
 fn test262_locale_identifiers_and_case_mapping_match_the_passing_list() {
     check_trees(
         &[

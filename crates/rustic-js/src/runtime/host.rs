@@ -90,19 +90,41 @@ impl Agent {
         prototype: ObjectId,
         initialize: impl FnOnce(&mut Self, ObjectId) -> JsResult<()>,
     ) -> JsResult<()> {
+        self.install_host_interface_on(
+            self.intrinsics.global,
+            interface,
+            behavior,
+            length,
+            prototype,
+            initialize,
+        )
+    }
+
+    /// Install a host constructor on a namespace and retain its intrinsic
+    /// prototype under a qualified name such as `Namespace.Constructor`.
+    pub fn install_host_interface_on(
+        &mut self,
+        target: ObjectId,
+        interface: &'static str,
+        behavior: NativeFn,
+        length: u32,
+        prototype: ObjectId,
+        initialize: impl FnOnce(&mut Self, ObjectId) -> JsResult<()>,
+    ) -> JsResult<()> {
         if self.host_interface_prototype(interface).is_some() {
             return Ok(());
         }
-        let constructor = new_constructor(self, interface, behavior, length, prototype)?;
+        let name = interface.rsplit('.').next().expect("an interface name");
+        let constructor = new_constructor(self, name, behavior, length, prototype)?;
         initialize(self, constructor)?;
-        let key = self.heap.key(interface)?;
+        let key = self.heap.key(name)?;
         self.heap
             .host_interfaces
             .try_reserve(1)
             .map_err(|_| OutOfMemory)?;
         self.heap.charge(HOST_INTERFACE_BYTES)?;
         let published = self.define_property_or_throw(
-            self.intrinsics.global,
+            target,
             key,
             PropertyDescriptor::data_with(Value::object(constructor), true, false, true),
         );

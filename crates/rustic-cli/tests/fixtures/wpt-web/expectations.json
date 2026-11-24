@@ -3795,5 +3795,501 @@
       "name": "URLSearchParams must not do newline normalization",
       "status": "PASS"
     }
+  ],
+  "wasm/jsapi/constructor/compile.any.js": [
+    {
+      "name": "Missing argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Promise type",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty buffer",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid code",
+      "status": "PASS"
+    },
+    {
+      "name": "Result type",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Changing the buffer",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/constructor/toStringTag.any.js": [
+    {
+      "name": "@@toStringTag exists on the namespace object with the appropriate descriptor",
+      "status": "PASS"
+    },
+    {
+      "name": "Object.prototype.toString applied to the namespace object",
+      "status": "PASS"
+    },
+    {
+      "name": "Object.prototype.toString applied after modifying the namespace object's @@toStringTag",
+      "status": "PASS"
+    },
+    {
+      "name": "Object.prototype.toString applied after deleting @@toStringTag",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/constructor/validate.any.js": [
+    {
+      "name": "Missing argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [] in Uint32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [] in Int32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d] in Uint32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d] in Int32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0] in Uint32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0] in Int32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 0 0 0 0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 0 0 0 0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 0 0 0 0] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 0 0 0 0] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 0 0 0 0] in Uint32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 0 0 0 0] in Int32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 2 0 0 0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 2 0 0 0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 2 0 0 0] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 2 0 0 0] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 2 0 0 0] in Uint32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 2 0 0 0] in Int32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 0] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 0] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 1 0] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 1 0] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 2 1 61] in Uint8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 2 1 61] in Int8Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 2 1 61] in Uint16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 2 1 61] in Int16Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 2 1 61] in Uint32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Validating module [0 61 73 6d 1 0 0 0 0 2 1 61] in Int32Array",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/module/constructor.any.js": [
+    {
+      "name": "name",
+      "status": "PASS"
+    },
+    {
+      "name": "length",
+      "status": "PASS"
+    },
+    {
+      "name": "No arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Calling",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty buffer",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid code",
+      "status": "PASS"
+    },
+    {
+      "name": "Prototype",
+      "status": "PASS"
+    },
+    {
+      "name": "Extensibility",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/module/customSections.any.js": [
+    {
+      "name": "Missing arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Non-Module arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty module",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty module: array caching",
+      "status": "PASS"
+    },
+    {
+      "name": "Custom sections",
+      "status": "PASS"
+    },
+    {
+      "name": "Custom sections with surrogate pairs",
+      "status": "PASS"
+    },
+    {
+      "name": "Custom sections with U+FFFD",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Custom section buffers are independent copies",
+      "status": "PASS"
+    },
+    {
+      "name": "Mutating a custom section buffer does not change other copies",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/module/exports.any.js": [
+    {
+      "name": "Missing arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Non-Module arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Return type",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty module",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty module: array caching",
+      "status": "PASS"
+    },
+    {
+      "name": "exports",
+      "status": "PASS"
+    },
+    {
+      "name": "exports with empty name: function",
+      "status": "PASS"
+    },
+    {
+      "name": "exports with empty name: table",
+      "status": "PASS"
+    },
+    {
+      "name": "exports with empty name: global",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/module/imports.any.js": [
+    {
+      "name": "Missing arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Non-Module arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Return type",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty module",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty module: array caching",
+      "status": "PASS"
+    },
+    {
+      "name": "imports",
+      "status": "PASS"
+    },
+    {
+      "name": "imports with empty module name",
+      "status": "PASS"
+    },
+    {
+      "name": "imports with empty names",
+      "status": "PASS"
+    },
+    {
+      "name": "imports with empty module names and names",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/module/toString.any.js": [
+    {
+      "name": "Object.prototype.toString on an Module",
+      "status": "PASS"
+    },
+    {
+      "name": "@@toStringTag exists on the prototype with the appropriate descriptor",
+      "status": "PASS"
+    }
   ]
 }

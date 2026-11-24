@@ -15,10 +15,12 @@ const GLOBAL_FUNCTIONS: &[Method] = &[
     method("decodeURIComponent", super::uri::decode::<true>, 1),
     method("encodeURI", super::uri::encode::<false>, 1),
     method("encodeURIComponent", super::uri::encode::<true>, 1),
+    method("escape", super::uri::escape, 1),
     method("isFinite", is_finite, 1),
     method("isNaN", is_nan, 1),
     method("parseFloat", parse_float, 1),
     method("parseInt", parse_int, 2),
+    method("unescape", super::uri::unescape, 1),
 ];
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {

@@ -3,7 +3,7 @@
 //! their fallbacks, source-list matching (`*`, schemes, hosts with
 //! wildcards, ports and paths, `'self'`, `'none'`), nonces and hashes for
 //! inline scripts and styles, `'unsafe-inline'`, `'unsafe-hashes'`,
-//! `'strict-dynamic'`, `'unsafe-eval'`, `form-action`, `base-uri`,
+//! `'strict-dynamic'`, `'unsafe-eval'`, `'wasm-unsafe-eval'`, `form-action`, `base-uri`,
 //! `frame-ancestors`, `sandbox` and `upgrade-insecure-requests`, with
 //! report-only policies producing violations without blocking.
 //!
@@ -328,13 +328,25 @@ impl CspList {
     /// §4.4 "EnsureCSPDoesNotBlockStringCompilation": `'unsafe-eval'` in
     /// the effective `script-src`.
     pub fn check_eval(&self) -> Verdict {
+        self.check_compilation(false)
+    }
+
+    /// CSP §4.5.1: WebAssembly byte compilation is allowed by either
+    /// `'wasm-unsafe-eval'` or `'unsafe-eval'`.
+    pub fn check_wasm_compilation(&self) -> Verdict {
+        self.check_compilation(true)
+    }
+
+    fn check_compilation(&self, wasm: bool) -> Verdict {
         let mut verdict = Verdict::default();
         for policy in &self.policies {
             let Some((name, list)) = policy.effective(&["script-src", "default-src"]) else {
                 continue;
             };
-            if !has_keyword(list, "'unsafe-eval'") {
-                verdict.record(policy, name, "eval");
+            if !(has_keyword(list, "'unsafe-eval'")
+                || wasm && has_keyword(list, "'wasm-unsafe-eval'"))
+            {
+                verdict.record(policy, name, if wasm { "wasm-eval" } else { "eval" });
             }
         }
         verdict

@@ -3343,3 +3343,31 @@ including 1,098 additional bulk table cases using imported functions. A
 separate numeric, control and memory replay matched 16,108 invocations.
 The JavaScript bridge, reference-valued host calls and shared imported
 state remain open. [ADR 0079](adr/0079-wasm-function-imports.md)
+
+### WASM-06 — Window module compilation and MIME/CSP
+
+Window exposes `WebAssembly.validate`, `new WebAssembly.Module`, `compile`
+and buffered `compileStreaming`, plus the WebAssembly error constructors.
+Module reflection reports ordered imports and exports and returns independent
+copies of matching custom sections. Compilation uses the original decoder,
+with per-operation resource and cancellation limits. Promise jobs retain
+a byte snapshot for a BufferSource or consume the branded Fetch response.
+
+Network compilation checks the response status, readability, and exact
+`application/wasm` MIME type. The document's CSP applies to module
+construction and both compilation entry points independently of string
+evaluation. Validation can run under a compilation restriction. The eight
+pinned Window WPT files cover compilation, validation and module reflection.
+All 120 subtests pass.
+JavaScript instantiation, imported string builtins, and a progressive
+response pipeline remain open.
+[ADR 0080](adr/0080-window-wasm-module-compilation.md)
+
+### ECMAScript Annex B — Legacy percent functions
+
+The global `escape` and `unescape` functions operate on UTF-16 code units.
+They preserve lone surrogates and keep malformed percent sequences literal
+on decode. Encoding uses the Annex B alphabet and uppercase hex digits.
+The runtime test covers conversion, edge cases and intrinsic descriptors.
+All 35 files in the two pinned Test262 Annex B directories pass. The
+upstream Wasm module builder uses `unescape` for UTF-8 fixture names.

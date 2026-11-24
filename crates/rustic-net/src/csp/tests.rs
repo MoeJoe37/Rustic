@@ -371,3 +371,28 @@ fn non_ascii_tokens_never_split_characters() {
     );
     assert!(verdict.allowed());
 }
+
+#[test]
+fn wasm_compilation_has_an_independent_csp_keyword_and_default_fallback() {
+    let wasm_only = list(&["default-src 'WaSm-UnSaFe-EvAl'"], &[]);
+    assert!(wasm_only.check_wasm_compilation().allowed());
+    assert!(!wasm_only.check_eval().allowed());
+
+    let override_policy = list(&["default-src 'unsafe-eval'; script-src 'self'"], &[]);
+    assert!(!override_policy.check_wasm_compilation().allowed());
+    let report = list(&["script-src 'unsafe-eval'"], &["script-src 'none'"]);
+    let verdict = report.check_wasm_compilation();
+    assert!(verdict.allowed());
+    assert_eq!(verdict.violations[0].blocked, "wasm-eval");
+
+    let stacked = list(
+        &["script-src 'wasm-unsafe-eval'", "default-src 'none'"],
+        &[],
+    );
+    assert!(!stacked.check_wasm_compilation().allowed());
+    assert!(
+        list(&["style-src 'none'"], &[])
+            .check_wasm_compilation()
+            .allowed()
+    );
+}

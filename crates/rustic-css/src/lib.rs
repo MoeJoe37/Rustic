@@ -22,6 +22,7 @@
 #![warn(missing_docs)]
 
 mod anb;
+mod anchor;
 mod animation;
 mod background;
 mod calc;
@@ -49,10 +50,13 @@ mod transform;
 mod values;
 
 pub use anb::parse_an_plus_b;
+pub use anchor::{
+    AnchorFunction, AnchorSide, AnchorSizeKeyword, AnchorValue, Anchored, AreaSpan, PositionArea,
+};
 pub use animation::{
     AnimationDirection, AnimationDuration, AnimationName, AnimationTimeline, AnimationValue,
-    CompositeOperation, FillMode, IterationCount, PlayState, ScrollAxis, Scroller, Time,
-    TransitionBehavior, TransitionProperty, cycle,
+    CompositeOperation, FillMode, IterationCount, PlayState, RangeEdge, ScrollAxis, Scroller, Time,
+    TimelineName, TimelineRangeName, TransitionBehavior, TransitionProperty, ViewInset, cycle,
 };
 pub use background::{
     Attachment, BackgroundRepeat, BackgroundSize, Image, PositionComponent, PositionSide,

@@ -411,6 +411,94 @@ impl fmt::Display for AnimationTimeline {
     }
 }
 
+keywords! {
+    /// A `<timeline-range-name>` (Scroll-driven Animations §4.1).
+    TimelineRangeName {
+        Cover => "cover",
+        Contain => "contain",
+        Entry => "entry",
+        Exit => "exit",
+        EntryCrossing => "entry-crossing",
+        ExitCrossing => "exit-crossing",
+        Scroll => "scroll",
+    }
+}
+
+/// One `animation-range-start` or `animation-range-end` entry: `normal`
+/// (no name, no offset), a `<length-percentage>`, or a named range with an
+/// optional offset (0% for a start, 100% for an end when omitted).
+#[derive(Clone, Debug, PartialEq)]
+pub struct RangeEdge {
+    /// The named timeline range.
+    pub name: Option<TimelineRangeName>,
+    /// The offset within it (or within the whole timeline without a name).
+    pub offset: Option<crate::LengthPercentage>,
+}
+
+impl RangeEdge {
+    /// `normal`.
+    pub const NORMAL: Self = Self {
+        name: None,
+        offset: None,
+    };
+
+    fn parse(parts: &[&Value]) -> Option<Self> {
+        let (name, offset) = match parts {
+            [one] if ident(one).is_some_and(|n| n.eq_ignore_ascii_case("normal")) => {
+                return Some(Self::NORMAL);
+            }
+            [one] => match ident(one) {
+                Some(n) => (Some(TimelineRangeName::from_name(n)?), None),
+                None => (None, Some(crate::properties::length_percentage(one)?)),
+            },
+            [name, offset] => (
+                Some(TimelineRangeName::from_name(ident(name)?)?),
+                Some(crate::properties::length_percentage(offset)?),
+            ),
+            _ => return None,
+        };
+        Some(Self { name, offset })
+    }
+}
+
+impl fmt::Display for RangeEdge {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match (&self.name, &self.offset) {
+            (None, None) => f.write_str("normal"),
+            (Some(name), None) => f.write_str(name.name()),
+            (None, Some(offset)) => write!(f, "{offset}"),
+            (Some(name), Some(offset)) => write!(f, "{name} {offset}"),
+        }
+    }
+}
+
+/// One `view-timeline-inset` entry: start and end insets.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ViewInset(pub LengthPercentageOrAuto, pub LengthPercentageOrAuto);
+
+impl fmt::Display for ViewInset {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0 == self.1 {
+            write!(f, "{}", self.0)
+        } else {
+            write!(f, "{} {}", self.0, self.1)
+        }
+    }
+}
+
+/// One `scroll-timeline-name` or `view-timeline-name` entry.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TimelineName(pub Option<Arc<str>>);
+
+impl fmt::Display for TimelineName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0 {
+            Some(name) => crate::serialize::serialize_identifier(f, name),
+            None => f.write_str("none"),
+        }
+    }
+}
+
 /// The value of one transition or animation longhand (each is a list).
 #[derive(Clone, Debug, PartialEq)]
 pub enum AnimationValue {
@@ -436,6 +524,14 @@ pub enum AnimationValue {
     Compositions(Vec<CompositeOperation>),
     /// `animation-timeline`.
     Timelines(Vec<AnimationTimeline>),
+    /// `scroll-timeline-name`, `view-timeline-name`.
+    TimelineNames(Vec<TimelineName>),
+    /// `scroll-timeline-axis`, `view-timeline-axis`.
+    Axes(Vec<ScrollAxis>),
+    /// `view-timeline-inset`.
+    ViewInsets(Vec<ViewInset>),
+    /// `animation-range-start`, `animation-range-end`.
+    Ranges(Vec<RangeEdge>),
 }
 
 impl AnimationValue {
@@ -470,6 +566,10 @@ impl AnimationValue {
             Self::PlayStates(v) => v.len(),
             Self::Compositions(v) => v.len(),
             Self::Timelines(v) => v.len(),
+            Self::TimelineNames(v) => v.len(),
+            Self::Axes(v) => v.len(),
+            Self::ViewInsets(v) => v.len(),
+            Self::Ranges(v) => v.len(),
         }
     }
 
@@ -494,6 +594,10 @@ impl fmt::Display for AnimationValue {
             Self::PlayStates(v) => write_list(f, v),
             Self::Compositions(v) => write_list(f, v),
             Self::Timelines(v) => write_list(f, v),
+            Self::TimelineNames(v) => write_list(f, v),
+            Self::Axes(v) => write_list(f, v),
+            Self::ViewInsets(v) => write_list(f, v),
+            Self::Ranges(v) => write_list(f, v),
         }
     }
 }
@@ -531,6 +635,19 @@ pub(crate) fn initial(property: PropertyId) -> Option<AnimationValue> {
         P::AnimationPlayState => AnimationValue::PlayStates(vec![PlayState::Running]),
         P::AnimationComposition => AnimationValue::Compositions(vec![CompositeOperation::Replace]),
         P::AnimationTimeline => AnimationValue::Timelines(vec![AnimationTimeline::Auto]),
+        P::ScrollTimelineName | P::ViewTimelineName => {
+            AnimationValue::TimelineNames(vec![TimelineName(None)])
+        }
+        P::ScrollTimelineAxis | P::ViewTimelineAxis => {
+            AnimationValue::Axes(vec![ScrollAxis::Block])
+        }
+        P::ViewTimelineInset => AnimationValue::ViewInsets(vec![ViewInset(
+            LengthPercentageOrAuto::Auto,
+            LengthPercentageOrAuto::Auto,
+        )]),
+        P::AnimationRangeStart | P::AnimationRangeEnd => {
+            AnimationValue::Ranges(vec![RangeEdge::NORMAL])
+        }
         _ => return None,
     })
 }
@@ -678,6 +795,110 @@ fn timeline(value: &Value) -> Option<AnimationTimeline> {
     }
 }
 
+fn timeline_name(value: &Value) -> Option<TimelineName> {
+    let name = ident(value)?;
+    if name.eq_ignore_ascii_case("none") {
+        Some(TimelineName(None))
+    } else if name.starts_with("--") && name.len() > 2 {
+        Some(TimelineName(Some(name.into())))
+    } else {
+        None
+    }
+}
+
+fn inset(value: &Value) -> Option<LengthPercentageOrAuto> {
+    if ident(value).is_some_and(|n| n.eq_ignore_ascii_case("auto")) {
+        Some(LengthPercentageOrAuto::Auto)
+    } else {
+        crate::properties::length_percentage(value).map(LengthPercentageOrAuto::LengthPercentage)
+    }
+}
+
+fn view_inset(parts: &[&Value]) -> Option<ViewInset> {
+    match parts {
+        [one] => {
+            let one = inset(one)?;
+            Some(ViewInset(one.clone(), one))
+        }
+        [start, end] => Some(ViewInset(inset(start)?, inset(end)?)),
+        _ => None,
+    }
+}
+
+/// `scroll-timeline` (`view` false) or `view-timeline`:
+/// `[<name> <axis>?]#` (`view-timeline` also takes an inset).
+pub(crate) fn timeline_shorthand(parts: &[&Value], view: bool) -> Option<Vec<PropertyValue>> {
+    let mut names = Vec::new();
+    let mut axes = Vec::new();
+    let mut insets = Vec::new();
+    for entry in entries(parts)? {
+        let (first, rest) = entry.split_first()?;
+        names.push(timeline_name(first)?);
+        let mut axis = None;
+        let mut inset_parts = Vec::new();
+        for value in rest {
+            match ident(value).and_then(ScrollAxis::from_name) {
+                Some(a) if axis.is_none() && (inset_parts.is_empty() || view) => axis = Some(a),
+                _ if view => inset_parts.push(*value),
+                _ => return None,
+            }
+        }
+        axes.push(axis.unwrap_or(ScrollAxis::Block));
+        insets.push(if inset_parts.is_empty() {
+            ViewInset(LengthPercentageOrAuto::Auto, LengthPercentageOrAuto::Auto)
+        } else {
+            view_inset(&inset_parts)?
+        });
+    }
+    let mut out = vec![
+        PropertyValue::Animation(AnimationValue::TimelineNames(names)),
+        PropertyValue::Animation(AnimationValue::Axes(axes)),
+    ];
+    if view {
+        out.push(PropertyValue::Animation(AnimationValue::ViewInsets(insets)));
+    }
+    Some(out)
+}
+
+/// `animation-range: [<animation-range-start> <animation-range-end>?]#`.
+/// An omitted end is the start's named range at 100%, or `normal`.
+pub(crate) fn range_shorthand(parts: &[&Value]) -> Option<Vec<PropertyValue>> {
+    let mut starts = Vec::new();
+    let mut ends = Vec::new();
+    for entry in entries(parts)? {
+        // Try every split; the start takes as few values as it can.
+        let mut found = None;
+        for split in 1..=entry.len() {
+            let (start, end) = entry.split_at(split);
+            let Some(start) = RangeEdge::parse(start) else {
+                continue;
+            };
+            if end.is_empty() {
+                let end = match start.name {
+                    Some(name) if start.offset.is_none() => RangeEdge {
+                        name: Some(name),
+                        offset: None,
+                    },
+                    _ => RangeEdge::NORMAL,
+                };
+                found = Some((start, end));
+                break;
+            }
+            if let Some(end) = RangeEdge::parse(end) {
+                found = Some((start, end));
+                break;
+            }
+        }
+        let (start, end) = found?;
+        starts.push(start);
+        ends.push(end);
+    }
+    Some(vec![
+        PropertyValue::Animation(AnimationValue::Ranges(starts)),
+        PropertyValue::Animation(AnimationValue::Ranges(ends)),
+    ])
+}
+
 /// Parse one of the transition or animation longhands.
 pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<PropertyValue> {
     use PropertyId as P;
@@ -721,6 +942,24 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
             AnimationValue::Compositions(each(parts, |v| CompositeOperation::from_name(ident(v)?))?)
         }
         P::AnimationTimeline => AnimationValue::Timelines(each(parts, timeline)?),
+        P::ScrollTimelineName | P::ViewTimelineName => {
+            AnimationValue::TimelineNames(each(parts, timeline_name)?)
+        }
+        P::ScrollTimelineAxis | P::ViewTimelineAxis => {
+            AnimationValue::Axes(each(parts, |v| ScrollAxis::from_name(ident(v)?))?)
+        }
+        P::ViewTimelineInset => AnimationValue::ViewInsets(
+            entries(parts)?
+                .iter()
+                .map(|e| view_inset(e))
+                .collect::<Option<_>>()?,
+        ),
+        P::AnimationRangeStart | P::AnimationRangeEnd => AnimationValue::Ranges(
+            entries(parts)?
+                .iter()
+                .map(|e| RangeEdge::parse(e))
+                .collect::<Option<_>>()?,
+        ),
         _ => return None,
     };
     Some(PropertyValue::Animation(value))
@@ -736,7 +975,7 @@ pub(crate) const TRANSITION: &[PropertyId] = &[
 ];
 
 /// The longhands the `animation` shorthand sets (it also resets
-/// `animation-composition` and `animation-timeline`).
+/// `animation-composition`, `animation-timeline` and `animation-range`).
 pub(crate) const ANIMATION: &[PropertyId] = &[
     PropertyId::AnimationName,
     PropertyId::AnimationDuration,
@@ -748,6 +987,8 @@ pub(crate) const ANIMATION: &[PropertyId] = &[
     PropertyId::AnimationPlayState,
     PropertyId::AnimationComposition,
     PropertyId::AnimationTimeline,
+    PropertyId::AnimationRangeStart,
+    PropertyId::AnimationRangeEnd,
 ];
 
 /// `transition: <single-transition>#`.
@@ -883,5 +1124,7 @@ pub(crate) fn animation_shorthand(parts: &[&Value]) -> Option<Vec<PropertyValue>
             CompositeOperation::Replace,
         ])),
         PropertyValue::Animation(AnimationValue::Timelines(vec![AnimationTimeline::Auto])),
+        PropertyValue::Animation(AnimationValue::Ranges(vec![RangeEdge::NORMAL])),
+        PropertyValue::Animation(AnimationValue::Ranges(vec![RangeEdge::NORMAL])),
     ])
 }

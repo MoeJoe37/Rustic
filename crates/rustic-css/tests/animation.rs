@@ -164,5 +164,78 @@ fn css_wide_keywords_and_var_apply_to_every_longhand() {
     assert_eq!(wide.len(), 5);
     assert!(wide.iter().all(|(_, v)| v == "inherit"));
     let deferred = parse("animation: var(--a) 1s").unwrap();
-    assert_eq!(deferred.len(), 10);
+    assert_eq!(deferred.len(), 12);
+}
+
+#[test]
+fn scroll_driven_longhands_and_shorthands() {
+    assert_eq!(value("scroll-timeline-name: --a, none"), "--a, none");
+    invalid("scroll-timeline-name: plain");
+    assert_eq!(value("view-timeline-axis: x, inline"), "x, inline");
+    invalid("scroll-timeline-axis: diagonal");
+    assert_eq!(value("view-timeline-inset: 10px auto, 5%"), "10px auto, 5%");
+    assert_eq!(
+        value("animation-range-start: entry 10%, normal, 20px"),
+        "entry 10%, normal, 20px"
+    );
+    invalid("animation-range-end: sideways 10%");
+    let range = longhands("animation-range: entry 10% exit, contain");
+    assert_eq!(
+        range,
+        vec![
+            (PropertyId::AnimationRangeStart, "entry 10%, contain".into()),
+            (PropertyId::AnimationRangeEnd, "exit, contain".into()),
+        ]
+    );
+    let range = longhands("animation-range: 10% 90%");
+    assert_eq!(range[1], (PropertyId::AnimationRangeEnd, "90%".into()));
+    let scroll = longhands("scroll-timeline: --s x, --t");
+    assert_eq!(
+        scroll[0],
+        (PropertyId::ScrollTimelineName, "--s, --t".into())
+    );
+    assert_eq!(
+        scroll[1],
+        (PropertyId::ScrollTimelineAxis, "x, block".into())
+    );
+    invalid("scroll-timeline: --s 10px");
+    let view = longhands("view-timeline: --v inline 10px 20px");
+    assert_eq!(view[1], (PropertyId::ViewTimelineAxis, "inline".into()));
+    assert_eq!(view[2], (PropertyId::ViewTimelineInset, "10px 20px".into()));
+    let all = longhands("animation: spin 1s");
+    assert_eq!(all[10], (PropertyId::AnimationRangeStart, "normal".into()));
+}
+
+#[test]
+fn anchor_properties_and_functions() {
+    assert_eq!(value("anchor-name: --a, --b"), "--a, --b");
+    assert_eq!(value("anchor-name: none"), "none");
+    invalid("anchor-name: a");
+    invalid("anchor-name: --a,");
+    assert_eq!(value("position-anchor: auto"), "auto");
+    assert_eq!(value("position-anchor: --a"), "--a");
+    assert_eq!(value("position-area: top left"), "top left");
+    assert_eq!(value("position-area: left top"), "top left");
+    assert_eq!(value("position-area: span-bottom"), "span-bottom");
+    assert_eq!(value("position-area: start end"), "top right");
+    assert_eq!(value("position-area: span-all"), "span-all");
+    assert_eq!(value("position-area: center"), "center");
+    invalid("position-area: left right");
+    assert_eq!(value("view-transition-name: hero"), "hero");
+    assert_eq!(value("view-transition-name: none"), "none");
+    invalid("view-transition-name: auto");
+    assert_eq!(
+        value("top: anchor(--a bottom, 5px)"),
+        "anchor(--a bottom, 5px)"
+    );
+    assert_eq!(value("left: anchor(25%)"), "anchor(25%)");
+    assert_eq!(
+        value("width: anchor-size(--a height)"),
+        "anchor-size(--a height)"
+    );
+    assert_eq!(value("max-height: anchor-size()"), "anchor-size()");
+    invalid("top: anchor(--a)");
+    invalid("top: anchor-size(width)");
+    invalid("width: anchor(--a top)");
+    invalid("width: anchor-size(width, -5px)");
 }

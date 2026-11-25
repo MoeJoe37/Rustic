@@ -111,6 +111,9 @@ pub struct ComputedStyle {
     values: Vec<PropertyValue>,
     pub(crate) custom: CustomProperties,
     font_ratios: EmRatios,
+    /// Insets and sizes given by `anchor()` or `anchor-size()`, with their
+    /// fallbacks computed; [`Self::get`] returns the fallback value.
+    anchored: Vec<(PropertyId, rustic_css::AnchorFunction)>,
 }
 
 fn index(property: PropertyId) -> usize {
@@ -357,6 +360,27 @@ impl ComputedStyle {
         &self.values[index(property)]
     }
 
+    /// The `anchor()` or `anchor-size()` function an inset or size was
+    /// given by. Layout resolves it for absolutely positioned boxes;
+    /// [`Self::get`] holds the value used when it does not resolve.
+    pub fn anchor_function(&self, property: PropertyId) -> Option<&rustic_css::AnchorFunction> {
+        self.anchored
+            .iter()
+            .find(|(p, _)| *p == property)
+            .map(|(_, f)| f)
+    }
+
+    /// Whether any inset or size uses an anchor function.
+    pub fn has_anchor_functions(&self) -> bool {
+        !self.anchored.is_empty()
+    }
+
+    /// Replace the computed value of `property` (layout uses this to
+    /// substitute resolved anchor positions into a copy of the style).
+    pub fn set(&mut self, property: PropertyId, value: PropertyValue) {
+        self.values[index(property)] = value;
+    }
+
     /// The computed custom properties (registered ones that do not inherit
     /// included).
     pub fn custom_properties(&self) -> &CustomProperties {
@@ -598,10 +622,15 @@ fn compute_values(
         _ => None,
     };
 
+    let mut anchored = Vec::new();
     let values = PropertyId::ALL
         .iter()
         .map(|&property| {
-            let value = specified.get(property);
+            let mut value = specified.get(property);
+            if let PropertyValue::Anchored(a) = value {
+                anchored.push((property, a.function.map_fallback(|lp| basis.lp(lp, false))));
+                value = &a.fallback;
+            }
             match property {
                 P::Display => match value {
                     PropertyValue::Display(d) if is_root || positioned || floated => {
@@ -862,6 +891,7 @@ fn compute_values(
             .custom_properties()
             .absolutize(&|lp| basis.lp(lp, false)),
         font_ratios,
+        anchored,
     }
 }
 

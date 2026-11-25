@@ -10,6 +10,7 @@
 
 #![warn(missing_docs)]
 
+mod anchor;
 mod exclusions;
 mod flow;
 mod formatting;

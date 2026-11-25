@@ -708,6 +708,11 @@ pub enum PropertyValue {
     Easing(EasingList),
     /// The other transition and animation longhands (all lists).
     Animation(crate::AnimationValue),
+    /// `anchor-name`, `position-anchor`, `position-area`,
+    /// `view-transition-name`.
+    Anchor(crate::AnchorValue),
+    /// An inset given by `anchor()` or a size given by `anchor-size()`.
+    Anchored(Box<crate::Anchored>),
     /// `vertical-align`.
     VerticalAlign(VerticalAlign),
     /// `text-align`.
@@ -933,6 +938,17 @@ property_ids! {
     AnimationPlayState => "animation-play-state", false;
     AnimationComposition => "animation-composition", false;
     AnimationTimeline => "animation-timeline", false;
+    AnimationRangeStart => "animation-range-start", false;
+    AnimationRangeEnd => "animation-range-end", false;
+    ScrollTimelineName => "scroll-timeline-name", false;
+    ScrollTimelineAxis => "scroll-timeline-axis", false;
+    ViewTimelineName => "view-timeline-name", false;
+    ViewTimelineAxis => "view-timeline-axis", false;
+    ViewTimelineInset => "view-timeline-inset", false;
+    AnchorName => "anchor-name", false;
+    PositionAnchor => "position-anchor", false;
+    PositionArea => "position-area", false;
+    ViewTransitionName => "view-transition-name", false;
 }
 
 impl PropertyId {
@@ -1004,9 +1020,19 @@ impl PropertyId {
             | P::AnimationFillMode
             | P::AnimationPlayState
             | P::AnimationComposition
-            | P::AnimationTimeline => PropertyValue::Animation(
+            | P::AnimationTimeline
+            | P::AnimationRangeStart
+            | P::AnimationRangeEnd
+            | P::ScrollTimelineName
+            | P::ScrollTimelineAxis
+            | P::ViewTimelineName
+            | P::ViewTimelineAxis
+            | P::ViewTimelineInset => PropertyValue::Animation(
                 crate::animation::initial(self).expect("an animation longhand"),
             ),
+            P::AnchorName | P::PositionAnchor | P::PositionArea | P::ViewTransitionName => {
+                PropertyValue::Anchor(crate::anchor::initial(self).expect("an anchor longhand"))
+            }
             P::VerticalAlign => {
                 PropertyValue::VerticalAlign(VerticalAlign::Keyword(VerticalAlignKeyword::Baseline))
             }
@@ -1427,6 +1453,13 @@ pub fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "background" => BACKGROUND,
         "transition" => crate::animation::TRANSITION,
         "animation" => crate::animation::ANIMATION,
+        "animation-range" => &[P::AnimationRangeStart, P::AnimationRangeEnd],
+        "scroll-timeline" => &[P::ScrollTimelineName, P::ScrollTimelineAxis],
+        "view-timeline" => &[
+            P::ViewTimelineName,
+            P::ViewTimelineAxis,
+            P::ViewTimelineInset,
+        ],
         _ => {
             let id = PropertyId::from_name(name)?;
             let index = PropertyId::ALL.iter().position(|&p| p == id)?;
@@ -1994,7 +2027,17 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::AnimationFillMode
         | P::AnimationPlayState
         | P::AnimationComposition
-        | P::AnimationTimeline => return crate::animation::longhand(property, parts),
+        | P::AnimationTimeline
+        | P::AnimationRangeStart
+        | P::AnimationRangeEnd
+        | P::ScrollTimelineName
+        | P::ScrollTimelineAxis
+        | P::ViewTimelineName
+        | P::ViewTimelineAxis
+        | P::ViewTimelineInset => return crate::animation::longhand(property, parts),
+        P::AnchorName | P::PositionAnchor | P::PositionArea | P::ViewTransitionName => {
+            return crate::anchor::longhand(property, parts);
+        }
         P::FontFamily => return font_family(parts).map(PropertyValue::FontFamily),
         P::TextTransform => return text_transform(parts).map(PropertyValue::TextTransform),
         P::TextDecorationLine => {
@@ -2089,6 +2132,17 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::AnimationPlayState
         | P::AnimationComposition
         | P::AnimationTimeline
+        | P::AnimationRangeStart
+        | P::AnimationRangeEnd
+        | P::ScrollTimelineName
+        | P::ScrollTimelineAxis
+        | P::ViewTimelineName
+        | P::ViewTimelineAxis
+        | P::ViewTimelineInset
+        | P::AnchorName
+        | P::PositionAnchor
+        | P::PositionArea
+        | P::ViewTransitionName
         | P::FontFamily
         | P::TextTransform
         | P::TextDecorationLine
@@ -2144,9 +2198,15 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::FontVariantCaps => PropertyValue::FontVariantCaps(FontVariantCaps::from_name(name()?)?),
         P::FontStretch => PropertyValue::FontStretch(font_stretch(value)?),
         P::Position => PropertyValue::Position(Position::from_name(name()?)?),
-        P::Top | P::Right | P::Bottom | P::Left => {
-            PropertyValue::LengthPercentageOrAuto(lp_or_auto(value, true)?)
-        }
+        P::Top | P::Right | P::Bottom | P::Left => match lp_or_auto(value, true) {
+            Some(v) => PropertyValue::LengthPercentageOrAuto(v),
+            None => crate::anchor::anchored(value, false, |fallback| {
+                Some(PropertyValue::LengthPercentageOrAuto(match fallback {
+                    Some(lp) => LengthPercentageOrAuto::LengthPercentage(lp.clone()),
+                    None => LengthPercentageOrAuto::Auto,
+                }))
+            })?,
+        },
         P::ZIndex => PropertyValue::ZIndex(z_index(value)?),
         P::Float => PropertyValue::Float(Float::from_name(name()?)?),
         P::Clear => PropertyValue::Clear(Clear::from_name(name()?)?),
@@ -2197,10 +2257,26 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::BorderTopStyle | P::BorderRightStyle | P::BorderBottomStyle | P::BorderLeftStyle => {
             PropertyValue::BorderStyle(BorderStyle::from_name(ident(value)?)?)
         }
-        P::Width | P::Height | P::MinWidth | P::MinHeight => {
-            PropertyValue::Size(flex::size(value)?)
-        }
-        P::MaxWidth | P::MaxHeight => PropertyValue::MaxSize(max_size(value)?),
+        P::Width | P::Height | P::MinWidth | P::MinHeight => match flex::size(value) {
+            Some(v) => PropertyValue::Size(v),
+            None => crate::anchor::anchored(value, true, |fallback| {
+                Some(PropertyValue::Size(match fallback {
+                    Some(lp) if !lp.is_negative() => Size::LengthPercentage(lp.clone()),
+                    Some(_) => return None,
+                    None => Size::Auto,
+                }))
+            })?,
+        },
+        P::MaxWidth | P::MaxHeight => match max_size(value) {
+            Some(v) => PropertyValue::MaxSize(v),
+            None => crate::anchor::anchored(value, true, |fallback| {
+                Some(PropertyValue::MaxSize(match fallback {
+                    Some(lp) if !lp.is_negative() => MaxSize::LengthPercentage(lp.clone()),
+                    Some(_) => return None,
+                    None => MaxSize::None,
+                }))
+            })?,
+        },
         P::BoxSizing => PropertyValue::BoxSizing(BoxSizing::from_name(ident(value)?)?),
         P::FontSize => PropertyValue::FontSize(match ident(value) {
             Some(name) => FontSize::Keyword(FontSizeKeyword::from_name(name)?),
@@ -2365,6 +2441,9 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
         "background" => background::shorthand(parts),
         "transition" => crate::animation::transition_shorthand(parts),
         "animation" => crate::animation::animation_shorthand(parts),
+        "animation-range" => crate::animation::range_shorthand(parts),
+        "scroll-timeline" => crate::animation::timeline_shorthand(parts, false),
+        "view-timeline" => crate::animation::timeline_shorthand(parts, true),
         "border" | "border-top" | "border-right" | "border-bottom" | "border-left" => {
             let (mut width, mut style, mut color) = (None, None, None);
             for v in parts {
@@ -2485,6 +2564,8 @@ impl fmt::Display for PropertyValue {
             Self::Opacity(n) => write_number(f, *n),
             Self::Easing(functions) => functions.fmt(f),
             Self::Animation(value) => value.fmt(f),
+            Self::Anchor(value) => value.fmt(f),
+            Self::Anchored(value) => value.fmt(f),
             Self::VerticalAlign(VerticalAlign::Keyword(k)) => write!(f, "{k}"),
             Self::VerticalAlign(VerticalAlign::LengthPercentage(lp)) => write!(f, "{lp}"),
             Self::TextAlign(v) => write!(f, "{v}"),

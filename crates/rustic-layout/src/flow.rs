@@ -21,6 +21,7 @@ use std::{collections::HashMap, error::Error, fmt};
 
 mod flex;
 
+use crate::anchor;
 use crate::exclusions::{Exclusions, Side};
 use crate::height::HeightConstraint;
 use crate::inline::{self, Entry, Ifc};
@@ -288,6 +289,8 @@ struct Node<'a> {
     /// containing padding box for absolute/fixed boxes.
     pos: (f64, f64),
     top_resolved: bool,
+    /// An absolute or fixed box that [`Engine::layout_absolute`] placed.
+    placed: bool,
     rel: CssPoint,
     /// Absolute/fixed: hypothetical margin edge in the parent's child space.
     static_pos: (f64, f64),
@@ -648,6 +651,7 @@ fn new_node<'a>(
         border_height: CssPx::ZERO,
         pos: (0.0, 0.0),
         top_resolved: false,
+        placed: false,
         rel: CssPoint::default(),
         static_pos: (0.0, 0.0),
         anonymous: false,
@@ -1998,7 +2002,71 @@ impl<'a, 'c> Engine<'a, 'c> {
         }
     }
 
+    /// The border box of the anchor named `name` for the absolutely
+    /// positioned box `i`, in `containing`'s padding-box space: the last
+    /// placed box in tree order with that `anchor-name`, other than `i` and
+    /// its descendants (TD-216).
+    fn anchor_rect(
+        &mut self,
+        i: usize,
+        name: &str,
+        containing: Option<usize>,
+    ) -> Result<Option<anchor::Rect>, FlowError> {
+        let end = self.nodes[i].end;
+        let mut found = None;
+        'search: for j in (0..self.nodes.len()).rev() {
+            self.work.charge(1)?;
+            let n = &self.nodes[j];
+            if (i..end).contains(&j) || n.anonymous || !anchor::is_named(n.style, name) {
+                continue;
+            }
+            // Every absolute box from here up must already be placed.
+            let mut k = Some(j);
+            while let Some(a) = k {
+                self.work.charge(1)?;
+                let n = &self.nodes[a];
+                if matches!(n.scheme, Scheme::Absolute | Scheme::Fixed) && !n.placed {
+                    continue 'search;
+                }
+                k = n.parent;
+            }
+            found = Some(j);
+            break;
+        }
+        let Some(j) = found else {
+            return Ok(None);
+        };
+        let n = &self.nodes[j];
+        let origin = sub(n.child_origin(), n.edge());
+        let (width, height) = (n.border_width(), n.border_height.get());
+        let (x, y) = self.map_to_containing(Some(j), origin, None)?;
+        let (cx, cy) = match containing {
+            Some(c) => {
+                let n = &self.nodes[c];
+                let m = n.measure;
+                let padding = sub(
+                    n.child_origin(),
+                    (m.padding.left.get(), m.padding.top.get()),
+                );
+                self.map_to_containing(Some(c), padding, None)?
+            }
+            None => (0.0, 0.0),
+        };
+        Ok(Some(anchor::Rect {
+            x: x - cx,
+            y: y - cy,
+            width,
+            height,
+        }))
+    }
+
     fn layout_absolute(&mut self, i: usize) -> Result<(), FlowError> {
+        let result = self.layout_absolute_box(i);
+        self.nodes[i].placed = true;
+        result
+    }
+
+    fn layout_absolute_box(&mut self, i: usize) -> Result<(), FlowError> {
         let n = &self.nodes[i];
         let containing = n.containing;
         let (width, height, containing_direction) = match containing {
@@ -2020,23 +2088,54 @@ impl<'a, 'c> Engine<'a, 'c> {
         let static_direction = n
             .parent
             .map_or(self.root_direction, |p| self.nodes[p].direction);
-        let (parent, static_pos) = (n.parent, n.static_pos);
+        let (parent, static_pos, base) = (n.parent, n.static_pos, n.style);
         let (static_x, static_y) = self.map_to_containing(parent, static_pos, containing)?;
+        // Anchor functions and position-area: a substituted style, and a
+        // grid region that replaces the containing block.
+        let mut anchored = None;
+        if anchor::uses_anchors(base) {
+            let cb = anchor::Containing {
+                width,
+                height,
+                direction: containing_direction,
+            };
+            let mut rects: Vec<(String, Option<anchor::Rect>)> = Vec::new();
+            let mut wanted = Vec::new();
+            anchor::resolve(base, &cb, |name| {
+                wanted.push(name.to_owned());
+                None
+            });
+            for name in wanted {
+                if rects.iter().all(|(n, _)| *n != name) {
+                    let rect = self.anchor_rect(i, &name, containing)?;
+                    rects.push((name, rect));
+                }
+            }
+            anchored = anchor::resolve(base, &cb, |name| {
+                rects.iter().find(|(n, _)| n == name).and_then(|(_, r)| *r)
+            });
+        }
+        let region = anchored.as_ref().and_then(|(_, region)| *region);
+        let style: &ComputedStyle = anchored.as_ref().map_or(base, |(style, _)| style);
+        let (width, height, offset) = match region {
+            Some(r) => (r.rect.width, r.rect.height, (r.rect.x, r.rect.y)),
+            None => (width, height, (0.0, 0.0)),
+        };
         let cx = AbsoluteContext {
             width,
             height,
-            static_x,
-            static_y,
+            static_x: static_x - offset.0,
+            static_y: static_y - offset.1,
             static_direction,
             containing_direction,
         };
         let replaced = self.replaced_size(i, cx.width, CssPx::new(cx.height).ok())?;
         let n = &self.nodes[i];
         let horizontal =
-            position::absolute_width(n.style, &cx, n.intrinsic, replaced.map(|(w, _)| w))?;
+            position::absolute_width(style, &cx, n.intrinsic, replaced.map(|(w, _)| w))?;
         let m = horizontal.measure;
         let vertical =
-            AbsoluteHeight::new(n.style, &cx, m.padding, m.border, replaced.map(|(_, h)| h))?;
+            AbsoluteHeight::new(style, &cx, m.padding, m.border, replaced.map(|(_, h)| h))?;
         let definite = vertical.definite().map(CssPx::new).transpose()?;
         let extras = {
             let n = &mut self.nodes[i];
@@ -2054,9 +2153,19 @@ impl<'a, 'c> Engine<'a, 'c> {
         n.content_height = CssPx::new(solved.size.max(0.0))?;
         n.border_height = n.content_height.checked_add(extras)?;
         n.pos = (
-            horizontal.left + m.margin.left.get(),
-            solved.start + solved.margin_start,
+            horizontal.left + m.margin.left.get() + offset.0,
+            solved.start + solved.margin_start + offset.1,
         );
+        if let Some(region) = region {
+            if region.center_x {
+                let outer = m.margin.left.get() + n.border_width() + m.margin.right.get();
+                n.pos.0 += (width - outer) / 2.0;
+            }
+            if region.center_y {
+                let outer = solved.margin_start + n.border_height.get() + solved.margin_end;
+                n.pos.1 += (height - outer) / 2.0;
+            }
+        }
         n.top_resolved = true;
         Ok(())
     }

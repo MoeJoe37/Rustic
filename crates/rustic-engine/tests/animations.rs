@@ -223,3 +223,52 @@ fn scroll_and_view_timelines_drive_script_animations() {
          if (a.effect.getComputedTiming().progress !== 0.5) throw 'effect';",
     );
 }
+
+#[test]
+fn view_transitions_run_their_update_callback_and_settle_promises() {
+    let mut engine = Engine::new(1);
+    let mut page = page(&mut engine, "<!doctype html><div id=t></div>");
+    run(
+        &mut page,
+        "var log = [];
+         var vt = document.startViewTransition(() => { log.push('update'); });
+         if (!(vt instanceof ViewTransition)) throw 'type';
+         [['done', vt.updateCallbackDone], ['ready', vt.ready], ['finished', vt.finished]]
+             .forEach(([name, p]) => p.then(() => log.push(name), e => log.push(name + ':' + e.name)));
+         var skipped = document.startViewTransition({ update: () => log.push('second') });
+         skipped.ready.catch(e => log.push('skipped:' + e.name));
+         skipped.finished.then(() => log.push('skipped-finished'));
+         skipped.skipTransition();
+         var failing;",
+    );
+    frame(&mut page, 16);
+    // The first transition was skipped by the second, which was skipped
+    // by script; both callbacks ran.
+    run(
+        &mut page,
+        "if (log.join() !== 'update,second,ready:AbortError,skipped:AbortError,done,finished,skipped-finished')
+             throw log.join();
+         log = [];
+         var vt = document.startViewTransition(() => { log.push('update'); });
+         vt.updateCallbackDone.then(() => log.push('done'));
+         vt.ready.then(() => log.push('ready'));
+         vt.finished.then(() => log.push('finished'));",
+    );
+    frame(&mut page, 16);
+    // No named elements: ready and finished follow the update at once.
+    run(
+        &mut page,
+        "if (log.join() !== 'update,done,ready,finished') throw log.join();
+         log = [];
+         failing = document.startViewTransition(() => { throw new RangeError('no'); });
+         failing.updateCallbackDone.catch(e => log.push('done:' + e.name));
+         failing.ready.catch(e => log.push('ready:' + e.name));
+         failing.finished.catch(e => log.push('finished:' + e.name));",
+    );
+    frame(&mut page, 16);
+    frame(&mut page, 16);
+    run(
+        &mut page,
+        "if (log.join() !== 'done:RangeError,ready:RangeError,finished:RangeError') throw log.join();",
+    );
+}

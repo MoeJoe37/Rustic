@@ -39,6 +39,7 @@ mod resize_observer;
 mod scrolling;
 mod selectors;
 mod url;
+mod view_transitions;
 mod wasm;
 mod web_storage;
 mod window;
@@ -306,6 +307,7 @@ struct Page {
     animations: animations::Animations,
     /// CSSOM objects.
     cssom: cssom::Cssom,
+    view_transitions: view_transitions::ViewTransitions,
 }
 
 impl ExecutionHost for Page {
@@ -665,6 +667,8 @@ fn install_page(
     animations::install(agent)?;
     cssom::install(agent)?;
     let cssom = cssom::Cssom::new(agent)?;
+    view_transitions::install(agent)?;
+    let view_transitions = view_transitions::ViewTransitions::new(agent)?;
     let mut animations = animations::Animations::new(agent, tree.animations())?;
     let document_timeline = animations::create_document_timeline(agent)?;
     animations.set_document_timeline(document_timeline);
@@ -700,6 +704,7 @@ fn install_page(
         scrolls: scrolling::PendingScrolls::default(),
         animations,
         cssom,
+        view_transitions,
     }))?;
     animations::register_document_timeline(agent, document_timeline)
 }
@@ -844,6 +849,27 @@ pub fn update_animations(agent: &mut Agent, now: f64) -> JsResult<()> {
         return Ok(());
     }
     animations::update(agent, now)
+}
+
+/// The view transition steps of a rendering opportunity at `now`
+/// milliseconds (capture, update callback, ready and finished).
+pub fn update_view_transitions(agent: &mut Agent, now: f64) -> JsResult<()> {
+    let host = agent.execution_host();
+    if !host
+        .as_ref()
+        .is_some_and(|host| host.as_any().downcast_ref::<Page>().is_some())
+    {
+        return Ok(());
+    }
+    view_transitions::update(agent, now)
+}
+
+/// Whether a view transition waits for the next rendering opportunity.
+pub fn wants_view_transition_frame(agent: &Agent) -> bool {
+    let host = agent.execution_host();
+    host.as_ref()
+        .and_then(|host| host.as_any().downcast_ref::<Page>())
+        .is_some_and(|page| page.view_transitions.wants_frame())
 }
 
 /// "Run the scroll steps" of a rendering opportunity: fire the `scroll`

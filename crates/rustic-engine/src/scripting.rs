@@ -1052,7 +1052,12 @@ impl<C: Clock> ScriptedDocument<C> {
     /// Whether `requestAnimationFrame` callbacks wait for the next
     /// rendering opportunity (a live host keeps offering frames).
     pub fn wants_animation_frame(&self) -> bool {
-        self.pending.queue.borrow().has_frames() || self.document.animations.borrow().wants_frames()
+        self.pending.queue.borrow().has_frames()
+            || self.document.animations.borrow().wants_frames()
+            || self
+                .agent
+                .as_ref()
+                .is_ok_and(page::wants_view_transition_frame)
     }
 
     /// The document's animation controller: the renderer styles each frame
@@ -1355,6 +1360,12 @@ impl<C: Clock> ScriptedDocument<C> {
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         let observed = page::broadcast_resize_observations(agent);
         self.page_result(observed)?;
+        self.checkpoint()?;
+        // View transition steps, after the rendering is up to date.
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        let transitions =
+            page::update_view_transitions(agent, frame.timestamp().as_secs_f64() * 1_000.0);
+        self.page_result(transitions)?;
         self.checkpoint()?;
         self.pending
             .queue

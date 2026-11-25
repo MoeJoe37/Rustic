@@ -3432,8 +3432,8 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Table imports and wrappers, shared memories, reference-valued host calls
-and the progressive response pipeline remain open.
+Module table imports and exports, shared memories, reference-valued host
+calls and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3541,3 +3541,20 @@ trace its allocation owner. [ADR 0087](adr/0087-wasm-resizable-buffers.md)
 The six pinned memory WPT files pass 55 of 56 subtests. The five resizable
 buffer cases and both fixed-buffer cases pass. Shared memory growth
 accounts for the remaining expected failure.
+
+### WASM-06 — Standalone Window tables
+
+`new WebAssembly.Table` supports `anyfunc` and `externref` with both address
+widths. The `length` getter and the return value of `grow` use Number for
+`i32` and BigInt for `i64`. The `get` and `set` methods check the full
+index before accessing an entry. Function tables accept Wasm functions
+and `null`. External reference tables preserve JavaScript values and
+their identity. Entries remain live through the table wrapper, including
+the Wasm instance retained by a stored function.
+
+Construction and growth admit at most 65,536 entries per table and charge
+the JavaScript heap. Failed growth preserves the previous length and
+entries. The regression tests cover collection, reentrant count coercion,
+default values and the exact host limit. All 88 subtests in the five pinned
+Window table WPT files pass. Module table imports and exports remain open.
+[ADR 0088](adr/0088-window-wasm-tables.md)

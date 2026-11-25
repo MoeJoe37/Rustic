@@ -23,21 +23,12 @@ pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
 }
 
 fn index(agent: &mut Agent, value: Value, address: AddressType) -> JsResult<u64> {
-    match address {
-        AddressType::I32 => {
-            let number = agent.to_number(value)?.trunc();
-            if (0.0..=f64::from(u32::MAX)).contains(&number) {
-                return Ok(number as u64);
-            }
-        }
-        AddressType::I64 => {
-            let number = agent.to_bigint(value)?;
-            if !number.is_negative() && number.bit_length() <= 64 {
-                return Ok(number.to_u64_wrapping());
-            }
-        }
-    }
-    agent.type_error("invalid WebAssembly memory page count")
+    address_index(
+        agent,
+        value,
+        address,
+        "invalid WebAssembly memory page count",
+    )
 }
 
 fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
@@ -47,22 +38,7 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let Some(descriptor) = arg(args, 0).as_object() else {
         return agent.type_error("WebAssembly.Memory requires a descriptor");
     };
-    let key = agent.heap.key("address")?;
-    let address = agent.get(descriptor, key)?;
-    let address_type = if address == Value::UNDEFINED {
-        AddressType::I32
-    } else {
-        let name = agent.to_string(address)?;
-        let name = agent.heap.string(name);
-        if name.len() != 3 {
-            return agent.type_error("invalid WebAssembly memory address type");
-        }
-        match name.to_text().as_str() {
-            "i32" => AddressType::I32,
-            "i64" => AddressType::I64,
-            _ => return agent.type_error("invalid WebAssembly memory address type"),
-        }
-    };
+    let address_type = address_type(agent, descriptor, "invalid WebAssembly memory address type")?;
     let key = agent.heap.key("initial")?;
     let initial = agent.get(descriptor, key)?;
     let initial = index(agent, initial, address_type)?;

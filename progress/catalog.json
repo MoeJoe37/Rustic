@@ -4441,6 +4441,21 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_window_executes_indirect_calls_with_local_table64_indices"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/wasm/table.rs",
+              "marker": "fn construct"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_standalone_tables_trace_function_and_external_references"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_standalone_table64_checks_full_indices_and_growth_after_reentry"
             }
           ]
         },
@@ -4496,6 +4511,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
               "marker": "\"wasm/jsapi/memory/grow.any.js\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "\"wasm/jsapi/table/get-set.any.js\""
             }
           ]
         }

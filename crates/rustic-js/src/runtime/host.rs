@@ -92,6 +92,32 @@ impl Agent {
         }
     }
 
+    /// Append repeated values atomically to a private, dense host array.
+    /// The caller must keep the array private and its elements contiguous.
+    pub fn append_host_array(&mut self, array: ObjectId, count: u32, value: Value) -> JsResult<()> {
+        let object = self.heap.object(array);
+        assert!(object.class == Class::Array && object.sparse().is_none());
+        assert_eq!(object.elements.len(), object.length as usize);
+        let length = object.length.checked_add(count).ok_or(OutOfMemory)?;
+        let count = count as usize;
+        let bytes = count.checked_mul(size_of::<Value>()).ok_or(OutOfMemory)?;
+        let work = if length as usize > object.elements.capacity() {
+            length as usize
+        } else {
+            count
+        };
+        self.spend_native_work(work as u64)?;
+        self.heap.charge(bytes)?;
+        let object = self.heap.object_mut(array);
+        if object.elements.try_reserve_exact(count).is_err() {
+            let _ = self.heap.budget.release(bytes);
+            return Err(OutOfMemory.into());
+        }
+        object.elements.resize(length as usize, value);
+        object.length = length;
+        Ok(())
+    }
+
     /// Run a host operation with `bytes` of temporary storage charged to
     /// this heap until the operation returns. The caller reserves fallibly.
     pub fn with_host_memory<T>(

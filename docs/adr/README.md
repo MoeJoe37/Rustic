@@ -95,6 +95,7 @@ instead of rewriting the history of a decision.
 | [0085](0085-wasm-fixed-memory-buffers.md) | Unshared Wasm linear memory and fixed-length buffer generations | Accepted for M9 |
 | [0086](0086-wasm-memory64.md) | Memory64 operand validation, checked host ranges and BigInt page counts | Accepted for M9 |
 | [0087](0087-wasm-resizable-buffers.md) | Resizable unshared Wasm memory and detachable buffer modes | Accepted for M9 |
+| [0088](0088-window-wasm-tables.md) | Standalone Window Wasm tables and JavaScript reference tracing | Accepted for M9 |
 
 ## Records by area
 

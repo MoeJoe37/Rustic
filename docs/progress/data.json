@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "4f2659f4cb3fb1642399af828d8462ad1d3e2034cbedf065f130b278044cb5ca",
+  "source_fingerprint": "9d278152d17522ba7bac85d18e65cd0e50bee0d26424f34e1d08f230f60e266c",
   "percent": "50.98",
   "verified_percent": "49.65",
   "partial_percent": "1.33",
@@ -4795,6 +4795,21 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_window_executes_indirect_calls_with_local_table64_indices"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/wasm/table.rs",
+              "marker": "fn construct"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_standalone_tables_trace_function_and_external_references"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_standalone_table64_checks_full_indices_and_growth_after_reentry"
             }
           ],
           "credit": "0.00",
@@ -4856,6 +4871,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
               "marker": "\"wasm/jsapi/memory/grow.any.js\""
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "\"wasm/jsapi/table/get-set.any.js\""
             }
           ],
           "credit": "0.00",

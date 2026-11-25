@@ -3883,32 +3883,32 @@
     {
       "name": "imports: BufferSource argument",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
     },
     {
       "name": "imports: Module argument",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
     },
     {
       "name": "imports with empty module names: BufferSource argument",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
     },
     {
       "name": "imports with empty module names: Module argument",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
     },
     {
       "name": "imports with empty names: BufferSource argument",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
     },
     {
       "name": "imports with empty names: Module argument",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
     },
     {
       "name": "exports with empty name: function: BufferSource argument",
@@ -4929,17 +4929,17 @@
     {
       "name": "imports",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "invalid WebAssembly import"
     },
     {
       "name": "imports with empty module names",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "invalid WebAssembly import"
     },
     {
       "name": "imports with empty names",
       "status": "FAIL",
-      "message": "value is not a constructor"
+      "message": "invalid WebAssembly import"
     },
     {
       "name": "exports with empty name: function",
@@ -5460,6 +5460,368 @@
   "wasm/jsapi/module/toString.any.js": [
     {
       "name": "Object.prototype.toString on an Module",
+      "status": "PASS"
+    },
+    {
+      "name": "@@toStringTag exists on the prototype with the appropriate descriptor",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/table/constructor.any.js": [
+    {
+      "name": "name",
+      "status": "PASS"
+    },
+    {
+      "name": "length",
+      "status": "PASS"
+    },
+    {
+      "name": "No arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Calling",
+      "status": "PASS"
+    },
+    {
+      "name": "Empty descriptor",
+      "status": "PASS"
+    },
+    {
+      "name": "Invalid descriptor argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Undefined initial value in descriptor",
+      "status": "PASS"
+    },
+    {
+      "name": "Undefined element value in descriptor",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range initial value in descriptor: NaN",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range maximum value in descriptor: NaN",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range initial value in descriptor: Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range maximum value in descriptor: Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range initial value in descriptor: -Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range maximum value in descriptor: -Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range initial value in descriptor: -1",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range maximum value in descriptor: -1",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range initial value in descriptor: 4294967296",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range maximum value in descriptor: 4294967296",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range initial value in descriptor: 68719476736",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range maximum value in descriptor: 68719476736",
+      "status": "PASS"
+    },
+    {
+      "name": "Initial value exceeds maximum",
+      "status": "PASS"
+    },
+    {
+      "name": "Basic (zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Basic (non-zero)",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Proxy descriptor",
+      "status": "PASS"
+    },
+    {
+      "name": "Type conversion for descriptor.element",
+      "status": "PASS"
+    },
+    {
+      "name": "Order of evaluation for descriptor",
+      "status": "PASS"
+    },
+    {
+      "name": "initialize externref table with default value",
+      "status": "PASS"
+    },
+    {
+      "name": "initialize table with a wrong element value",
+      "status": "PASS"
+    },
+    {
+      "name": "initialize anyfunc table with default value",
+      "status": "PASS"
+    },
+    {
+      "name": "initialize anyfunc table with a bad default value",
+      "status": "PASS"
+    },
+    {
+      "name": "initialize anyfunc table with a bad default value and a bad descriptor",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/table/get-set.any.js": [
+    {
+      "name": "Missing arguments: get",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding: get",
+      "status": "PASS"
+    },
+    {
+      "name": "Missing arguments: set",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding: set",
+      "status": "PASS"
+    },
+    {
+      "name": "Basic",
+      "status": "PASS"
+    },
+    {
+      "name": "Growing",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-bounds",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting non-function",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting non-wasm function",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting non-wasm arrow function",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: undefined",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: undefined",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: NaN",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: NaN",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: -Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: -Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: -1",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: -1",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: 4294967296",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: 4294967296",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: 68719476736",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: 68719476736",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: \"0x100000000\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: \"0x100000000\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Getting out-of-range argument: object \"[object Object]\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting out-of-range argument: object \"[object Object]\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Order of argument conversion",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Arguments for anyfunc table set",
+      "status": "PASS"
+    },
+    {
+      "name": "Arguments for externref table set",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/table/grow.any.js": [
+    {
+      "name": "Missing arguments",
+      "status": "PASS"
+    },
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Basic",
+      "status": "PASS"
+    },
+    {
+      "name": "Reached maximum",
+      "status": "PASS"
+    },
+    {
+      "name": "Exceeded maximum",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: undefined",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: NaN",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: -Infinity",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: -1",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: 4294967296",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: 68719476736",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: \"0x100000000\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Out-of-range argument: object \"[object Object]\"",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Grow with exported-function argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Grow with non-function argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Grow with JS-function argument",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/table/length.any.js": [
+    {
+      "name": "Branding",
+      "status": "PASS"
+    },
+    {
+      "name": "Stray argument",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting (sloppy mode)",
+      "status": "PASS"
+    },
+    {
+      "name": "Setting (strict mode)",
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/table/toString.any.js": [
+    {
+      "name": "Object.prototype.toString on an Table",
       "status": "PASS"
     },
     {

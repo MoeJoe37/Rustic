@@ -129,7 +129,12 @@
     "wasm/jsapi/module/customSections.any.js",
     "wasm/jsapi/module/exports.any.js",
     "wasm/jsapi/module/imports.any.js",
-    "wasm/jsapi/module/toString.any.js"
+    "wasm/jsapi/module/toString.any.js",
+    "wasm/jsapi/table/constructor.any.js",
+    "wasm/jsapi/table/get-set.any.js",
+    "wasm/jsapi/table/grow.any.js",
+    "wasm/jsapi/table/length.any.js",
+    "wasm/jsapi/table/toString.any.js"
   ],
   "support": [
     "FileAPI/support/Blob.js",
@@ -139,6 +144,7 @@
     "wasm/jsapi/assertions.js",
     "wasm/jsapi/instanceTestFactory.js",
     "wasm/jsapi/memory/assertions.js",
+    "wasm/jsapi/table/assertions.js",
     "wasm/jsapi/wasm-module-builder.js"
   ],
   "sha256": {
@@ -278,6 +284,12 @@
     "wasm/jsapi/module/exports.any.js": "7e708e1ede4b4fde5bdb651e203ea8b3a0c300a03886ea0964a35f7941fb8842",
     "wasm/jsapi/module/imports.any.js": "190c33e14201bc561fb362cc755b094f5c3dfc38cbed5a728bb6e684e7760e7b",
     "wasm/jsapi/module/toString.any.js": "b4542915022b1e0eaafd95e87352f8a03ac627e1f3b00e4e74c3f9640fd937bb",
+    "wasm/jsapi/table/assertions.js": "5128c0a79196caef4757b914de2a26dbda6c81a1d2d0f25f32eecfb096cd2405",
+    "wasm/jsapi/table/constructor.any.js": "c719300ad7a0057ee78c122b51fe8b17ba692f5fd2438d090037d0bec51b7a5b",
+    "wasm/jsapi/table/get-set.any.js": "4a92d1341fef7a9f26abb7251401de3b549f9e22e967d12dd1dcf294254ccbf7",
+    "wasm/jsapi/table/grow.any.js": "30e1b030a1b741089f56c108b5b601375fa5e71b1e41a0cff68b76a8e949525f",
+    "wasm/jsapi/table/length.any.js": "a340af87d9770c06e9d5bc791416f8ce96e34575662f76ec4a0be4fb4724de4b",
+    "wasm/jsapi/table/toString.any.js": "9568a90181fcc2a111111884aecca7f4ea195d16aa042085d8255861811ce9bd",
     "wasm/jsapi/wasm-module-builder.js": "8eabf2c5fc2595dedc1fa5c1c53c548de6608300687938e409670dcecec86fd4"
   }
 }

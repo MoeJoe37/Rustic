@@ -187,6 +187,15 @@ impl PrivateArray {
         agent.set(self.0, PropertyKey::Index(index), value, true)
     }
 
+    pub(super) fn append_repeated(
+        self,
+        agent: &mut Agent,
+        count: u32,
+        value: Value,
+    ) -> JsResult<()> {
+        agent.append_host_array(self.0, count, value)
+    }
+
     pub(super) fn len(self, agent: &mut Agent) -> JsResult<u32> {
         let key = PropertyKey::String(agent.names.length);
         let len = agent.get(self.0, key)?;

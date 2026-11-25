@@ -4,6 +4,7 @@ mod global;
 mod host;
 mod instance;
 mod memory;
+mod table;
 
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
@@ -13,8 +14,8 @@ use rustic_js::runtime::{
     PropertyKey, Value, to_int32,
 };
 use rustic_wasm::{
-    BinaryErrorKind, DecodeLimits, ExportIndex, ImportType, ValidatedModule, ValidationErrorKind,
-    Value as WasmValue, ValueType, decode_module, validate_module,
+    AddressType, BinaryErrorKind, DecodeLimits, ExportIndex, ImportType, ValidatedModule,
+    ValidationErrorKind, Value as WasmValue, ValueType, decode_module, validate_module,
 };
 
 use super::{
@@ -99,6 +100,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     define_method(agent, namespace, "compileStreaming", compile_streaming, 1)?;
     global::install(agent, namespace)?;
     memory::install(agent, namespace)?;
+    table::install(agent, namespace)?;
     instance::install(agent, namespace)?;
 
     let module = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
@@ -176,6 +178,47 @@ fn tag(agent: &mut Agent, object: ObjectId, name: &str) -> JsResult<()> {
 
 fn arg(args: &[Value], index: usize) -> Value {
     args.get(index).copied().unwrap_or(Value::UNDEFINED)
+}
+
+fn address_type(agent: &mut Agent, descriptor: ObjectId, invalid: &str) -> JsResult<AddressType> {
+    let key = agent.heap.key("address")?;
+    let value = agent.get(descriptor, key)?;
+    if value == Value::UNDEFINED {
+        return Ok(AddressType::I32);
+    }
+    let name = agent.to_string(value)?;
+    let name = agent.heap.string(name);
+    if name.len() == 3 {
+        match name.to_text().as_str() {
+            "i32" => return Ok(AddressType::I32),
+            "i64" => return Ok(AddressType::I64),
+            _ => {}
+        }
+    }
+    agent.type_error(invalid)
+}
+
+fn address_index(
+    agent: &mut Agent,
+    value: Value,
+    address: AddressType,
+    invalid: &str,
+) -> JsResult<u64> {
+    match address {
+        AddressType::I32 => {
+            let number = agent.to_number(value)?.trunc();
+            if (0.0..=f64::from(u32::MAX)).contains(&number) {
+                return Ok(number as u64);
+            }
+        }
+        AddressType::I64 => {
+            let number = agent.to_bigint(value)?;
+            if !number.is_negative() && number.bit_length() <= 64 {
+                return Ok(number.to_u64_wrapping());
+            }
+        }
+    }
+    agent.type_error(invalid)
 }
 
 fn is_numeric(ty: ValueType) -> bool {

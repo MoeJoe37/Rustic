@@ -1997,3 +1997,111 @@ fn wasm_window_executes_indirect_calls_with_local_table64_indices() {
     }
     assert_eq!(outcome.unwrap(), Value::TRUE);
 }
+
+#[test]
+fn wasm_standalone_tables_trace_function_and_external_references() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    let outcome = agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        function makeFunction() {
+            const bytes = Uint8Array.of(
+                0,97,115,109,1,0,0,0,
+                1,5,1,96,0,1,127, 3,2,1,0,
+                7,7,1,3,114,117,110,0,0, 10,6,1,4,0,65,42,11
+            );
+            return new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports.run;
+        }
+        const {Table} = WebAssembly;
+        class Child extends Table {}
+        const table = new Child({element: 'anyfunc', initial: 1, maximum: 4}, makeFunction());
+        const external = new Table({element: 'externref', initial: 2}, {tag: 'retained'});
+        assert(table instanceof Child && table.length === 1, 'subclass and length');
+        const fn = table.get(0);
+        assert(fn() === 42, 'table retains the Wasm function and its instance');
+        assert(table.grow(2, fn) === 1 && table.get(2) === fn, 'growth and function identity');
+        assert(table.set(0) === undefined && table.get(0) === null, 'default function entry');
+        assert(rejects(TypeError, () => table.set(1, undefined)), 'explicit undefined is invalid');
+        assert(rejects(TypeError, () => table.set(1, () => 42)), 'plain JS function is invalid');
+        assert(rejects(TypeError, () => table.set(1, new Proxy(fn, {}))), 'function proxies are invalid');
+        assert(rejects(TypeError, () => Table.prototype.get.call({}, 0)), 'receiver brand');
+        assert(rejects(RangeError, () => table.grow(2)) && table.length === 3, 'failed growth');
+        assert(table.get(1) === fn, 'failed mutations leave entries intact');
+        assert(external.get(0).tag === 'retained' && external.get(0) === external.get(1), 'externref traces identity');
+        const symbol = Symbol('entry');
+        external.set(1, symbol);
+        assert(external.get(1) === symbol, 'symbol round trip');
+        external.set(0, null);
+        assert(external.get(0) === null, 'null round trip');
+        external.set(0);
+        assert(external.get(0) === undefined, 'default externref entry');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}
+
+#[test]
+fn wasm_standalone_table64_checks_full_indices_and_growth_after_reentry() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    let outcome = agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        const {Table} = WebAssembly;
+        const table = new Table({element: 'externref', address: 'i64', initial: 1n, maximum: 3n}, 10);
+        assert(table.length === 1n && table.get(0n) === 10, 'wide length and index');
+        assert(rejects(TypeError, () => table.get(0)), 'wide counts reject Numbers');
+        assert(rejects(TypeError, () => table.get(-1n)), 'negative index');
+        assert(rejects(TypeError, () => table.get(2n ** 64n)), 'index outside address width');
+        assert(rejects(RangeError, () => table.get(2n ** 32n)), 'index is never truncated');
+        assert(table.grow({valueOf() {
+            assert(table.grow(1n, 20) === 1n, 'reentrant growth');
+            return 1n;
+        }}, 30) === 2n, 'growth returns the current previous length');
+        assert(table.length === 3n && table.get(1n) === 20 && table.get(2n) === 30, 'both growths are visible');
+        assert(rejects(RangeError, () => table.grow(1n)) && table.length === 3n, 'maximum is enforced');
+        const capped = new Table({element: 'anyfunc', address: 'i64', initial: 65535n, maximum: 2n ** 63n});
+        assert(capped.grow(1n) === 65535n && capped.get(65535n) === null, 'exact host cap');
+        assert(rejects(RangeError, () => capped.grow(1n)), 'declared maximum does not override host cap');
+        assert(capped.length === 65536n, 'failed growth preserves length');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}
+
+#[test]
+fn wasm_standalone_table_growth_respects_the_heap_budget() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::with_heap_limit(512 * 1024).unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    let outcome = agent.evaluate(
+        r#"
+        const table = new WebAssembly.Table({element: 'externref', initial: 1}, 42);
+        let rejected = false;
+        try { table.grow(65535, 'too large for this heap'); }
+        catch (error) { rejected = error instanceof RangeError; }
+        rejected && table.length === 1 && table.get(0) === 42 &&
+            table.grow(1) === 1 && table.get(1) === undefined
+    "#,
+    );
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}

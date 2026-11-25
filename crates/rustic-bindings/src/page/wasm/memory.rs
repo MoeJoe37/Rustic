@@ -1,5 +1,5 @@
 use rustic_js::runtime::ErrorKind;
-use rustic_wasm::{LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES};
+use rustic_wasm::{AddressType, Limits, LinearMemory, MEMORY_PAGE_BYTES};
 
 use super::*;
 
@@ -21,12 +21,22 @@ pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
     agent.install_host_interface_on(namespace, MEMORY, construct, 1, proto, |_, _| Ok(()))
 }
 
-fn index(agent: &mut Agent, value: Value) -> JsResult<u32> {
-    let number = agent.to_number(value)?.trunc();
-    if !(0.0..=f64::from(u32::MAX)).contains(&number) {
-        return agent.type_error("invalid WebAssembly memory page count");
+fn index(agent: &mut Agent, value: Value, address: AddressType) -> JsResult<u64> {
+    match address {
+        AddressType::I32 => {
+            let number = agent.to_number(value)?.trunc();
+            if (0.0..=f64::from(u32::MAX)).contains(&number) {
+                return Ok(number as u64);
+            }
+        }
+        AddressType::I64 => {
+            let number = agent.to_bigint(value)?;
+            if !number.is_negative() && number.bit_length() <= 64 {
+                return Ok(number.to_u64_wrapping());
+            }
+        }
     }
-    Ok(number as u32)
+    agent.type_error("invalid WebAssembly memory page count")
 }
 
 fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
@@ -38,38 +48,52 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     };
     let key = agent.heap.key("address")?;
     let address = agent.get(descriptor, key)?;
-    if address != Value::UNDEFINED {
+    let address_type = if address == Value::UNDEFINED {
+        AddressType::I32
+    } else {
         let name = agent.to_string(address)?;
-        if agent.heap.string(name).len() != 3 || agent.heap.string(name).to_text() != "i32" {
-            return agent.type_error("only 32-bit WebAssembly memory is supported");
+        let name = agent.heap.string(name);
+        if name.len() != 3 {
+            return agent.type_error("invalid WebAssembly memory address type");
         }
-    }
+        match name.to_text().as_str() {
+            "i32" => AddressType::I32,
+            "i64" => AddressType::I64,
+            _ => return agent.type_error("invalid WebAssembly memory address type"),
+        }
+    };
     let key = agent.heap.key("initial")?;
     let initial = agent.get(descriptor, key)?;
-    let initial = index(agent, initial)?;
+    let initial = index(agent, initial, address_type)?;
     let key = agent.heap.key("maximum")?;
     let maximum = agent.get(descriptor, key)?;
     let maximum = if maximum == Value::UNDEFINED {
         None
     } else {
-        Some(index(agent, maximum)?)
+        Some(index(agent, maximum, address_type)?)
     };
     let key = agent.heap.key("shared")?;
     let shared = agent.get(descriptor, key)?;
     if agent.to_boolean(shared) {
         return agent.type_error("shared WebAssembly memory is unavailable");
     }
-    let maximum_pages = maximum.unwrap_or(MEMORY32_MAX_PAGES);
-    let admitted = maximum_pages.min((MEMORY_LIMIT / MEMORY_PAGE_BYTES) as u32);
-    if initial > admitted || maximum_pages > MEMORY32_MAX_PAGES {
+    let address_limit = address_type.max_memory_pages();
+    let maximum_pages = maximum.unwrap_or(address_limit);
+    let admitted = maximum_pages.min((MEMORY_LIMIT / MEMORY_PAGE_BYTES) as u64);
+    if initial > admitted || maximum_pages > address_limit {
         return Err(agent.throw(ErrorKind::RangeError, "invalid WebAssembly memory limits"));
     }
     let byte_limit = admitted as usize * MEMORY_PAGE_BYTES;
     let allocation = LinearMemory::storage_bytes(byte_limit);
     let proto = agent.host_prototype_from_new_target(MEMORY, target)?;
-    agent.spend_native_work(u64::from(initial) * (MEMORY_PAGE_BYTES as u64 / 64))?;
+    agent.spend_native_work(initial * (MEMORY_PAGE_BYTES as u64 / 64))?;
     let allocated = agent.with_host_memory(allocation, |_| {
-        Ok(LinearMemory::new(initial, maximum, byte_limit))
+        let limits = Limits {
+            address_type,
+            min: initial,
+            max: maximum,
+        };
+        Ok(LinearMemory::with_limits(limits, byte_limit))
     });
     let memory = match allocated {
         Ok(Some(memory)) => memory,
@@ -126,12 +150,14 @@ fn buffer(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 
 fn grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let memory = state(agent, this)?;
-    let pages = index(agent, arg(args, 0))?;
+    let address = memory.address_type();
+    let pages = index(agent, arg(args, 0), address)?;
     let old = memory.grow(pages, |work| {
         agent.spend_native_work((work as u64).div_ceil(64))
     })?;
-    match old {
-        Some(pages) => Ok(Value::number(f64::from(pages))),
-        None => Err(agent.throw(ErrorKind::RangeError, "cannot grow WebAssembly memory")),
+    match (old, address) {
+        (Some(pages), AddressType::I32) => Ok(Value::number(pages as f64)),
+        (Some(pages), AddressType::I64) => agent.bigint_value(BigInt::from_u64(pages)),
+        (None, _) => Err(agent.throw(ErrorKind::RangeError, "cannot grow WebAssembly memory")),
     }
 }

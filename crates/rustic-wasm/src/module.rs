@@ -29,6 +29,24 @@ pub enum AddressType {
     I64,
 }
 
+impl AddressType {
+    /// Integer type of addresses and page counts in guest instructions.
+    pub const fn value_type(self) -> ValueType {
+        match self {
+            Self::I32 => ValueType::I32,
+            Self::I64 => ValueType::I64,
+        }
+    }
+
+    /// The maximum number of 64 KiB pages for this address width.
+    pub const fn max_memory_pages(self) -> u64 {
+        match self {
+            Self::I32 => 1 << 16,
+            Self::I64 => 1 << 48,
+        }
+    }
+}
+
 /// Declared memory pages or table elements. Validation checks their range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
@@ -38,6 +56,15 @@ pub struct Limits {
     pub min: u64,
     /// Optional bound on growth.
     pub max: Option<u64>,
+}
+
+impl Limits {
+    pub(crate) fn fits(self, max: u64) -> bool {
+        self.min <= max
+            && self
+                .max
+                .is_none_or(|bound| (self.min..=max).contains(&bound))
+    }
 }
 
 /// Type of a table, excluding its optional initializer.

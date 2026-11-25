@@ -138,7 +138,11 @@ fn import_indexes_constants_and_reference_declarations_are_checked() {
 fn validation_rejects_incompatible_declarations_and_memory_immediates() {
     for (bytes, fault, value) in [
         (module(&[(5, &[1, 1, 2, 1])]), Fault::InvalidLimits, 1),
-        (module(&[(5, &[1, 4, 0])]), Fault::UnsupportedType, 4),
+        (
+            module(&[(4, &[1, 0x70, 4, 0])]),
+            Fault::UnsupportedType,
+            0x70,
+        ),
         (
             module(&[(1, &[1, 0x60, 1, 0x7b, 0])]),
             Fault::UnsupportedType,
@@ -191,6 +195,35 @@ fn validation_rejects_incompatible_declarations_and_memory_immediates() {
         (11, &[1, 1, 1, 42]),
     ]);
     validate(&bytes).unwrap();
+}
+
+#[test]
+fn memory64_checks_limits_offsets_and_each_bulk_operand_width() {
+    let wide = &[(5, &[1, 4, 1][..])];
+    let load = &[0x42, 0, 0x28, 2, 0x80, 0x80, 0x80, 0x80, 0x10, 0x1a];
+    validate(&function(EMPTY, wide, &[0], load)).unwrap();
+    invalid(
+        &function(EMPTY, wide, &[0], &[0x41, 0, 0x28, 2, 0, 0x1a]),
+        Fault::TypeMismatch,
+        0x28,
+    );
+    let data = module(&[(5, &[1, 4, 1]), (11, &[1, 0, 0x41, 0, END, 0])]);
+    assert_eq!(validate(&data).unwrap_err().kind, Fault::TypeMismatch);
+
+    let mixed = &[(5, &[2, 4, 1, 0, 1][..])];
+    let copy = [0x42, 0, 0x41, 0, 0x41, 0, 0xfc, 10, 0, 1];
+    validate(&function(EMPTY, mixed, &[0], &copy)).unwrap();
+    let mut invalid_length = copy;
+    invalid_length[4] = 0x42;
+    invalid(
+        &function(EMPTY, mixed, &[0], &invalid_length),
+        Fault::TypeMismatch,
+        0xfc,
+    );
+    let maximum = module(&[(5, &[1, 5, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x40])]);
+    validate(&maximum).unwrap();
+    let too_large = module(&[(5, &[1, 5, 0, 0x81, 0x80, 0x80, 0x80, 0x80, 0x80, 0x40])]);
+    invalid(&too_large, Fault::InvalidLimits, 5);
 }
 
 #[test]

@@ -1834,3 +1834,62 @@ fn wasm_fixed_memories_share_live_bytes_and_detach_views_on_successful_growth() 
     }
     assert_eq!(outcome.unwrap(), Value::TRUE);
 }
+
+#[test]
+fn wasm_memory64_uses_bigint_counts_and_links_only_the_same_address_width() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    let outcome = agent.evaluate(r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        const producer = Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,16,3,96,1,126,1,127,96,2,126,127,0,96,1,126,1,126,
+            3,4,3,0,1,2, 5,4,1,5,1,3,
+            7,37,5,3,109,101,109,2,0, 5,97,108,105,97,115,2,0,
+            4,108,111,97,100,0,0, 5,115,116,111,114,101,0,1, 4,103,114,111,119,0,2,
+            10,26,3,7,0,32,0,45,0,0,11, 9,0,32,0,32,1,58,0,0,11, 6,0,32,0,64,0,11,
+            11,7,1,0,66,0,11,1,5
+        );
+        const importer = new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0, 2,11,1,1,109,3,109,101,109,2,5,2,3,
+            7,7,1,3,109,101,109,2,0
+        ));
+        assert(WebAssembly.validate(producer), 'valid i64 address module');
+        const {mem, alias, load, store, grow} = new WebAssembly.Instance(new WebAssembly.Module(producer)).exports;
+        assert(mem === alias && mem instanceof WebAssembly.Memory && load(0n) === 5, 'i64 active data');
+        const old = mem.buffer;
+        new DataView(old).setUint8(1, 42);
+        assert(load(1n) === 42, 'live host write');
+        store(0n, 27);
+        assert(new Uint8Array(old)[0] === 27, 'live guest write');
+        assert(rejects(WebAssembly.RuntimeError, () => load(4294967296n)), 'no address truncation');
+        assert(rejects(TypeError, () => mem.grow(1)), 'i64 growth requires BigInt conversion');
+        assert(rejects(TypeError, () => mem.grow(-1n)), 'negative BigInt');
+        assert(rejects(TypeError, () => mem.grow(18446744073709551616n)), 'BigInt beyond u64');
+        assert(rejects(RangeError, () => mem.grow(18446744073709551615n)), 'u64 beyond page limit');
+        assert(grow(-1n) === -1n && old === mem.buffer && !old.detached, 'rejected guest growth');
+        assert(grow(1n) === 1n && old.detached, 'guest growth detaches');
+        const larger = mem.buffer;
+        assert(larger.byteLength === 131072 && load(0n) === 27 && load(65536n) === 0, 'grown memory');
+        assert(new WebAssembly.Instance(importer, {m:{mem}}).exports.mem === mem, 'live i64 import');
+        assert(mem.grow(0n) === 2n && larger.detached, 'zero BigInt growth detaches');
+        const wrong = new WebAssembly.Memory({initial:2, maximum:3});
+        assert(rejects(WebAssembly.LinkError, () => new WebAssembly.Instance(importer, {m:{mem:wrong}})), 'width mismatch');
+        const standalone = new WebAssembly.Memory({address:'i64', initial:'2', maximum:3n});
+        assert(new WebAssembly.Instance(importer, {m:{mem:standalone}}).exports.mem === standalone, 'standalone i64 import');
+        assert(rejects(TypeError, () => new WebAssembly.Memory({address:'i64', initial:1})), 'Number has the wrong type');
+        assert(rejects(RangeError, () => new WebAssembly.Memory({address:'i64', initial:129n})), 'allocation cap');
+        assert(rejects(RangeError, () => new WebAssembly.Memory({address:'i64', initial:0n, maximum:281474976710657n})), 'page maximum');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}

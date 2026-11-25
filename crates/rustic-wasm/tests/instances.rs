@@ -486,3 +486,95 @@ fn imported_memory_preserves_segment_prefixes_and_copies_across_aliased_indices(
     assert_eq!(memory.grow(0, |_| Ok::<_, ()>(())).unwrap(), Some(1));
     assert!(old.read().is_none());
 }
+
+#[test]
+fn memory64_bulk_operations_keep_full_width_addresses_under_the_host_budget() {
+    #[rustfmt::skip]
+    let types = [
+        4, 0x60, 0, 0,          // () -> ()
+        0x60, 1, 0x7e, 1, 0x7e, // (i64) -> i64
+        0x60, 1, 0x7e, 1, 0x7f, // (i64) -> i32
+        0x60, 1, 0x7e, 0,       // (i64) -> ()
+    ];
+    #[rustfmt::skip]
+    let bulk = [
+        0x42, 2, 0x41, 0, 0x41, 3, 0xfc, 8, 1, 0, // Init memory64 with passive data.
+        0x42, 5, 0x41, 33, 0x42, 2, 0xfc, 11, 0,  // Fill memory64.
+        0x41, 0, 0x42, 0, 0x41, 7, 0xfc, 10, 1, 0, // Copy to memory32.
+        0x42, 0, 0x41, 1, 0x41, 4, 0xfc, 10, 0, 1, // Copy back to memory64.
+        0x42, 1, 0x42, 0, 0x42, 4, 0xfc, 10, 0, 0, // Overlapping memory64 copy.
+    ];
+    let bytes = program(
+        &types,
+        &[(5, &[2, 5, 1, 3, 0, 1])],
+        &[
+            Function {
+                name: "bulk",
+                ty: 0,
+                code: &bulk,
+            },
+            Function {
+                name: "grow",
+                ty: 1,
+                code: &[0x20, 0, 0x40, 0],
+            },
+            Function {
+                name: "load",
+                ty: 2,
+                code: &[0x20, 0, 0x2d, 0, 1],
+            },
+            Function {
+                name: "wide_offset",
+                ty: 2,
+                code: &[0x20, 0, 0x2d, 0, 0x80, 0x80, 0x80, 0x80, 0x10],
+            },
+            Function {
+                name: "fill",
+                ty: 3,
+                code: &[0x42, 0, 0x41, 0, 0x20, 0, 0xfc, 11, 0],
+            },
+        ],
+        None,
+        Some(&[2, 0, 0x42, 0, 0x0b, 2, b'A', b'B', 1, 3, b'C', b'D', b'E']),
+    );
+    let module = validated(&bytes);
+    let limits = InstanceLimits {
+        memory_bytes: 3 * PAGE,
+        ..Default::default()
+    };
+    let token = CancellationToken::default();
+    let mut instance = Instance::instantiate(&module, limits, &token).unwrap();
+    let memory = instance.memory(0).unwrap();
+    instance.invoke("bulk", &[], &token).unwrap();
+    let old = memory.buffer();
+    assert_eq!(&old.read().unwrap()[..7], b"BBCDE!!");
+    for (name, arg) in [
+        ("load", -1),
+        ("load", 1 << 32),
+        ("wide_offset", 0),
+        ("fill", (1 << 32) + 1),
+    ] {
+        assert_eq!(
+            instance
+                .invoke(name, &[Value::I64(arg)], &token)
+                .unwrap_err()
+                .kind,
+            Fault::MemoryOutOfBounds,
+        );
+    }
+    assert_eq!(&old.read().unwrap()[..7], b"BBCDE!!");
+    for (delta, previous) in [(-1, -1), (1 << 32, -1), (2, -1), (1, 1), (0, 2)] {
+        assert_eq!(
+            instance
+                .invoke("grow", &[Value::I64(delta)], &token)
+                .unwrap(),
+            [Value::I64(previous)],
+        );
+        assert_eq!(old.read().is_some(), previous == -1);
+    }
+    assert_eq!(memory.pages(), 2);
+    let current = memory.buffer();
+    let bytes = current.read().unwrap();
+    assert_eq!(&bytes[..7], b"BBCDE!!");
+    assert!(bytes[PAGE..].iter().all(|&byte| byte == 0));
+}

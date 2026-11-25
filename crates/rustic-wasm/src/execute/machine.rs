@@ -179,7 +179,11 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
             }
             (Opcode::Core(op @ 0x28..=0x3e), Immediate::Memory { memory, offset, .. }) => {
                 let value = (op >= 0x36).then(|| self.pop().number());
-                let address = u64::from(self.pop_i32() as u32) + offset;
+                let address = self
+                    .pop()
+                    .address()
+                    .checked_add(*offset)
+                    .ok_or_else(|| error(self.offset, Fault::MemoryOutOfBounds))?;
                 if let Some(result) =
                     self.state
                         .borrow_mut()
@@ -190,15 +194,15 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
             }
             (Opcode::Core(0x3f), Immediate::Index(memory)) => {
                 let size = self.state.borrow().size(*memory);
-                self.push(Slot::Number(Value::I32(size)))?;
+                self.push(Slot::Number(size))?;
             }
             (Opcode::Core(0x40), Immediate::Index(memory)) => {
-                let pages = self.pop_i32() as u32;
+                let pages = self.pop().address();
                 let result =
                     self.state
                         .borrow_mut()
                         .grow(*memory, pages, self.offset, &mut self.budget)?;
-                self.push(Slot::Number(Value::I32(result)))?;
+                self.push(Slot::Number(result))?;
             }
             (Opcode::Core(0xd0), Immediate::HeapType(ty)) => {
                 self.push(Slot::Ref(Reference::null(*ty)))?;
@@ -534,9 +538,9 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
     }
 
     fn pop_transfer(&mut self) -> Transfer {
-        let size = self.pop_i32() as u32;
-        let source = self.pop_i32() as u32;
-        let destination = self.pop_i32() as u32;
+        let size = self.pop().address();
+        let source = self.pop().address();
+        let destination = self.pop().address();
         Transfer {
             destination,
             source,

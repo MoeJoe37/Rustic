@@ -306,14 +306,16 @@ Window module objects own byte snapshots and reflection metadata. Numeric
 function, global and memory exports trace the interpreter state through the
 JS heap. Global wrappers and importing instances read the same numeric cells.
 An attached Wasm buffer views the current generation of linear memory and
-traces its allocation owner. A dispatched import runs with its invocation
-stack owned by the interpreter and all guest store borrows released. The
-realm keeps its bindings and propagates JavaScript exceptions. The
+traces its allocation owner. Each memory has an address width and shares the
+byte budget of its allocating owner. The interpreter checks full-width guest
+ranges before converting them to host indices. A dispatched import runs with
+its invocation stack owned by the interpreter and all guest store borrows
+released. The realm keeps its bindings and propagates JavaScript exceptions. The
 interpreter remains available on hosts without executable-memory permission.
 [ADR 0080](adr/0080-window-wasm-module-compilation.md),
 [ADR 0081](adr/0081-owned-wasm-instances.md), [ADR 0082](adr/0082-wasm-numeric-globals.md),
 [ADR 0083](adr/0083-wasm-js-function-imports.md), [ADR 0084](adr/0084-shared-numeric-wasm-globals.md),
-[ADR 0085](adr/0085-wasm-fixed-memory-buffers.md)
+[ADR 0085](adr/0085-wasm-fixed-memory-buffers.md), [ADR 0086](adr/0086-wasm-memory64.md)
 
 Extensions execute under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native

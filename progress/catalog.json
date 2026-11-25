@@ -4147,6 +4147,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/validation.rs",
               "marker": "fn validation_rejects_incompatible_declarations_and_memory_immediates"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/validation.rs",
+              "marker": "fn memory64_checks_limits_offsets_and_each_bulk_operand_width"
             }
           ]
         },
@@ -4210,6 +4215,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/instances.rs",
               "marker": "fn owned_instances_outlive_the_source_and_keep_passive_data"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/instances.rs",
+              "marker": "fn memory64_bulk_operations_keep_full_width_addresses_under_the_host_budget"
             }
           ]
         },
@@ -4284,6 +4294,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/instances.rs",
               "marker": "fn imported_memory_preserves_segment_prefixes_and_copies_across_aliased_indices"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_memory64_uses_bigint_counts_and_links_only_the_same_address_width"
             }
           ]
         },

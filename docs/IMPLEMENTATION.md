@@ -3249,15 +3249,15 @@ expressions. The decoder checks all eight element and three data encodings.
 limits, export names, start and tag signatures, constant expressions and
 function references. The iterative body pass checks the numeric instruction
 set, multi-value blocks and branches, locals, globals, direct and indirect
-calls, abstract function and external references, and 32-bit memory and table
-instructions including bulk operations. Stack, local and work limits apply
-before producing a `ValidatedModule`.
+calls, abstract function and external references, and scalar and bulk
+instructions for 32- and 64-bit memories and 32-bit tables. Stack, local
+and work limits apply before producing a `ValidatedModule`.
 
 The integration suites in `crates/rustic-wasm/tests/sections.rs` and
 `validation.rs` cover positive and malformed modules, unreachable stack
 polymorphism, initializer visibility, and cancellation and resource limits.
 The `wasm-binary` fuzz target exercises both passes. GC and concrete reference
-types, SIMD, exception instructions, shared memory, and 64-bit addressing
+types, SIMD, exception instructions, shared memory, and 64-bit tables
 remain outside the supported profile.
 [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)
 
@@ -3280,8 +3280,8 @@ zero-argument exports under a small execution budget.
 
 ## WASM-04 — Instance globals and linear memory
 
-`Instance::instantiate` creates independent local numeric globals and 32-bit
-linear memories, evaluates their initializers, applies active data segments
+`Instance::instantiate` creates independent local numeric globals and linear
+memories, evaluates their initializers, applies active data segments
 and then runs the start function. Function calls share that state. Changes
 made before a trap remain visible to later calls.
 
@@ -3378,7 +3378,7 @@ upstream Wasm module builder uses `unescape` for UTF-8 fixture names.
 `Instance::instantiate_owned` consumes validated code, copies retained names
 and passive data, and keeps mutable guest state after the input is released.
 Window exposes `Instance`, `instantiate` and `instantiateStreaming` for
-modules with numeric function, numeric global and unshared 32-bit memory
+modules with numeric function, numeric global and unshared memory
 imports and exports.
 Exported functions retain their instance through the collector. Export aliases
 share identity.
@@ -3392,7 +3392,7 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Table imports and wrappers, memory64, shared memories, resizable Wasm buffers,
+Table imports and wrappers, shared memories, resizable Wasm buffers,
 reference-valued host calls and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
@@ -3458,3 +3458,28 @@ Five pinned memory fixtures pass 49 of 51 subtests. The two expected
 failures require shared memory growth or conversion to a resizable buffer.
 The pinned runner preserves helper paths so the general Wasm and memory
 assertion scripts can load together under their original basenames.
+
+### WASM-04/06 — Unshared 64-bit memory
+
+The validator checks the address width of each memory index, including
+imports and active data destinations. The interpreter supports scalar
+loads and stores, size and growth, fill, copy, and passive initialization
+with the core memory64 operand types. Mixed-width copies use a 32-bit
+length. Passive initialization uses a 64-bit destination for memory64
+and 32-bit data offsets and lengths. Full-width bounds checks precede
+host indexing and mutation.
+
+Window accepts `address: "i64"` on `WebAssembly.Memory`. The constructor
+converts the page counts to BigInt before checking the unsigned range;
+`grow` converts its input the same way and returns the previous page
+count as a BigInt. Memory imports require the declared address width.
+Both widths use the allocation cap and buffer lifecycle described above.
+[ADR 0086](adr/0086-wasm-memory64.md)
+
+The native and Window regression tests cover address overflow, invalid
+operand widths, live imports, growth and fixed buffer detachment. A local
+replay generated with WABT 1.0.42 matched 5,343 invocations and 353 binary
+or validation rejections across 14 files from the pinned memory64 suite.
+The memory-only cases in the pinned import fixture also passed in Window
+with 14 successful links and 22 incompatible imports rejected.
+[Pinned memory64 suite](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core/memory64)

@@ -128,7 +128,7 @@ impl<'a> ValidatedModule<'a> {
 }
 
 /// Validate numeric and multi-value control flow, local and global access,
-/// direct and indirect calls, 32-bit memories and tables, and bulk operations.
+/// direct and indirect calls, 32- and 64-bit memories, 32-bit tables, and bulk operations.
 /// Reference validation covers abstract function and external references.
 /// GC types, SIMD, non-null declared storage and 64-bit addressing are outside
 /// this profile. Validation performs no linking, allocation of guest memories,
@@ -241,26 +241,12 @@ fn append<T>(items: &mut Vec<T>, value: T, offset: usize) -> Result<(), Validati
     Ok(())
 }
 
-fn allocation_limits(limits: Limits, max: u64, offset: usize) -> Result<(), ValidationError> {
-    if limits.address_type != AddressType::I32 {
-        return Err(error(offset, Fault::UnsupportedType));
-    }
-    if limits.min > max
-        || limits
-            .max
-            .is_some_and(|bound| bound > max || bound < limits.min)
-    {
-        return Err(error(offset, Fault::InvalidLimits));
-    }
-    Ok(())
-}
-
 struct Context<'a, 'bytes> {
     declarations: &'a Declarations<'bytes>,
     functions: Vec<&'a FunctionType>,
     globals: Vec<GlobalType>,
     imported_globals: usize,
-    memories: usize,
+    memories: Vec<AddressType>,
     tables: Vec<TableType>,
     tags: usize,
     referenced_functions: Vec<bool>,
@@ -277,7 +263,7 @@ impl<'a, 'bytes> Context<'a, 'bytes> {
             functions: Vec::new(),
             globals: Vec::new(),
             imported_globals: 0,
-            memories: 0,
+            memories: Vec::new(),
             tables: Vec::new(),
             tags: 0,
             referenced_functions: Vec::new(),
@@ -350,14 +336,21 @@ impl<'a, 'bytes> Context<'a, 'bytes> {
 
     fn add_table(&mut self, ty: TableType, offset: usize) -> Result<(), ValidationError> {
         declared_type(ty.element_type, offset)?;
-        allocation_limits(ty.limits, u32::MAX.into(), offset)?;
+        if ty.limits.address_type != AddressType::I32 {
+            return Err(error(offset, Fault::UnsupportedType));
+        }
+        if !ty.limits.fits(u32::MAX.into()) {
+            return Err(error(offset, Fault::InvalidLimits));
+        }
         append(&mut self.tables, ty, offset)
     }
 
     fn add_memory(&mut self, limits: Limits, offset: usize) -> Result<(), ValidationError> {
-        allocation_limits(limits, 65_536, offset)?;
-        self.memories += 1;
-        Ok(())
+        let address = limits.address_type;
+        if !limits.fits(address.max_memory_pages()) {
+            return Err(error(offset, Fault::InvalidLimits));
+        }
+        append(&mut self.memories, address, offset)
     }
 
     fn add_global(&mut self, ty: GlobalType, offset: usize) -> Result<(), ValidationError> {
@@ -445,8 +438,8 @@ impl<'a, 'bytes> Context<'a, 'bytes> {
         for segment in &declarations.data {
             budget.spend(segment.offset, 1)?;
             if let Some(active) = &segment.value.active {
-                self.memory(active.target, segment.offset)?;
-                body::constant(self, &active.offset, Ty::I32, self.globals.len(), budget)?;
+                let address = self.memory(active.target, segment.offset)?;
+                body::constant(self, &active.offset, address, self.globals.len(), budget)?;
             }
         }
         for segment in &declarations.elements {
@@ -488,7 +481,9 @@ impl<'a, 'bytes> Context<'a, 'bytes> {
                 ExportIndex::Function(value) => {
                     self.function(value, offset)?;
                 }
-                ExportIndex::Memory(value) => self.memory(value, offset)?,
+                ExportIndex::Memory(value) => {
+                    self.memory(value, offset)?;
+                }
                 ExportIndex::Table(value) => {
                     self.table(value, offset)?;
                 }
@@ -510,8 +505,8 @@ impl<'a, 'bytes> Context<'a, 'bytes> {
         )?)
     }
 
-    fn memory(&self, value: u32, offset: usize) -> Result<(), ValidationError> {
-        check_index(value, self.memories, IndexSpace::Memory, offset)
+    fn memory(&self, value: u32, offset: usize) -> Result<Ty, ValidationError> {
+        Ok(index(&self.memories, value, IndexSpace::Memory, offset)?.value_type())
     }
 
     fn global(&self, value: u32, offset: usize) -> Result<GlobalType, ValidationError> {

@@ -112,9 +112,9 @@ impl GlobalSlot {
 }
 
 pub(super) struct Transfer {
-    pub(super) destination: u32,
-    pub(super) source: u32,
-    pub(super) size: u32,
+    pub(super) destination: u64,
+    pub(super) source: u64,
+    pub(super) size: u64,
 }
 
 impl<'bytes> State<'bytes> {
@@ -204,12 +204,12 @@ impl<'bytes> State<'bytes> {
                     limits.execution.values,
                     budget,
                 )?
-                .i32();
+                .address();
                 let memory = &state.memories[active.target as usize];
                 let range = match checked_range(
                     memory.len(),
-                    u64::from(address as u32),
-                    bytes.len(),
+                    address,
+                    bytes.len() as u64,
                     entry.offset,
                     Fault::MemoryOutOfBounds,
                 ) {
@@ -243,19 +243,21 @@ impl<'bytes> State<'bytes> {
         Ok(state)
     }
 
-    pub(super) fn size(&self, memory: u32) -> i32 {
-        self.memories[memory as usize].pages() as i32
+    pub(super) fn size(&self, memory: u32) -> Value {
+        let memory = &self.memories[memory as usize];
+        memory.page_result(Some(memory.pages()))
     }
 
     pub(super) fn grow(
         &mut self,
         memory: u32,
-        pages: u32,
+        pages: u64,
         offset: usize,
         budget: &mut Budget<'_>,
-    ) -> Result<i32, ExecutionError> {
-        let old = self.memories[memory as usize].grow(pages, |work| budget.spend(offset, work))?;
-        Ok(old.map_or(-1, |pages| pages as i32))
+    ) -> Result<Value, ExecutionError> {
+        let memory = &self.memories[memory as usize];
+        let old = memory.grow(pages, |work| budget.spend(offset, work))?;
+        Ok(memory.page_result(old))
     }
 
     pub(super) fn access(
@@ -269,7 +271,13 @@ impl<'bytes> State<'bytes> {
         let memory = &self.memories[memory as usize];
         let (_, alignment) = memory_access(op);
         let len = 1 << alignment;
-        let range = checked_range(memory.len(), address, len, offset, Fault::MemoryOutOfBounds)?;
+        let range = checked_range(
+            memory.len(),
+            address,
+            len as u64,
+            offset,
+            Fault::MemoryOutOfBounds,
+        )?;
         let mut buffer = [0u8; 8];
         if let Some(value) = store {
             let bits = match value {
@@ -314,7 +322,7 @@ impl<'bytes> State<'bytes> {
             offset,
             Fault::MemoryOutOfBounds,
         )?;
-        budget.spend(offset, transfer.size as usize)?;
+        budget.spend(offset, dst.len())?;
         destination.write(|bytes| bytes[dst].copy_from_slice(&source[src]));
         Ok(())
     }
@@ -339,7 +347,7 @@ impl<'bytes> State<'bytes> {
             offset,
             Fault::MemoryOutOfBounds,
         )?;
-        budget.spend(offset, transfer.size as usize)?;
+        budget.spend(offset, dst.len())?;
         if destination.aliases(source) {
             destination.write(|bytes| bytes.copy_within(src, dst.start));
         } else {
@@ -360,12 +368,12 @@ impl<'bytes> State<'bytes> {
         let memory = &self.memories[memory as usize];
         let range = checked_range(
             memory.len(),
-            u64::from(transfer.destination),
-            transfer.size as usize,
+            transfer.destination,
+            transfer.size,
             offset,
             Fault::MemoryOutOfBounds,
         )?;
-        budget.spend(offset, transfer.size as usize)?;
+        budget.spend(offset, range.len())?;
         memory.write(|bytes| bytes[range].fill(transfer.source as u8));
         Ok(())
     }
@@ -409,20 +417,8 @@ impl Transfer {
         kind: Fault,
     ) -> Result<(Range<usize>, Range<usize>), ExecutionError> {
         Ok((
-            checked_range(
-                source_len,
-                u64::from(self.source),
-                self.size as usize,
-                offset,
-                kind,
-            )?,
-            checked_range(
-                destination_len,
-                u64::from(self.destination),
-                self.size as usize,
-                offset,
-                kind,
-            )?,
+            checked_range(source_len, self.source, self.size, offset, kind)?,
+            checked_range(destination_len, self.destination, self.size, offset, kind)?,
         ))
     }
 }
@@ -430,14 +426,13 @@ impl Transfer {
 pub(super) fn checked_range(
     len: usize,
     address: u64,
-    bytes: usize,
+    bytes: u64,
     offset: usize,
     kind: Fault,
 ) -> Result<Range<usize>, ExecutionError> {
-    let start = usize::try_from(address).map_err(|_| error(offset, kind))?;
-    let end = start
+    let end = address
         .checked_add(bytes)
-        .filter(|&end| end <= len)
+        .filter(|&end| end <= len as u64)
         .ok_or_else(|| error(offset, kind))?;
-    Ok(start..end)
+    Ok(address as usize..end as usize)
 }

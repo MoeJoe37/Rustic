@@ -8,7 +8,7 @@ use crate::{AddressType, Limits};
 /// Number of bytes in one WebAssembly page.
 pub const MEMORY_PAGE_BYTES: usize = 65_536;
 /// Addressable pages in a 32-bit WebAssembly memory.
-pub const MEMORY32_MAX_PAGES: u32 = 65_536;
+pub const MEMORY32_MAX_PAGES: u32 = AddressType::I32.max_memory_pages() as u32;
 
 struct Pool {
     used: Cell<usize>,
@@ -34,7 +34,8 @@ impl MemoryPool {
 
 struct Memory {
     bytes: LinearBuffer,
-    maximum: Option<u32>,
+    address: AddressType,
+    maximum: Option<u64>,
     pool: MemoryPool,
 }
 
@@ -47,14 +48,28 @@ impl Drop for Memory {
     }
 }
 
-/// An unshared 32-bit memory that can be linked by several instances in one agent.
+/// An unshared memory that can be linked by several instances in one agent.
 #[derive(Clone)]
 pub struct LinearMemory(Rc<Memory>);
 
 impl LinearMemory {
-    /// Allocate a standalone memory against its own aggregate byte limit.
+    /// Allocate a standalone 32-bit memory against its own aggregate byte limit.
     pub fn new(initial: u32, maximum: Option<u32>, byte_limit: usize) -> Option<Self> {
-        Self::allocate(initial, maximum, &MemoryPool::new(byte_limit))
+        Self::with_limits(
+            Limits {
+                address_type: AddressType::I32,
+                min: initial.into(),
+                max: maximum.map(u64::from),
+            },
+            byte_limit,
+        )
+    }
+
+    /// Allocate a standalone memory with a declared address width and page limits.
+    pub fn with_limits(limits: Limits, byte_limit: usize) -> Option<Self> {
+        let pool = MemoryPool::new(byte_limit);
+        let length = Self::initial_length(limits, &pool)?;
+        Self::allocate(limits, length, &pool)
     }
 
     /// Storage charged for the backing store and its allocation records.
@@ -67,20 +82,20 @@ impl LinearMemory {
         )
     }
 
-    fn allocate(initial: u32, maximum: Option<u32>, pool: &MemoryPool) -> Option<Self> {
-        let maximum_pages = maximum.unwrap_or(MEMORY32_MAX_PAGES);
-        if initial > maximum_pages || maximum_pages > MEMORY32_MAX_PAGES {
+    fn initial_length(limits: Limits, pool: &MemoryPool) -> Option<usize> {
+        if !limits.fits(limits.address_type.max_memory_pages()) {
             return None;
         }
-        let length = (initial as usize).checked_mul(MEMORY_PAGE_BYTES)?;
-        if !pool.admits(length) {
-            return None;
-        }
+        byte_length(limits.min).filter(|&length| pool.admits(length))
+    }
+
+    fn allocate(limits: Limits, length: usize, pool: &MemoryPool) -> Option<Self> {
         let bytes = LinearBuffer::zeroed(length)?;
         pool.0.used.set(pool.0.used.get() + length);
         Some(Self(Rc::new(Memory {
             bytes,
-            maximum,
+            address: limits.address_type,
+            maximum: limits.max,
             pool: pool.clone(),
         })))
     }
@@ -91,37 +106,39 @@ impl LinearMemory {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<Self, ExecutionError> {
-        if limits.address_type != AddressType::I32 {
-            return Err(error(offset, Fault::UnsupportedModule));
-        }
-        let initial = u32::try_from(limits.min).map_err(|_| error(offset, Fault::LimitExceeded))?;
-        let length = (initial as usize)
-            .checked_mul(MEMORY_PAGE_BYTES)
-            .filter(|&bytes| pool.admits(bytes))
+        let length = Self::initial_length(limits, pool)
             .ok_or_else(|| error(offset, Fault::LimitExceeded))?;
-        budget.spend(offset, 1 + length)?;
-        // The validator bounds the declared maximum to the 32-bit page limit.
-        let maximum = limits.max.map(|pages| pages as u32);
-        Self::allocate(initial, maximum, pool).ok_or_else(|| error(offset, Fault::LimitExceeded))
+        budget.spend(offset, length + 1)?;
+        Self::allocate(limits, length, pool).ok_or_else(|| error(offset, Fault::LimitExceeded))
     }
 
     pub(super) fn matches(&self, limits: Limits) -> bool {
-        limits.address_type == AddressType::I32
-            && u64::from(self.pages()) >= limits.min
-            && limits.max.is_none_or(|required| {
-                self.0
-                    .maximum
-                    .is_some_and(|actual| u64::from(actual) <= required)
-            })
+        limits.address_type == self.address_type()
+            && self.pages() >= limits.min
+            && limits
+                .max
+                .is_none_or(|required| self.0.maximum.is_some_and(|actual| actual <= required))
     }
 
     pub(super) fn aliases(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
+    /// Address width of this memory, fixed for the lifetime of its allocation.
+    pub fn address_type(&self) -> AddressType {
+        self.0.address
+    }
+
     /// Current number of allocated WebAssembly pages.
-    pub fn pages(&self) -> u32 {
-        (self.len() / MEMORY_PAGE_BYTES) as u32
+    pub fn pages(&self) -> u64 {
+        (self.len() / MEMORY_PAGE_BYTES) as u64
+    }
+
+    pub(super) fn page_result(&self, pages: Option<u64>) -> Value {
+        match self.0.address {
+            AddressType::I32 => Value::I32(pages.map_or(-1, |pages| pages as i32)),
+            AddressType::I64 => Value::I64(pages.map_or(-1, |pages| pages as i64)),
+        }
     }
 
     /// A fixed-length, live byte view of the current generation.
@@ -145,15 +162,15 @@ impl LinearMemory {
     /// Validation and the host's work charge precede mutation.
     pub fn grow<E>(
         &self,
-        pages: u32,
+        pages: u64,
         charge: impl FnOnce(usize) -> Result<(), E>,
-    ) -> Result<Option<u32>, E> {
+    ) -> Result<Option<u64>, E> {
         let previous = self.pages();
         let old_length = self.len();
         let Some(length) = previous
             .checked_add(pages)
-            .filter(|&count| count <= self.0.maximum.unwrap_or(MEMORY32_MAX_PAGES))
-            .and_then(|count| (count as usize).checked_mul(MEMORY_PAGE_BYTES))
+            .filter(|&count| count <= self.0.maximum.unwrap_or(self.0.address.max_memory_pages()))
+            .and_then(byte_length)
             .filter(|&length| self.0.pool.admits(length - old_length))
         else {
             return Ok(None);
@@ -169,4 +186,8 @@ impl LinearMemory {
         used.set(used.get() + (length - old_length));
         Ok(Some(previous))
     }
+}
+
+fn byte_length(pages: u64) -> Option<usize> {
+    usize::try_from(pages).ok()?.checked_mul(MEMORY_PAGE_BYTES)
 }

@@ -83,7 +83,7 @@ impl Tables {
                     let range = checked_range(
                         target.len(),
                         u64::from(start),
-                        count,
+                        count as u64,
                         offset,
                         OUT_OF_BOUNDS,
                     )?;
@@ -189,7 +189,7 @@ impl Tables {
         let source = &self.elements[element as usize];
         let target = &mut self.tables[table as usize].entries;
         let (src, dst) = transfer.ranges(source.len(), target.len(), offset, OUT_OF_BOUNDS)?;
-        budget.spend(offset, transfer.size as usize)?;
+        budget.spend(offset, dst.len())?;
         target[dst].copy_from_slice(&source[src]);
         Ok(())
     }
@@ -214,7 +214,7 @@ impl Tables {
             offset,
             OUT_OF_BOUNDS,
         )?;
-        budget.spend(offset, transfer.size as usize)?;
+        budget.spend(offset, dst.len())?;
         if destination == source {
             self.tables[destination].entries.copy_within(src, dst.start);
         } else {
@@ -242,7 +242,7 @@ impl Tables {
         let range = checked_range(
             entries.len(),
             u64::from(index),
-            count as usize,
+            u64::from(count),
             offset,
             OUT_OF_BOUNDS,
         )?;

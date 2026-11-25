@@ -284,23 +284,25 @@ impl<'a> Body<'a, '_, '_, '_, '_> {
                     offset,
                 },
             ) => {
-                self.context.memory(*memory, self.offset)?;
+                let address = self.context.memory(*memory, self.offset)?;
                 let (ty, natural_alignment) = numeric::memory_access(code);
-                if *alignment > natural_alignment || *offset > u64::from(u32::MAX) {
+                if *alignment > natural_alignment
+                    || (address == Ty::I32 && *offset > u64::from(u32::MAX))
+                {
                     return Err(self.error(Fault::InvalidLimits));
                 }
                 if code < 0x36 {
-                    self.effect(&[Ty::I32], &[ty])?;
+                    self.effect(&[address], &[ty])?;
                 } else {
-                    self.pop_types(&[Ty::I32, ty])?;
+                    self.pop_types(&[address, ty])?;
                 }
             }
             (Opcode::Core(0x3f | 0x40), Immediate::Index(memory)) => {
-                self.context.memory(*memory, self.offset)?;
+                let address = self.context.memory(*memory, self.offset)?;
                 if op == Opcode::Core(0x40) {
-                    self.pop(Ty::I32)?;
+                    self.pop(address)?;
                 }
-                self.push(Some(Ty::I32))?;
+                self.push(Some(address))?;
             }
             (Opcode::Core(0xd0), Immediate::HeapType(heap_type)) => {
                 let ty = Ty::Ref {
@@ -357,14 +359,20 @@ impl<'a> Body<'a, '_, '_, '_, '_> {
         match (op, immediate) {
             (Opcode::Misc(8), Immediate::Indices(data, memory)) => {
                 context.data(*data, at)?;
-                context.memory(*memory, at)?;
+                let address = context.memory(*memory, at)?;
+                return self.pop_types(&[address, Ty::I32, Ty::I32]);
             }
             (Opcode::Misc(9), Immediate::Index(data)) => return context.data(*data, at),
             (Opcode::Misc(10), Immediate::Indices(dst, src)) => {
-                context.memory(*dst, at)?;
-                context.memory(*src, at)?;
+                let dst = context.memory(*dst, at)?;
+                let src = context.memory(*src, at)?;
+                let size = if dst == src { dst } else { Ty::I32 };
+                return self.pop_types(&[dst, src, size]);
             }
-            (Opcode::Misc(11), Immediate::Index(memory)) => context.memory(*memory, at)?,
+            (Opcode::Misc(11), Immediate::Index(memory)) => {
+                let address = context.memory(*memory, at)?;
+                return self.pop_types(&[address, Ty::I32, address]);
+            }
             (Opcode::Misc(12), Immediate::Indices(element, table)) => {
                 let element = context.element(*element, at)?;
                 let table = context.table(*table, at)?.element_type;

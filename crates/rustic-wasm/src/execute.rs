@@ -84,6 +84,14 @@ impl Slot {
         };
         value
     }
+
+    fn address(self) -> u64 {
+        match self.number() {
+            Value::I32(value) => u64::from(value as u32),
+            Value::I64(value) => value as u64,
+            _ => unreachable!("validated integer operand"),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]

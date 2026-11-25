@@ -2,7 +2,7 @@
 //! of a stylesheet as written, with the fields script reads from
 //! `CSSStyleRule`, `CSSScopeRule`, `CSSMediaRule` and the rest. Text
 //! fields are the source text of each part with whitespace collapsed, not
-//! the canonical CSSOM serialization (TD-215).
+//! the canonical CSSOM serialization (TD-204).
 
 use rustic_base::SourceSpan;
 use rustic_css::{

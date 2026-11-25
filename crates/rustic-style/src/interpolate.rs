@@ -12,7 +12,7 @@
 //! colors and in premultiplied Oklab otherwise. Transform lists interpolate
 //! function by function when their primitives match and through matrix
 //! decomposition otherwise; lists that need decomposition and contain
-//! percentage translations are discrete (TD-212).
+//! percentage translations are discrete (TD-201).
 
 use rustic_css::{
     BackgroundSize, BorderWidth, Calc, Color, CompositeOperation, CornerRadius, Display,

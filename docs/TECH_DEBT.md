@@ -57,10 +57,11 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
+| M11 (parity) | TD-205, TD-206, TD-207 | Anchor positioning, scroll-driven animation and view transition parity with other engines, measured by their WPT directories |
 | M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162, TD-193, TD-198, TD-184, TD-185, TD-181 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms; GPU shared memory, presentation from the GPU process and finer compositor layers |
 | M14 (Android and iOS devices, ADR 0067) | None yet; the device and simulator half of the hosted-CI row's mobile entry is paid here | Device, simulator and Apple-entitlement work deferred to the last milestone; mobile compile checks and the Android emulator job stay in CI meanwhile |
 | Standing (guarded by a rule or a test, no payoff date) | TD-04, TD-08, TD-13, TD-34, TD-35, TD-73, TD-90, TD-114, TD-144 | Reviewed whenever the guarded code changes |
@@ -3337,3 +3338,81 @@ gates before the engine has background compilation or a stream reader.
 **Pay:** use cancellable incremental input and a dedicated completion task
 when the M9 Wasm/Streams integration exposes those boundaries.
 [ADR 0080](adr/0080-window-wasm-module-compilation.md)
+
+### TD-201 — Transform interpolation edge cases
+
+Transform lists that need matrix decomposition and contain percentage
+translations interpolate discretely, because the percentages need the box
+size that styles do not have. Decomposition uses the platform's `f64`
+trigonometry, which can differ in the last bits between platforms, so tests
+compare with tolerances.
+**Pay:** carry percentage translations through decomposition as a deferred
+`calc()` resolved by layout, and pin a portable trigonometry if a reftest
+needs bit-exact frames (M9 CSS/layout row).
+
+### TD-202 — Animations cannot target pseudo-elements
+
+CSS transitions and animations run on elements only: `::before`, `::after`
+and `::marker` styles do not start them, and `KeyframeEffect` rejects a
+`pseudoElement`. Events carry an empty `pseudoElement`.
+**Pay:** give generated-content boxes animation state keyed by (element,
+pseudo) when the M9 generated-content work lands.
+
+### TD-203 — Web Animations API limits
+
+`commitStyles()` throws `NotSupportedError` (no inline style editing from
+the binding yet). Every `DocumentTimeline` shares the document clock: a
+non-zero `originTime` only shifts its own `currentTime`. Finished script
+animations that no longer affect anything are dropped oldest first beyond
+256 (`KEPT_FINISHED`), and a detached `KeyframeEffect` keeps its native
+effect until the page goes away.
+**Pay:** implement `commitStyles` with the inline-style CSSOM (TD-204),
+timelines with their own origin, and release detached effects from a
+collector hook (M9 language and web APIs row).
+
+### TD-204 — CSSOM is read-only and not canonical
+
+`document.styleSheets` and the rule interfaces are snapshots: no
+`insertRule`, `deleteRule`, `replace`, constructable sheets or
+`style` setters, and linked or imported sheets expose no rules. Text
+fields are the source text with whitespace collapsed, not the canonical
+CSSOM serialization.
+**Pay:** a mutable rule tree shared with the cascade, with canonical
+serialization from the typed values (M9 CSS row).
+
+### TD-205 — Anchor positioning subset
+
+`anchor()` and `anchor-size()` are accepted only as a whole inset or size
+value (not inside `calc()` or margins). Anchors must be block-level boxes
+laid out before the positioned box; scroll offsets between anchor and
+containing block are ignored. Logical sides and `position-area` keywords
+resolve as `horizontal-tb`; `position-try`, `position-visibility`,
+`anchor-scope`, `anchor-center` and implicit (popover) anchors are not
+implemented.
+**Pay:** with writing modes and the M11 parity work on anchor positioning
+WPT.
+
+### TD-206 — Scroll-driven animation subset
+
+Timelines are measured from unscrolled client rectangles with the scroll
+container's border box as the scrollport; logical axes resolve as
+`horizontal-tb`. `timeline-scope` is not supported, named timelines
+resolve only from the element and its ancestors, and timelines update once
+per rendering opportunity from the previous layout. Script
+`ScrollTimeline` and `ViewTimeline` report `currentTime` as a percentage
+number rather than a `CSSUnitValue`, `ViewTimeline.source`,
+`startOffset` and `endOffset` are missing, and script animations on
+progress timelines keep time-based timing.
+**Pay:** with CSS Typed OM, writing modes and scroll-driven animation WPT in
+the M11 parity work.
+
+### TD-207 — View transitions are not painted
+
+`startViewTransition` runs the full promise and capture sequence, but no
+snapshots are taken and the `::view-transition` pseudo-element tree is not
+built or painted, so the new state replaces the old without a visual
+animation; `finished` waits for the default 0.25 s group duration.
+Transition types, `:active-view-transition` and cross-document transitions
+are not implemented.
+**Pay:** render captured snapshots as compositor layers and build the
+pseudo-element tree once the compositor has per-element layers (M11).

@@ -6,7 +6,7 @@
 //! containing block's padding-box space, to [`resolve`], which returns a
 //! copy of the positioned box's style with the anchor functions replaced by
 //! pixel lengths and, for `position-area`, the grid region that becomes the
-//! containing block. Limits are TD-216.
+//! containing block. Limits are TD-205.
 
 use rustic_css::{
     AnchorFunction, AnchorSide, AnchorSizeKeyword, AnchorValue, AreaSpan, Direction, Length,
@@ -173,7 +173,7 @@ fn edge(
     };
     let end = start + size;
     // Inline-axis logical sides follow the direction (block axis is
-    // always top to bottom: TD-216).
+    // always top to bottom: TD-205).
     let flipped = |direction: Direction| !vertical && direction == Direction::Rtl;
     let at_start = matches!(property, P::Top | P::Left);
     Some(match side {

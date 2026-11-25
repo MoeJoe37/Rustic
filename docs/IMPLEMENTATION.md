@@ -16,6 +16,31 @@ which describes the current state in one place. What is next is in the
 [roadmap queue](ROADMAP.md#18-current-implementation-queue), and the measured
 status is the [progress summary](progress/summary.md).
 
+## CSS-09 — Animations and modern CSS
+
+`rustic_style::AnimationController` holds a document's animations and
+follows the Web Animations timing model. The animated restyle walk
+(`style_tree_animated`) starts CSS transitions and animations from style
+changes and `@keyframes` rules and samples every effect into the cascade's
+animation and transition origins. Values interpolate by type, transforms
+through matrix decomposition. The engine ticks the controller at each
+rendering opportunity and dispatches `TransitionEvent`, `AnimationEvent` and
+`AnimationPlaybackEvent`. Script has the Web Animations API with
+`CSSAnimation` and `CSSTransition` objects.
+
+Scroll-driven animations add `scroll()`, `view()` and named timelines and
+`animation-range`. The engine measures each timeline from layout and scroll
+positions before animations update, and `ScrollTimeline` and `ViewTimeline`
+drive script animations. Anchor positioning resolves `anchor()`,
+`anchor-size()` and `position-area` for absolutely positioned boxes in block
+layout. `document.startViewTransition()` runs the capture, update callback
+and promise sequence without painting snapshots. `@scope` gains implicit,
+nested and imported scopes and scoped declarations, and
+`document.styleSheets` exposes a read-only CSSOM. Tests are in
+`rustic-css`, `rustic-style`, `rustic-layout`, `rustic-engine` and
+`rustic-cli` (rendered frames). Limits are TD-201 to TD-207. See
+[CSS.md](CSS.md#transitions-and-animations).
+
 ## M9 language — Array.fromAsync
 
 The built-in consumes async iterables, adapts sync iterables through Rustic's

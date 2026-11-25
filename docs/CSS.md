@@ -381,8 +381,8 @@ within the interval and endpoint tangents outside it. Piecewise-linear
 curves distribute omitted stops, clamp decreasing input positions to the
 preceding position and retain jumps at coincident positions. The sampler follows
 [CSS Easing Functions Level 2 §2](https://www.w3.org/TR/css-easing-2/),
-reviewed 2026-11-15. Playback, shorthand parsing, keyframes, transition and
-animation events, and Web Animations integration remain separate work.
+reviewed 2026-11-15. Playback, keyframes and events are in
+[Transitions and animations](#transitions-and-animations).
 
 ## Cascade
 
@@ -450,10 +450,33 @@ scoped rules uses the full-restyle reference path because root or limit
 membership may have changed ([TD-119](TECH_DEBT.md)).
 
 The reference is [CSS Cascade Level 6 §3.1 and §3.5](https://drafts.csswg.org/css-cascade-6/),
-reviewed 2026-11-15. Implicit roots, nested scope rules, declarations directly
-inside scopes, scoped imports and the CSSOM interface remain open. Tests
-exercise matching, root specificity, proximity, invalid rules and boundary
-mutations through the cascade and style-tree entry points.
+reviewed 2026-11-25. A prelude without a start selector is an implicit scope:
+its root is the owner of the sheet (a `<style>` element's parent, or the
+shadow host for a sheet in a shadow tree, or the tree root). `@scope` nests:
+an inner scope's start is matched relative to the outer root, and its roots
+must lie inside an outer root. Inside a style rule, `@scope` takes the rule's
+selector as its implicit start, and a start that is written is parsed with
+nesting. Declarations directly inside `@scope` apply to the root as
+`:where(:scope)`. `@import url(...) scope(<start>) to (<end>)` scopes every
+rule of the imported sheet. Tests exercise matching, root specificity,
+proximity, invalid rules, boundary mutations, implicit and nested scopes,
+scoped declarations and scoped imports through the cascade and style-tree
+entry points.
+
+### CSS Object Model
+
+`document.styleSheets` lists a `CSSStyleSheet` for each `<style>` element
+and stylesheet link (with `ownerNode`, `media`, `href`, `disabled` and
+`cssRules`). Rules are `CSSStyleRule` (`selectorText`, `style` as
+`CSSStyleProperties` with `getPropertyValue`, `getPropertyPriority`, `item`,
+`length` and `cssText`), `CSSImportRule`, `CSSMediaRule`,
+`CSSContainerRule`, `CSSSupportsRule`, `CSSKeyframesRule` and
+`CSSKeyframeRule`, `CSSLayerBlockRule` and `CSSLayerStatementRule`,
+`CSSScopeRule` (`start`, `end`), `CSSNestedDeclarations`,
+`CSSNamespaceRule`, `CSSFontFaceRule`, `CSSPropertyRule` and `CSSPageRule`,
+each with `type`, `cssText`, `parentRule` and `parentStyleSheet`. The model
+is read-only and its text is the source text with whitespace collapsed
+([TD-204](TECH_DEBT.md)).
 
 ### Cascade layers
 
@@ -474,9 +497,93 @@ the query does not match (TD-25). `@import ... layer()` waits for `@import`.
 ### Animation and transition origins
 
 `StyleInputs` carries animation and transition values for an element, and the
-cascade sorts them into their origins. Rustic has no animation engine yet, so
-the engine passes none; the tiers, `revert` and `revert-layer` behave as above
-once it does.
+cascade sorts them into their origins. `style_tree_animated` fills them from
+the document's `AnimationController` (see
+[Transitions and animations](#transitions-and-animations)).
+
+### Transitions and animations
+
+The `transition-*` and `animation-*` longhands and the `transition` and
+`animation` shorthands parse and serialize as comma-separated lists
+([CSS Transitions 1/2](https://drafts.csswg.org/css-transitions-2/),
+[CSS Animations 1/2](https://drafts.csswg.org/css-animations-2/), editor's
+drafts reviewed 2026-11-25). `rustic_style::AnimationController` is the
+document's animation state and follows the
+[Web Animations](https://drafts.csswg.org/web-animations-1/) timing model:
+start and hold times, playback rate, pending play and pause tasks, the
+finished state, fill modes, iteration and direction, phases, composite
+operations (`replace`, `add`, `accumulate`) and replaced-animation
+removal. Each rendering opportunity ticks it, then the animated restyle
+walk starts CSS transitions from before-change and after-change styles
+(with delay, reversing shortening, `transition-behavior: allow-discrete`
+and cancellation when the property or element goes away), starts, updates
+and cancels CSS animations from `@keyframes` rules (looked up through the
+cascade, so layered and shadow-tree keyframes resolve), and samples every
+effect into the animation and transition origins. `display: none` cancels
+an element's animations and transitions, and `animation-play-state` pauses
+and resumes. Values interpolate by property type: lengths, percentages and
+`calc()`, numbers, colors (premultiplied sRGB or Oklab), shadows, filters,
+transforms (by function, or by matrix decomposition with quaternion
+slerp), visibility and discrete values with the 50% flip
+([TD-201](TECH_DEBT.md)). `transitionrun`, `transitionstart`,
+`transitionend`, `transitioncancel`, `animationstart`,
+`animationiteration`, `animationend` and `animationcancel` fire as
+`TransitionEvent` and `AnimationEvent` in the rendering turn.
+
+Script gets the Web Animations API: `element.animate()`, `Animation`
+(play, pause, finish, cancel, reverse, `updatePlaybackRate`, `persist`,
+times, `playState`, `replaceState`, `ready` and `finished` promises,
+`finish`, `cancel` and `remove` events), `KeyframeEffect` (keyframe lists
+in array and property-indexed form, `getTiming`, `updateTiming`,
+`getComputedTiming`), `DocumentTimeline`, `getAnimations()` on elements
+and the document, and `CSSAnimation` and `CSSTransition` objects for CSS
+animations. Pseudo-element targets and `commitStyles` are not supported
+([TD-202](TECH_DEBT.md), [TD-203](TECH_DEBT.md)).
+
+### Scroll-driven animations
+
+`animation-timeline` takes `auto`, `none`, a named timeline, `scroll()`
+and `view()`; `scroll-timeline-*`, `view-timeline-*` (including
+`view-timeline-inset`), `animation-range-*` and their shorthands parse and
+serialize ([Scroll-driven Animations](https://drafts.csswg.org/scroll-animations-1/),
+reviewed 2026-11-25). A CSS animation on a progress-based timeline spreads
+its iterations over its `animation-range` (normal, a length or
+percentage, or a named range: `cover`, `contain`, `entry`, `exit`,
+`entry-crossing`, `exit-crossing`, with an offset) and auto-aligns its
+start time. The controller lists the scroll and view timelines in use, and
+the engine measures each from layout and the scroll positions at every
+rendering opportunity before animations update, so styles follow the
+scroll. Script can build `ScrollTimeline` and `ViewTimeline` objects and
+pass them to `element.animate()` or `Animation.timeline`. Limits are
+[TD-206](TECH_DEBT.md).
+
+### Anchor positioning
+
+`anchor-name`, `position-anchor` and `position-area` parse and serialize,
+`anchor()` is accepted as an inset and `anchor-size()` as a size
+([CSS Anchor Positioning](https://drafts.csswg.org/css-anchor-position-1/),
+reviewed 2026-11-25). The computed value keeps the function's fallback
+(or `auto`), and block layout resolves the functions for absolutely
+positioned boxes against the last box in tree order with that anchor name
+that is laid out before them and is not inside them: any side keyword,
+`center`, percentages, `inside` and `outside`, and every size keyword.
+`position-area` turns the anchor's 3×3 grid region into the containing
+block and aligns the box toward the anchor (start, end or center). Limits
+are [TD-205](TECH_DEBT.md).
+
+### View transitions
+
+`view-transition-name` parses and serializes, and
+`document.startViewTransition()` returns a `ViewTransition` whose
+`updateCallbackDone`, `ready` and `finished` promises follow
+[CSS View Transitions Level 1](https://drafts.csswg.org/css-view-transitions-1/)
+(reviewed 2026-11-25): the next rendering opportunity captures the named
+elements (a duplicate name skips with `InvalidStateError`) and runs the
+update callback; when it fulfills the new state is captured and `ready`
+resolves, and `finished` resolves after the default 0.25 s group
+animation. `skipTransition()` and a newer transition skip with
+`AbortError`. Snapshots and the pseudo-element tree are not painted yet
+([TD-207](TECH_DEBT.md)).
 
 ### Shadow trees
 

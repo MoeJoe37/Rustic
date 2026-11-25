@@ -281,8 +281,11 @@ jobs, including jobs queued by jobs, under a job-count limit
 ([ADR 0021](adr/0021-document-script-turns.md),
 [ADR 0022](adr/0022-document-task-sources-and-timers.md)).
 
-A rendering turn runs the due `requestAnimationFrame` callbacks first, each
-followed by its own checkpoint, then calls the host's render function and
+A rendering turn runs the scroll steps, measures scroll-driven timelines and
+updates animations (dispatching their events), runs the due
+`requestAnimationFrame` callbacks, each followed by its own checkpoint, the
+ResizeObserver steps and the view transition steps, then calls the host's
+render function and
 returns its output with a frame ticket. `accept_rendered_frame` tells the host
 whether that output is still the newest for its document, so a late frame is
 never presented over a newer one
@@ -347,7 +350,12 @@ same turn budget, so a single call cannot run unmetered.
   `MutationRecord`, `ResizeObserver`, `ResizeObserverEntry`,
   `ResizeObserverSize`, `ValidityState`, `HTMLInputElement`,
   `HTMLTextAreaElement`, `HTMLButtonElement`, `HTMLFormElement`,
-  `DOMException` and the `console` namespace. IMPLEMENTATION.md lists the members of each; treat that
+  `Animation`, `AnimationEffect`, `KeyframeEffect`, `AnimationTimeline`,
+  `DocumentTimeline`, `ScrollTimeline`, `ViewTimeline`, `CSSAnimation`,
+  `CSSTransition`, `TransitionEvent`, `AnimationEvent`,
+  `AnimationPlaybackEvent`, `ViewTransition`, `StyleSheetList`,
+  `CSSStyleSheet`, `CSSRuleList`, `MediaList`, the `CSSRule` family and
+  `CSSStyleProperties`, `DOMException` and the `console` namespace. IMPLEMENTATION.md lists the members of each; treat that
   list, not this one, as the contract.
 - **Selectors** ([ADR 0030](adr/0030-dom-selectors-and-node-lists.md)).
   `querySelector`, `querySelectorAll`, `matches` and `closest` use the same
@@ -405,6 +413,8 @@ and `AbortSignal` listener removal are TD-131.
 | Error reporting, handlers and console | `crates/rustic-bindings/tests/errors.rs`, `crates/rustic-engine/tests/error_reporting.rs` |
 | Node tree members | `crates/rustic-bindings/tests/node_tree.rs` |
 | ResizeObserver in rendering turns | `crates/rustic-engine/tests/resize_observers.rs` |
+| Web Animations, scroll timelines and view transitions | `crates/rustic-engine/tests/animations.rs` |
+| CSSOM | `crates/rustic-engine/tests/cssom.rs` |
 | Focus, editing, validation and submission | `crates/rustic-engine/tests/forms.rs`; parser form association in `crates/rustic-style/tests/invalidation.rs` |
 | Mutation journal, observers and `queueMicrotask` | `crates/rustic-dom/tests/journal.rs`, `crates/rustic-bindings/tests/mutation_observer.rs`, `crates/rustic-engine/tests/mutation_observers.rs` |
 | `DOMException` | `crates/rustic-bindings/tests/dom_exception.rs` |

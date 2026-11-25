@@ -7,7 +7,7 @@
 //! Matrices here are indexed `m[column][row]`, the layout of the
 //! specification's pseudo-code and of `matrix3d()`'s arguments. Trigonometry
 //! uses the platform's `f64` functions, which may differ in the last bits
-//! between platforms (TD-212); tests compare with tolerances.
+//! between platforms (TD-201); tests compare with tolerances.
 
 use rustic_css::{Calc, IndividualTransform, LengthPercentage, TransformFunction, TransformList};
 

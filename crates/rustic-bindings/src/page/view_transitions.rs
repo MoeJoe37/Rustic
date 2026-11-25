@@ -10,7 +10,7 @@
 //! resolves when the default group animation (0.25 s) has run, or at once
 //! with no named elements. Snapshots and the `::view-transition`
 //! pseudo-element tree are not painted, so the old and new states cross
-//! without a visual animation (TD-218).
+//! without a visual animation (TD-207).
 
 use std::cell::{Cell, RefCell};
 

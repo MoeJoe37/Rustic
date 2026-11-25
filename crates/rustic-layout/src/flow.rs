@@ -2005,7 +2005,7 @@ impl<'a, 'c> Engine<'a, 'c> {
     /// The border box of the anchor named `name` for the absolutely
     /// positioned box `i`, in `containing`'s padding-box space: the last
     /// placed box in tree order with that `anchor-name`, other than `i` and
-    /// its descendants (TD-216).
+    /// its descendants (TD-205).
     fn anchor_rect(
         &mut self,
         i: usize,

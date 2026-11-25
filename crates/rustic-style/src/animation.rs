@@ -359,7 +359,7 @@ pub fn distribute_offsets(keyframes: &mut [EffectKeyframe]) {
 /// What an effect animates.
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeyframeEffect {
-    /// The target element (pseudo-elements are not supported, TD-213).
+    /// The target element (pseudo-elements are not supported, TD-202).
     pub target: Option<NodeId>,
     /// The keyframes, sorted by computed offset (stable).
     pub keyframes: Vec<EffectKeyframe>,

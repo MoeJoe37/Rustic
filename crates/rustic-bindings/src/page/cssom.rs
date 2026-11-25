@@ -5,7 +5,7 @@
 //! A `<style>` element's sheet object stays the same while its text does;
 //! a new text builds a new sheet. Rule objects are snapshots of the
 //! sheet's rules. Editing through the CSSOM (`insertRule`, `style`
-//! setters) and linked sheets' rules are not supported yet (TD-215).
+//! setters) and linked sheets' rules are not supported yet (TD-204).
 //!
 //! [CSSOM §6]: https://drafts.csswg.org/cssom/#css-object-model
 //! [CSS Cascade 6 §3.5.3]: https://drafts.csswg.org/css-cascade-6/#the-cssscoperule-interface

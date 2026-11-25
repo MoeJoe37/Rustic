@@ -7,8 +7,8 @@
 //! An Animation wrapper is created on demand and held, with its
 //! controller entry, while the animation exists; finished script
 //! animations that no longer affect anything are dropped oldest first
-//! past [`KEPT_FINISHED`] (TD-214). A detached `KeyframeEffect` keeps its
-//! native effect in the page until the page goes away (TD-214).
+//! past [`KEPT_FINISHED`] (TD-203). A detached `KeyframeEffect` keeps its
+//! native effect in the page until the page goes away (TD-203).
 //!
 //! [Web Animations 1]: https://drafts.csswg.org/web-animations-1/
 
@@ -401,7 +401,7 @@ fn timeline_origin(agent: &mut Agent, timeline: Value) -> JsResult<Option<f64>> 
 
 /// `new ScrollTimeline({source, axis})` and `new ViewTimeline({subject,
 /// axis})` (Scroll-driven Animations §2.3, §3.3). `currentTime` is a
-/// percentage number rather than a `CSSUnitValue` (TD-217).
+/// percentage number rather than a `CSSUnitValue` (TD-206).
 fn construct_scroll_timeline<const VIEW: bool>(
     agent: &mut Agent,
     _: Value,
@@ -534,7 +534,7 @@ fn timeline_element<const VIEW: bool>(
         }
         (false, Some(KIND_SCROLL)) | (true, Some(KIND_VIEW)) => Ok(element),
         // A view timeline's source is its subject's scroll container,
-        // known only to layout (TD-217).
+        // known only to layout (TD-206).
         (false, Some(KIND_VIEW)) => Ok(Value::NULL),
         _ => agent.type_error("expected a ScrollTimeline receiver"),
     }
@@ -586,7 +586,7 @@ fn timeline_ref(agent: &mut Agent, timeline: Value) -> JsResult<TimelineRef> {
         return agent.type_error("expected an AnimationTimeline");
     }
     // Every DocumentTimeline shares the document's clock; a non-zero
-    // origin only shifts its own currentTime (TD-214).
+    // origin only shifts its own currentTime (TD-203).
     Ok(TimelineRef::Document)
 }
 
@@ -1932,7 +1932,7 @@ fn cancel(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 
 fn commit_styles(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
     // Writing animated values into the style attribute needs the
-    // animated computed values of one effect (TD-214).
+    // animated computed values of one effect (TD-203).
     Err(creation::exception(
         agent,
         "NotSupportedError",

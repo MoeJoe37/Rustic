@@ -4,7 +4,7 @@
 //! `view-transition-name` (CSS View Transitions Level 1 §3).
 //!
 //! `anchor()` and `anchor-size()` are accepted as the whole value of an
-//! inset or size property, not inside math functions (TD-216). Such a value
+//! inset or size property, not inside math functions (TD-205). Such a value
 //! keeps its fallback as the ordinary value of the property, so code that
 //! does not resolve anchors sees the fallback (or `auto`).
 
@@ -284,7 +284,7 @@ impl AreaSpan {
 }
 
 /// A `position-area` grid region (logical keywords resolve as
-/// `horizontal-tb`, `ltr`: TD-216).
+/// `horizontal-tb`, `ltr`: TD-205).
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PositionArea {
     /// The horizontal cells.

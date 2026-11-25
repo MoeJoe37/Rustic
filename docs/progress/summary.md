@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 50.03%** = 48.43% verified complete + 1.60% partial credit. 115/228 capabilities complete, 13 in progress.
+**Overall completion: 50.98%** = 49.65% verified complete + 1.33% partial credit. 117/228 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `fef792cfeb7421d9d0163b38873f137a415d9e78687c3669956119be5e1073d6`.
+Catalog: `engine-v4`. Source fingerprint: `bc4d1490b0329c20686f2c5797dd5782703e7bf067b5f18aff7779a7624ffa42`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,9 +18,9 @@ Catalog: `engine-v4`. Source fingerprint: `fef792cfeb7421d9d0163b38873f137a415d9
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 3/54 | 5.19% | 2.63% | 22.35% |
+| M9 Compatibility expansion | 4/54 | 7.25% | 5.36% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
-| M11 Web platform parity | 0/30 | 0.83% | 0.00% | 14.74% |
+| M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
 | M13 Desktop engine 1.0 | 0/1 | 0.00% | 0.00% | 0.45% |
 | M14 Mobile devices & 1.0 | 0/9 | 7.09% | 0.00% | 3.27% |
@@ -33,7 +33,7 @@ Catalog: `engine-v4`. Source fingerprint: `fef792cfeb7421d9d0163b38873f137a415d9
 | URLs & encoding | 10/12 | 0 | 83.33% | 83.33% | 2% | 1.66 |
 | DOM | 8/10 | 1 | 80.14% | 76.47% | 4% | 3.20 |
 | HTML | 10/11 | 0 | 78.37% | 78.37% | 5% | 3.91 |
-| CSS & style | 8/10 | 2 | 84.18% | 79.59% | 6% | 5.05 |
+| CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
 | Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
@@ -126,17 +126,8 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `css.queries` — Media/container queries and style attachment · size 3 · M2 · 0.36% of engine ([source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-style/src/html.rs), [source](../../crates/rustic-style/src/loading.rs), [test](../../crates/rustic-style/tests/external.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-css/src/media.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-css/src/container.rs), [source](../../crates/rustic-style/src/containers.rs), [test](../../crates/rustic-style/tests/containers.rs), [source](../../crates/rustic-style/src/sheet.rs), [test](../../crates/rustic-style/tests/containers.rs))
 - **complete** `css.invalidation` — Correct incremental invalidation against reference path · size 5 · M2 · 0.61% of engine ([source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/variables.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/containers.rs), [source](../../crates/rustic-style/src/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
 - **complete** `css.conformance` — Declared CSS conformance and regression gate · size 5 · M2 · 0.61% of engine ([source](../../tools/import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/wpt_conformance.rs), [test](../../tools/tests/test_import_wpt_css_tests.py), [test](../../crates/rustic-css/tests/corpus.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
-- **in progress 25.00%** `css.animations` — Transitions, CSS animations and Web Animations · size 5 · M9 · 0.61% of engine
-  - [x] Timing-function longhands and deterministic CSS easing evaluation ([source](../../crates/rustic-css/src/easing.rs), [test](../../crates/rustic-css/tests/easing.rs), [test](../../crates/rustic-style/tests/cascade.rs))
-  - [ ] CSS transition properties, interpolation, replacement and events
-  - [ ] CSS keyframes, animation properties, playback and events
-  - [ ] Web Animations timelines, keyframe effects and script API
-- **in progress 20.00%** `css.modern` — Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope · size 5 · M11 · 0.61% of engine
-  - [x] Explicit stylesheet scopes, limits, relative selectors and cascade proximity ([source](../../crates/rustic-style/src/scope.rs), [test](../../crates/rustic-style/tests/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs))
-  - [ ] Implicit and nested scopes, scoped declarations and imports, and CSSOM
-  - [ ] CSS anchor positioning
-  - [ ] View transitions
-  - [ ] Scroll-driven animations
+- **complete** `css.animations` — Transitions, CSS animations and Web Animations · size 5 · M9 · 0.61% of engine ([source](../../crates/rustic-style/src/animation.rs), [test](../../crates/rustic-engine/tests/animations.rs), [source](../../crates/rustic-css/src/easing.rs), [test](../../crates/rustic-css/tests/easing.rs), [test](../../crates/rustic-style/tests/cascade.rs), [source](../../crates/rustic-style/src/animation.rs), [source](../../crates/rustic-style/src/interpolate.rs), [test](../../crates/rustic-style/tests/animations.rs), [source](../../crates/rustic-style/src/animation.rs), [source](../../crates/rustic-bindings/src/page/events/animation.rs), [test](../../crates/rustic-style/tests/animations.rs), [test](../../crates/rustic-style/tests/animations.rs), [source](../../crates/rustic-bindings/src/page/animations.rs), [source](../../crates/rustic-style/src/animation.rs), [test](../../crates/rustic-style/tests/animations.rs), [test](../../crates/rustic-engine/tests/animations.rs), [test](../../crates/rustic-engine/tests/animations.rs))
+- **complete** `css.modern` — Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope · size 5 · M11 · 0.61% of engine ([source](../../crates/rustic-css/src/anchor.rs), [test](../../crates/rustic-cli/tests/scroll.rs), [source](../../crates/rustic-style/src/scope.rs), [test](../../crates/rustic-style/tests/cascade.rs), [test](../../crates/rustic-style/tests/invalidation.rs), [source](../../crates/rustic-style/src/sheet.rs), [source](../../crates/rustic-style/src/cssom.rs), [test](../../crates/rustic-style/tests/cascade.rs), [test](../../crates/rustic-style/tests/external.rs), [test](../../crates/rustic-engine/tests/cssom.rs), [source](../../crates/rustic-css/src/anchor.rs), [source](../../crates/rustic-layout/src/anchor.rs), [test](../../crates/rustic-css/tests/animation.rs), [test](../../crates/rustic-layout/tests/anchor.rs), [test](../../crates/rustic-layout/tests/anchor.rs), [source](../../crates/rustic-bindings/src/page/view_transitions.rs), [test](../../crates/rustic-engine/tests/animations.rs), [test](../../crates/rustic-cli/tests/view_transitions.rs), [test](../../crates/rustic-cli/tests/view_transitions.rs), [source](../../crates/rustic-style/src/animation.rs), [source](../../crates/rustic-engine/src/timelines.rs), [test](../../crates/rustic-css/tests/animation.rs), [test](../../crates/rustic-style/tests/animations.rs), [test](../../crates/rustic-engine/tests/animations.rs))
 
 ### Text & fonts
 

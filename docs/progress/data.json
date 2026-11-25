@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "fef792cfeb7421d9d0163b38873f137a415d9e78687c3669956119be5e1073d6",
-  "percent": "50.03",
-  "verified_percent": "48.43",
-  "partial_percent": "1.60",
-  "completed": 115,
-  "in_progress": 13,
+  "source_fingerprint": "bc4d1490b0329c20686f2c5797dd5782703e7bf067b5f18aff7779a7624ffa42",
+  "percent": "50.98",
+  "verified_percent": "49.65",
+  "partial_percent": "1.33",
+  "completed": 117,
+  "in_progress": 11,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -95,11 +95,11 @@
       "id": "M9",
       "label": "Compatibility expansion",
       "share": "22.35",
-      "completed": 3,
+      "completed": 4,
       "total": 54,
-      "percent": "5.19",
-      "verified_percent": "2.63",
-      "partial_percent": "2.56"
+      "percent": "7.25",
+      "verified_percent": "5.36",
+      "partial_percent": "1.89"
     },
     {
       "id": "M10",
@@ -115,11 +115,11 @@
       "id": "M11",
       "label": "Web platform parity",
       "share": "14.74",
-      "completed": 0,
+      "completed": 1,
       "total": 30,
-      "percent": "0.83",
-      "verified_percent": "0.00",
-      "partial_percent": "0.83"
+      "percent": "4.15",
+      "verified_percent": "4.15",
+      "partial_percent": "0.00"
     },
     {
       "id": "M12",
@@ -1920,51 +1920,95 @@
           "label": "Transitions, CSS animations and Web Animations",
           "size": 5,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "easing",
-              "label": "Timing-function longhands and deterministic CSS easing evaluation",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/easing.rs",
-                  "marker": "pub fn sample"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/easing.rs",
-                  "marker": "fn step_easing_handles_the_before_flag_and_endpoint_clamping"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/cascade.rs",
-                  "marker": "fn animation_and_transition_timing_functions_flow_through_the_cascade"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/animation.rs",
+              "marker": "pub struct AnimationController"
             },
             {
-              "id": "transitions",
-              "label": "CSS transition properties, interpolation, replacement and events",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/animations.rs",
+              "marker": "fn css_transitions_fire_events_from_styled_frames"
             },
             {
-              "id": "css-animations",
-              "label": "CSS keyframes, animation properties, playback and events",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-css/src/easing.rs",
+              "marker": "pub fn sample"
             },
             {
-              "id": "web-animations",
-              "label": "Web Animations timelines, keyframe effects and script API",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-css/tests/easing.rs",
+              "marker": "fn step_easing_handles_the_before_flag_and_endpoint_clamping"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/cascade.rs",
+              "marker": "fn animation_and_transition_timing_functions_flow_through_the_cascade"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/animation.rs",
+              "marker": "fn update_transitions"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/interpolate.rs",
+              "marker": "pub fn interpolate("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/animations.rs",
+              "marker": "fn a_style_change_starts_a_transition_that_interpolates_and_ends"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/animation.rs",
+              "marker": "fn update_css_animations"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/animation.rs",
+              "marker": "pub(in crate::page) fn fire_css("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/animations.rs",
+              "marker": "fn a_css_animation_runs_iterates_and_ends"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/animations.rs",
+              "marker": "fn display_none_cancels_animations_and_paused_ones_hold"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/animations.rs",
+              "marker": "fn animate("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/animation.rs",
+              "marker": "pub fn tick("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/animations.rs",
+              "marker": "fn script_animations_follow_web_animations_timing"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/animations.rs",
+              "marker": "fn element_animate_plays_settles_promises_and_fires_finish"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/animations.rs",
+              "marker": "fn animation_methods_and_cancel"
             }
           ],
-          "credit": "25.00",
+          "credit": "100.00",
           "engine_share": "0.61"
         },
         {
@@ -1972,68 +2016,141 @@
           "label": "Newer CSS shipped by other engines: anchor positioning, view transitions, scroll-driven animations and @scope",
           "size": 5,
           "milestone": "M11",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "id": "explicit-scopes",
-              "label": "Explicit stylesheet scopes, limits, relative selectors and cascade proximity",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/scope.rs",
-                  "marker": "pub(crate) fn match_rule"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/cascade.rs",
-                  "marker": "fn explicit_scopes_match_relative_rules_and_stop_at_limits"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/invalidation.rs",
-                  "marker": "fn mutations_of_scope_roots_and_limits_restyle_existing_subjects"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/anchor.rs",
+              "marker": "pub enum AnchorValue"
             },
             {
-              "id": "scope-integration",
-              "label": "Implicit and nested scopes, scoped declarations and imports, and CSSOM",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/scroll.rs",
+              "marker": "fn scroll_driven_animations_follow_the_scroll_position"
             },
             {
-              "id": "anchor-positioning",
-              "label": "CSS anchor positioning",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-style/src/scope.rs",
+              "marker": "pub(crate) fn match_rule"
             },
             {
-              "id": "view-transitions",
-              "label": "View transitions",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-style/tests/cascade.rs",
+              "marker": "fn explicit_scopes_match_relative_rules_and_stop_at_limits"
             },
             {
-              "id": "scroll-driven-animations",
-              "label": "Scroll-driven animations",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-style/tests/invalidation.rs",
+              "marker": "fn mutations_of_scope_roots_and_limits_restyle_existing_subjects"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/sheet.rs",
+              "marker": "fn nested_scope_rule("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/cssom.rs",
+              "marker": "pub fn parse(source: &str) -> Self"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/cascade.rs",
+              "marker": "fn nested_scopes_scoped_declarations_and_scopes_in_style_rules"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/external.rs",
+              "marker": "fn scoped_imports_and_implicit_scopes_follow_the_owner"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/cssom.rs",
+              "marker": "fn style_sheets_expose_scope_media_and_style_rules"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-css/src/anchor.rs",
+              "marker": "pub enum AnchorFunction"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/anchor.rs",
+              "marker": "pub(crate) fn resolve("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/animation.rs",
+              "marker": "fn anchor_properties_and_functions"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/anchor.rs",
+              "marker": "fn anchor_insets_follow_the_anchor_edges"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/anchor.rs",
+              "marker": "fn position_area_places_the_box_in_the_anchor_grid"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/view_transitions.rs",
+              "marker": "fn start(agent: &mut Agent"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/animations.rs",
+              "marker": "fn view_transitions_run_their_update_callback_and_settle_promises"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view_transitions.rs",
+              "marker": "fn named_elements_finish_after_the_group_animation"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/view_transitions.rs",
+              "marker": "fn duplicate_names_skip_the_transition"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/animation.rs",
+              "marker": "pub struct ScrollTimelineState"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-engine/src/timelines.rs",
+              "marker": "pub(crate) fn measure("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-css/tests/animation.rs",
+              "marker": "fn scroll_driven_longhands_and_shorthands"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/animations.rs",
+              "marker": "fn scroll_driven_animations_follow_their_timelines"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-engine/tests/animations.rs",
+              "marker": "fn scroll_and_view_timelines_drive_script_animations"
             }
           ],
-          "credit": "20.00",
+          "credit": "100.00",
           "engine_share": "0.61"
         }
       ],
       "points": 49,
-      "completed": 8,
-      "in_progress": 2,
+      "completed": 10,
+      "in_progress": 0,
       "total": 10,
-      "contribution": "5.05",
-      "percent": "84.18",
-      "verified_percent": "79.59",
-      "partial_percent": "4.59"
+      "contribution": "6.00",
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "text",

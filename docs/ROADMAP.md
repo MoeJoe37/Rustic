@@ -29,7 +29,8 @@ crash recovery ([§10](#10-m7--isolation-and-security-gate)). **M8 desktop
 alpha is the current milestone**: compositor scenes and scrolling (UI-05) and
 a Linux desktop window (UI-02) are done, and frames are composited in a
 confined GPU process ([ADR 0068](adr/0068-gpu-process.md)). M9 language
-compatibility work has started alongside M8. **Android and iOS device work is deferred to the last
+compatibility work has started alongside M8, and CSS-09 (animations and
+modern CSS) is done. **Android and iOS device work is deferred to the last
 milestone, M14** ([ADR 0067](adr/0067-mobile-devices-last.md),
 [§17](#17-m14--mobile-devices-and-five-platform-10)): the platforms stay
 release targets, and their compile checks and the Android emulator job stay
@@ -824,7 +825,7 @@ Firefox (Gecko) and Safari (WebKit) on any of their desktop or mobile platforms.
 | PAR-01 | Parity inventory: a tool that reads a pinned [browser-compat-data](https://github.com/mdn/browser-compat-data) release and lists every feature shipped by any of the three engines, mapped to a catalog capability with status implemented / planned (with milestone) / declined (with reviewed reason) | `release.inventory` | M9 workstreams defined |
 | PAR-02 | WPT at scale: the UI-06 runner covers the full pinned WPT checkout on every platform family and compares each directory with the three engines' results for the same WPT revision on [wpt.fyi](https://wpt.fyi) | `release.interop` | UI-06 |
 | HTML-10 | Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes, lazy loading | `html.elements` | M9 |
-| CSS-09 | Transitions, animations and Web Animations (M9), then anchor positioning, view transitions, scroll-driven animations and `@scope` | `css.animations`, `css.modern` | M9 CSS/layout |
+| CSS-09 | Transitions, animations and Web Animations (M9), then anchor positioning, view transitions, scroll-driven animations and `@scope`. **Done 2026-11-25** ([CSS.md](CSS.md#transitions-and-animations)); parity limits are TD-205 to TD-207 | `css.animations`, `css.modern` | M9 CSS/layout |
 | TXT-05 / LAY-09 | Variable/color fonts and the Font Loading API; SVG, MathML, ruby and multi-column layout | `text.color`, `layout.formats` | M9 |
 | WEB-08 | Navigation API, drag and drop, selection, pointer events, fullscreen, file APIs; performance timeline and Reporting APIs | `web.platform`, `web.performance` | M9 |
 | NET-08 / STO-08 | WebTransport, fetch priorities, Early Hints; origin-private file system, File System Access, storage buckets | `network.webtransport`, `storage.filesystem` | M6, M9 |
@@ -974,7 +975,7 @@ acceptance, and overall progress cannot reach 100% without it.
 ## 18. Current implementation queue
 
 Work in order unless a row says it runs in parallel. Status is as of
-2026-11-23; [implementation progress](IMPLEMENTATION.md) records each finished
+2026-11-25; [implementation progress](IMPLEMENTATION.md) records each finished
 contract, [§11](#11-m8--reference-desktop-alpha) has the M8 tasks and the
 [progress summary](progress/summary.md) the measured state. M1 to M8 are
 complete; their queues (DOC-, CSS-, REN-, JS-, WEB-, NET- and ISO- tasks) are
@@ -993,6 +994,7 @@ in the milestone sections above.
 | parallel | M9 language: `Math.sumPrecise` (TD-143) | ECMAScript §21.3.2.34, pinned Test262 Math cases, focused rounding, iterator and budget tests | Done for this built-in. The [M9 language gate](#12-m9--compatibility-expansion-program) remains open |
 | parallel | M9 language: binary and JSON data interchange (TD-143) | ECMAScript §23.3 and §25.5. Add the pinned `Uint8Array` directory and cover exact JSON tokens, view revalidation, malformed input and cancellation | Implemented with 89 added pinned built-in passes. [Implementation ledger](IMPLEMENTATION.md#m9-language--uint8array-and-json-data-interchange) |
 | parallel | M9 language: `Array.fromAsync` (TD-143) | ECMAScript §23.1.2.2, all 95 pinned cases, iterator cleanup, native step limits and small-heap collection | Implemented. [Implementation ledger](IMPLEMENTATION.md#m9-language--arrayfromasync), [ADR 0070](adr/0070-native-promise-continuations.md) |
+| parallel | CSS-09: transitions, animations, Web Animations, then anchor positioning, view transitions, scroll-driven animations and `@scope` (`css.animations`, `css.modern`) | Every step of both capabilities with source and test evidence; limits recorded as TD-201 to TD-207 | Done 2026-11-25 ([CSS.md](CSS.md#transitions-and-animations)) |
 | — | Hosted CI | The full matrix green on every commit; then require the `CI` check on `main` (M0 follow-up) | Green on `moejoe873/Rustic` at `e150a22` |
 | — | External security review (`security.brave`, external dependency) | Outside reviewers return findings on the [packet](reviews/2026-11-22-m7-external-review-packet.md); findings fixed or recorded | Waiting for reviewers; due before the M10 beta |
 | — | Android and iOS devices | M14 ([§17](#17-m14--mobile-devices-and-five-platform-10)) | Deferred by ADR 0067; compile checks and the Android emulator job stay in CI |

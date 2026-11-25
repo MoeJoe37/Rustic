@@ -5,7 +5,7 @@
 //!
 //! Positions come from unscrolled client rectangles. The scrollport is
 //! taken as the scroll container's border box and logical axes resolve as
-//! `horizontal-tb` (TD-217).
+//! `horizontal-tb` (TD-206).
 
 use rustic_css::{LengthPercentageOrAuto, ScrollAxis};
 use rustic_dom::NodeId;

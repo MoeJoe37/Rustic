@@ -615,6 +615,11 @@ fn compute_values(
                     other => other.clone(),
                 },
                 P::Float if positioned => PropertyValue::Float(Float::None),
+                // Times compute to seconds.
+                _ if matches!(value, PropertyValue::Animation(_)) => match value {
+                    PropertyValue::Animation(list) => PropertyValue::Animation(list.computed()),
+                    other => other.clone(),
+                },
                 P::OverflowX | P::OverflowY => match overflow {
                     Some((x, y)) => {
                         PropertyValue::Overflow(if property == P::OverflowX { x } else { y })

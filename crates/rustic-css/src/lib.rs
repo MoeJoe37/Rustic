@@ -22,9 +22,11 @@
 #![warn(missing_docs)]
 
 mod anb;
+mod animation;
 mod background;
 mod calc;
 mod color;
+mod color_space;
 mod container;
 mod custom;
 mod decode;
@@ -47,6 +49,11 @@ mod transform;
 mod values;
 
 pub use anb::parse_an_plus_b;
+pub use animation::{
+    AnimationDirection, AnimationDuration, AnimationName, AnimationTimeline, AnimationValue,
+    CompositeOperation, FillMode, IterationCount, PlayState, ScrollAxis, Scroller, Time,
+    TransitionBehavior, TransitionProperty, cycle,
+};
 pub use background::{
     Attachment, BackgroundRepeat, BackgroundSize, Image, PositionComponent, PositionSide,
     PositionValue, RepeatStyle, VisualBox,

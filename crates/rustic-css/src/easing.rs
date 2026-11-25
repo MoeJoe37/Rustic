@@ -39,6 +39,9 @@ enum Easing {
 pub struct EasingFunction(Easing);
 
 impl EasingFunction {
+    /// `linear`.
+    pub const LINEAR: Self = Self(Easing::Linear);
+
     /// The initial CSS timing function.
     pub const EASE: Self = Self::bezier([0.25, 0.1, 0.25, 1.0], Some("ease"));
 
@@ -124,6 +127,13 @@ impl EasingList {
         Some(Self(
             (items.as_slice() != [EasingFunction::EASE]).then(|| items.into()),
         ))
+    }
+
+    /// A list of timing functions (an empty list means one `ease`).
+    pub fn from_functions(items: Vec<EasingFunction>) -> Self {
+        Self(
+            (!items.is_empty() && items.as_slice() != [EasingFunction::EASE]).then(|| items.into()),
+        )
     }
 
     /// The timing functions in list order, defaulting to one `ease` entry.

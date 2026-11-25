@@ -406,6 +406,81 @@ impl Cascade {
         self.registry.0.as_deref().and_then(|r| r.get(name))
     }
 
+    /// The `@keyframes` rule named `name` for an element in the tree
+    /// `context` (CSS Animations 1 §3, CSS Scoping 1 §3.5): author rules
+    /// of that tree, then of the trees around it, then user and user-agent
+    /// rules; within one tree the rule in the highest-priority cascade
+    /// layer wins, and among those the last one. Rules inside an `@media`
+    /// that does not match are ignored. `outer` lists the contexts of the
+    /// enclosing trees, innermost first.
+    pub fn keyframes(
+        &self,
+        name: &str,
+        context: TreeContext,
+        outer: &[TreeContext],
+    ) -> Option<&std::sync::Arc<crate::KeyframesRule>> {
+        let contexts = std::iter::once(context).chain(outer.iter().copied());
+        let origins = [Origin::Author, Origin::User, Origin::UserAgent];
+        for (origin, context) in origins.iter().flat_map(|&o| {
+            let list: Vec<TreeContext> = if o == Origin::Author {
+                contexts.clone().collect()
+            } else {
+                vec![TreeContext::DOCUMENT]
+            };
+            list.into_iter().map(move |c| (o, c))
+        }) {
+            type Ranked<'r> = (
+                (u32, usize, usize),
+                &'r std::sync::Arc<crate::KeyframesRule>,
+            );
+            let mut best: Option<Ranked<'_>> = None;
+            for (sheet_index, ((sheet, placement), media)) in self
+                .sheets
+                .iter()
+                .zip(&self.placements)
+                .zip(&self.media_results)
+                .enumerate()
+            {
+                if sheet.origin != origin
+                    || (origin == Origin::Author && placement.context != context)
+                {
+                    continue;
+                }
+                let ranks = self
+                    .layers
+                    .get(&(sheet.origin, placement.context))
+                    .map_or(&[][..], |(_, ranks)| ranks);
+                for (rule_index, rule) in sheet.keyframes.iter().enumerate() {
+                    if &*rule.name != name
+                        || !rule
+                            .media
+                            .iter()
+                            .all(|&i| media.get(i).copied().unwrap_or(false))
+                    {
+                        continue;
+                    }
+                    let key = (
+                        Self::rank(ranks, placement, rule.layer),
+                        sheet_index,
+                        rule_index,
+                    );
+                    if best.as_ref().is_none_or(|(b, _)| key > *b) {
+                        best = Some((key, rule));
+                    }
+                }
+            }
+            if let Some((_, rule)) = best {
+                return Some(rule);
+            }
+        }
+        None
+    }
+
+    /// Whether any sheet has `@keyframes` rules.
+    pub fn has_keyframes(&self) -> bool {
+        self.sheets.iter().any(|s| !s.keyframes.is_empty())
+    }
+
     /// Whether any sheet has `@container` rules.
     pub fn has_container_queries(&self) -> bool {
         self.sheets.iter().any(|s| !s.containers.is_empty())

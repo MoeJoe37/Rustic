@@ -230,6 +230,22 @@ impl Calc {
         }
     }
 
+    /// `a × wa + b × wb`, simplified: the weighted sum that interpolating
+    /// and adding `<length-percentage>` values needs. Pixels and
+    /// percentages that do not cancel stay a calculation.
+    pub fn mix(a: &LengthPercentage, wa: f64, b: &LengthPercentage, wb: f64) -> LengthPercentage {
+        let node = |value: &LengthPercentage| match value {
+            LengthPercentage::Length(l) => (CalcNode::Length(*l), CalcKind::Length),
+            LengthPercentage::Percentage(p) => (CalcNode::Percentage(*p), CalcKind::Percentage),
+            LengthPercentage::Calc(calc) => (calc.root.clone(), calc.kind),
+        };
+        let ((na, ka), (nb, kb)) = (node(a), node(b));
+        let kind = ka.add(kb, true).unwrap_or(CalcKind::LengthPercentage);
+        let scaled = |n: CalcNode, w: f64| CalcNode::Product(vec![n, CalcNode::Number(censor(w))]);
+        let sum = CalcNode::Sum(vec![scaled(na, wa), scaled(nb, wb)]);
+        Self::from_node(simplify(sum), kind)
+    }
+
     /// `calc(100% - value)`, simplified (used to turn `right 10px` into a
     /// left offset).
     pub fn hundred_percent_minus(value: &LengthPercentage) -> LengthPercentage {

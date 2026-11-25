@@ -202,3 +202,25 @@ fn serialization_is_a_fixed_point() {
         assert_eq!(again.as_deref(), Some(once.as_str()), "{input:?}");
     }
 }
+
+#[test]
+fn mix_weights_and_simplifies_length_percentages() {
+    use rustic_css::{Calc, Length, LengthPercentage};
+    let px = |v| LengthPercentage::Length(Length::px(v));
+    assert_eq!(Calc::mix(&px(10.0), 0.75, &px(30.0), 0.25), px(15.0));
+    assert_eq!(
+        Calc::mix(
+            &LengthPercentage::Percentage(20.0),
+            0.5,
+            &LengthPercentage::Percentage(40.0),
+            0.5
+        ),
+        LengthPercentage::Percentage(30.0)
+    );
+    let mixed = Calc::mix(&px(10.0), 0.5, &LengthPercentage::Percentage(50.0), 0.5);
+    assert_eq!(mixed.to_string(), "calc(25% + 5px)");
+    assert_eq!(
+        Calc::mix(&mixed, 1.0, &px(0.0), 0.0).to_string(),
+        "calc(25% + 5px)"
+    );
+}

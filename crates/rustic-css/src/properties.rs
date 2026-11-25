@@ -706,6 +706,8 @@ pub enum PropertyValue {
     Opacity(f64),
     /// The comma-separated easing functions of an animation or transition.
     Easing(EasingList),
+    /// The other transition and animation longhands (all lists).
+    Animation(crate::AnimationValue),
     /// `vertical-align`.
     VerticalAlign(VerticalAlign),
     /// `text-align`.
@@ -918,6 +920,19 @@ property_ids! {
     Isolation => "isolation", false;
     AnimationTimingFunction => "animation-timing-function", false;
     TransitionTimingFunction => "transition-timing-function", false;
+    TransitionProperty => "transition-property", false;
+    TransitionDuration => "transition-duration", false;
+    TransitionDelay => "transition-delay", false;
+    TransitionBehavior => "transition-behavior", false;
+    AnimationName => "animation-name", false;
+    AnimationDuration => "animation-duration", false;
+    AnimationDelay => "animation-delay", false;
+    AnimationIterationCount => "animation-iteration-count", false;
+    AnimationDirection => "animation-direction", false;
+    AnimationFillMode => "animation-fill-mode", false;
+    AnimationPlayState => "animation-play-state", false;
+    AnimationComposition => "animation-composition", false;
+    AnimationTimeline => "animation-timeline", false;
 }
 
 impl PropertyId {
@@ -977,6 +992,21 @@ impl PropertyId {
             P::AnimationTimingFunction | P::TransitionTimingFunction => {
                 PropertyValue::Easing(EasingList::default())
             }
+            P::TransitionProperty
+            | P::TransitionDuration
+            | P::TransitionDelay
+            | P::TransitionBehavior
+            | P::AnimationName
+            | P::AnimationDuration
+            | P::AnimationDelay
+            | P::AnimationIterationCount
+            | P::AnimationDirection
+            | P::AnimationFillMode
+            | P::AnimationPlayState
+            | P::AnimationComposition
+            | P::AnimationTimeline => PropertyValue::Animation(
+                crate::animation::initial(self).expect("an animation longhand"),
+            ),
             P::VerticalAlign => {
                 PropertyValue::VerticalAlign(VerticalAlign::Keyword(VerticalAlignKeyword::Baseline))
             }
@@ -1395,6 +1425,8 @@ pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "border-radius" => BORDER_RADIUS,
         "font" => FONT,
         "background" => BACKGROUND,
+        "transition" => crate::animation::TRANSITION,
+        "animation" => crate::animation::ANIMATION,
         _ => {
             let id = PropertyId::from_name(name)?;
             let index = PropertyId::ALL.iter().position(|&p| p == id)?;
@@ -1950,6 +1982,19 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::AnimationTimingFunction | P::TransitionTimingFunction => {
             return EasingList::parse(parts).map(PropertyValue::Easing);
         }
+        P::TransitionProperty
+        | P::TransitionDuration
+        | P::TransitionDelay
+        | P::TransitionBehavior
+        | P::AnimationName
+        | P::AnimationDuration
+        | P::AnimationDelay
+        | P::AnimationIterationCount
+        | P::AnimationDirection
+        | P::AnimationFillMode
+        | P::AnimationPlayState
+        | P::AnimationComposition
+        | P::AnimationTimeline => return crate::animation::longhand(property, parts),
         P::FontFamily => return font_family(parts).map(PropertyValue::FontFamily),
         P::TextTransform => return text_transform(parts).map(PropertyValue::TextTransform),
         P::TextDecorationLine => {
@@ -2031,6 +2076,19 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::Display
         | P::AnimationTimingFunction
         | P::TransitionTimingFunction
+        | P::TransitionProperty
+        | P::TransitionDuration
+        | P::TransitionDelay
+        | P::TransitionBehavior
+        | P::AnimationName
+        | P::AnimationDuration
+        | P::AnimationDelay
+        | P::AnimationIterationCount
+        | P::AnimationDirection
+        | P::AnimationFillMode
+        | P::AnimationPlayState
+        | P::AnimationComposition
+        | P::AnimationTimeline
         | P::FontFamily
         | P::TextTransform
         | P::TextDecorationLine
@@ -2305,6 +2363,8 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
             Some(vec![PropertyValue::Gap(row), PropertyValue::Gap(column)])
         }
         "background" => background::shorthand(parts),
+        "transition" => crate::animation::transition_shorthand(parts),
+        "animation" => crate::animation::animation_shorthand(parts),
         "border" | "border-top" | "border-right" | "border-bottom" | "border-left" => {
             let (mut width, mut style, mut color) = (None, None, None);
             for v in parts {
@@ -2424,6 +2484,7 @@ impl fmt::Display for PropertyValue {
             Self::Visibility(v) => write!(f, "{v}"),
             Self::Opacity(n) => write_number(f, *n),
             Self::Easing(functions) => functions.fmt(f),
+            Self::Animation(value) => value.fmt(f),
             Self::VerticalAlign(VerticalAlign::Keyword(k)) => write!(f, "{k}"),
             Self::VerticalAlign(VerticalAlign::LengthPercentage(lp)) => write!(f, "{lp}"),
             Self::TextAlign(v) => write!(f, "{v}"),

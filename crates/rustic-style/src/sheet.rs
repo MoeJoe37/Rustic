@@ -55,6 +55,89 @@ pub struct StyleRule {
     pub scope: Option<Arc<ScopeRule>>,
 }
 
+/// One keyframe block of an `@keyframes` rule.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Keyframe {
+    /// Its keyframe selectors, as offsets in `0..=1` (`from` is 0, `to`
+    /// is 1), or timeline range names with offsets for scroll-driven
+    /// animations.
+    pub selectors: Vec<KeyframeSelector>,
+    /// Its declarations (`!important` ones are dropped).
+    pub declarations: Vec<PropertyDeclaration>,
+}
+
+/// A keyframe selector.
+#[derive(Clone, Debug, PartialEq)]
+pub enum KeyframeSelector {
+    /// A percentage of the whole animation, as a fraction.
+    Offset(f64),
+    /// `<timeline-range-name> <percentage>` (Scroll-driven Animations §4.3).
+    Range(Arc<str>, f64),
+}
+
+/// An `@keyframes` rule.
+#[derive(Clone, Debug, PartialEq)]
+pub struct KeyframesRule {
+    /// The keyframes name (case-sensitive).
+    pub name: Arc<str>,
+    /// The keyframe blocks in source order.
+    pub keyframes: Vec<Keyframe>,
+    /// The rule's cascade layer in its sheet.
+    pub layer: Option<usize>,
+    /// The conditional rules it sits in (indices into [`StyleSheet::media`]).
+    pub media: Vec<usize>,
+}
+
+/// `<keyframe-selector>#`: `from`, `to`, percentages in `0%..=100%`, or a
+/// timeline range name and a percentage.
+fn keyframe_selectors(prelude: &[Value]) -> Option<Vec<KeyframeSelector>> {
+    let mut out = Vec::new();
+    for part in trim_whitespace(prelude).split(|v| v.token() == Some(&Token::Comma)) {
+        let values: Vec<&Value> = significant(part).collect();
+        let percent = |v: &Value| match v.token() {
+            Some(Token::Percentage(n)) if (0.0..=100.0).contains(&n.value) => Some(n.value / 100.0),
+            _ => None,
+        };
+        out.push(match values.as_slice() {
+            [one] => match one.token() {
+                Some(Token::Ident(name)) if name.eq_ignore_ascii_case("from") => {
+                    KeyframeSelector::Offset(0.0)
+                }
+                Some(Token::Ident(name)) if name.eq_ignore_ascii_case("to") => {
+                    KeyframeSelector::Offset(1.0)
+                }
+                _ => KeyframeSelector::Offset(percent(one)?),
+            },
+            [range, offset] => {
+                let Some(Token::Ident(name)) = range.token() else {
+                    return None;
+                };
+                let name = name.to_ascii_lowercase();
+                if ![
+                    "cover",
+                    "contain",
+                    "entry",
+                    "exit",
+                    "entry-crossing",
+                    "exit-crossing",
+                    "scroll",
+                ]
+                .contains(&name.as_str())
+                {
+                    return None;
+                }
+                let offset = match offset.token() {
+                    Some(Token::Percentage(n)) => n.value / 100.0,
+                    _ => return None,
+                };
+                KeyframeSelector::Range(name.into(), offset)
+            }
+            _ => return None,
+        });
+    }
+    (!out.is_empty()).then_some(out)
+}
+
 /// A stylesheet ready for the cascade.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StyleSheet {
@@ -68,7 +151,8 @@ pub struct StyleSheet {
     /// element's `media` attribute).
     pub media: Vec<MediaQueryList>,
     /// `@container` conditions, as (index into [`StyleSheet::media`], query
-    /// list) pairs in increasing index order.
+    /// list) pairs in increasing index order (they never apply to
+    /// `@keyframes`, which need no element).
     pub containers: Vec<(usize, ContainerQueryList)>,
     /// Every cascade layer the sheet declares, fully qualified, in order of
     /// first declaration (`@layer` statements and blocks alike). Layer
@@ -77,6 +161,9 @@ pub struct StyleSheet {
     /// Custom properties registered by valid `@property` rules, in source
     /// order (a later registration of a name wins).
     pub properties: Vec<PropertyRegistration>,
+    /// Valid `@keyframes` rules in source order, each with its cascade
+    /// layer (an index into [`StyleSheet::layers`]).
+    pub keyframes: Vec<Arc<KeyframesRule>>,
     /// The URL that relative `url()` values resolve against: the sheet's
     /// own URL for an external or imported sheet, the document base URL
     /// for a `<style>` element. Set it with [`StyleSheet::set_base_url`].
@@ -114,6 +201,10 @@ pub enum StyleDiagnosticKind {
     /// A malformed `@import` rule, one inside another rule, or one after a
     /// rule other than `@charset`, `@layer` statements and other `@import`s.
     InvalidImportRule,
+    /// An `@keyframes` rule with an invalid name or no block, or one
+    /// inside a style rule. Invalid keyframe selectors drop only their
+    /// keyframe, with this diagnostic too.
+    InvalidKeyframesRule,
     /// An `@property` rule that is malformed (a missing or invalid
     /// `syntax`, `inherits` or `initial-value`, or an unsupported syntax),
     /// or that is inside a conditional rule or a style rule.
@@ -540,6 +631,77 @@ impl Builder {
         }
     }
 
+    /// `@keyframes <keyframes-name> { <keyframe-block>* }` (CSS
+    /// Animations 1 §3, editor's draft reviewed 2026-11-25).
+    fn keyframes_rule(&mut self, at: AtRule, layer: Option<usize>, media: Vec<usize>) {
+        let prelude: Vec<&Value> = significant(&at.prelude).collect();
+        let name = match prelude.as_slice() {
+            [only] => match only.token() {
+                Some(Token::Ident(name)) => {
+                    let lower = name.to_ascii_lowercase();
+                    let reserved = [
+                        "none",
+                        "default",
+                        "initial",
+                        "inherit",
+                        "unset",
+                        "revert",
+                        "revert-layer",
+                    ];
+                    (!reserved.contains(&lower.as_str())).then(|| name.clone())
+                }
+                Some(Token::String(name)) => Some(name.clone()),
+                _ => None,
+            },
+            _ => None,
+        };
+        let (Some(name), Some(block)) = (name, at.block) else {
+            self.diagnose(StyleDiagnosticKind::InvalidKeyframesRule, at.span);
+            return;
+        };
+        let mut keyframes = Vec::new();
+        for item in parse_block_contents(&block, 0).value {
+            let rule = match item {
+                BlockItem::Rule(Rule::Qualified(rule)) => rule,
+                BlockItem::Rule(rule) => {
+                    self.diagnose(StyleDiagnosticKind::InvalidKeyframesRule, rule_span(&rule));
+                    continue;
+                }
+                BlockItem::Declaration(d) => {
+                    self.diagnose(StyleDiagnosticKind::MisplacedDeclaration, d.span);
+                    continue;
+                }
+            };
+            let Some(selectors) = keyframe_selectors(&rule.prelude) else {
+                self.diagnose(StyleDiagnosticKind::InvalidKeyframesRule, rule.span);
+                continue;
+            };
+            let mut declarations = Vec::new();
+            for item in parse_block_contents(&rule.block, 0).value {
+                match item {
+                    // `!important` keyframe declarations are ignored.
+                    BlockItem::Declaration(d) if d.important => {}
+                    BlockItem::Declaration(d) => {
+                        declaration(&d, &mut declarations, &mut self.diagnostics);
+                    }
+                    BlockItem::Rule(rule) => {
+                        self.diagnose(StyleDiagnosticKind::UnsupportedNestedRule, rule_span(&rule))
+                    }
+                }
+            }
+            keyframes.push(Keyframe {
+                selectors,
+                declarations,
+            });
+        }
+        self.sheet.keyframes.push(Arc::new(KeyframesRule {
+            name: name.into(),
+            keyframes,
+            layer,
+            media,
+        }));
+    }
+
     fn scope_rule(&mut self, at: AtRule, parent: &Frame) -> Option<Frame> {
         let prelude = trim_whitespace(&at.prelude);
         let implicit = prelude.is_empty()
@@ -696,6 +858,15 @@ impl StyleSheet {
                         stack.push(frame);
                     }
                 }
+                Rule::At(at)
+                    if at.name.eq_ignore_ascii_case("keyframes")
+                        || at.name.eq_ignore_ascii_case("-webkit-keyframes") =>
+                {
+                    builder.namespaces_allowed = false;
+                    let layer = frame.layer;
+                    let media = frame.media.clone();
+                    builder.keyframes_rule(at, layer, media);
+                }
                 Rule::At(at) if at.name.eq_ignore_ascii_case("property") => {
                     builder.namespaces_allowed = false;
                     // Top level or in `@layer` blocks only: a registration
@@ -745,6 +916,11 @@ impl StyleSheet {
         if let Some(base) = &base {
             for rule in &mut self.rules {
                 resolve_declaration_urls(&mut rule.declarations, base);
+            }
+            for rule in &mut self.keyframes {
+                for keyframe in &mut Arc::make_mut(rule).keyframes {
+                    resolve_declaration_urls(&mut keyframe.declarations, base);
+                }
             }
         }
         self.base_url = base;

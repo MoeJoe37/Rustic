@@ -1496,22 +1496,19 @@
     {
       "name": "If the context node is a document, inserting a new doctype should work.",
       "status": "FAIL",
-      "message": "too many detached documents"
+      "message": "operation violates the node hierarchy"
     },
     {
       "name": "Replacing the document element with a DocumentFragment containing a single element should work.",
-      "status": "FAIL",
-      "message": "too many detached documents"
+      "status": "PASS"
     },
     {
       "name": "Replacing the document element with a DocumentFragment containing a single element and comments should work.",
-      "status": "FAIL",
-      "message": "too many detached documents"
+      "status": "PASS"
     },
     {
       "name": "Replacing the document element with a single element should work.",
-      "status": "FAIL",
-      "message": "too many detached documents"
+      "status": "PASS"
     },
     {
       "name": "replaceChild should work in the presence of mutation events.",

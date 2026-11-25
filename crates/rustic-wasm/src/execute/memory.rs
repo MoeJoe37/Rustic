@@ -3,7 +3,7 @@ use std::{cell::Cell, rc::Rc};
 use rustic_base::{LinearBuffer, LinearBytes};
 
 use super::*;
-use crate::{AddressType, Limits};
+use crate::Limits;
 
 /// Number of bytes in one WebAssembly page.
 pub const MEMORY_PAGE_BYTES: usize = 65_536;
@@ -140,10 +140,7 @@ impl LinearMemory {
     }
 
     pub(super) fn page_result(&self, pages: Option<u64>) -> Value {
-        match self.0.address {
-            AddressType::I32 => Value::I32(pages.map_or(-1, |pages| pages as i32)),
-            AddressType::I64 => Value::I64(pages.map_or(-1, |pages| pages as i64)),
-        }
+        self.0.address.index_value(pages.unwrap_or(u64::MAX))
     }
 
     /// A live byte view of the current generation.

@@ -66,6 +66,139 @@ fn number(instance: &mut Instance<'_, '_>, name: &str, args: &[i32]) -> i32 {
 }
 
 #[test]
+fn table64_preserves_indices_and_budget_across_calls_and_bulk_operations() {
+    #[rustfmt::skip]
+    let types = [
+        7, 0x60, 0, 1, 0x7f,     // () -> i32
+        0x60, 1, 0x7e, 1, 0x7f,  // (i64) -> i32
+        0x60, 1, 0x7f, 1, 0x7f,  // (i32) -> i32
+        0x60, 1, 0x7e, 0,        // (i64) -> ()
+        0x60, 1, 0x7e, 1, 0x7e,  // (i64) -> i64
+        0x60, 0, 0,              // () -> ()
+        0x60, 0, 1, 0x7e,        // () -> i64
+    ];
+    #[rustfmt::skip]
+    let bulk = [
+        0x42, 1, 0x41, 0, 0x41, 2, 0xfc, 12, 1, 0, // Passive entries into table64.
+        0x41, 0, 0x42, 1, 0x41, 2, 0xfc, 14, 1, 0, // Copy wide to narrow.
+        0x42, 0, 0x41, 0, 0x41, 2, 0xfc, 14, 0, 1, // Copy narrow to wide.
+        0x42, 1, 0x42, 0, 0x42, 2, 0xfc, 14, 0, 0, // Overlapping copy within table64.
+        0x42, 2, 0xd0, 0x70, 0x42, 1, 0xfc, 17, 0, // Fill one wide slot with null.
+    ];
+    let tables = &[2, 0x70, 5, 3, 5, 0x70, 1, 2, 3];
+    let elements = &[2, 0, 0x42, 0, 0x0b, 2, 0, 1, 1, 0, 2, 1, 0];
+    let bytes = program(
+        &types,
+        &[(4, tables)],
+        elements,
+        None,
+        &[
+            (b"", 0, &[0], &[0x41, 9]),
+            (b"", 0, &[0], &[0x41, 11]),
+            (b"call", 1, &[0], &[0x20, 0, 0x11, 0, 0]),
+            (b"tail", 1, &[0], &[0x20, 0, 0x13, 0, 0]),
+            (b"narrow", 2, &[0], &[0x20, 0, 0x11, 0, 1]),
+            (b"set", 3, &[0], &[0x20, 0, 0xd2, 0, 0x26, 0]),
+            (b"isnull", 1, &[0], &[0x20, 0, 0x25, 0, 0xd1]),
+            (b"grow", 4, &[0], &[0xd0, 0x70, 0x20, 0, 0xfc, 15, 0]),
+            (b"size", 6, &[0], &[0xfc, 16, 0]),
+            (b"bulk", 5, &[0], &bulk),
+            (b"drop", 5, &[0], &[0xfc, 13, 1]),
+            (
+                b"fill",
+                3,
+                &[0],
+                &[0x42, 0, 0xd0, 0x70, 0x20, 0, 0xfc, 17, 0],
+            ),
+        ],
+    );
+    let module = validated(&bytes);
+    let token = CancellationToken::default();
+    let limits = InstanceLimits {
+        table_elements: 8,
+        ..Default::default()
+    };
+    let mut instance = Instance::instantiate(&module, limits, &token).unwrap();
+    let mut invoke = |name, arg| instance.invoke(name, &[Value::I64(arg)], &token);
+    assert_eq!(invoke("call", 0).unwrap(), [Value::I32(9)]);
+    assert_eq!(invoke("tail", 1).unwrap(), [Value::I32(11)]);
+    assert_eq!(invoke("isnull", 2).unwrap(), [Value::I32(1)]);
+    assert_eq!(invoke("set", 2).unwrap(), []);
+    assert_eq!(invoke("call", 2).unwrap(), [Value::I32(9)]);
+    for (name, index) in [
+        ("call", -1),
+        ("tail", 1 << 32),
+        ("isnull", 1 << 32),
+        ("set", 1 << 32),
+        ("fill", (1 << 32) + 1),
+    ] {
+        assert_eq!(
+            invoke(name, index).unwrap_err().kind,
+            Fault::TableOutOfBounds
+        );
+    }
+    assert_eq!(invoke("call", 0).unwrap(), [Value::I32(9)]);
+    assert_eq!(invoke("grow", -1).unwrap(), [Value::I64(-1)]);
+    assert_eq!(invoke("grow", 1 << 32).unwrap(), [Value::I64(-1)]);
+    assert_eq!(invoke("grow", 2).unwrap(), [Value::I64(-1)]);
+    assert_eq!(invoke("grow", 1).unwrap(), [Value::I64(3)]);
+
+    instance.invoke("bulk", &[], &token).unwrap();
+    assert_eq!(number(&mut instance, "narrow", &[0]), 11);
+    assert_eq!(number(&mut instance, "narrow", &[1]), 9);
+    for index in [0, 1] {
+        assert_eq!(
+            instance
+                .invoke("call", &[Value::I64(index)], &token)
+                .unwrap(),
+            [Value::I32(11)]
+        );
+    }
+    assert_eq!(
+        instance
+            .invoke("call", &[Value::I64(2)], &token)
+            .unwrap_err()
+            .kind,
+        Fault::NullReference,
+    );
+    instance.invoke("drop", &[], &token).unwrap();
+    assert_eq!(
+        instance.invoke("grow", &[Value::I64(1)], &token).unwrap(),
+        [Value::I64(4)]
+    );
+    assert_eq!(
+        instance.invoke("grow", &[Value::I64(1)], &token).unwrap(),
+        [Value::I64(-1)]
+    );
+    assert_eq!(
+        instance.invoke("size", &[], &token).unwrap(),
+        [Value::I64(5)]
+    );
+}
+
+#[test]
+fn table64_rejects_unrepresentable_initialization_without_wrapping() {
+    let huge = module(&[(4, &[1, 0x70, 4, 0x80, 0x80, 0x80, 0x80, 0x10])]);
+    let bad_segment = module(&[
+        (4, &[1, 0x70, 4, 1]),
+        (9, &[1, 0, 0x42, 0x80, 0x80, 0x80, 0x80, 0x10, 0x0b, 0]),
+    ]);
+    let token = CancellationToken::default();
+    for (bytes, kind) in [
+        (huge, Fault::LimitExceeded),
+        (bad_segment, Fault::TableOutOfBounds),
+    ] {
+        assert_eq!(
+            Instance::instantiate(&validated(&bytes), Default::default(), &token)
+                .err()
+                .unwrap()
+                .kind,
+            kind,
+        );
+    }
+}
+
+#[test]
 fn indirect_calls_accept_equivalent_signatures_and_distinguish_table_traps() {
     let types = &[
         4, 0x60, 0, 1, 0x7f, 0x60, 0, 1, 0x7f, 0x60, 1, 0x7f, 1, 0x7f, 0x60, 0, 1, 0x7e,

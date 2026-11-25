@@ -14,7 +14,8 @@ pub(super) struct Tables {
 
 struct Table {
     entries: Vec<Reference>,
-    max: usize,
+    address: AddressType,
+    max: u64,
 }
 
 impl Tables {
@@ -32,7 +33,8 @@ impl Tables {
         for entry in &declarations.tables {
             let offset = entry.offset;
             let table = &entry.value;
-            let count = table.ty.limits.min as usize;
+            let count = usize::try_from(table.ty.limits.min)
+                .map_err(|_| error(offset, Fault::LimitExceeded))?;
             budget.spend(offset, 1)?;
             state.reserve(count, offset)?;
             budget.spend(offset, count)?;
@@ -45,8 +47,17 @@ impl Tables {
                 .try_reserve_exact(count)
                 .map_err(|_| error(offset, Fault::LimitExceeded))?;
             entries.resize(count, initial.reference());
-            let max = table.ty.limits.max.unwrap_or(u64::from(u32::MAX)) as usize;
-            append(&mut state.tables, Table { entries, max }, offset)?;
+            let address = table.ty.limits.address_type;
+            let max = table.ty.limits.max.unwrap_or(address.max_table_elements());
+            append(
+                &mut state.tables,
+                Table {
+                    entries,
+                    address,
+                    max,
+                },
+                offset,
+            )?;
         }
 
         for entry in &declarations.elements {
@@ -77,16 +88,10 @@ impl Tables {
                     }
                 }
                 ElementMode::Active(active) => {
-                    let start =
-                        constant(globals, &active.offset, stack_limit, budget)?.i32() as u32;
+                    let start = constant(globals, &active.offset, stack_limit, budget)?.address();
                     let target = &mut state.tables[active.target as usize].entries;
-                    let range = checked_range(
-                        target.len(),
-                        u64::from(start),
-                        count as u64,
-                        offset,
-                        OUT_OF_BOUNDS,
-                    )?;
+                    let range =
+                        checked_range(target.len(), start, count as u64, offset, OUT_OF_BOUNDS)?;
                     budget.spend(offset, count)?;
                     // No state is exposed until every segment and the start function succeed.
                     for (index, slot) in target[range].iter_mut().enumerate() {
@@ -118,52 +123,55 @@ impl Tables {
     pub(super) fn get(
         &self,
         table: u32,
-        index: u32,
+        index: u64,
         offset: usize,
     ) -> Result<Reference, ExecutionError> {
-        self.tables[table as usize]
-            .entries
-            .get(index as usize)
-            .copied()
-            .ok_or_else(|| error(offset, OUT_OF_BOUNDS))
+        let entries = &self.tables[table as usize].entries;
+        let range = checked_range(entries.len(), index, 1, offset, OUT_OF_BOUNDS)?;
+        Ok(entries[range.start])
     }
 
     pub(super) fn set(
         &mut self,
         table: u32,
-        index: u32,
+        index: u64,
         value: Reference,
         offset: usize,
     ) -> Result<(), ExecutionError> {
-        let target = self.tables[table as usize]
-            .entries
-            .get_mut(index as usize)
-            .ok_or_else(|| error(offset, OUT_OF_BOUNDS))?;
-        *target = value;
+        let entries = &mut self.tables[table as usize].entries;
+        let range = checked_range(entries.len(), index, 1, offset, OUT_OF_BOUNDS)?;
+        entries[range.start] = value;
         Ok(())
     }
 
-    pub(super) fn size(&self, table: u32) -> i32 {
-        self.tables[table as usize].entries.len() as i32
+    pub(super) fn size(&self, table: u32) -> Value {
+        let table = &self.tables[table as usize];
+        table.address.index_value(table.entries.len() as u64)
     }
 
     pub(super) fn grow(
         &mut self,
         table: u32,
-        count: u32,
+        count: u64,
         value: Reference,
         offset: usize,
         budget: &mut Budget<'_>,
-    ) -> Result<i32, ExecutionError> {
+    ) -> Result<Value, ExecutionError> {
         let table = &mut self.tables[table as usize];
         let old = table.entries.len();
-        let count = count as usize;
-        let Some(new) = old.checked_add(count).filter(|&new| new <= table.max) else {
-            return Ok(-1);
+        let failed = table.address.index_value(u64::MAX);
+        let Some(count) = usize::try_from(count)
+            .ok()
+            .filter(|&count| count <= self.limit - self.used)
+        else {
+            return Ok(failed);
         };
-        if count > self.limit - self.used {
-            return Ok(-1);
-        }
+        let Some(new) = old
+            .checked_add(count)
+            .filter(|&new| new as u64 <= table.max)
+        else {
+            return Ok(failed);
+        };
         let work = if new > table.entries.capacity() {
             new
         } else {
@@ -171,11 +179,11 @@ impl Tables {
         };
         budget.spend(offset, work)?;
         if table.entries.try_reserve_exact(count).is_err() {
-            return Ok(-1);
+            return Ok(failed);
         }
         table.entries.resize(new, value);
         self.used += count;
-        Ok(old as i32)
+        Ok(table.address.index_value(old as u64))
     }
 
     pub(super) fn init(
@@ -232,21 +240,15 @@ impl Tables {
     pub(super) fn fill(
         &mut self,
         table: u32,
-        index: u32,
-        count: u32,
+        index: u64,
+        count: u64,
         value: Reference,
         budget: &mut Budget<'_>,
         offset: usize,
     ) -> Result<(), ExecutionError> {
         let entries = &mut self.tables[table as usize].entries;
-        let range = checked_range(
-            entries.len(),
-            u64::from(index),
-            u64::from(count),
-            offset,
-            OUT_OF_BOUNDS,
-        )?;
-        budget.spend(offset, count as usize)?;
+        let range = checked_range(entries.len(), index, count, offset, OUT_OF_BOUNDS)?;
+        budget.spend(offset, range.len())?;
         entries[range].fill(value);
         Ok(())
     }

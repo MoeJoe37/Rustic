@@ -128,7 +128,7 @@ impl<'a> ValidatedModule<'a> {
 }
 
 /// Validate numeric and multi-value control flow, local and global access,
-/// direct and indirect calls, 32- and 64-bit memories, 32-bit tables, and bulk operations.
+/// direct and indirect calls, 32- and 64-bit memories and tables, and bulk operations.
 /// Reference validation covers abstract function and external references.
 /// GC types, SIMD, non-null declared storage and 64-bit addressing are outside
 /// this profile. Validation performs no linking, allocation of guest memories,
@@ -336,10 +336,7 @@ impl<'a, 'bytes> Context<'a, 'bytes> {
 
     fn add_table(&mut self, ty: TableType, offset: usize) -> Result<(), ValidationError> {
         declared_type(ty.element_type, offset)?;
-        if ty.limits.address_type != AddressType::I32 {
-            return Err(error(offset, Fault::UnsupportedType));
-        }
-        if !ty.limits.fits(u32::MAX.into()) {
+        if !ty.limits.fits(ty.limits.address_type.max_table_elements()) {
             return Err(error(offset, Fault::InvalidLimits));
         }
         append(&mut self.tables, ty, offset)
@@ -458,7 +455,8 @@ impl<'a, 'bytes> Context<'a, 'bytes> {
                 if !matches_type(Some(ty), table.element_type) {
                     return Err(error(segment.offset, Fault::TypeMismatch));
                 }
-                body::constant(self, &active.offset, Ty::I32, self.globals.len(), budget)?;
+                let address = table.limits.address_type.value_type();
+                body::constant(self, &active.offset, address, self.globals.len(), budget)?;
             }
         }
         if let Some(start) = &declarations.start {

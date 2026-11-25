@@ -1965,3 +1965,35 @@ fn wasm_resizable_buffers_follow_guest_and_host_growth_and_detach_on_mode_switch
     }
     assert_eq!(outcome.unwrap(), Value::TRUE);
 }
+
+#[test]
+fn wasm_window_executes_indirect_calls_with_local_table64_indices() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    let outcome = agent.evaluate(
+        r#"
+        const bytes = Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,10,2,96,0,1,127,96,1,126,1,127,
+            3,3,2,0,1, 4,4,1,112,4,1,
+            7,8,1,4,99,97,108,108,0,1,
+            9,7,1,0,66,0,11,1,0,
+            10,14,2,4,0,65,42,11,7,0,32,0,17,0,0,11
+        );
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        const valid = WebAssembly.validate(bytes);
+        const {call} = new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports;
+        valid && call(0n) === 42 &&
+            rejects(WebAssembly.RuntimeError, () => call(4294967296n)) &&
+            rejects(TypeError, () => call(0))
+    "#,
+    );
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}

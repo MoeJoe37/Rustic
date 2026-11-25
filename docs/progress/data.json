@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "86b37665f9326ba4689163fb22cb86e2b1f2371e1f45968c87389306036d78db",
+  "source_fingerprint": "fef792cfeb7421d9d0163b38873f137a415d9e78687c3669956119be5e1073d6",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
@@ -4500,6 +4500,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/validation.rs",
               "marker": "fn memory64_checks_limits_offsets_and_each_bulk_operand_width"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/validation.rs",
+              "marker": "fn table64_checks_table_indices_and_the_width_of_mixed_copies"
             }
           ],
           "credit": "0.00",
@@ -4572,6 +4577,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/instances.rs",
               "marker": "fn memory64_bulk_operations_keep_full_width_addresses_under_the_host_budget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn table64_preserves_indices_and_budget_across_calls_and_bulk_operations"
             }
           ],
           "credit": "0.00",
@@ -4663,6 +4673,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
               "marker": "wasm/jsapi/memory/to-resizable-buffer.any.js"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_window_executes_indirect_calls_with_local_table64_indices"
             }
           ],
           "credit": "0.00",

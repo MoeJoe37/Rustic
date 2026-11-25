@@ -165,13 +165,13 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                 self.state.borrow_mut().globals[*global as usize].write_guest(value);
             }
             (Opcode::Core(0x25), Immediate::Index(table)) => {
-                let index = self.pop_i32() as u32;
+                let index = self.pop().address();
                 let value = self.state.borrow().tables.get(*table, index, self.offset)?;
                 self.push(Slot::Ref(value))?;
             }
             (Opcode::Core(0x26), Immediate::Index(table)) => {
                 let value = self.pop().reference();
-                let index = self.pop_i32() as u32;
+                let index = self.pop().address();
                 self.state
                     .borrow_mut()
                     .tables
@@ -272,7 +272,7 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                 )?;
             }
             (Opcode::Misc(15), Immediate::Index(table)) => {
-                let count = self.pop_i32() as u32;
+                let count = self.pop().address();
                 let value = self.pop().reference();
                 let size = self.state.borrow_mut().tables.grow(
                     *table,
@@ -281,16 +281,16 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                     self.offset,
                     &mut self.budget,
                 )?;
-                self.push(Slot::Number(Value::I32(size)))?;
+                self.push(Slot::Number(size))?;
             }
             (Opcode::Misc(16), Immediate::Index(table)) => {
                 let size = self.state.borrow().tables.size(*table);
-                self.push(Slot::Number(Value::I32(size)))?;
+                self.push(Slot::Number(size))?;
             }
             (Opcode::Misc(17), Immediate::Index(table)) => {
-                let count = self.pop_i32() as u32;
+                let count = self.pop().address();
                 let value = self.pop().reference();
-                let index = self.pop_i32() as u32;
+                let index = self.pop().address();
                 self.state.borrow_mut().tables.fill(
                     *table,
                     index,
@@ -314,7 +314,7 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
     }
 
     fn indirect(&mut self, ty: u32, table: u32) -> Result<usize, ExecutionError> {
-        let index = self.pop_i32() as u32;
+        let index = self.pop().address();
         let value = self.state.borrow().tables.get(table, index, self.offset)?;
         let Reference::Function(Some(function)) = value else {
             return Err(error(self.offset, Fault::NullReference));

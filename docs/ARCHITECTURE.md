@@ -309,8 +309,10 @@ An attached Wasm buffer views the current generation of linear memory and
 traces its allocation owner. Resizable generations retain their wrapper on
 growth. Mode changes move the bytes into a new generation and detach the old
 one. Each memory has an address width and shares the byte budget of its
-allocating owner. The interpreter checks full-width guest
-ranges before converting them to host indices. A dispatched import runs with
+allocating owner. Local tables also carry their declared address width and
+share an instance-wide entry budget with passive element segments. The
+interpreter checks full-width guest ranges before converting them to host
+indices. A dispatched import runs with
 its invocation stack owned by the interpreter and all guest store borrows
 released. The realm keeps its bindings and propagates JavaScript exceptions. The
 interpreter remains available on hosts without executable-memory permission.

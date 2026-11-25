@@ -30,7 +30,7 @@ pub enum AddressType {
 }
 
 impl AddressType {
-    /// Integer type of addresses and page counts in guest instructions.
+    /// Integer type of addresses and sizes in guest instructions.
     pub const fn value_type(self) -> ValueType {
         match self {
             Self::I32 => ValueType::I32,
@@ -43,6 +43,14 @@ impl AddressType {
         match self {
             Self::I32 => 1 << 16,
             Self::I64 => 1 << 48,
+        }
+    }
+
+    /// Maximum declared number of table elements for this address width.
+    pub const fn max_table_elements(self) -> u64 {
+        match self {
+            Self::I32 => u32::MAX as u64,
+            Self::I64 => u64::MAX,
         }
     }
 }

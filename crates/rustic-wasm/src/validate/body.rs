@@ -223,7 +223,7 @@ impl<'a> Body<'a, '_, '_, '_, '_> {
                 if !matches_type(Some(table.element_type), FUNCREF) {
                     return Err(self.error(Fault::TypeMismatch));
                 }
-                self.pop(Ty::I32)?;
+                self.pop(table.limits.address_type.value_type())?;
                 self.call(self.context.signature(*ty, self.offset)?, is_tail)?;
             }
             (Opcode::Core(0x1a), _) => {
@@ -269,11 +269,13 @@ impl<'a> Body<'a, '_, '_, '_, '_> {
                 }
             }
             (Opcode::Core(0x25 | 0x26), Immediate::Index(table)) => {
-                let ty = self.context.table(*table, self.offset)?.element_type;
+                let table = self.context.table(*table, self.offset)?;
+                let address = table.limits.address_type.value_type();
+                let ty = table.element_type;
                 if op == Opcode::Core(0x25) {
-                    self.effect(&[Ty::I32], &[ty])?;
+                    self.effect(&[address], &[ty])?;
                 } else {
-                    self.pop_types(&[Ty::I32, ty])?;
+                    self.pop_types(&[address, ty])?;
                 }
             }
             (
@@ -360,52 +362,57 @@ impl<'a> Body<'a, '_, '_, '_, '_> {
             (Opcode::Misc(8), Immediate::Indices(data, memory)) => {
                 context.data(*data, at)?;
                 let address = context.memory(*memory, at)?;
-                return self.pop_types(&[address, Ty::I32, Ty::I32]);
+                self.pop_types(&[address, Ty::I32, Ty::I32])
             }
-            (Opcode::Misc(9), Immediate::Index(data)) => return context.data(*data, at),
+            (Opcode::Misc(9), Immediate::Index(data)) => context.data(*data, at),
             (Opcode::Misc(10), Immediate::Indices(dst, src)) => {
                 let dst = context.memory(*dst, at)?;
                 let src = context.memory(*src, at)?;
                 let size = if dst == src { dst } else { Ty::I32 };
-                return self.pop_types(&[dst, src, size]);
+                self.pop_types(&[dst, src, size])
             }
             (Opcode::Misc(11), Immediate::Index(memory)) => {
                 let address = context.memory(*memory, at)?;
-                return self.pop_types(&[address, Ty::I32, address]);
+                self.pop_types(&[address, Ty::I32, address])
             }
             (Opcode::Misc(12), Immediate::Indices(element, table)) => {
                 let element = context.element(*element, at)?;
-                let table = context.table(*table, at)?.element_type;
-                if !matches_type(Some(element), table) {
+                let table = context.table(*table, at)?;
+                if !matches_type(Some(element), table.element_type) {
                     return Err(self.error(Fault::TypeMismatch));
                 }
+                self.pop_types(&[table.limits.address_type.value_type(), Ty::I32, Ty::I32])
             }
             (Opcode::Misc(13), Immediate::Index(element)) => {
-                context.element(*element, at)?;
-                return Ok(());
+                context.element(*element, at).map(|_| ())
             }
             (Opcode::Misc(14), Immediate::Indices(dst, src)) => {
-                let dst = context.table(*dst, at)?.element_type;
-                let src = context.table(*src, at)?.element_type;
-                if !matches_type(Some(src), dst) {
+                let dst = context.table(*dst, at)?;
+                let src = context.table(*src, at)?;
+                if !matches_type(Some(src.element_type), dst.element_type) {
                     return Err(self.error(Fault::TypeMismatch));
                 }
+                let dst = dst.limits.address_type.value_type();
+                let src = src.limits.address_type.value_type();
+                let size = if dst == src { dst } else { Ty::I32 };
+                self.pop_types(&[dst, src, size])
             }
             (Opcode::Misc(15), Immediate::Index(table)) => {
-                let element = context.table(*table, at)?.element_type;
-                return self.effect(&[element, Ty::I32], &[Ty::I32]);
+                let table = context.table(*table, at)?;
+                let address = table.limits.address_type.value_type();
+                self.effect(&[table.element_type, address], &[address])
             }
             (Opcode::Misc(16), Immediate::Index(table)) => {
-                context.table(*table, at)?;
-                return self.push(Some(Ty::I32));
+                let table = context.table(*table, at)?;
+                self.push(Some(table.limits.address_type.value_type()))
             }
             (Opcode::Misc(17), Immediate::Index(table)) => {
-                let element = context.table(*table, at)?.element_type;
-                return self.pop_types(&[Ty::I32, element, Ty::I32]);
+                let table = context.table(*table, at)?;
+                let address = table.limits.address_type.value_type();
+                self.pop_types(&[address, table.element_type, address])
             }
-            _ => return Err(self.error(Fault::UnsupportedInstruction)),
+            _ => Err(self.error(Fault::UnsupportedInstruction)),
         }
-        self.pop_types(&[Ty::I32; 3])
     }
 
     fn call(&mut self, signature: &FunctionType, tail: bool) -> Result<(), ValidationError> {

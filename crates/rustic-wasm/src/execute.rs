@@ -4,8 +4,8 @@ use rustic_base::CancellationToken;
 
 use crate::validate::numeric::effect;
 use crate::{
-    BlockType, Declaration, Declarations, Export, ExportIndex, Function, FunctionType, GlobalType,
-    Instruction, Opcode, ValidatedModule, ValueType,
+    AddressType, BlockType, Declaration, Declarations, Export, ExportIndex, Function, FunctionType,
+    GlobalType, Instruction, Opcode, ValidatedModule, ValueType,
 };
 
 mod imports;
@@ -42,6 +42,15 @@ impl Value {
             Self::I64(_) => ValueType::I64,
             Self::F32(_) => ValueType::F32,
             Self::F64(_) => ValueType::F64,
+        }
+    }
+}
+
+impl AddressType {
+    fn index_value(self, bits: u64) -> Value {
+        match self {
+            Self::I32 => Value::I32(bits as i32),
+            Self::I64 => Value::I64(bits as i64),
         }
     }
 }
@@ -273,7 +282,7 @@ impl Default for InstanceLimits {
     }
 }
 
-/// An executable instance with local globals, 32-bit linear memories and tables.
+/// An executable instance with globals, linear memories and tables.
 ///
 /// State changes remain visible across invocations, including changes made
 /// before a trap. Function references stay within the instance. An external

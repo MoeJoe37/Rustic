@@ -1,37 +1,112 @@
 # Contributing to Rustic
 
-Rustic has a working static renderer (M1–M3) and is building its JavaScript
-engine (M4). Start with the [documentation index](docs/README.md), the
-[architecture](docs/ARCHITECTURE.md), the [roadmap](docs/ROADMAP.md) (its
-current queue lists the next tasks) and the [development commands](docs/DEVELOPMENT.md).
-Existing core browser or JavaScript engines must not be introduced as hidden
-implementation shortcuts.
+Rustic is an original browser engine written in Rust. The desktop alpha includes
+rendering, scripting, network and storage services, and process isolation.
+Compatibility work continues across the engine and web platform. Check the
+[implementation ledger](docs/IMPLEMENTATION.md) for what works today and the
+[roadmap](docs/ROADMAP.md) for dependencies and upcoming work.
 
-## Make a reviewable change
+## Set up a checkout
 
-Work lands through the `feature` branch and is merged into `main` once every
-check passes ([branches and merging](docs/DEVELOPMENT.md#branches-and-merging)).
-Keep each change focused. State the observable problem
-and resulting behavior, relevant roadmap task, standards section/revision, in/out
-scope, and test evidence. Include a reduced regression fixture when changing
-behavior. Security-sensitive issues follow [SECURITY.md](SECURITY.md), rather
-than a public exploit report. Do not put credentials or private browsing data in
-issues, fixtures, logs or screenshots.
+Install Git, [rustup](https://rustup.rs/), and Python 3.11 or later. Rustup reads
+[rust-toolchain.toml](rust-toolchain.toml) to select the pinned compiler, rustfmt,
+and Clippy. CI also tests Rust 1.85.0 and the current stable release. Keep
+`Cargo.lock` committed and use `--locked` for builds and tests.
 
-Run the local checks in the development guide. Add negative/resource-limit tests
-for untrusted inputs and update feature status honestly. Preserve the correct
-reference path when adding incremental/optimized behavior. Do not rewrite test
-expectations just to hide failures. Every change must keep all [platform tiers](docs/PLATFORMS.md)
-green, including 32-bit and big-endian targets; native changes need tests on the
-affected platform.
+```sh
+git clone https://github.com/MoeJoe37/Rustic.git
+cd Rustic
+git switch feature
+cargo run --locked -p rustic-cli -- --help
+```
 
-Use an [ADR](docs/adr/README.md) for changes to engine scope, ownership/GC,
-execution, authority, public APIs, or major dependencies. Keep internal APIs
-private until proven. Create component crates when needed, not as placeholders.
-Default project code remains safe Rust; exceptions require an explicit reviewed
-boundary and invariants. New dependencies follow the
-[dependency policy](docs/DEPENDENCIES.md).
+On Linux x86-64 and ARM64, renderer isolation tests require bubblewrap
+(`bwrap`) on `PATH` and access to unprivileged user namespaces. See the
+[development guide](docs/DEVELOPMENT.md#toolchain-and-local-checks) for setup
+and local test options. The [platform matrix](docs/PLATFORMS.md) distinguishes
+native tests, emulated tests, and cross-compilation checks.
 
-The maintainer decides scope and merges. There is no CLA or automated publishing
-flow established by this initial setup. Preserve the existing license and notices
-in contributed or imported material.
+## Prepare a focused change
+
+- Read [AGENTS.md](AGENTS.md) for repository rules and the
+  [architecture](docs/ARCHITECTURE.md) before moving responsibilities across
+  crates. Use the [documentation index](docs/README.md) to find the subsystem
+  guide for your change.
+- Describe the behavior you are changing and the relevant roadmap item or
+  specification section. Add a small regression test for behavior changes.
+  Cover malformed input, resource limits, cancellation, or reentry when the
+  changed code handles them.
+- Keep shared code portable across pointer widths, byte orders, and operating
+  systems. Keep OS-specific code in adapters and add evidence from the
+  affected platforms for native changes. Use safe Rust by default and document
+  the boundary and invariants of any proposed `unsafe` code for review.
+- Keep the browser engine, JavaScript runtime, and Wasm implementation in
+  Rustic. Use reviewed libraries for support services through explicit adapter
+  boundaries. Follow the [dependency policy](docs/DEPENDENCIES.md) for
+  dependency, lockfile, and license-notice changes.
+- Update the implementation ledger and affected subsystem docs when behavior
+  changes. Use an [ADR](docs/adr/README.md) for changes to ownership, execution,
+  process authority, public API guarantees, engine scope, or major dependencies.
+  Record deliberate shortcuts in the [technical debt ledger](docs/TECH_DEBT.md).
+
+## Verify the change
+
+Run the repository checks from the checkout root. On systems that provide
+Python 3.11 or newer as `python`, use that command in place of `python3`.
+
+```sh
+python3 tools/progress.py --write
+python3 tools/progress.py --check
+python3 tools/check_repository.py
+python3 -m unittest discover -s tools/tests -p 'test_*.py'
+```
+
+For the Rust checks, use the following commands in a POSIX shell. In PowerShell,
+set `$env:RUSTDOCFLAGS = '-Dwarnings'` before running the `cargo doc` command.
+The [development guide](docs/DEVELOPMENT.md) gives the pinned `cargo-deny`
+installation command and the rest of the CI checks.
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo test --locked --workspace --all-targets
+cargo test --locked --workspace --doc
+RUSTDOCFLAGS=-Dwarnings cargo doc --locked --workspace --no-deps
+cargo deny --locked check advisories licenses bans sources
+```
+
+Run the affected integration harnesses as well. Use the pinned Test262 checkout
+for JavaScript runtime changes and the pinned Window WPT selection for changes
+to browser-exposed behavior. Explain each expected-failure or reference-output
+update and record the suite revision and results. Keep the reference path
+available when introducing an optimization. See the
+[testing guide](docs/TESTING.md) and [standards reporting](docs/STANDARDS.md).
+
+## Submit and review
+
+Base contributions on `feature` and target it when opening a pull request.
+Include the original problem, the observable result, and the checks you ran.
+Record any skipped tests or platform limits so reviewers can see what still
+needs verification.
+
+The maintainer integrates changes through `feature` and merges to `main` after
+the aggregate **CI** check passes. Check the failed job and step when a run
+fails. A new push can cancel an in-progress run for the same branch. The
+default-branch workflow can publish refreshed progress assets after CI, so
+sync those commits into local work while preserving branch history.
+[GitHub Actions](https://github.com/MoeJoe37/Rustic/actions)
+
+## Report issues and preserve notices
+
+For public bug reports, include the affected commit, OS and architecture,
+steps to reproduce, and what you expected and observed. Use a reduced fixture
+and remove credentials and private browsing data from logs and screenshots.
+[GitHub Issues](https://github.com/MoeJoe37/Rustic/issues)
+
+Follow the private reporting steps in [SECURITY.md](SECURITY.md) for
+vulnerabilities.
+
+Rustic is licensed under [AGPL-3.0-only](LICENSE). Preserve required notices
+and record the upstream revision and license when importing test fixtures,
+fonts, or other third-party material. See the
+[reviewed dependency notices](third_party/README.md).

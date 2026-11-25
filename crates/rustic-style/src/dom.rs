@@ -110,6 +110,10 @@ impl<'a> DomElement<'a> {
 }
 
 impl ElementView for DomElement<'_> {
+    fn node_id(&self) -> Option<NodeId> {
+        Some(self.id)
+    }
+
     fn is_virtual_scope(&self) -> bool {
         self.element.is_none()
     }

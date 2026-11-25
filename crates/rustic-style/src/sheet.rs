@@ -384,6 +384,8 @@ pub struct ImportRule {
     pub url: String,
     /// Whether a `layer` or `layer(...)` condition is present.
     pub layer: bool,
+    /// The `scope(...)` the imported sheet's rules are scoped to.
+    pub scope: Option<Arc<ScopeRule>>,
     /// Whether a `supports(...)` condition is present.
     pub supports: bool,
     /// The media query list, or `None` when there is none (all media).
@@ -433,6 +435,14 @@ fn import_rule(at: &AtRule) -> Option<ImportRule> {
         rest = &rest[1..];
     }
     rest = skip_whitespace(rest);
+    let mut scope = None;
+    if let Some(ComponentValue::Function { name, arguments }) = rest.first().map(|v| &v.value) {
+        if name.eq_ignore_ascii_case("scope") {
+            scope = Some(Arc::new(import_scope(arguments)?));
+            rest = &rest[1..];
+        }
+    }
+    rest = skip_whitespace(rest);
     let supports = rest.first().is_some_and(|v| is_function(v, "supports"));
     if supports {
         rest = &rest[1..];
@@ -442,10 +452,38 @@ fn import_rule(at: &AtRule) -> Option<ImportRule> {
     Some(ImportRule {
         url,
         layer,
+        scope,
         supports,
         media,
         span: at.span,
     })
+}
+
+/// The argument of `@import ... scope(...)`: `<scope-start>` alone, or
+/// `(<scope-start>)? [to (<scope-end>)]?` as in `@scope`.
+fn import_scope(arguments: &[Value]) -> Option<ScopeRule> {
+    let arguments = trim_whitespace(arguments);
+    let namespaces = NamespaceMap::new();
+    let boundaries = arguments.first().is_none_or(|first| {
+        matches!(
+            &first.value,
+            ComponentValue::Block {
+                kind: rustic_css::BlockKind::Paren,
+                ..
+            }
+        ) || matches!(first.token(), Some(Token::Ident(s)) if s.eq_ignore_ascii_case("to"))
+    });
+    if boundaries {
+        return ScopeRule::parse(arguments, &namespaces, None, None);
+    }
+    let wrapped = Value {
+        value: ComponentValue::Block {
+            kind: rustic_css::BlockKind::Paren,
+            contents: arguments.to_vec(),
+        },
+        ..arguments[0].clone()
+    };
+    ScopeRule::parse(std::slice::from_ref(&wrapped), &namespaces, None, None)
 }
 
 /// One level of grouping rules being read: the remaining items, the
@@ -456,6 +494,59 @@ struct Frame {
     layer: Option<usize>,
     media: Vec<usize>,
     scope: Option<Arc<ScopeRule>>,
+    /// Declarations directly in an `@scope` block, waiting for the next
+    /// rule or the end of the block (scoped declarations).
+    pending: Vec<PropertyDeclaration>,
+}
+
+impl Frame {
+    fn new(
+        block: &[Value],
+        layer: Option<usize>,
+        media: Vec<usize>,
+        scope: Option<Arc<ScopeRule>>,
+    ) -> Self {
+        Self {
+            items: parse_block_contents(block, 0).value.into_iter(),
+            layer,
+            media,
+            scope,
+            pending: Vec::new(),
+        }
+    }
+
+    /// Emit pending scoped declarations as a `:where(:scope)` rule.
+    fn flush(&mut self, rules: &mut Vec<StyleRule>) {
+        if self.pending.is_empty() {
+            return;
+        }
+        rules.push(StyleRule {
+            selectors: scope_self(),
+            declarations: std::mem::take(&mut self.pending),
+            media: self.media.clone(),
+            layer: self.layer,
+            scope: self.scope.clone(),
+        });
+    }
+}
+
+/// `:where(:scope)`, the selector of declarations directly in `@scope`
+/// (CSS Cascade Level 6 §3.5.1): the scoping root, with no specificity.
+fn scope_self() -> SelectorList {
+    static SELECTOR: std::sync::OnceLock<SelectorList> = std::sync::OnceLock::new();
+    SELECTOR
+        .get_or_init(|| {
+            let parsed = CssParser::default()
+                .stylesheet(":where(:scope) {}")
+                .expect("a fixed stylesheet parses")
+                .value;
+            let Some(Rule::Qualified(rule)) = parsed.rules.first() else {
+                unreachable!("one qualified rule");
+            };
+            parse_scoped_selector_list(&rule.prelude, &NamespaceMap::new(), false)
+                .expect("a fixed selector parses")
+        })
+        .clone()
 }
 
 /// Builds a [`StyleSheet`] from rules, tracking layers and diagnostics.
@@ -530,12 +621,12 @@ impl Builder {
         let (index, block) = self.condition(at)?;
         let mut nested = parent.media.clone();
         nested.push(index);
-        Some(Frame {
-            items: parse_block_contents(&block, 0).value.into_iter(),
-            layer: parent.layer,
-            media: nested,
-            scope: parent.scope.clone(),
-        })
+        Some(Frame::new(
+            &block,
+            parent.layer,
+            nested,
+            parent.scope.clone(),
+        ))
     }
 
     /// Append a style rule and its nested rules (CSS Nesting §3, Editor's
@@ -594,6 +685,12 @@ impl Builder {
                     child.emitted = true;
                     stack.push(child);
                 }
+                BlockItem::Rule(Rule::At(at)) if at.name.eq_ignore_ascii_case("scope") => {
+                    frame.flush(&mut self.sheet.rules, layer, &scope);
+                    let selectors = Arc::clone(&frame.selectors);
+                    let media = frame.media.clone();
+                    self.nested_scope_rule(at, &selectors, layer, media, scope.clone());
+                }
                 BlockItem::Rule(rule) => {
                     self.diagnose(StyleDiagnosticKind::UnsupportedNestedRule, rule_span(&rule));
                 }
@@ -617,12 +714,12 @@ impl Builder {
                     vec![LayerSegment::Anonymous(self.anonymous_layers)]
                 });
                 let layer = self.declare_layer(parent.layer, segments);
-                Some(Frame {
-                    items: parse_block_contents(&block, 0).value.into_iter(),
-                    layer: Some(layer),
-                    media: parent.media.clone(),
-                    scope: parent.scope.clone(),
-                })
+                Some(Frame::new(
+                    &block,
+                    Some(layer),
+                    parent.media.clone(),
+                    parent.scope.clone(),
+                ))
             }
             _ => {
                 self.diagnose(StyleDiagnosticKind::InvalidLayerRule, at.span);
@@ -702,25 +799,67 @@ impl Builder {
         }));
     }
 
+    /// `@scope`, at the top level or in a grouping rule (possibly in
+    /// another `@scope`): the frame for its block.
     fn scope_rule(&mut self, at: AtRule, parent: &Frame) -> Option<Frame> {
         let prelude = trim_whitespace(&at.prelude);
-        let implicit = prelude.is_empty()
-            || matches!(prelude[0].token(), Some(Token::Ident(name)) if name.eq_ignore_ascii_case("to"));
-        if parent.scope.is_some() || implicit {
-            self.diagnose(StyleDiagnosticKind::UnsupportedAtRule, at.span);
-            return None;
-        }
-        let (Some(block), Some(scope)) = (at.block, ScopeRule::parse(prelude, &self.namespaces))
-        else {
+        let scope = ScopeRule::parse(prelude, &self.namespaces, parent.scope.clone(), None);
+        let (Some(block), Some(scope)) = (at.block, scope) else {
             self.diagnose(StyleDiagnosticKind::InvalidScopeRule, at.span);
             return None;
         };
-        Some(Frame {
-            items: parse_block_contents(&block, 0).value.into_iter(),
-            layer: parent.layer,
-            media: parent.media.clone(),
-            scope: Some(Arc::new(scope)),
-        })
+        Some(Frame::new(
+            &block,
+            parent.layer,
+            parent.media.clone(),
+            Some(Arc::new(scope)),
+        ))
+    }
+
+    /// `@scope` nested in a style rule whose selectors are `nesting`: its
+    /// declarations apply to the scoping roots and its style rules are
+    /// scoped, each expanded like any nested rule.
+    fn nested_scope_rule(
+        &mut self,
+        at: AtRule,
+        nesting: &SelectorList,
+        layer: Option<usize>,
+        media: Vec<usize>,
+        outer: Option<Arc<ScopeRule>>,
+    ) {
+        let prelude = trim_whitespace(&at.prelude);
+        let scope = ScopeRule::parse(prelude, &self.namespaces, outer, Some(nesting));
+        let (Some(block), Some(scope)) = (at.block, scope) else {
+            self.diagnose(StyleDiagnosticKind::InvalidScopeRule, at.span);
+            return;
+        };
+        let mut frame = Frame::new(&block, layer, media, Some(Arc::new(scope)));
+        while let Some(item) = frame.items.next() {
+            match item {
+                BlockItem::Declaration(d) => {
+                    declaration(&d, &mut frame.pending, &mut self.diagnostics);
+                }
+                BlockItem::Rule(Rule::Qualified(q)) => {
+                    frame.flush(&mut self.sheet.rules);
+                    match parse_scoped_selector_list(&q.prelude, &self.namespaces, true) {
+                        Ok(selectors) => self.expand(
+                            selectors,
+                            frame.layer,
+                            frame.media.clone(),
+                            frame.scope.clone(),
+                            &q.block,
+                        ),
+                        Err(error) => {
+                            self.diagnose(StyleDiagnosticKind::InvalidSelector(error.kind), q.span)
+                        }
+                    }
+                }
+                BlockItem::Rule(rule) => {
+                    self.diagnose(StyleDiagnosticKind::UnsupportedNestedRule, rule_span(&rule));
+                }
+            }
+        }
+        frame.flush(&mut self.sheet.rules);
     }
 }
 
@@ -785,21 +924,29 @@ impl StyleSheet {
             layer: None,
             media: Vec::new(),
             scope: None,
+            pending: Vec::new(),
         }];
         while !stack.is_empty() {
             let top_level = stack.len() == 1;
             let frame = stack.last_mut().expect("nonempty stack");
             let Some(item) = frame.items.next() else {
+                frame.flush(&mut builder.sheet.rules);
                 stack.pop();
                 continue;
             };
             let rule = match item {
                 BlockItem::Rule(rule) => rule,
+                // Declarations directly in `@scope` apply to its roots.
+                BlockItem::Declaration(d) if frame.scope.is_some() => {
+                    declaration(&d, &mut frame.pending, &mut builder.diagnostics);
+                    continue;
+                }
                 BlockItem::Declaration(declaration) => {
                     builder.diagnose(StyleDiagnosticKind::MisplacedDeclaration, declaration.span);
                     continue;
                 }
             };
+            frame.flush(&mut builder.sheet.rules);
             let layer_statement = matches!(&rule, Rule::At(at)
                 if at.name.eq_ignore_ascii_case("layer") && at.block.is_none());
             let keeps_imports = matches!(&rule, Rule::At(at)
@@ -924,6 +1071,37 @@ impl StyleSheet {
             }
         }
         self.base_url = base;
+    }
+
+    /// Root the sheet's implicit `@scope` rules (those without a start) at
+    /// `owner`: the owner node's parent element, or the shadow host for a
+    /// sheet in a shadow tree (CSS Cascade Level 6 §3.5). `None` roots them
+    /// at the tree's root element.
+    pub fn set_scope_owner(&mut self, owner: Option<rustic_dom::NodeId>) {
+        let mut done: HashMap<*const ScopeRule, Arc<ScopeRule>> = HashMap::new();
+        for rule in &mut self.rules {
+            if let Some(scope) = &rule.scope {
+                let key = Arc::as_ptr(scope);
+                let updated = done
+                    .entry(key)
+                    .or_insert_with(|| Arc::new(scope.with_owner(owner)));
+                rule.scope = Some(Arc::clone(updated));
+            }
+        }
+    }
+
+    /// Put every rule inside `outer`, as `@import ... scope(...)` does.
+    pub fn scope_within(&mut self, outer: &Arc<ScopeRule>) {
+        let mut done: HashMap<*const ScopeRule, Arc<ScopeRule>> = HashMap::new();
+        for rule in &mut self.rules {
+            rule.scope = Some(match &rule.scope {
+                Some(scope) => Arc::clone(
+                    done.entry(Arc::as_ptr(scope))
+                        .or_insert_with(|| Arc::new(scope.within(outer))),
+                ),
+                None => Arc::clone(outer),
+            });
+        }
     }
 
     /// Make every rule also depend on `media` (for example a `<style>`

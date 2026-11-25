@@ -42,6 +42,7 @@ mod animation;
 mod cascade;
 mod computed;
 mod containers;
+mod cssom;
 mod dom;
 mod fonts;
 mod html;
@@ -67,6 +68,7 @@ pub use animation::{
 pub use cascade::{Cascade, SpecifiedStyle, StyleInputs, TreeContext, TreeScope};
 pub use computed::{ComputeContext, ComputedStyle};
 pub use containers::{ContainerInfo, ContainerSize};
+pub use cssom::{CssomDeclaration, CssomRule, CssomRuleKind, CssomSheet};
 pub use dom::{
     DomElement, ElementStyle, ScopedSelector, SelectorQueryError, SelectorWork, query_selector_all,
     shadow_tree_context, style_tree, style_tree_animated, style_tree_with_sizes,
@@ -74,7 +76,7 @@ pub use dom::{
 pub use fonts::{FontMetricsSource, FontQuery};
 pub use html::{
     HTML_USER_AGENT_STYLESHEET, StyleElementSheet, StyleElementStatus, document_cascade,
-    document_cascade_with, dump_computed_styles, html_user_agent_sheet,
+    document_cascade_with, document_style_owners, dump_computed_styles, html_user_agent_sheet,
 };
 pub use interpolate::{
     AnimationType, animation_type, composite, discrete, interpolable, interpolate,
@@ -89,7 +91,7 @@ pub use loading::{
 };
 pub use matching::{MatchContext, matches, matches_complex};
 pub use rustic_text::EmRatios;
-pub use scope::ScopeRule;
+pub use scope::{ScopeRule, ScopeStart};
 pub use sheet::{
     ImportRule, Keyframe, KeyframeSelector, KeyframesRule, Origin, StyleDiagnostic,
     StyleDiagnosticKind, StyleRule, StyleSheet, parse_style_attribute, resolve_declaration_urls,

@@ -27,6 +27,11 @@ pub enum ChildRef<'a, E> {
 /// Equality must mean "the same element", and hashing must agree with it
 /// (the matcher memoizes nested selector results per element).
 pub trait ElementView: Copy + Eq + std::hash::Hash {
+    /// The DOM node behind this element, for implicit `@scope` roots.
+    fn node_id(&self) -> Option<rustic_dom::NodeId> {
+        None
+    }
+
     /// A featureless fragment root usable for scoped selector relationships.
     fn is_virtual_scope(&self) -> bool {
         false

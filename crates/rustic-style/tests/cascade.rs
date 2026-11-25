@@ -487,3 +487,47 @@ fn media_rule_errors_are_reported() {
     assert_eq!(sheet.rules.len(), 2);
     assert_eq!(sheet.media[2].to_string(), "(bogus), screen");
 }
+
+#[test]
+fn nested_scopes_scoped_declarations_and_scopes_in_style_rules() {
+    let html = "<main id=main><div class=card id=card><div class=media id=media>\
+                <img id=img></div><p id=text></p></div><img id=loose></main>";
+    let css = "@scope (.card) {
+                   width: 1px;
+                   @scope (.media) {
+                       height: 2px;
+                       img { width: 3px }
+                   }
+                   p { width: 4px }
+                   min-height: 5px;
+               }
+               @scope (.media) { @scope (img) { max-width: 6px } }
+               main {
+                   @scope (img) { min-width: 7px; :scope { max-height: 8px } }
+                   @scope { opacity: 0.5 }
+               }
+               @scope (.card) { @scope (.card) { max-height: 9px } }";
+    let styled = styles(html, &[(Origin::Author, css)]);
+    let style = |id| styled.iter().find(|(i, _)| i == id).unwrap().1.clone();
+    let card = style("card");
+    assert!(
+        card.contains("width: 1px\n") && card.contains("min-height: 5px\n"),
+        "{card}"
+    );
+    // A nested start is relative to the outer root, so it is not the root.
+    assert!(!card.contains("max-height: 9px"), "{card}");
+    assert!(style("media").contains("height: 2px\n"));
+    assert!(style("img").contains("width: 3px\n"));
+    assert!(style("img").contains("max-width: 6px\n"));
+    assert!(style("text").contains("width: 4px\n"));
+    assert!(!style("loose").contains("width: 3px"));
+    for id in ["img", "loose"] {
+        let s = style(id);
+        assert!(
+            s.contains("min-width: 7px\n") && s.contains("max-height: 8px\n"),
+            "{s}"
+        );
+    }
+    assert!(style("main").contains("opacity: 0.5\n"));
+    assert!(!style("card").contains("opacity"));
+}

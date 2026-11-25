@@ -25,6 +25,7 @@ mod character_data;
 mod collections;
 mod computed_style;
 mod creation;
+mod cssom;
 mod documents;
 mod dom_rect;
 mod encoding;
@@ -303,6 +304,8 @@ struct Page {
     scrolls: scrolling::PendingScrolls,
     /// Web Animations state.
     animations: animations::Animations,
+    /// CSSOM objects.
+    cssom: cssom::Cssom,
 }
 
 impl ExecutionHost for Page {
@@ -660,6 +663,8 @@ fn install_page(
     let observers = mutation_observer::Observers::new(agent)?;
     let resize_observers = resize_observer::ResizeObservers::new(agent)?;
     animations::install(agent)?;
+    cssom::install(agent)?;
+    let cssom = cssom::Cssom::new(agent)?;
     let mut animations = animations::Animations::new(agent, tree.animations())?;
     let document_timeline = animations::create_document_timeline(agent)?;
     animations.set_document_timeline(document_timeline);
@@ -694,6 +699,7 @@ fn install_page(
         popups: popups::Popups::default(),
         scrolls: scrolling::PendingScrolls::default(),
         animations,
+        cssom,
     }))?;
     animations::register_document_timeline(agent, document_timeline)
 }

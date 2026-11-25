@@ -143,6 +143,37 @@ fn child_text(document: &Document, id: NodeId) -> String {
     String::from_utf16_lossy(&units)
 }
 
+/// The HTML `<style>` and `<link>` elements of the document tree that
+/// may own a stylesheet, in tree order, with each `<style>`'s text (empty
+/// for a link): what `document.styleSheets` lists (CSSOM §6.2).
+pub fn document_style_owners(document: &Document) -> Vec<(NodeId, bool, String)> {
+    let mut out = Vec::new();
+    let Ok(walk) = document.walk(document.root()) else {
+        return out;
+    };
+    for (id, _) in walk {
+        let Some(element) = DomElement::new(document, id) else {
+            continue;
+        };
+        if is_html(element, "style") {
+            let css = attribute(element, "type").is_none_or(|t| {
+                t.is_empty() || trim_ascii_whitespace(&t).eq_ignore_ascii_case("text/css")
+            });
+            if css {
+                out.push((id, true, child_text(document, id)));
+            }
+        } else if is_html(element, "link")
+            && attribute(element, "rel")
+                .and_then(|r| stylesheet_link(&r))
+                .is_some()
+            && attribute(element, "href").is_some_and(|h| !h.is_empty())
+        {
+            out.push((id, false, String::new()));
+        }
+    }
+    out
+}
+
 /// A cascade for an HTML document without external stylesheets: the
 /// user-agent stylesheet, then the sheet of every HTML `<style>` element in
 /// tree order (template contents are not searched), each reported in the
@@ -303,7 +334,13 @@ pub fn document_cascade_with(
             Ok((tree, diagnostics)) => {
                 report.diagnostics = diagnostics;
                 report.imports = tree.imports;
-                for sheet in tree.sheets {
+                // Implicit `@scope` roots: the owner's parent element, or
+                // the shadow host for a sheet in a shadow tree.
+                let owner = element
+                    .parent_element()
+                    .or_else(|| element.parent_shadow_host());
+                for mut sheet in tree.sheets {
+                    sheet.set_scope_owner(owner.map(|o| o.id()));
                     cascade.push_in(sheet, context);
                 }
             }

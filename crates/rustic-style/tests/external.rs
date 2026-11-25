@@ -661,3 +661,32 @@ fn url_values_resolve_against_the_declaring_sheets_base() {
         "url(\"#clip\")"
     );
 }
+
+#[test]
+fn scoped_imports_and_implicit_scopes_follow_the_owner() {
+    let loaded = load(
+        "<!doctype html><div class=a><p id=in></p></div><p id=out></p>\
+         <section id=sec><style>@scope { p { height: 4px } :scope { height: 5px } }</style>\
+         <p id=sec-p></p></section>\
+         <style>@import 'a.css' scope(.a); @import url(b.css) scope((section) to (.x));</style>",
+        &[
+            (
+                "pages/a.css",
+                "p { width: 1px } @scope (p) { :scope { min-width: 2px } }",
+            ),
+            ("pages/b.css", "p { max-width: 3px }"),
+        ],
+        StyleLoadLimits::default(),
+    );
+    assert_eq!(computed(&loaded, "in", PropertyId::Width), "1px");
+    assert_eq!(computed(&loaded, "out", PropertyId::Width), "auto");
+    // A scope inside an imported, scoped sheet nests in the import's.
+    assert_eq!(computed(&loaded, "in", PropertyId::MinWidth), "2px");
+    assert_eq!(computed(&loaded, "out", PropertyId::MinWidth), "auto");
+    assert_eq!(computed(&loaded, "sec-p", PropertyId::MaxWidth), "3px");
+    assert_eq!(computed(&loaded, "in", PropertyId::MaxWidth), "none");
+    // `@scope` without a start is rooted at the style element's parent.
+    assert_eq!(computed(&loaded, "sec-p", PropertyId::Height), "4px");
+    assert_eq!(computed(&loaded, "sec", PropertyId::Height), "5px");
+    assert_eq!(computed(&loaded, "in", PropertyId::Height), "auto");
+}

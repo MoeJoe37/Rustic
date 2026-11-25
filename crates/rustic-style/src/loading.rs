@@ -178,6 +178,9 @@ struct Frame {
     /// Media query lists that restrict this sheet: its own import's list
     /// and every ancestor's (including the element's `media` attribute).
     media: Vec<MediaQueryList>,
+    /// The `scope()` of its import and every ancestor import, outermost
+    /// first.
+    scopes: Vec<std::sync::Arc<crate::ScopeRule>>,
 }
 
 impl<'a> StyleLoader<'a> {
@@ -286,6 +289,7 @@ impl<'a> StyleLoader<'a> {
             base: base.cloned(),
             key: url.map(Url::serialize_without_fragment),
             media: media.into_iter().collect(),
+            scopes: Vec::new(),
         }];
         let mut tree = LoadedTree {
             sheets: Vec::new(),
@@ -298,6 +302,10 @@ impl<'a> StyleLoader<'a> {
                 for media in done.media {
                     done.sheet.restrict_to(media);
                 }
+                // Innermost import first, so outer scopes enclose inner ones.
+                for scope in done.scopes.iter().rev() {
+                    done.sheet.scope_within(scope);
+                }
                 tree.sheets.push(done.sheet);
                 continue;
             };
@@ -305,6 +313,8 @@ impl<'a> StyleLoader<'a> {
             let base = frame.base.clone();
             let mut media = frame.media.clone();
             media.extend(import.media.clone());
+            let mut scopes = frame.scopes.clone();
+            scopes.extend(import.scope.clone());
             let depth = stack.len();
             let mut report = ImportReport {
                 url: import.url.clone(),
@@ -313,7 +323,14 @@ impl<'a> StyleLoader<'a> {
                 status: SheetStatus::Applied,
                 diagnostics: Vec::new(),
             };
-            match self.import(parser, &import, base.as_ref(), depth, &stack, media) {
+            match self.import(
+                parser,
+                &import,
+                base.as_ref(),
+                depth,
+                &stack,
+                (media, scopes),
+            ) {
                 Ok((frame, diagnostics)) => {
                     report.diagnostics = diagnostics;
                     stack.push(frame);
@@ -332,7 +349,7 @@ impl<'a> StyleLoader<'a> {
         base: Option<&Url>,
         depth: usize,
         stack: &[Frame],
-        media: Vec<MediaQueryList>,
+        (media, scopes): (Vec<MediaQueryList>, Vec<std::sync::Arc<crate::ScopeRule>>),
     ) -> Result<(Frame, Vec<StyleDiagnostic>), SheetStatus> {
         if import.layer || import.supports {
             return Err(SheetStatus::UnsupportedCondition);
@@ -357,6 +374,7 @@ impl<'a> StyleLoader<'a> {
                 base: Some(url),
                 key: Some(key),
                 media,
+                scopes,
             },
             diagnostics,
         ))

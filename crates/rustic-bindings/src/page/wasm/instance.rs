@@ -172,13 +172,27 @@ fn instantiate_module(
                     }
                 }
                 ExportIndex::Memory(_) => true,
+                ExportIndex::Table(index) => {
+                    declarations
+                        .tables
+                        .get(index as usize)
+                        .is_some_and(|table| {
+                            matches!(
+                                table.value.ty.element_type,
+                                ValueType::Ref {
+                                    nullable: true,
+                                    heap_type: -16
+                                }
+                            )
+                        })
+                }
                 _ => false,
             };
             if !supported {
                 return Err(wasm_error(
                     agent,
                     LINK_ERROR,
-                    "this WebAssembly instance supports numeric function, memory and global exports",
+                    "unsupported WebAssembly export type",
                 ));
             }
         }
@@ -215,10 +229,12 @@ fn instantiate_module(
     })?;
     let object = Value::object(agent.new_host_state(INSTANCE, proto, runtime, allocation)?);
     with_root(agent, object, |agent| {
+        let functions = PrivateArray::new(agent, &[])?;
         let record = PrivateArray::new(
             agent,
             &[
                 bindings.functions.value(),
+                functions.value(),
                 bindings.globals.value(),
                 bindings.memories.value(),
             ],
@@ -260,14 +276,7 @@ fn populate_exports(
             None => {
                 entries.try_reserve(1).map_err(|_| OutOfMemory)?;
                 let value = match item.target {
-                    ExportIndex::Function(index) => {
-                        let imported = bindings.functions.get(agent, index)?;
-                        if host::function_record(agent, imported)?.is_some() {
-                            imported
-                        } else {
-                            function_export(agent, instance, &runtime, index)?
-                        }
-                    }
+                    ExportIndex::Function(index) => function(agent, instance, &runtime, index)?,
                     ExportIndex::Global(index) => {
                         let imported = bindings.globals.get(agent, index)?;
                         if imported != Value::UNDEFINED {
@@ -288,6 +297,12 @@ fn populate_exports(
                             memory::export(agent, instance, state)?
                         }
                     }
+                    ExportIndex::Table(index) => {
+                        let limits = runtime
+                            .function_table_limits(index)
+                            .expect("admitted function table");
+                        table::export(agent, instance, index, limits.address_type)?
+                    }
                     _ => unreachable!("admitted exports checked before instantiation"),
                 };
                 entries.insert(item.target, value);
@@ -305,12 +320,23 @@ fn populate_exports(
     Ok(())
 }
 
-fn function_export(
+pub(super) fn function(
     agent: &mut Agent,
     instance: Value,
     runtime: &Runtime,
     index: u32,
 ) -> JsResult<Value> {
+    let record = host::instance_record(agent, instance)?;
+    let imports = PrivateArray::from_value(record.get(agent, 0)?).expect("function imports");
+    let imported = imports.get(agent, index)?;
+    if host::function_record(agent, imported)?.is_some() {
+        return Ok(imported);
+    }
+    let functions = PrivateArray::from_value(record.get(agent, 1)?).expect("function cache");
+    let cached = functions.get(agent, index)?;
+    if cached != Value::UNDEFINED {
+        return Ok(cached);
+    }
     let size = runtime
         .function_type_at(index)
         .expect("export signature")
@@ -328,6 +354,7 @@ fn function_export(
         with_page(agent, |agent, page| {
             agent.weak_map_set(page.wasm_calls, function, record.value())
         })?;
+        functions.set(agent, index, function)?;
         Ok(function)
     })
 }
@@ -349,10 +376,22 @@ fn call(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let record = PrivateArray::from_value(agent.host_capture(0)).expect("export function record");
     let (instance, function) = host::function_parts(agent, record)?;
     let runtime = find(agent, instance).expect("export function owner");
-    let types = &runtime
+    let signature = runtime
         .function_type_at(function)
-        .expect("export is present")
-        .params;
+        .expect("function is present");
+    agent.spend_native_work((signature.params.len() + signature.results.len()) as u64)?;
+    if !signature
+        .params
+        .iter()
+        .chain(&signature.results)
+        .copied()
+        .all(is_numeric)
+    {
+        return agent.type_error(
+            "only numeric WebAssembly function signatures can be called from JavaScript",
+        );
+    }
+    let types = &signature.params;
     let mut input = Vec::new();
     input
         .try_reserve_exact(types.len())

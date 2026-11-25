@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "8362bb82caa31dc23b91075938997c5cc730f538734b5b11205b29a59e36c01c",
+  "source_fingerprint": "23519850d6a65ccafba3a358ded6ae01586f376a8d8c9399202aaf3d369f2fd0",
   "percent": "50.98",
   "verified_percent": "49.65",
   "partial_percent": "1.33",
@@ -4810,6 +4810,16 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_standalone_table64_checks_full_indices_and_growth_after_reentry"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_exported_function_tables_share_guest_state_and_preserve_identity"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn function_table_host_growth_shares_the_instance_budget"
             }
           ],
           "credit": "0.00",

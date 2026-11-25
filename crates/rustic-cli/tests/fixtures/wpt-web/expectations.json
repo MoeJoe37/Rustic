@@ -3920,13 +3920,11 @@
     },
     {
       "name": "exports with empty name: table: BufferSource argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: this WebAssembly instance supports numeric function, memory and global exports\""
+      "status": "PASS"
     },
     {
       "name": "exports with empty name: table: Module argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: this WebAssembly instance supports numeric function, memory and global exports\""
+      "status": "PASS"
     },
     {
       "name": "exports with empty name: global: BufferSource argument",
@@ -3938,13 +3936,11 @@
     },
     {
       "name": "No imports: BufferSource argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: this WebAssembly instance supports numeric function, memory and global exports\""
+      "status": "PASS"
     },
     {
       "name": "No imports: Module argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: this WebAssembly instance supports numeric function, memory and global exports\""
+      "status": "PASS"
     },
     {
       "name": "exports and imports: BufferSource argument",
@@ -4947,8 +4943,7 @@
     },
     {
       "name": "exports with empty name: table",
-      "status": "FAIL",
-      "message": "this WebAssembly instance supports numeric function, memory and global exports"
+      "status": "PASS"
     },
     {
       "name": "exports with empty name: global",
@@ -4956,8 +4951,7 @@
     },
     {
       "name": "No imports",
-      "status": "FAIL",
-      "message": "this WebAssembly instance supports numeric function, memory and global exports"
+      "status": "PASS"
     },
     {
       "name": "exports and imports",

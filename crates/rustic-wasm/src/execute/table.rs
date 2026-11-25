@@ -1,6 +1,6 @@
 use super::state::{GlobalSlot, Transfer, checked_range, constant};
 use super::*;
-use crate::{Declarations, ElementItems, ElementMode};
+use crate::{Declarations, ElementItems, ElementMode, Limits, TableType};
 
 const OUT_OF_BOUNDS: Fault = Fault::TableOutOfBounds;
 
@@ -14,8 +14,84 @@ pub(super) struct Tables {
 
 struct Table {
     entries: Vec<Reference>,
-    address: AddressType,
-    max: u64,
+    ty: TableType,
+}
+
+impl Instance<'_, '_> {
+    /// Read the declared limits of a nullable, module-defined function table.
+    pub fn function_table_limits(&self, table: u32) -> Option<Limits> {
+        Some(self.state.borrow().tables.function_table(table)?.ty.limits)
+    }
+
+    /// Read the current length of a nullable function table.
+    pub fn function_table_len(&self, table: u32) -> Option<u64> {
+        Some(
+            self.state
+                .borrow()
+                .tables
+                .function_table(table)?
+                .entries
+                .len() as u64,
+        )
+    }
+
+    /// Read a function table entry. The inner `None` represents a null reference.
+    pub fn function_table_get(&self, table: u32, index: u64) -> Option<Option<u32>> {
+        let state = self.state.borrow();
+        let table = state.tables.function_table(table)?;
+        let index = usize::try_from(index).ok()?;
+        let Reference::Function(function) = *table.entries.get(index)? else {
+            unreachable!("validated function table entry")
+        };
+        Some(function)
+    }
+
+    /// Write a function by its index in this instance, or write null. Invalid
+    /// indices or table types leave the table unchanged.
+    pub fn function_table_set(&self, table: u32, index: u64, function: Option<u32>) -> bool {
+        if function.is_some_and(|index| self.function_type_at(index).is_none()) {
+            return false;
+        }
+        let mut state = self.state.borrow_mut();
+        state.tables.function_table(table).is_some()
+            && state
+                .tables
+                .set(table, index, Reference::Function(function), 0)
+                .is_ok()
+    }
+
+    /// Return the work growth would require, if admitted by the table and
+    /// instance limits. The host can charge that work before entering the store.
+    pub fn function_table_growth_work(&self, table: u32, count: u64) -> Option<usize> {
+        let state = self.state.borrow();
+        state.tables.function_table(table)?;
+        state.tables.growth(table, count).map(|(_, _, work)| work)
+    }
+
+    /// Grow a function table using the same budget and limits as guest growth.
+    /// Return the previous length or `None` for invalid or unallocatable growth.
+    pub fn grow_function_table(
+        &self,
+        table: u32,
+        count: u64,
+        function: Option<u32>,
+        cancellation: &CancellationToken,
+    ) -> Result<Option<u64>, ExecutionError> {
+        if function.is_some_and(|index| self.function_type_at(index).is_none()) {
+            return Ok(None);
+        }
+        let mut state = self.state.borrow_mut();
+        if state.tables.function_table(table).is_none() {
+            return Ok(None);
+        }
+        let mut budget = Budget {
+            remaining: self.executable.limits.invocation_work,
+            cancellation,
+        };
+        state
+            .tables
+            .grow_entries(table, count, Reference::Function(function), 0, &mut budget)
+    }
 }
 
 impl Tables {
@@ -47,14 +123,11 @@ impl Tables {
                 .try_reserve_exact(count)
                 .map_err(|_| error(offset, Fault::LimitExceeded))?;
             entries.resize(count, initial.reference());
-            let address = table.ty.limits.address_type;
-            let max = table.ty.limits.max.unwrap_or(address.max_table_elements());
             append(
                 &mut state.tables,
                 Table {
                     entries,
-                    address,
-                    max,
+                    ty: table.ty,
                 },
                 offset,
             )?;
@@ -146,7 +219,45 @@ impl Tables {
 
     pub(super) fn size(&self, table: u32) -> Value {
         let table = &self.tables[table as usize];
-        table.address.index_value(table.entries.len() as u64)
+        table
+            .ty
+            .limits
+            .address_type
+            .index_value(table.entries.len() as u64)
+    }
+
+    fn function_table(&self, index: u32) -> Option<&Table> {
+        let table = self.tables.get(index as usize)?;
+        matches!(
+            table.ty.element_type,
+            ValueType::Ref {
+                nullable: true,
+                heap_type: -16
+            }
+        )
+        .then_some(table)
+    }
+
+    fn growth(&self, table: u32, count: u64) -> Option<(usize, usize, usize)> {
+        let table = &self.tables[table as usize];
+        let count = usize::try_from(count)
+            .ok()
+            .filter(|&count| count <= self.limit - self.used)?;
+        let limits = table.ty.limits;
+        let max = limits
+            .max
+            .unwrap_or_else(|| limits.address_type.max_table_elements());
+        let new = table
+            .entries
+            .len()
+            .checked_add(count)
+            .filter(|&new| new as u64 <= max)?;
+        let work = if new > table.entries.capacity() {
+            new
+        } else {
+            count
+        };
+        Some((count, new, work))
     }
 
     pub(super) fn grow(
@@ -157,33 +268,31 @@ impl Tables {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<Value, ExecutionError> {
-        let table = &mut self.tables[table as usize];
-        let old = table.entries.len();
-        let failed = table.address.index_value(u64::MAX);
-        let Some(count) = usize::try_from(count)
-            .ok()
-            .filter(|&count| count <= self.limit - self.used)
-        else {
-            return Ok(failed);
-        };
-        let Some(new) = old
-            .checked_add(count)
-            .filter(|&new| new as u64 <= table.max)
-        else {
-            return Ok(failed);
-        };
-        let work = if new > table.entries.capacity() {
-            new
-        } else {
-            count
+        let address = self.tables[table as usize].ty.limits.address_type;
+        let previous = self.grow_entries(table, count, value, offset, budget)?;
+        Ok(address.index_value(previous.unwrap_or(u64::MAX)))
+    }
+
+    fn grow_entries(
+        &mut self,
+        table: u32,
+        count: u64,
+        value: Reference,
+        offset: usize,
+        budget: &mut Budget<'_>,
+    ) -> Result<Option<u64>, ExecutionError> {
+        let Some((count, new, work)) = self.growth(table, count) else {
+            return Ok(None);
         };
         budget.spend(offset, work)?;
+        let table = &mut self.tables[table as usize];
+        let old = table.entries.len();
         if table.entries.try_reserve_exact(count).is_err() {
-            return Ok(failed);
+            return Ok(None);
         }
         table.entries.resize(new, value);
         self.used += count;
-        Ok(table.address.index_value(old as u64))
+        Ok(Some(old as u64))
     }
 
     pub(super) fn init(

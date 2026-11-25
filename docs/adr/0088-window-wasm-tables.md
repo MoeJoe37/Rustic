@@ -31,10 +31,10 @@ the page's existing ephemeron map.
 
 ## Consequences and revisit trigger
 
-Standalone tables share the normal heap budget. Table imports and exports
-will need a shared representation that lets guest instructions and JavaScript
-observe the same values and resolve functions to their owning instances.
-Revisit the storage design when introducing those links.
+Standalone tables share the normal heap budget. [ADR 0089](0089-live-wasm-function-tables.md)
+adds live module-defined function table exports. Table imports, module-defined
+external-reference tables and independently linked function references still
+need a shared representation.
 
 ## Validation
 

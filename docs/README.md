@@ -83,7 +83,7 @@ New to the project? Read these in order:
 | [JS.md](JS.md) | The JavaScript engine: parser, heap and collector, bytecode interpreter, built-ins, modules, realms, Intl, Test262 gates and benchmarks |
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | Accessibility tree (HTML-AAM, ARIA, AccName), platform bridges, assistive actions, editing, IME and the CI acceptance probes |
 | [SCRIPTING.md](SCRIPTING.md) | Scripted documents: lifecycle, script/timer/input/rendering turns, Web IDL, DOM bindings, events, observers, forms and their remaining limits |
-| WebAssembly (M9) | [Window surface and limits](SCRIPTING.md#window-encoding-url-fetch-and-webassembly), [core runtime and host binding evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), ADRs 0077 and 0079–0088 |
+| WebAssembly (M9) | [Window surface and limits](SCRIPTING.md#window-encoding-url-fetch-and-webassembly), [core runtime and host binding evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), ADRs 0077 and 0079–0089 |
 | Networking (M6) | No separate guide yet: the [NET sections of IMPLEMENTATION.md](IMPLEMENTATION.md#net-01--http11-transport-without-tls), [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services) and ADRs 0051–0055 and 0066 |
 | Isolation (M7) | [SECURITY.md](SECURITY.md) for the model; the [ISO sections of IMPLEMENTATION.md](IMPLEMENTATION.md#iso-02--split-renderer-process-and-brokered-authority), [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate) and ADRs 0056–0063 for what is built |
 

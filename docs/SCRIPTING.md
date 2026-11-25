@@ -229,7 +229,7 @@ Unimplemented Web APIs are absent from the exposed interface.
 | URL | `URL`, `URL.canParse()`, `URL.parse()` and live `URLSearchParams`, including component setters on `URL` | Structured URL record and pinned Window tests. [URL guide](URL.md), [ADR 0076](adr/0076-window-url-and-search-params.md) |
 | Fetch and Blob | Buffered string, unshared fixed-length buffer, `URLSearchParams` and Blob bodies. Body readers include `text()`, `json()`, `arrayBuffer()`, `bytes()` and `blob()`. The `Blob` constructor, slicing, repeatable buffered reads and `Response.json()` are exposed | Headers and bodies follow the supported Fetch policy and consumption rules. Stream bodies, `File` and `FormData` remain open. [NET-03 ledger](IMPLEMENTATION.md#net-03--fetch-headers-request-and-response) |
 | Wasm compilation | `validate`, `compile`, `Module` reflection, `instantiate` and the Fetch-response entry points | Buffered `compileStreaming` and `instantiateStreaming` check Fetch status and Wasm MIME. Compilation follows document CSP. [Compilation evidence](IMPLEMENTATION.md#wasm-06--window-module-compilation-and-mimecsp) |
-| Wasm state and linking | Numeric function and global imports/exports, shared identity for linked numeric globals, and unshared 32-bit and 64-bit memories with fixed or resizable buffers. Standalone `WebAssembly.Table` supports `anyfunc` and `externref` in both address widths | Local module tables and indirect calls work in the interpreter. Module table linking, shared Wasm memories, wider reference-typed host calls and progressive streaming remain open. [Runtime evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), [standalone tables](IMPLEMENTATION.md#wasm-06--standalone-window-tables) |
+| Wasm state and linking | Numeric function and global imports/exports, shared identity for linked numeric globals, and unshared 32-bit and 64-bit memories with fixed or resizable buffers. Standalone `WebAssembly.Table` supports `anyfunc` and `externref`. Module-defined function tables have live JS exports. Both interfaces support both address widths | Table imports, module-defined external-reference exports, shared Wasm memories, reference-typed host calls and progressive streaming remain open. [Runtime evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), [live table exports](IMPLEMENTATION.md#wasm-06--live-function-table-exports) |
 
 ## Crates
 
@@ -446,8 +446,8 @@ static reference.
 
 The headless CLI runs upstream `testharness.js` at revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The checked-in Linux CI baseline
-contains **132 files and 1,368 subtests**, with **1,274 passing**
-and **94 expected failures**. It includes DOM nodes/events/collections,
+contains **132 files and 1,368 subtests**, with **1,280 passing**
+and **88 expected failures**. It includes DOM nodes/events/collections,
 HTML timers and animation frames, CSSOM and CSSOM View, text encoding, URL,
 Blob and Fetch, and Wasm constructors, reflection, globals, memories and tables.
 See the [manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)

@@ -3434,8 +3434,8 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Module table imports and exports, shared memories, reference-valued host
-calls and the progressive response pipeline remain open.
+Module table imports, external-reference exports, shared memories,
+reference-valued host calls and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3478,8 +3478,8 @@ the selected binding intact. A write to a selected mutable global remains
 visible to the guest. [ADR 0084](adr/0084-shared-numeric-wasm-globals.md)
 
 The pinned `Instance` and `instantiate` constructor fixtures exercise
-numeric imports, memory links and synchronous Module lookup. They now pass
-71 of 86 subtests. The remaining 15 exercise table constructors or exports.
+numeric imports, memory links and synchronous Module lookup. They passed
+71 of 86 subtests at the standalone-table checkpoint.
 
 ### WASM-06 — Window unshared 32-bit memory bindings
 
@@ -3558,5 +3558,26 @@ Construction and growth admit at most 65,536 entries per table and charge
 the JavaScript heap. Failed growth preserves the previous length and
 entries. The regression tests cover collection, reentrant count coercion,
 default values and the exact host limit. All 88 subtests in the five pinned
-Window table WPT files pass. Module table imports and exports remain open.
+Window table WPT files pass.
 [ADR 0088](adr/0088-window-wasm-tables.md)
+
+### WASM-06 — Live function table exports
+
+Window instances can export module-defined nullable function tables in both
+address widths. Aliases return the same wrapper. `get`, `set`, `length` and
+`grow` use the live interpreter table, so mutations through either API are
+visible to guest instructions and JavaScript. Growth uses the allocating
+instance's entry budget, including entries in other tables and passive segments.
+
+A function read from a table shares the wrapper used by ordinary exports.
+Functions reachable through the table alone are wrapped on demand. A table
+can store null, a function belonging to its instance, or a Wasm function the
+instance already imports. JavaScript calls to a wrapper still require a
+numeric signature. The collector follows table wrappers to their instances,
+and instances trace their cached functions and imported objects.
+[ADR 0089](adr/0089-live-wasm-function-tables.md) records the ownership
+boundary and TD-208 tracks cross-instance table sharing.
+
+Six previously failing `Instance` and `instantiate` subtests now pass. They
+exercise table exports under ordinary and empty names, including both promise
+overloads. The two files now pass 77 of 86 subtests.

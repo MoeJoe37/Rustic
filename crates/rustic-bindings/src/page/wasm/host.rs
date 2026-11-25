@@ -140,7 +140,7 @@ pub(super) fn function_record(
     agent: &mut Agent,
     function: Value,
 ) -> JsResult<Option<PrivateArray>> {
-    if function.as_object().is_none() {
+    if !agent.is_callable(function) {
         return Ok(None);
     }
     with_page(agent, |agent, page| {
@@ -155,6 +155,15 @@ pub(super) fn function_parts(agent: &mut Agent, record: PrivateArray) -> JsResul
     // Private records store the original u32 index, exactly represented.
     let function = record.get(agent, 1)?.as_number().expect("export index");
     Ok((instance, function as u32))
+}
+
+pub(super) fn instance_record(agent: &mut Agent, instance: Value) -> JsResult<PrivateArray> {
+    with_page(agent, |agent, page| {
+        Ok(
+            PrivateArray::from_value(agent.weak_map_get(page.wasm_calls, instance))
+                .expect("instance bindings"),
+        )
+    })
 }
 
 pub(super) fn with_dispatch<T>(
@@ -184,12 +193,7 @@ pub(super) fn invoke(
     function: u32,
     arguments: &[WasmValue],
 ) -> JsResult<Vec<WasmValue>> {
-    let record = with_page(agent, |agent, page| {
-        Ok(
-            PrivateArray::from_value(agent.weak_map_get(page.wasm_calls, instance))
-                .expect("instance bindings"),
-        )
-    })?;
+    let record = instance_record(agent, instance)?;
     let bindings = PrivateArray::from_value(record.get(agent, 0)?).expect("function bindings");
     let token = agent.cancellation().unwrap_or_default();
     with_dispatch(agent, bindings, false, |dispatch| {

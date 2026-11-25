@@ -2105,3 +2105,85 @@ fn wasm_standalone_table_growth_respects_the_heap_budget() {
     }
     assert_eq!(outcome.unwrap(), Value::TRUE);
 }
+
+#[test]
+fn wasm_exported_function_tables_share_guest_state_and_preserve_identity() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    let outcome = agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        function section(kind, bytes) { return [kind, bytes.length, ...bytes]; }
+        function body(...instructions) { return [instructions.length + 2, 0, ...instructions, 11]; }
+        function exportOf(name, kind, index) {
+            return [name.length, ...Array.from(name, char => char.charCodeAt(0)), kind, index];
+        }
+        function provider() {
+            return Uint8Array.of(
+                0,97,115,109,1,0,0,0,
+                1,5,1,96,0,1,127, 3,2,1,0,
+                7,7,1,3,114,117,110,0,0, 10,6,1,4,0,65,17,11
+            );
+        }
+        function module(wide) {
+            const addr = wide ? 126 : 127;
+            const constant = wide ? 66 : 65;
+            return new WebAssembly.Module(Uint8Array.of(
+                0,97,115,109,1,0,0,0,
+                ...section(1, [5,96,0,1,127, 96,1,addr,1,127, 96,1,addr,0,
+                    96,1,addr,1,addr, 96,1,111,0]),
+                ...section(2, [1,1,109,1,102,0,0]), // import m.f at function index 0
+                ...section(3, [6,0,0,1,2,3,4]),
+                ...section(4, [1,112,wide ? 5 : 1,3,5]),
+                ...section(7, [7, ...exportOf('table', 1, 0), ...exportOf('alias',1,0),
+                    ...exportOf('answer',0,1), ...exportOf('call',0,3),
+                    ...exportOf('clear',0,4), ...exportOf('grow',0,5), ...exportOf('linked',0,0)]),
+                ...section(9, [1,0,constant,0,11,3,1,2,6]),
+                ...section(10, [6, ...body(65,42), ...body(65,43),
+                    ...body(32,0,17,0,0), ...body(32,0,208,112,38,0),
+                    ...body(208,112,32,0,252,15,0), ...body()])
+            ));
+        }
+        const foreign = new WebAssembly.Instance(new WebAssembly.Module(provider())).exports.run;
+        const unrelated = new WebAssembly.Instance(new WebAssembly.Module(provider())).exports.run;
+        function exercise(wide) {
+            const {table, alias, answer, call, clear, grow, linked} =
+                new WebAssembly.Instance(module(wide), {m:{f:foreign}}).exports;
+            const at = i => wide ? BigInt(i) : i;
+            assert(table === alias && table instanceof WebAssembly.Table, 'table aliases and brand');
+            assert(table.length === at(3) && table.get(at(0)) === answer, 'initial elements and exported identity');
+            const hidden = table.get(at(1));
+            assert(hidden === table.get(at(1)) && hidden() === 43, 'lazy function wrapper');
+            assert(rejects(TypeError, () => table.get(at(2))(null)), 'unsupported host signature has a typed error');
+            clear(at(0));
+            assert(table.get(at(0)) === null, 'guest clear visible to JS');
+            assert(rejects(WebAssembly.RuntimeError, () => call(at(0))), 'guest observes null');
+            table.set(at(0), hidden);
+            assert(call(at(0)) === 43, 'write visible to indirect call');
+            assert(linked === foreign, 'import re-export identity');
+            table.set(at(1), foreign);
+            assert(table.get(at(1)) === foreign && call(at(1)) === 17, 'existing import used by table');
+            assert(rejects(TypeError, () => table.set(at(1), unrelated)), 'a foreign function needs a binding');
+            assert(rejects(TypeError, () => table.set(at(1), new WebAssembly.Memory({initial:0}))), 'memory is not a function');
+            assert(table.get(at(1)) === foreign, 'failed write preserves entry');
+            assert(grow(at(1)) === at(3) && table.length === at(4), 'guest growth visible to JS');
+            assert(table.grow(at(1), answer) === at(4) && call(at(4)) === 42, 'JS growth visible to guest');
+            assert(rejects(RangeError, () => table.grow(at(1))) && table.length === at(5), 'growth limit');
+            assert(rejects(RangeError, () => table.get(wide ? 4294967296n : 0xffffffff)), 'full-width bounds');
+            return table;
+        }
+        const table = exercise(false);
+        exercise(true);
+        assert(table.get(0)() === 43 && table.get(4)() === 42, 'table alone retains instance and functions');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}

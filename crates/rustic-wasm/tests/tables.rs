@@ -66,6 +66,59 @@ fn number(instance: &mut Instance<'_, '_>, name: &str, args: &[i32]) -> i32 {
 }
 
 #[test]
+fn function_table_host_growth_shares_the_instance_budget() {
+    let bytes = program(
+        &[1, 0x60, 0, 1, 0x7f],
+        &[(4, &[2, 0x70, 1, 1, 4, 0x6f, 0, 1])],
+        &[],
+        None,
+        &[(b"answer", 0, &[0], &[0x41, 42])],
+    );
+    let module = validated(&bytes);
+    let cancellation = CancellationToken::default();
+    let limits = InstanceLimits {
+        table_elements: 3,
+        ..Default::default()
+    };
+    let instance = Instance::instantiate(&module, limits, &cancellation).unwrap();
+
+    assert_eq!(instance.function_table_get(0, 0), Some(None));
+    assert_eq!(instance.function_table_len(1), None);
+    assert_eq!(instance.function_table_get(0, 1 << 32), None);
+    assert!(!instance.function_table_set(0, 0, Some(1)));
+    assert!(!instance.function_table_set(1, 0, None));
+    assert_eq!(instance.function_table_get(0, 0), Some(None));
+    assert!(instance.function_table_set(0, 0, Some(0)));
+    assert_eq!(instance.function_table_growth_work(0, 2), None);
+    assert_eq!(
+        instance
+            .grow_function_table(0, 2, None, &cancellation)
+            .unwrap(),
+        None
+    );
+    assert_eq!(instance.function_table_len(0), Some(1));
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    assert_eq!(
+        instance
+            .grow_function_table(0, 1, None, &cancelled)
+            .unwrap_err()
+            .kind,
+        Fault::Cancelled
+    );
+    assert_eq!(
+        instance
+            .grow_function_table(0, 1, Some(0), &cancellation)
+            .unwrap(),
+        Some(1)
+    );
+    assert_eq!(instance.function_table_get(0, 0), Some(Some(0)));
+    assert_eq!(instance.function_table_get(0, 1), Some(Some(0)));
+    assert_eq!(instance.function_table_growth_work(0, 1), None);
+}
+
+#[test]
 fn table64_preserves_indices_and_budget_across_calls_and_bulk_operations() {
     #[rustfmt::skip]
     let types = [

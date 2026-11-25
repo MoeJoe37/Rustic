@@ -4456,6 +4456,16 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_standalone_table64_checks_full_indices_and_growth_after_reentry"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_exported_function_tables_share_guest_state_and_preserve_identity"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn function_table_host_growth_shares_the_instance_budget"
             }
           ]
         },

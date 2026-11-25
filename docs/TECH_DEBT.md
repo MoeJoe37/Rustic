@@ -59,7 +59,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
 | M9, CSS, layout and paint | TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
-| M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
+| M9, language and web APIs | TD-208, TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
 | M11 (parity) | TD-205, TD-206, TD-207 | Anchor positioning, scroll-driven animation and view transition parity with other engines, measured by their WPT directories |
 | M12 (performance leadership) | TD-170, TD-168, TD-95, TD-103, TD-104, TD-112, TD-146, TD-156, TD-162, TD-193, TD-198, TD-184, TD-185, TD-181 | Collector pauses, inline-cache and shape-lookup design, BigInt algorithms; GPU shared memory, presentation from the GPU process and finer compositor layers |
@@ -265,6 +265,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-198 | Deliberate | Network / CLI | Frame and popup documents are read whole in the broker before their renderer parses them; only top-level documents stream | Open, M12 |
 | TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M10 |
 | TD-200 | Deliberate | WebAssembly | Module compilation runs as bounded promise jobs over buffered input | Open, M9 |
+| TD-208 | Deliberate | WebAssembly | Exported function tables hold references in their owning instance’s index space. Table imports, unrelated function references and module-defined external-reference table exports need store-wide tracing | Open, M9 language and web APIs |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3404,3 +3405,16 @@ Transition types, `:active-view-transition` and cross-document transitions
 are not implemented.
 **Pay:** render captured snapshots as compositor layers and build the
 pseudo-element tree once the compositor has per-element layers (M11).
+
+### TD-208 — Shared WebAssembly table and reference ownership
+
+[ADR 0089](adr/0089-live-wasm-function-tables.md) exposes module-defined
+function tables with their existing instance-local reference representation.
+The host can write functions defined or imported in that instance. Unrelated
+functions and external JavaScript values need reference identities that guest
+stacks, globals, tables and passive segments can trace across reentrant calls.
+
+**Pay** with shared store entries and traced reference ownership. Test aliases,
+active-segment writes, indirect signature checks, collection after overwrites,
+reentrant calls and exhaustion of the shared allocation budget. The trigger
+is M9 table linking and reference-typed host interoperability.

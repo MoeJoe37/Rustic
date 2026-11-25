@@ -1313,7 +1313,7 @@ pub fn parse_declaration(
 }
 
 /// Longhands of a property name (one for a longhand, several for a shorthand).
-pub(crate) fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
+pub fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     use PropertyId as P;
     const MARGIN: &[P] = &[P::MarginTop, P::MarginRight, P::MarginBottom, P::MarginLeft];
     const PADDING: &[P] = &[

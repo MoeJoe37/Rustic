@@ -16,7 +16,11 @@ rustic-dom = { path = "../rustic-dom" }
 rustic-encoding = { path = "../rustic-encoding" }
 rustic-html = { path = "../rustic-html" }
 rustic-js = { path = "../rustic-js" }
+rustic-style = { path = "../rustic-style" }
 rustic-url = { path = "../rustic-url" }
+
+[dev-dependencies]
+rustic-css = { path = "../rustic-css" }
 
 [lints]
 workspace = true

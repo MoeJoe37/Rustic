@@ -90,7 +90,7 @@ pub use properties::{
     LengthPercentageOrAuto, LineBreak, LineHeight, MaxSize, OutlineStyle, Overflow, OverflowWrap,
     Position, PropertyDeclaration, PropertyError, PropertyId, PropertyName, PropertyValue, Spacing,
     TextAlign, TextCase, TextDecorationLine, TextDecorationStyle, TextTransform, UnicodeBidi,
-    VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, WordBreak, ZIndex,
+    VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, WordBreak, ZIndex, longhands_of,
     parse_declaration, serialize_four_sided_shorthand,
 };
 pub use registered::{

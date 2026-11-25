@@ -95,6 +95,11 @@ impl Event {
         self.0.get(agent, Self::DETAIL)
     }
 
+    /// The extra slot as stored (null for plain events).
+    pub(super) fn extra_value(self, agent: &mut Agent) -> JsResult<Value> {
+        self.0.get(agent, Self::EXTRA)
+    }
+
     pub(super) fn extra(self, agent: &mut Agent) -> JsResult<PrivateArray> {
         let value = self.0.get(agent, Self::EXTRA)?;
         Ok(PrivateArray::from_value(value).expect("UI event fields"))

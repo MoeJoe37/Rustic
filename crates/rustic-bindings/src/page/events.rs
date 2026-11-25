@@ -14,6 +14,7 @@ use crate::webidl::coerce_string;
 
 use super::{identity, install_interface, prototype, read_node, required_arg, with_page, wrap};
 
+mod animation;
 mod editing;
 mod errors;
 mod forms;
@@ -21,6 +22,9 @@ mod handlers;
 mod input;
 mod state;
 mod ui;
+pub(in crate::page) use animation::{
+    ANIMATION_EVENT, TRANSITION_EVENT, fire_css, fire_playback, register_target,
+};
 pub use editing::Composition;
 pub use errors::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
@@ -32,6 +36,7 @@ pub use forms::{
     AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
 };
 pub(super) use handlers::install as install_handlers;
+pub(in crate::page) use handlers::install_animation as install_animation_handlers;
 pub use input::{AssistiveAction, InputEvent, KeyInput, Modifiers};
 pub(super) use input::{connected, deliver, install_controls, reaches_root};
 
@@ -127,6 +132,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     )?;
     state::install(agent)?;
     ui::install(agent)?;
+    animation::install(agent)?;
     errors::install(agent)
 }
 

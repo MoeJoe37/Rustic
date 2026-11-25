@@ -180,6 +180,9 @@ struct ScriptTree {
     /// Scroll positions (ADR 0064): the viewport's, and scroll containers'
     /// by element.
     scroll: RefCell<ScrollState>,
+    /// Running CSS transitions, CSS animations and script animations,
+    /// shared by the bindings and the renderer.
+    animations: Rc<RefCell<rustic_style::AnimationController>>,
 }
 
 /// The document's scroll positions.
@@ -236,6 +239,16 @@ impl ScriptTree {
 }
 
 impl PageTree for ScriptTree {
+    fn animations(&self) -> Option<Rc<RefCell<rustic_style::AnimationController>>> {
+        Some(Rc::clone(&self.animations))
+    }
+
+    fn animations_changed(&self) {
+        if let Ok(mut layout) = self.layout.try_borrow_mut() {
+            layout.inputs_changed();
+        }
+    }
+
     fn read(&self) -> Option<Ref<'_, Document>> {
         Ref::filter_map(self.state.try_borrow().ok()?, |state| match state {
             ScriptTreeState::Parsing(parser) => parser.live_document(),
@@ -494,12 +507,14 @@ impl<C: Clock> ScriptedDocument<C> {
         agent.set_cancellation(Some(cancellation.clone()));
         agent.set_can_block(false);
         dom_exception::install(&mut agent).map_err(|_| ScriptStop::OutOfMemory)?;
+        let animations: Rc<RefCell<rustic_style::AnimationController>> = Rc::default();
         let document = Rc::new(ScriptTree {
             state: RefCell::new(state),
             current_script: Cell::new(None),
             pending_classics: RefCell::default(),
-            layout: RefCell::default(),
+            layout: RefCell::new(LayoutReads::with_animations(Rc::clone(&animations))),
             scroll: RefCell::default(),
+            animations,
         });
         let owner = document
             .read()
@@ -1001,7 +1016,14 @@ impl<C: Clock> ScriptedDocument<C> {
     /// Whether `requestAnimationFrame` callbacks wait for the next
     /// rendering opportunity (a live host keeps offering frames).
     pub fn wants_animation_frame(&self) -> bool {
-        self.pending.queue.borrow().has_frames()
+        self.pending.queue.borrow().has_frames() || self.document.animations.borrow().wants_frames()
+    }
+
+    /// The document's animation controller: the renderer styles each frame
+    /// through it (`rustic_style::style_tree_animated`), after the
+    /// rendering turn advanced it.
+    pub fn animations(&self) -> Rc<RefCell<rustic_style::AnimationController>> {
+        Rc::clone(&self.document.animations)
     }
 
     /// Take the popups `window.open()` asked for with transient activation;
@@ -1262,6 +1284,11 @@ impl<C: Clock> ScriptedDocument<C> {
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         let fired = page::fire_scroll_events(agent);
         self.page_result(fired)?;
+        self.checkpoint()?;
+        // "Update animations and send events", before the callbacks.
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        let updated = page::update_animations(agent, frame.timestamp().as_secs_f64() * 1_000.0);
+        self.page_result(updated)?;
         self.checkpoint()?;
         loop {
             let root = self.pending.queue.borrow_mut().pop_frame(cursor);

@@ -770,6 +770,17 @@ impl Agent {
         Ok(())
     }
 
+    /// Set `[[PromiseIsHandled]]` on a pending host promise before the host
+    /// rejects it, so the rejection is never reported as unhandled (Web IDL
+    /// "mark as handled"). Settled promises and non-promises are unchanged.
+    pub fn mark_promise_handled(&mut self, promise: ObjectId) {
+        if let Some(p) = record(self, promise) {
+            if p.state == PromiseState::Pending {
+                p.handled = true;
+            }
+        }
+    }
+
     /// `[[PromiseIsHandled]]` of a promise, or `None` if `promise` is not one.
     pub fn promise_is_handled(&self, promise: ObjectId) -> Option<bool> {
         match self.heap.object(promise).internal() {

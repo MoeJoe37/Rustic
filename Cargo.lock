@@ -2065,10 +2065,12 @@ dependencies = [
  "rustic-a11y",
  "rustic-base",
  "rustic-bindings",
+ "rustic-css",
  "rustic-dom",
  "rustic-encoding",
  "rustic-html",
  "rustic-js",
+ "rustic-style",
  "rustic-url",
 ]
 

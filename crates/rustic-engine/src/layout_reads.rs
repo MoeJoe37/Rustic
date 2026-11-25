@@ -1,11 +1,14 @@
 //! Document-local revisions and synchronous layout snapshot reuse.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 use rustic_bindings::page::{BoxSizes, ComputedStyleSnapshot, LayoutReadError};
 use rustic_dom::{Document, NodeId};
 use rustic_html::DocumentMode;
+use rustic_style::AnimationController;
 
 /// The maximum number of dirty layout snapshots a script turn can build.
 pub const MAX_LAYOUT_FLUSHES_PER_TURN: usize = 8;
@@ -19,6 +22,19 @@ pub trait LayoutSource: Debug {
         document: &Document,
         mode: DocumentMode,
     ) -> Result<LayoutGeometry, LayoutReadError>;
+
+    /// [`Self::measure_layout`] with the document's running animations
+    /// applied to computed styles (and advanced by any style change, as
+    /// a style flush does). The default ignores them.
+    fn measure_layout_animated(
+        &self,
+        document: &Document,
+        mode: DocumentMode,
+        animations: &RefCell<AnimationController>,
+    ) -> Result<LayoutGeometry, LayoutReadError> {
+        let _ = animations;
+        self.measure_layout(document, mode)
+    }
 }
 
 /// Geometry captured at one DOM and rendering-input revision.
@@ -55,6 +71,7 @@ type Geometry = Result<LayoutGeometry, LayoutReadError>;
 #[derive(Debug, Default)]
 pub(crate) struct LayoutReads {
     source: Option<Box<dyn LayoutSource>>,
+    animations: Option<Rc<RefCell<AnimationController>>>,
     cached: Option<(LayoutRevision, Geometry)>,
     inputs: u64,
     turn_flushes: usize,
@@ -62,6 +79,13 @@ pub(crate) struct LayoutReads {
 }
 
 impl LayoutReads {
+    pub(crate) fn with_animations(animations: Rc<RefCell<AnimationController>>) -> Self {
+        Self {
+            animations: Some(animations),
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn has_source(&self) -> bool {
         self.source.is_some()
     }
@@ -117,7 +141,10 @@ impl LayoutReads {
         }
         self.turn_flushes += 1;
         self.total_flushes = self.total_flushes.saturating_add(1);
-        let geometry = source.measure_layout(document, mode);
+        let geometry = match &self.animations {
+            Some(animations) => source.measure_layout_animated(document, mode, animations),
+            None => source.measure_layout(document, mode),
+        };
         let result = geometry.as_ref().map_err(|&error| error).and_then(read);
         self.cached = revision.map(|revision| (revision, geometry));
         result

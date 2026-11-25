@@ -18,6 +18,7 @@ use crate::{DomGcError, DomHeap, dom_exception};
 pub use rustic_net::csp::Verdict as WasmCompilationPolicy;
 
 mod activation;
+mod animations;
 mod attributes;
 mod blob;
 mod character_data;
@@ -248,6 +249,14 @@ pub trait PageTree: Debug {
     fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {
         Ok(true)
     }
+    /// The document's animation controller, shared with the renderer. A
+    /// tree without one gets a private controller.
+    fn animations(&self) -> Option<Rc<RefCell<rustic_style::AnimationController>>> {
+        None
+    }
+    /// Animated values may have changed without a DOM mutation, so cached
+    /// layout reads are stale.
+    fn animations_changed(&self) {}
 }
 
 #[derive(Debug)]
@@ -292,6 +301,8 @@ struct Page {
     popups: popups::Popups,
     /// `scroll` event targets for the next rendering opportunity.
     scrolls: scrolling::PendingScrolls,
+    /// Web Animations state.
+    animations: animations::Animations,
 }
 
 impl ExecutionHost for Page {
@@ -648,6 +659,10 @@ fn install_page(
     agent.root(Value::object(computed_styles))?;
     let observers = mutation_observer::Observers::new(agent)?;
     let resize_observers = resize_observer::ResizeObservers::new(agent)?;
+    animations::install(agent)?;
+    let mut animations = animations::Animations::new(agent, tree.animations())?;
+    let document_timeline = animations::create_document_timeline(agent)?;
+    animations.set_document_timeline(document_timeline);
     agent.attach_execution_host(Rc::new(Page {
         tree,
         main,
@@ -678,7 +693,9 @@ fn install_page(
         now: std::cell::Cell::new(std::time::Duration::ZERO),
         popups: popups::Popups::default(),
         scrolls: scrolling::PendingScrolls::default(),
-    }))
+        animations,
+    }))?;
+    animations::register_document_timeline(agent, document_timeline)
 }
 
 /// Give the attached page its network for `fetch()`.
@@ -806,6 +823,21 @@ pub fn take_form_submissions(agent: &Agent) -> FormSubmissions {
 /// Focus and live form-control state for the accessibility tree.
 pub fn accessible_controls(agent: &mut Agent) -> AccessibleControls {
     events::accessible_controls(agent).unwrap_or_default()
+}
+
+/// "Update animations and send events" of a rendering opportunity: advance
+/// the document timeline to `now` milliseconds and dispatch transition,
+/// animation and playback events. A page without animations returns at
+/// once.
+pub fn update_animations(agent: &mut Agent, now: f64) -> JsResult<()> {
+    let host = agent.execution_host();
+    if !host
+        .as_ref()
+        .is_some_and(|host| host.as_any().downcast_ref::<Page>().is_some())
+    {
+        return Ok(());
+    }
+    animations::update(agent, now)
 }
 
 /// "Run the scroll steps" of a rendering opportunity: fire the `scroll`

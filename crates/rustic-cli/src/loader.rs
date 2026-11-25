@@ -10,6 +10,7 @@
 //! chunks, so the whole file is never buffered, and every stage is bounded:
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsStr;
@@ -869,8 +870,10 @@ fn run_scripted_load(
     // and gives the page transient activation (HTML §6.4.3).
     for &(x, y) in limits.clicks.iter().flatten() {
         let state = document.scroll_state();
+        let animations = document.animations();
         let list = display_list(LayoutInput {
             scroll: Some(&state),
+            animations: Some(&*animations),
             ..LayoutInput::new(
                 &document.document(),
                 &source.path,
@@ -958,9 +961,11 @@ fn run_scripted_load(
             document.offer_rendering_opportunity()?;
             document.run_next_with_render(|_, _| ())?;
             let state = document.scroll_state();
+            let animations = document.animations();
             let engine_document = document.document();
             let input = LayoutInput {
                 scroll: Some(&state),
+                animations: Some(&*animations),
                 ..LayoutInput::new(
                     &engine_document,
                     &source.path,
@@ -1102,9 +1107,11 @@ fn live_page(
                     let zoom = view.zoom();
                     let (x, y) = (x / zoom, y / zoom);
                     let state = document.scroll_state();
+                    let animations = document.animations();
                     let engine_document = document.document();
                     let list = display_list(LayoutInput {
                         scroll: Some(&state),
+                        animations: Some(&*animations),
                         ..LayoutInput::new(
                             &engine_document,
                             &source.path,
@@ -1200,10 +1207,12 @@ fn live_page(
                 PageInput::Accessibility => {
                     let live = document.accessibility_state();
                     let state = document.scroll_state();
+                    let animations = document.animations();
                     let engine_document = document.document();
                     let tree = tree_of(
                         LayoutInput {
                             scroll: Some(&state),
+                            animations: Some(&*animations),
                             ..LayoutInput::new(
                                 &engine_document,
                                 &source.path,
@@ -1273,10 +1282,12 @@ fn live_page(
                         }
                     }
                     let state = document.scroll_state();
+                    let animations = document.animations();
                     let live = document.accessibility_state();
                     let engine_document = document.document();
                     let input = LayoutInput {
                         scroll: Some(&state),
+                        animations: Some(&*animations),
                         ..LayoutInput::new(
                             &engine_document,
                             &source.path,
@@ -1391,9 +1402,11 @@ impl SessionPage<'_> {
         document: &rustic_engine::ScriptedDocument<ManualClock>,
     ) -> Result<rustic_paint::DisplayList, LoadError> {
         let state = document.scroll_state();
+        let animations = document.animations();
         let engine_document = document.document();
         display_list(LayoutInput {
             scroll: Some(&state),
+            animations: Some(&*animations),
             ..LayoutInput::new(
                 &engine_document,
                 &self.source.path,
@@ -1440,9 +1453,11 @@ impl crate::devtools::PageHost for SessionPage<'_> {
         document: &rustic_engine::ScriptedDocument<ManualClock>,
     ) -> Result<(u32, u32, Vec<u8>), LoadError> {
         let state = document.scroll_state();
+        let animations = document.animations();
         let engine_document = document.document();
         let (_, surface) = rasterize_list(LayoutInput {
             scroll: Some(&state),
+            animations: Some(&*animations),
             ..LayoutInput::new(
                 &engine_document,
                 &self.source.path,
@@ -2181,8 +2196,20 @@ fn compute_styles(
     cascade.set_environment(environment);
     let mut cx = MatchContext::html();
     cx.quirks = mode == DocumentMode::Quirks;
-    let styles = style_tree(document, document.root(), &cascade, &parser, &cx, &compute)
-        .map_err(node_error)?;
+    let styles = match input.animations {
+        Some(animations) => rustic_style::style_tree_animated(
+            document,
+            document.root(),
+            &cascade,
+            &parser,
+            &cx,
+            &compute,
+            &HashMap::new(),
+            &mut animations.borrow_mut(),
+        ),
+        None => style_tree(document, document.root(), &cascade, &parser, &cx, &compute),
+    }
+    .map_err(node_error)?;
     check_cancelled(cancellation)?;
     Ok((styles, sheets))
 }
@@ -2388,6 +2415,8 @@ struct LayoutInput<'a> {
     network: Option<&'a Rc<dyn Session>>,
     /// The scroll positions scripts left, for painting.
     scroll: Option<&'a rustic_engine::ScrollState>,
+    /// The document's running animations, for a scripted page's frames.
+    animations: Option<&'a RefCell<rustic_style::AnimationController>>,
 }
 
 impl<'a> LayoutInput<'a> {
@@ -2410,6 +2439,7 @@ impl<'a> LayoutInput<'a> {
             applied_files,
             network,
             scroll: None,
+            animations: None,
         }
     }
 }
@@ -2505,6 +2535,26 @@ impl LayoutSource for LocalLayout {
         document: &Document,
         mode: DocumentMode,
     ) -> Result<LayoutGeometry, LayoutReadError> {
+        self.measure(document, mode, None)
+    }
+
+    fn measure_layout_animated(
+        &self,
+        document: &Document,
+        mode: DocumentMode,
+        animations: &RefCell<rustic_style::AnimationController>,
+    ) -> Result<LayoutGeometry, LayoutReadError> {
+        self.measure(document, mode, Some(animations))
+    }
+}
+
+impl LocalLayout {
+    fn measure(
+        &self,
+        document: &Document,
+        mode: DocumentMode,
+        animations: Option<&RefCell<rustic_style::AnimationController>>,
+    ) -> Result<LayoutGeometry, LayoutReadError> {
         let (tree, layout, viewport, _, styles) = block_layout(LayoutInput {
             document,
             mode,
@@ -2516,6 +2566,7 @@ impl LayoutSource for LocalLayout {
             applied_files: Some(&self.applied_files),
             network: self.network.as_ref(),
             scroll: None,
+            animations,
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
         // Public block fragments omit anonymous wrappers and include atomic

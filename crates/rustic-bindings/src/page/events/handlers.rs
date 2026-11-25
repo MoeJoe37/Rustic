@@ -19,7 +19,7 @@ use super::{Listener, ListenerList, PrivateArray, Target, errors, receiver, type
 
 /// Handler names, in the order of [`GETTERS`] and [`SETTERS`]. The last
 /// [`WINDOW_ONLY`] names exist only on Window.
-const NAMES: [&str; 32] = [
+const NAMES: [&str; 42] = [
     "abort",
     "blur",
     "cancel",
@@ -50,22 +50,41 @@ const NAMES: [&str; 32] = [
     "submit",
     "toggle",
     "wheel",
+    "animationcancel",
+    "animationend",
+    "animationiteration",
+    "animationstart",
+    "transitioncancel",
+    "transitionend",
+    "transitionrun",
+    "transitionstart",
     "rejectionhandled",
     "unhandledrejection",
+    "finish",
+    "remove",
 ];
+/// Names before the Window-only ones (GlobalEventHandlers).
+const GLOBAL: usize = 38;
 const WINDOW_ONLY: usize = 2;
+/// Handlers only Animation has (`onfinish`, `onremove`), after the
+/// Window-only ones; `oncancel` is shared with the global set.
+const ANIMATION: [usize; 3] = [2, GLOBAL + WINDOW_ONLY, GLOBAL + WINDOW_ONLY + 1];
 
-const GETTERS: [NativeFn; 32] = [
+const GETTERS: [NativeFn; 42] = [
     get::<0>, get::<1>, get::<2>, get::<3>, get::<4>, get::<5>, get::<6>, get::<7>, get::<8>,
     get::<9>, get::<10>, get::<11>, get::<12>, get::<13>, get::<14>, get::<15>, get::<16>,
     get::<17>, get::<18>, get::<19>, get::<20>, get::<21>, get::<22>, get::<23>, get::<24>,
-    get::<25>, get::<26>, get::<27>, get::<28>, get::<29>, get::<30>, get::<31>,
+    get::<25>, get::<26>, get::<27>, get::<28>, get::<29>, get::<30>, get::<31>, get::<32>,
+    get::<33>, get::<34>, get::<35>, get::<36>, get::<37>, get::<38>, get::<39>, get::<40>,
+    get::<41>,
 ];
-const SETTERS: [NativeFn; 32] = [
+const SETTERS: [NativeFn; 42] = [
     set::<0>, set::<1>, set::<2>, set::<3>, set::<4>, set::<5>, set::<6>, set::<7>, set::<8>,
     set::<9>, set::<10>, set::<11>, set::<12>, set::<13>, set::<14>, set::<15>, set::<16>,
     set::<17>, set::<18>, set::<19>, set::<20>, set::<21>, set::<22>, set::<23>, set::<24>,
-    set::<25>, set::<26>, set::<27>, set::<28>, set::<29>, set::<30>, set::<31>,
+    set::<25>, set::<26>, set::<27>, set::<28>, set::<29>, set::<30>, set::<31>, set::<32>,
+    set::<33>, set::<34>, set::<35>, set::<36>, set::<37>, set::<38>, set::<39>, set::<40>,
+    set::<41>,
 ];
 
 /// Handler entry slots: `[current value or null, active listener or null]`.
@@ -79,12 +98,21 @@ pub(in crate::page) fn install(
     prototype: ObjectId,
     window: bool,
 ) -> JsResult<()> {
-    let count = if window {
-        NAMES.len()
-    } else {
-        NAMES.len() - WINDOW_ONLY
-    };
-    for index in 0..count {
+    let count = if window { GLOBAL + WINDOW_ONLY } else { GLOBAL };
+    define(agent, prototype, 0..count)
+}
+
+/// Install `onfinish`, `oncancel` and `onremove` on Animation's prototype.
+pub(in crate::page) fn install_animation(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
+    define(agent, prototype, ANIMATION)
+}
+
+fn define(
+    agent: &mut Agent,
+    prototype: ObjectId,
+    indices: impl IntoIterator<Item = usize>,
+) -> JsResult<()> {
+    for index in indices {
         let name = format!("on{}", NAMES[index]);
         let get =
             Value::object(agent.new_native_function(GETTERS[index], &format!("get {name}"), 0)?);

@@ -287,6 +287,19 @@ pub struct EffectKeyframe {
     pub values: KeyframeValues,
 }
 
+impl Default for EffectKeyframe {
+    /// An empty, linear keyframe without an offset.
+    fn default() -> Self {
+        Self {
+            offset: None,
+            computed_offset: 0.0,
+            easing: EasingFunction::LINEAR,
+            composite: None,
+            values: KeyframeValues::Declarations(Vec::new()),
+        }
+    }
+}
+
 /// Fill in computed offsets (Web Animations §5.3.3 "compute missing
 /// keyframe offsets").
 pub fn distribute_offsets(keyframes: &mut [EffectKeyframe]) {

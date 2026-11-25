@@ -404,6 +404,7 @@ impl StyledDocument {
             cx,
             (compute, &HashMap::new()),
             None,
+            None,
         )?;
         let mut styled = Self {
             styles: Vec::new(),
@@ -800,6 +801,7 @@ impl StyledDocument {
             cx,
             (compute, &self.sizes),
             Some(reuse),
+            None,
         )?;
         let stats = RestyleStats {
             recomputed: walked.recomputed,

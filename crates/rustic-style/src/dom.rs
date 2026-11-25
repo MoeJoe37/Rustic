@@ -9,11 +9,14 @@ use rustic_css::{CssParser, SelectorList};
 use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind, Walk};
 
 use crate::matching::{MatchCache, matches_complex_cached};
+use crate::{AnimationController, KeyframesRule};
 use crate::{
     AttributeRef, Cascade, ChildRef, ComputeContext, ComputedStyle, ContainerInfo, ContainerSize,
     ElementView, MatchContext, SpecifiedStyle, StyleDiagnostic, StyleInputs, TreeContext,
     TreeScope, parse_style_attribute, resolve_declaration_urls,
 };
+use rustic_css::{Display, PropertyId, PropertyValue};
+use std::sync::Arc;
 
 /// An element of a [`Document`], borrowed for matching.
 #[derive(Clone, Copy, Debug)]
@@ -452,8 +455,46 @@ pub fn style_tree<'a>(
         cx,
         (compute, &HashMap::new()),
         None,
+        None,
     )
     .map(|walk| walk.styles)
+}
+
+/// [`style_tree_with_sizes`] with running animations and transitions:
+/// every element's computed style goes through `animations`, which starts,
+/// updates and cancels CSS animations and transitions against the styles
+/// it saw last time and adds their current values to the cascade's
+/// animation and transition origins. Call it once per rendering update,
+/// after [`AnimationController::tick`].
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the walk's inputs are independent"
+)]
+pub fn style_tree_animated<'a>(
+    document: &'a Document,
+    root: NodeId,
+    cascade: &Cascade,
+    parser: &CssParser,
+    cx: &MatchContext<DomElement<'a>>,
+    compute: &ComputeContext,
+    sizes: &HashMap<NodeId, ContainerSize>,
+    animations: &mut AnimationController,
+) -> Result<Vec<ElementStyle>, DomError> {
+    animations.begin_restyle();
+    let walked = style_walk(
+        document,
+        root,
+        cascade,
+        parser,
+        cx,
+        (compute, sizes),
+        None,
+        Some(animations),
+    );
+    if walked.is_ok() {
+        animations.end_restyle();
+    }
+    walked.map(|walk| walk.styles)
 }
 
 /// [`style_tree`] with the content-box sizes of query containers, as
@@ -468,7 +509,17 @@ pub fn style_tree_with_sizes<'a>(
     compute: &ComputeContext,
     sizes: &HashMap<NodeId, ContainerSize>,
 ) -> Result<Vec<ElementStyle>, DomError> {
-    style_walk(document, root, cascade, parser, cx, (compute, sizes), None).map(|walk| walk.styles)
+    style_walk(
+        document,
+        root,
+        cascade,
+        parser,
+        cx,
+        (compute, sizes),
+        None,
+        None,
+    )
+    .map(|walk| walk.styles)
 }
 
 /// Styles kept from an earlier walk and what has to be recomputed; see
@@ -517,13 +568,21 @@ struct PathEntry {
     subtree: bool,
     /// Its computed style changed, so its children must be recomputed.
     changed: bool,
+    /// It or an ancestor has `display: none`, so it is not rendered and
+    /// runs no animations.
+    hidden: bool,
 }
 
 /// The walk behind [`style_tree`]; with `reuse`, an element keeps its
 /// earlier style unless it is dirty, has a new style parent, or its parent
 /// (or the root) got a different computed style. With `@container` rules in
 /// the cascade, a changed computed style restyles the whole subtree, since
-/// any descendant may query it.
+/// any descendant may query it. With `animations`, each element's style
+/// goes through the controller (see [`style_tree_animated`]).
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the walk's inputs are independent"
+)]
 pub(crate) fn style_walk<'a>(
     document: &'a Document,
     root: NodeId,
@@ -532,6 +591,7 @@ pub(crate) fn style_walk<'a>(
     cx: &MatchContext<DomElement<'a>>,
     (compute, sizes): (&ComputeContext, &HashMap<NodeId, ContainerSize>),
     mut reuse: Option<Reuse<'_>>,
+    mut animations: Option<&mut AnimationController>,
 ) -> Result<Walked, DomError> {
     let container_queries = cascade.has_container_queries();
     let mut out: Vec<ElementStyle> = Vec::new();
@@ -561,6 +621,16 @@ pub(crate) fn style_walk<'a>(
             continue; // The shadow root itself, standing in for its host.
         }
         let (scope, depth) = (tree.scope, tree.base + depth);
+        // The contexts of the enclosing trees, for `@keyframes` lookup.
+        let outer: Vec<TreeContext> = if animations.is_some() {
+            walks[..walks.len() - 1]
+                .iter()
+                .rev()
+                .map(|w| w.scope.context)
+                .collect()
+        } else {
+            Vec::new()
+        };
         while path.last().is_some_and(|e| e.depth >= depth) {
             path.pop();
         }
@@ -643,13 +713,62 @@ pub(crate) fn style_walk<'a>(
                 let specified =
                     cascade.specified_style_cached(element, cx, &inputs, parent, &cache);
                 let root_computed = root_style.map(|i| &out[i].computed);
-                let computed = ComputedStyle::compute(
-                    &specified,
-                    parent,
-                    root_computed,
-                    element.is_root() || root_style.is_none(),
-                    compute,
-                );
+                let is_root = element.is_root() || root_style.is_none();
+                let computed =
+                    ComputedStyle::compute(&specified, parent, root_computed, is_root, compute);
+                let (specified, computed) = match animations.as_deref_mut() {
+                    None => (specified, computed),
+                    Some(controller) => {
+                        let rendered =
+                            !parent_entry.is_some_and(|e| e.hidden) && !is_display_none(&computed);
+                        let keyframes = |name: &str| -> Option<Arc<KeyframesRule>> {
+                            cascade.keyframes(name, scope.context, &outer).cloned()
+                        };
+                        let mut recompute = |animated: &[rustic_css::PropertyDeclaration],
+                                             transitioned: &[rustic_css::PropertyDeclaration]| {
+                            let inputs = StyleInputs {
+                                animations: animated,
+                                transitions: transitioned,
+                                ..inputs
+                            };
+                            let specified = cascade
+                                .specified_style_cached(element, cx, &inputs, parent, &cache);
+                            ComputedStyle::compute(
+                                &specified,
+                                parent,
+                                root_computed,
+                                is_root,
+                                compute,
+                            )
+                        };
+                        match controller.style_element(
+                            id,
+                            &computed,
+                            rendered,
+                            &keyframes,
+                            &mut recompute,
+                        ) {
+                            None => (specified, computed),
+                            Some(values) => {
+                                let inputs = StyleInputs {
+                                    animations: &values.animations,
+                                    transitions: &values.transitions,
+                                    ..inputs
+                                };
+                                let specified = cascade
+                                    .specified_style_cached(element, cx, &inputs, parent, &cache);
+                                let computed = ComputedStyle::compute(
+                                    &specified,
+                                    parent,
+                                    root_computed,
+                                    is_root,
+                                    compute,
+                                );
+                                (specified, computed)
+                            }
+                        }
+                    }
+                };
                 let changed = previous.as_ref().is_none_or(|p| p.computed != computed);
                 (
                     ElementStyle {
@@ -666,11 +785,13 @@ pub(crate) fn style_walk<'a>(
             root_style = Some(out.len());
             root_changed = changed && reuse.is_some();
         }
+        let hidden = parent_entry.is_some_and(|e| e.hidden) || is_display_none(&style.computed);
         path.push(PathEntry {
             depth,
             index: out.len(),
             subtree: subtree || (container_queries && changed),
             changed,
+            hidden,
         });
         out.push(style);
         parents.push(parent_id);
@@ -692,4 +813,11 @@ pub(crate) fn style_walk<'a>(
         parents,
         recomputed,
     })
+}
+
+fn is_display_none(style: &ComputedStyle) -> bool {
+    matches!(
+        style.get(PropertyId::Display),
+        PropertyValue::Display(Display::None)
+    )
 }

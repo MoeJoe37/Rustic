@@ -36,9 +36,10 @@ one store with validation and conversion at their boundaries.
 
 Browser owners retain the 8 MiB memory cap, including when linking
 modules with both memory widths. The byte pool also makes the
-profile usable on hosts with 32-bit indices. Revisit physical
-allocation strategies when a measured workload needs a larger
-memory budget. Shared memories and table64 have independent work.
+profile usable on hosts with 32-bit indices. Local table64 uses the same
+full-width range checks with an entry budget. Revisit physical allocation
+strategies when a measured workload needs a larger memory budget. Shared
+memories and links to external tables have separate work.
 
 ## Validation
 
@@ -49,4 +50,5 @@ buffer identity, detachment, and live data across the JS boundary.
 
 [Core memory type validation](https://webassembly.github.io/spec/core/valid/types.html#memory-types),
 [Core memory instruction validation](https://webassembly.github.io/spec/core/valid/instructions.html#memory-instructions),
+[Core table instruction validation](https://webassembly.github.io/spec/core/valid/instructions.html#table-instructions),
 [JavaScript Memory interface](https://www.w3.org/TR/2026/CRD-wasm-js-api-2-20261123/#memories)

@@ -4152,6 +4152,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/validation.rs",
               "marker": "fn memory64_checks_limits_offsets_and_each_bulk_operand_width"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/validation.rs",
+              "marker": "fn table64_checks_table_indices_and_the_width_of_mixed_copies"
             }
           ]
         },
@@ -4220,6 +4225,11 @@
               "kind": "test",
               "path": "crates/rustic-wasm/tests/instances.rs",
               "marker": "fn memory64_bulk_operations_keep_full_width_addresses_under_the_host_budget"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-wasm/tests/tables.rs",
+              "marker": "fn table64_preserves_indices_and_budget_across_calls_and_bulk_operations"
             }
           ]
         },
@@ -4309,6 +4319,11 @@
               "kind": "test",
               "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
               "marker": "wasm/jsapi/memory/to-resizable-buffer.any.js"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_window_executes_indirect_calls_with_local_table64_indices"
             }
           ]
         },

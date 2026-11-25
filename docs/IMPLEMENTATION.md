@@ -3250,14 +3250,14 @@ limits, export names, start and tag signatures, constant expressions and
 function references. The iterative body pass checks the numeric instruction
 set, multi-value blocks and branches, locals, globals, direct and indirect
 calls, abstract function and external references, and scalar and bulk
-instructions for 32- and 64-bit memories and 32-bit tables. Stack, local
+instructions for 32- and 64-bit memories and tables. Stack, local
 and work limits apply before producing a `ValidatedModule`.
 
 The integration suites in `crates/rustic-wasm/tests/sections.rs` and
 `validation.rs` cover positive and malformed modules, unreachable stack
 polymorphism, initializer visibility, and cancellation and resource limits.
 The `wasm-binary` fuzz target exercises both passes. GC and concrete reference
-types, SIMD, exception instructions, shared memory, and 64-bit tables
+types, SIMD, exception instructions and shared memory
 remain outside the supported profile.
 [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md)
 
@@ -3308,7 +3308,7 @@ types and instructions outside the implemented profiles.
 
 ### WASM-03/04 — Tables, references and indirect calls
 
-Local instances now initialize 32-bit tables and active element segments before
+Local instances initialize 32- and 64-bit tables and active element segments before
 calling start. Passive segments retain their entries until `elem.drop`. The
 interpreter implements indexed get and set, size and growth, copy, fill and
 `table.init`. Tables and retained passive entries share an instance-wide entry
@@ -3327,6 +3327,21 @@ A local replay of 13 files from the pinned suite matched 783 invocations and
 requiring linked modules, reference-valued host invocations or wider types and
 instructions were outside that run.
 [Pinned core suite](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core)
+
+Table instructions and indirect calls use the address width of the selected
+table. A mixed-width copy uses an i32 length, and passive initialization
+uses i32 for the source index and element count. The interpreter checks
+full-width indices and ranges before converting to host indices. A table's
+declared maximum can exceed the instance's shared element budget. Rejected
+growth preserves entries and returns the width-appropriate failure value.
+
+Window modules can use local table64 through scalar exports. The focused
+tests cover indirect calls, mixed copies, failed allocation and indices
+above 32 bits. A WABT 1.0.42 replay matched 2,492 executions and 81
+validation rejections across ten pinned table64 fixtures. The replay covers
+numeric host signatures and leaves the array-reference case in
+`table_init64.wast` to the GC profile.
+[Pinned table64 fixtures](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core/memory64)
 
 ### WASM-05/06 — Numeric host function bindings
 

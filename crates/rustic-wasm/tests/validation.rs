@@ -139,8 +139,8 @@ fn validation_rejects_incompatible_declarations_and_memory_immediates() {
     for (bytes, fault, value) in [
         (module(&[(5, &[1, 1, 2, 1])]), Fault::InvalidLimits, 1),
         (
-            module(&[(4, &[1, 0x70, 4, 0])]),
-            Fault::UnsupportedType,
+            module(&[(4, &[1, 0x70, 5, 2, 1])]),
+            Fault::InvalidLimits,
             0x70,
         ),
         (
@@ -224,6 +224,46 @@ fn memory64_checks_limits_offsets_and_each_bulk_operand_width() {
     validate(&maximum).unwrap();
     let too_large = module(&[(5, &[1, 5, 0, 0x81, 0x80, 0x80, 0x80, 0x80, 0x80, 0x40])]);
     invalid(&too_large, Fault::InvalidLimits, 5);
+}
+
+#[test]
+fn table64_checks_table_indices_and_the_width_of_mixed_copies() {
+    let tables = &[(4, &[2, 0x70, 4, 2, 0x70, 0, 2][..])];
+    let wide = &[0x42, 0, 0x25, 0, 0x1a];
+    validate(&function(EMPTY, tables, &[0], wide)).unwrap();
+    invalid(
+        &function(EMPTY, tables, &[0], &[0x41, 0, 0x25, 0, 0x1a]),
+        Fault::TypeMismatch,
+        0x25,
+    );
+    invalid(
+        &function(EMPTY, tables, &[0], &[0x42, 0, 0x25, 1, 0x1a]),
+        Fault::TypeMismatch,
+        0x25,
+    );
+    let copy = [0x42, 0, 0x41, 0, 0x41, 0, 0xfc, 14, 0, 1];
+    validate(&function(EMPTY, tables, &[0], &copy)).unwrap();
+    let mut wrong_count = copy;
+    wrong_count[4] = 0x42;
+    invalid(
+        &function(EMPTY, tables, &[0], &wrong_count),
+        Fault::TypeMismatch,
+        0xfc,
+    );
+    let wrong_offset = module(&[tables[0], (9, &[1, 0, 0x41, 0, END, 0])]);
+    assert_eq!(
+        validate(&wrong_offset).unwrap_err().kind,
+        Fault::TypeMismatch
+    );
+
+    #[rustfmt::skip]
+    let largest = [1, 0x70, 5, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
+    validate(&module(&[(4, &largest)])).unwrap();
+    invalid(
+        &module(&[(4, &[1, 0x70, 1, 0, 0x80, 0x80, 0x80, 0x80, 0x10])]),
+        Fault::InvalidLimits,
+        0x70,
+    );
 }
 
 #[test]

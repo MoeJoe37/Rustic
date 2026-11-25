@@ -468,7 +468,9 @@ fn construct(agent: &mut Agent, kind: ElementKind, args: &[Value]) -> JsResult<V
         let Some(offset) = usize::try_from(offset).ok().filter(|o| *o <= buffer_length) else {
             return range_error(agent, "the start offset is outside the buffer");
         };
-        let resizable = agent.buffer_data(source).is_some_and(|d| d.max.is_some());
+        let resizable = agent
+            .buffer_data(source)
+            .is_some_and(|data| data.is_resizable());
         let length = match new_length {
             None if resizable => None,
             None => {

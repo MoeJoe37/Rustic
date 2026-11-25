@@ -4299,6 +4299,16 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_memory64_uses_bigint_counts_and_links_only_the_same_address_width"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_resizable_buffers_follow_guest_and_host_growth_and_detach_on_mode_switch"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "wasm/jsapi/memory/to-resizable-buffer.any.js"
             }
           ]
         },

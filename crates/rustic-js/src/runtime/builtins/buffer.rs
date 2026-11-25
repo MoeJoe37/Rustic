@@ -12,7 +12,7 @@ use std::{
     ops::{Deref, Range},
 };
 
-use rustic_base::FixedBytes;
+use rustic_base::LinearBytes;
 
 use super::{arg, install_constructor, install_methods, method, prototype_from_new_target};
 use crate::runtime::agent::{Agent, ErrorKind, JsResult};
@@ -42,13 +42,23 @@ pub(crate) struct BufferData {
 
 #[derive(Clone, Debug)]
 struct WasmBuffer {
-    bytes: FixedBytes,
+    bytes: LinearBytes,
     owner: ObjectId,
+    resize: Option<WasmBufferResize>,
 }
 
 impl WasmBuffer {
     // A detached buffer still retains its generation's empty metadata.
-    const STORAGE_BYTES: usize = size_of::<Self>() + FixedBytes::storage_bytes();
+    const STORAGE_BYTES: usize = size_of::<Self>() + LinearBytes::storage_bytes();
+}
+
+/// The declared size and grow operation of a resizable Wasm buffer.
+#[derive(Clone, Copy, Debug)]
+pub struct WasmBufferResize {
+    /// Declared maximum byte length as an exactly representable Number.
+    pub maximum: f64,
+    /// Grow the owning memory to the requested byte length.
+    pub grow: fn(&mut Agent, ObjectId, usize) -> JsResult<()>,
 }
 
 /// Bytes borrowed from an attached buffer or view while no script runs.
@@ -80,6 +90,18 @@ impl BufferBytes<'_> {
 }
 
 impl BufferData {
+    fn resize_limit(&self) -> Option<f64> {
+        if let Some(wasm) = &self.wasm {
+            wasm.resize.map(|resize| resize.maximum)
+        } else {
+            self.max.map(|max| max as f64)
+        }
+    }
+
+    pub(super) fn is_resizable(&self) -> bool {
+        self.resize_limit().is_some()
+    }
+
     fn read(&self) -> Option<BufferBytes<'_>> {
         let read = match &self.wasm {
             Some(wasm) => BufferRead::Wasm(wasm.bytes.read()?),
@@ -278,7 +300,7 @@ impl Agent {
             if self
                 .source_buffer(object)
                 .and_then(|buffer| self.buffer_data(buffer))
-                .is_some_and(|data| data.max.is_none() && (allow_shared || !data.shared))
+                .is_some_and(|data| !data.is_resizable() && (allow_shared || !data.shared))
             {
                 return Ok(object);
             }
@@ -567,12 +589,19 @@ impl Agent {
         self.buffer_data(buffer)?.read()
     }
 
-    /// Wrap a Wasm fixed-length generation in the owner's realm. The
-    /// attached buffer traces the owner that pays for the backing bytes.
-    pub fn new_wasm_array_buffer(&mut self, owner: ObjectId, bytes: FixedBytes) -> JsResult<Value> {
+    /// Wrap a Wasm generation in the owner's realm. Attached buffers trace
+    /// the owner. Mode changes may prepare a detached generation before
+    /// moving the bytes to it.
+    pub fn new_wasm_array_buffer(
+        &mut self,
+        owner: ObjectId,
+        bytes: LinearBytes,
+        resize: Option<WasmBufferResize>,
+    ) -> JsResult<Value> {
+        debug_assert_eq!(bytes.is_resizable(), resize.is_some());
         if bytes
             .read()
-            .is_none_or(|bytes| bytes.len() > MAX_BUFFER_BYTES)
+            .is_some_and(|bytes| bytes.len() > MAX_BUFFER_BYTES)
         {
             return Err(self.throw(ErrorKind::RangeError, "invalid Wasm ArrayBuffer length"));
         }
@@ -584,7 +613,11 @@ impl Agent {
         let mut object = Object::new(Class::ArrayBuffer, Some(prototype));
         object.extra_mut().internal = Some(Internal::ArrayBuffer(Box::new(BufferData {
             bytes: None,
-            wasm: Some(Box::new(WasmBuffer { bytes, owner })),
+            wasm: Some(Box::new(WasmBuffer {
+                bytes,
+                owner,
+                resize,
+            })),
             max: None,
             shared: false,
             immutable: false,
@@ -817,16 +850,16 @@ fn buffer_byte_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<V
 fn buffer_max_byte_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let buffer = this_buffer(agent, this, "maxByteLength")?;
     let data = agent.buffer_data(buffer).expect("checked above");
-    let length = data
-        .read()
-        .map_or(0, |bytes| data.max.unwrap_or(bytes.len()));
-    Ok(Value::number(length as f64))
+    let length = data.read().map_or(0.0, |bytes| {
+        data.resize_limit().unwrap_or(bytes.len() as f64)
+    });
+    Ok(Value::number(length))
 }
 
 fn buffer_resizable(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let buffer = this_buffer(agent, this, "resizable")?;
     let data = agent.buffer_data(buffer).expect("checked above");
-    Ok(Value::boolean(data.max.is_some()))
+    Ok(Value::boolean(data.is_resizable()))
 }
 
 fn buffer_detached(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
@@ -915,7 +948,7 @@ fn buffer_slice(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
 /// `ArrayBuffer.prototype.resize(newLength)` (§25.1.6.6).
 fn buffer_resize(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let buffer = this_buffer(agent, this, "resize")?;
-    let Some(max) = agent.buffer_data(buffer).and_then(|d| d.max) else {
+    let Some(max) = agent.buffer_data(buffer).and_then(BufferData::resize_limit) else {
         return agent.type_error("ArrayBuffer.prototype.resize: the buffer is not resizable");
     };
     let new_length = agent.to_index(arg(args, 0))?;
@@ -923,7 +956,7 @@ fn buffer_resize(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Val
         return detached_error(agent);
     };
     let new_length = match usize::try_from(new_length) {
-        Ok(n) if n <= max => n,
+        Ok(n) if n as f64 <= max => n,
         _ => {
             return Err(agent.throw(
                 ErrorKind::RangeError,
@@ -931,6 +964,13 @@ fn buffer_resize(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Val
             ));
         }
     };
+    if let Some((owner, resize)) = agent.buffer_data(buffer).and_then(|data| {
+        let wasm = data.wasm.as_ref()?;
+        Some((wasm.owner, wasm.resize?))
+    }) {
+        (resize.grow)(agent, owner, new_length)?;
+        return Ok(Value::UNDEFINED);
+    }
     if new_length > old_length && agent.heap.charge(new_length - old_length).is_err() {
         return Err(agent.throw(ErrorKind::RangeError, "Array buffer allocation failed"));
     }
@@ -1122,7 +1162,9 @@ fn data_view_constructor(agent: &mut Agent, _: Value, args: &[Value]) -> JsResul
             ));
         }
     };
-    let resizable = agent.buffer_data(buffer).is_some_and(|d| d.max.is_some());
+    let resizable = agent
+        .buffer_data(buffer)
+        .is_some_and(BufferData::is_resizable);
     let requested = arg(args, 2);
     let length = if requested == Value::UNDEFINED {
         (!resizable).then_some(buffer_length - offset)

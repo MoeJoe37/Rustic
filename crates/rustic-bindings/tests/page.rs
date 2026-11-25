@@ -1893,3 +1893,75 @@ fn wasm_memory64_uses_bigint_counts_and_links_only_the_same_address_width() {
     }
     assert_eq!(outcome.unwrap(), Value::TRUE);
 }
+
+#[test]
+fn wasm_resizable_buffers_follow_guest_and_host_growth_and_detach_on_mode_switch() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    let outcome = agent.evaluate(r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        const pageSize = 65536;
+        const mem = new WebAssembly.Memory({initial:1, maximum:4});
+        const fixed = mem.buffer;
+        new Uint8Array(fixed)[0] = 19;
+        const expanded = mem.toResizableBuffer();
+        assert(fixed.detached && expanded.resizable && expanded.maxByteLength === 4 * pageSize, 'mode change');
+        assert(mem.buffer === expanded && mem.toResizableBuffer() === expanded, 'stable identity');
+        const tracking = new Uint8Array(expanded);
+        const data = new DataView(expanded);
+        const short = new Uint8Array(expanded, 0, 1);
+        const module = new WebAssembly.Module(Uint8Array.of(
+            0,97,115,109,1,0,0,0,
+            1,10,2,96,1,127,1,127,96,0,1,127,
+            2,11,1,1,109,3,109,101,109,2,1,1,4,
+            3,3,2,0,1,
+            7,21,3,3,109,101,109,2,0,4,103,114,111,119,0,0,4,115,105,122,101,0,1,
+            10,13,2,6,0,32,0,64,0,11,4,0,63,0,11
+        ));
+        const guest = new WebAssembly.Instance(module, {m:{mem}}).exports;
+        assert(guest.mem === mem && guest.grow(1) === 1 && mem.buffer === expanded, 'guest growth');
+        assert(tracking.length === 2 * pageSize && data.byteLength === 2 * pageSize && short.length === 1, 'tracking bounds');
+        data.setUint8(pageSize, 41);
+        expanded.resize(3 * pageSize);
+        assert(guest.size() === 3 && tracking.length === 3 * pageSize, 'resize reaches guest');
+        assert(tracking[0] === 19 && tracking[pageSize] === 41 && data.getUint8(2 * pageSize) === 0, 'preserved bytes');
+        assert(rejects(RangeError, () => expanded.resize(2 * pageSize)), 'shrink rejected');
+        assert(rejects(RangeError, () => expanded.resize(3 * pageSize + 1)), 'alignment checked');
+        assert(rejects(RangeError, () => expanded.resize(5 * pageSize)), 'declared max checked');
+        assert(rejects(TypeError, () => expanded.transfer()) && guest.size() === 3, 'no transfer');
+        assert(mem.grow(0) === 3 && mem.grow(1) === 3 && mem.buffer === expanded, 'host growth');
+        assert(guest.grow(1) === -1 && expanded.byteLength === 4 * pageSize, 'rejected growth preserves view');
+        let newFixed;
+        assert(rejects(TypeError, () => expanded.resize({valueOf() {
+            newFixed = mem.toFixedLengthBuffer();
+            return 4 * pageSize;
+        }})), 'resize rechecks attachment after coercion');
+        assert(expanded.detached && expanded.maxByteLength === 0 && tracking.length === 0, 'old views detached');
+        assert(!newFixed.resizable && mem.buffer === newFixed && mem.toFixedLengthBuffer() === newFixed, 'fixed identity');
+        assert(new Uint8Array(newFixed)[0] === 19 && guest.grow(0) === 4 && newFixed.detached, 'fixed growth');
+
+        const unlimited = new WebAssembly.Memory({initial:0});
+        const original = unlimited.buffer;
+        assert(rejects(TypeError, () => unlimited.toResizableBuffer()) && unlimited.buffer === original, 'maximum required');
+        const wide = new WebAssembly.Memory({address:'i64', initial:0n, maximum:281474976710656n});
+        const wideView = wide.toResizableBuffer();
+        assert(wideView.maxByteLength === 2 ** 64, 'maximum is declared even above host index range');
+        wideView.resize(pageSize);
+        assert(wide.grow(1n) === 1n && wideView.byteLength === 2 * pageSize, 'memory64 growth paths');
+        assert(rejects(RangeError, () => wideView.resize(129 * pageSize)) && wideView.byteLength === 2 * pageSize, 'owner budget');
+        const onlyBuffer = new WebAssembly.Memory({initial:0, maximum:1}).toResizableBuffer();
+        onlyBuffer.resize(pageSize);
+        assert(onlyBuffer.byteLength === pageSize, 'attached view keeps owner alive');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}

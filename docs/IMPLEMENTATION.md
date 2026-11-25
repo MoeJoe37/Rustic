@@ -3392,8 +3392,8 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Table imports and wrappers, shared memories, resizable Wasm buffers,
-reference-valued host calls and the progressive response pipeline remain open.
+Table imports and wrappers, shared memories, reference-valued host calls
+and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3454,8 +3454,6 @@ exported wrapper. Browser-owned allocations are capped at 8 MiB per standalone
 memory or per instance's locally allocated memories. Imported allocations
 remain charged to their owner. [ADR 0085](adr/0085-wasm-fixed-memory-buffers.md)
 
-Five pinned memory fixtures pass 49 of 51 subtests. The two expected
-failures require shared memory growth or conversion to a resizable buffer.
 The pinned runner preserves helper paths so the general Wasm and memory
 assertion scripts can load together under their original basenames.
 
@@ -3483,3 +3481,23 @@ or validation rejections across 14 files from the pinned memory64 suite.
 The memory-only cases in the pinned import fixture also passed in Window
 with 14 successful links and 22 incompatible imports rejected.
 [Pinned memory64 suite](https://github.com/WebAssembly/spec/tree/fad6ff682c3dddf4dc35d9df6997ce91ebe15435/test/core/memory64)
+
+### WASM-06 — Resizable unshared memory buffers
+
+`WebAssembly.Memory.prototype.toResizableBuffer()` requires a declared
+maximum and exposes that maximum as `maxByteLength`. It supports both
+address widths. A resizable buffer keeps its identity and expands
+when the guest grows memory, JavaScript calls `Memory.grow()`, or
+`ArrayBuffer.resize()` requests a larger whole-page length. All three
+paths use the same owning memory's byte budget. Length-tracking typed
+arrays and DataViews see the new size, and explicit-length views keep
+their original lengths.
+
+Switching to a fixed or resizable buffer detaches the old buffer and
+preserves the memory contents. The new wrapper and cache entry are
+prepared before the bytes move. An attached buffer continues to
+trace its allocation owner. [ADR 0087](adr/0087-wasm-resizable-buffers.md)
+
+The six pinned memory WPT files pass 55 of 56 subtests. The five resizable
+buffer cases and both fixed-buffer cases pass. Shared memory growth
+accounts for the remaining expected failure.

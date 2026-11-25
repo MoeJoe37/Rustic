@@ -5245,8 +5245,29 @@
     },
     {
       "name": "toFixedLengthBuffer caching behavior",
-      "status": "FAIL",
-      "message": "value is not a function"
+      "status": "PASS"
+    }
+  ],
+  "wasm/jsapi/memory/to-resizable-buffer.any.js": [
+    {
+      "name": "API surface",
+      "status": "PASS"
+    },
+    {
+      "name": "toResizableBuffer caching behavior",
+      "status": "PASS"
+    },
+    {
+      "name": "toResizableBuffer max size",
+      "status": "PASS"
+    },
+    {
+      "name": "Resizing a Memory's resizable buffer",
+      "status": "PASS"
+    },
+    {
+      "name": "Resizable buffers from Memory cannot be detached by JS",
+      "status": "PASS"
     }
   ],
   "wasm/jsapi/memory/toString.any.js": [

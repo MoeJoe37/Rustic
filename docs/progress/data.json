@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "7372998b0db2d360758410a8e5afa8bdc29285c9bfc6a579709898d6281a3bbf",
+  "source_fingerprint": "86b37665f9326ba4689163fb22cb86e2b1f2371e1f45968c87389306036d78db",
   "percent": "50.03",
   "verified_percent": "48.43",
   "partial_percent": "1.60",
@@ -4653,6 +4653,16 @@
               "kind": "test",
               "path": "crates/rustic-bindings/tests/page.rs",
               "marker": "fn wasm_memory64_uses_bigint_counts_and_links_only_the_same_address_width"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn wasm_resizable_buffers_follow_guest_and_host_growth_and_detach_on_mode_switch"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/manifest.json",
+              "marker": "wasm/jsapi/memory/to-resizable-buffer.any.js"
             }
           ],
           "credit": "0.00",

@@ -1,6 +1,6 @@
 use std::{cell::Cell, rc::Rc};
 
-use rustic_base::{FixedBytes, LinearBuffer};
+use rustic_base::{LinearBuffer, LinearBytes};
 
 use super::*;
 use crate::{AddressType, Limits};
@@ -78,7 +78,7 @@ impl LinearMemory {
             size_of::<Memory>()
                 + size_of::<Pool>()
                 + 4 * size_of::<usize>()
-                + FixedBytes::storage_bytes(),
+                + LinearBytes::storage_bytes(),
         )
     }
 
@@ -134,6 +134,11 @@ impl LinearMemory {
         (self.len() / MEMORY_PAGE_BYTES) as u64
     }
 
+    /// The declared growth limit in pages, when present.
+    pub fn maximum(&self) -> Option<u64> {
+        self.0.maximum
+    }
+
     pub(super) fn page_result(&self, pages: Option<u64>) -> Value {
         match self.0.address {
             AddressType::I32 => Value::I32(pages.map_or(-1, |pages| pages as i32)),
@@ -141,9 +146,21 @@ impl LinearMemory {
         }
     }
 
-    /// A fixed-length, live byte view of the current generation.
-    pub fn buffer(&self) -> FixedBytes {
-        self.0.bytes.fixed()
+    /// A live byte view of the current generation.
+    pub fn buffer(&self) -> LinearBytes {
+        self.0.bytes.view()
+    }
+
+    /// Replace the current view after preparing its wrapper successfully.
+    ///
+    /// The callback must not enter this memory and receives a temporarily
+    /// detached handle. A failed callback preserves the original view.
+    pub fn replace_buffer<T, E>(
+        &self,
+        resizable: bool,
+        prepare: impl FnOnce(LinearBytes) -> Result<T, E>,
+    ) -> Result<T, E> {
+        self.0.bytes.replace_view(resizable, prepare)
     }
 
     pub(super) fn len(&self) -> usize {

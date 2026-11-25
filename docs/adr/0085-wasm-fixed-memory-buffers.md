@@ -40,9 +40,10 @@ makes the transition observable without a second persistent copy.
 Window supports unshared wasm32 memories and fixed-length views.
 The browser caps standalone and aggregate instance-owned memory at 8 MiB.
 [ADR 0086](0086-wasm-memory64.md) extends this model to 64-bit memories.
-Shared memory and resizable Wasm views require additional ownership
-and synchronization work. Revisit the byte limit when measuring larger
-workloads or introducing a reserved virtual memory implementation.
+[ADR 0087](0087-wasm-resizable-buffers.md) adds resizable views for unshared
+memories. Shared memory requires additional ownership and synchronization
+work. Revisit the byte limit when measuring larger workloads or introducing
+a reserved virtual memory implementation.
 
 ## Evidence
 

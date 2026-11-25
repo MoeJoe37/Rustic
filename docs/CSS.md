@@ -155,8 +155,8 @@ dropped with `UnsupportedNestedRule` until those at-rules exist.
 ### Element states
 
 `rustic-style` derives HTML element states from content attributes and the
-tree, since there is no user interaction or script yet (HTML Standard,
-reviewed 2026-11-08):
+tree as documented below. The page host also handles focus and form input;
+remaining state propagation to selectors is tracked in TD-154.
 
 | State | Rule |
 | --- | --- |
@@ -712,14 +712,12 @@ whole document.
 The import tree is walked with an explicit stack, so even a 5,000-deep chain
 with unlimited budgets loads without recursion.
 
-`rustic dump-style` uses a local-only fetcher: the document's URL is the
-`file:` URL of its canonical path, and a sheet loads only if its `file:` URL
-names a regular file inside the document's directory tree, checked both
-lexically and after resolving symbolic links. Network, `data:` and other-host
-URLs and paths that leave the directory are blocked. Files are read in
-chunks within the remaining byte budget and decoded with `decode_stylesheet`
-(a BOM or `@charset` selects the encoding; otherwise the document's, which
-is UTF-8 until HTML encoding sniffing lands). The dump lists each
+For a local file, `rustic dump-style` uses the canonical `file:` URL and
+checks linked sheets against the granted directory. For an HTTP(S) document,
+the [network loader](IMPLEMENTATION.md#net-02--documents-and-subresources-over-http-in-the-cli)
+applies the document's grants and stylesheet policy. Stylesheet bytes use
+`decode_stylesheet` with BOM, transport charset, `@charset` and document
+encoding fallback as applicable. The dump lists each
 `@link` with its `href` as written and each `@import` indented by depth, with
 statuses and dropped constructs. `--max-stylesheets`, `--max-stylesheet-bytes`
 and `--max-import-depth` set the budgets.
@@ -785,7 +783,8 @@ new value types (`parse_media_query_list`, `CssParser::media_query_list`):
 `MediaEnvironment` describes the surface: media type, viewport and device
 size, resolution, color depth, pointer and hover capabilities and the user
 preferences. The default is a 1280×720 light-scheme desktop screen with a
-mouse and no scripting (JavaScript does not run yet). A `Cascade` holds one
+mouse and `scripting: none`. This is the default media environment for
+static checks. A `Cascade` holds one
 environment and caches each sheet's media list results; `set_environment`
 re-evaluates them and returns whether any result changed, which is the signal
 to restyle after a viewport resize or preference change. Container queries

@@ -228,7 +228,7 @@ See [JS.md](JS.md#mathsumprecise-m9) for the contract and reproduction command.
 </details>
 
 <details>
-<summary>Desktop alpha (M8, current): 5 sections</summary>
+<summary>Desktop alpha (M8): 5 sections</summary>
 
 - [UI-05 — Hardware compositor (wgpu)](#ui-05--hardware-compositor-wgpu)
 - [TD-182 — Long-lived renderer per page](#td-182--long-lived-renderer-per-page)
@@ -824,7 +824,7 @@ also exposed.
 
 [ADR 0047](adr/0047-mutation-observers.md),
 [DOM §4.3](https://dom.spec.whatwg.org/#mutation-observers).
-Open debt: [TD-150](TECH_DEBT.md#td-150--dead-mutation-observer-registrations-are-dropped-lazily),
+Open debt: [TD-150](TECH_DEBT.md#td-150--dead-mutation-observer-registrations-are-dropped-lazily-paid),
 [TD-151](TECH_DEBT.md#td-151--mutation-records-for-parser-and-host-edits-resolve-observers-when-drained).
 
 ## WEB-07 — Error reporting, event handlers and console
@@ -930,9 +930,10 @@ the shared layout snapshot; the CLI fills it from block fragments.
 
 ## WEB-09 — Initial Window conformance baseline
 
-The headless CLI runs a pinned upstream `testharness.js` with an exact
-baseline for 59 Window WPT files. It reports 342 subtests, including 272
-passes and 70 expected failures. The runner checks vendored files by digest and
+The original M5 gate ran pinned upstream `testharness.js` against 59 Window
+WPT files. At that checkpoint it recorded 342 subtests, including 272 passes
+and 70 expected failures. The [current selection](SCRIPTING.md#pinned-window-web-platform-tests)
+is maintained separately. The runner checks vendored files by digest and
 fails if a subtest name, result or failure diagnosis changes.
 Body replacement, legacy event creation and headless visibility resolved 11
 failures from the first run, including nested dispatch and animation callbacks.
@@ -1971,11 +1972,11 @@ switching, and that a resize reflows. `paint.conformance` is complete and
 [PAINT.md](PAINT.md#rasterizer-rustic-raster) and
 [PAINT.md](PAINT.md#resize-and-zoom).
 
-## Queue status
+## M3 closing snapshot
 
 *Historical section, written between 2026-11-08 and 2026-11-10. The catalog
-is now `engine-v4` (25 subsystems, 226 capabilities, M1–M14; see
-[PROGRESS.md](PROGRESS.md)), and the current queue is
+now uses `engine-v4` (see [PROGRESS.md](PROGRESS.md) and the
+[measured inventory](progress/summary.md)), and the current queue is
 [ROADMAP §18](ROADMAP.md#18-current-implementation-queue). The paragraphs
 below record how the scope grew and are kept for that history.*
 
@@ -2291,7 +2292,7 @@ concatenations are ropes flattened on first read and by the collector
 string; top-level `var` globals are cached by dictionary entry; and `for-in`
 skips prototypes that contribute no keys. Recorded x86-64 results are in
 [JS.md](JS.md#limits-and-performance-gate-js-09). The ARM64 record is from QEMU
-emulation; native ARM64 timings are TD-125. Collection pauses pass the 5 ms
+emulation. M8 later recorded native ARM64 timings (TD-125 paid). Collection pauses pass the 5 ms
 target up to about 30 MiB of live heap (TD-95, `perf.gc`).
 
 ## REN-03 completion: font formats, shaping and text policies
@@ -2370,9 +2371,9 @@ queries), and CSS-08 closed the declared conformance gate with known failures
 recorded rather than hidden. The M2 catalog scope is complete, including its
 math-function and invalidation steps; broader CSS compatibility remains open.
 M3's declared rendering scope is complete (REN sections above, with open debt in
-the ledger). M4 has started with JS-01, the ECMAScript lexer and parser. All
-project crates remain safe Rust and unpublished; the only third-party Rust
-crates are the reviewed font adapters of ADR 0014.
+the ledger). At that checkpoint M4 had started with JS-01, the ECMAScript lexer and parser.
+Later dependency reviews and native FFI boundaries are recorded in
+[DEPENDENCIES.md](DEPENDENCIES.md) and [SECURITY.md](SECURITY.md).
 
 ## JS-06 — Static module records and graph resolution
 
@@ -2762,8 +2763,9 @@ origin to a loopback fixture and wins for that origin.
 | Who resolves | The broker resolves (`NetworkPolicy::address`); the network process never resolves and re-checks every address it is given | the tests above |
 | Windows confinement | Without a loopback fixture grant, the network process runs in its own `Rustic.Network` LPAC (internetClient, lpacCryptoServices, registryRead) | `the_windows_network_process_is_confined_for_remote_origins` |
 
-Status: verified on Linux; the Windows container and the native resolver
-wait for the next hosted run (ADR 0066).
+The initial Linux checks were followed by native desktop CI. See
+[ADR 0066](adr/0066-remote-addresses-and-windows-network-container.md) and the
+[platform verification record](PLATFORMS.md#verification-status).
 
 ## ISO-05 — Trusted address and permission strip
 

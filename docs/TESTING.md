@@ -2,26 +2,18 @@
 
 ## Current and planned coverage
 
-Today's suite covers M1–M4 and the finished part of M5: focused unit and
-negative tests in every crate, seeded mutation tests against independent models
-(DOM tree, margin adjacency, `:has()` and invalidation, tracing), pinned
-upstream corpora (WPT URL and CSS parsing selections, html5lib tokenizer and
-tree records at every chunk split, Unicode IDNA and segmentation data, a
-css-flexbox WPT selection, HarfBuzz shaping references, and Test262 parse,
-execution, module and Intl gates with exact passing lists), garbage-collection
-stress runs (a collection at every safe point), the JavaScript limits,
-benchmark-checksum and heap-size gates, scripted-document tests on a manual
-clock (turn order, timers, input, frames, wrapper identity and DOM/JS cycle
-collection), CLI snapshot and reftests, and 29 deterministic fuzz targets. The
-[evidence table](README.md#evidence-at-a-glance) lists the counts and each
-subsystem document records its revision. The pinned Window WPT selection runs
-through upstream `testharness.js`, network tests run against the loopback
-fixture server ([ADR 0053](adr/0053-loopback-fixture-server.md)), the CLI
-isolation suites drive compromised renderers and network processes against
-the sandboxes, and the first cross-engine JavaScript report exists
-([PERF-01](reviews/2026-11-19-perf-01-m5.md)). Browser-hosted WPT, a
-sanitizer job in CI and page-level cross-engine runs are planned; add each
-harness with the subsystem it tests.
+The required suite covers the completed M1–M8 contracts and implemented M9
+features. It includes focused and negative tests, seeded model checks,
+checked rendering references, GC stress, scripted turns on a manual clock,
+network/profile integration, hostile-peer isolation tests, GPU recovery and
+native accessibility probes. The [evidence table](README.md#evidence-at-a-glance)
+links to coverage and pinned sources. The [platform matrix](PLATFORMS.md)
+shows which checks run natively, under emulation and at compile time.
+
+Linux CI drives the [pinned Window WPT selection](SCRIPTING.md#pinned-window-web-platform-tests)
+through `rustic automate`. This covers selected DOM, CSSOM, encoding, URL,
+Fetch and Wasm behavior. The broader browser WPT matrix, a hosted sanitizer
+job and real-device testing remain future work.
 
 Test262 is not vendored, so its gates are `#[ignore]` tests that need a pinned
 checkout ([JS.md](JS.md#conformance)). They are not part of `cargo test` or the
@@ -37,10 +29,11 @@ when a passing list changes.
 | CPU image/reftests | Paint order, text, clips, geometry, resize | M3; small required suite plus scheduled broad suite |
 | Test262 | Language semantics and host-independent runtime behavior | M4; parse, execution, module and Intl gates with exact passing lists (manual, pinned checkout) |
 | JS heap and benchmarks | Bytes per value kind, GC pause and throughput regressions | M4 (JS-09); see [PERFORMANCE.md](PERFORMANCE.md#javascript-runtime) |
-| Scripted document fixtures | Bindings, GC edges, tasks/events, reentry and invalidation | M5; engine and bindings tests run today, invalidation with WEB-06, WPT `dom/` selection with `web.conformance` |
+| Scripted document fixtures | Bindings, GC edges, tasks/events, reentry and invalidation | M5 onward. Engine and bindings tests plus pinned Window WPT for selected APIs |
 | Network/profile integration | Redirects, policy, cancellation, partitioning and persistence | M6; loopback servers in PR jobs |
 | Hostile-peer/isolation tests | Broker and OS restrictions, process recovery | M7; supported-platform required gates |
-| WPT testharness/reftests | Exposed platform behavior through a real host/adapter | Incremental from M3/M5, integrated M8 |
+| WPT testharness/reftests | Exposed platform behavior through a real host/adapter | Static reftests and headless Window selection through the M8 automation protocol |
+| Wasm core and JS | Decoding/validation, traps, interpreter state, linking and Window API behavior | M9. Focused crate tests, recorded core replays, `wasm-binary` fuzzing and pinned Window WPT |
 | Fuzzing/sanitizers | Crashes, hangs, memory errors and hostile boundary input | M1 targets, expanded M4/M7; bounded smoke + scheduled campaigns |
 | Performance corpus | Time, memory and responsiveness regressions | M3 onward; stable controlled runners |
 | Manual/accessibility checks | Assistive technology, IME, permission and chrome flows | M8; release checklist |
@@ -75,17 +68,15 @@ enforce per-test time/memory limits. Separate unsupported features from unexpect
 semantic failures. Never run every file as a plain non-strict script and call the
 result Test262 conformance.
 
-The CSS conformance gate is the one WPT selection that runs today without a
-browser host: `tools/import_wpt_css_tests.py` reads literal parsing-helper calls
-statically from a pinned checkout, and `rustic-css/tests/wpt_conformance.rs`
-compares them against a reasoned ratchet list (see
-[CSS.md](CSS.md#conformance-gate)).
-
-WPT integration needs the appropriate test servers, certificates, hostnames,
-automation/runner adapter, screenshot mechanism, testharness result collection,
-and timeout handling. Introduce suites only when their execution requirements are
-met. See [WPT test types](https://web-platform-tests.org/writing-tests/index.html)
-and [expectations](https://web-platform-tests.org/tools/wptrunner/docs/expectation.html).
+The [CSS parsing gate](CSS.md#conformance-gate) extracts literal helper calls
+from a pinned WPT checkout and compares them against the reasoned ratchet.
+The [layout guide](LAYOUT.md) records the static flexbox selection. For
+hosted JavaScript behavior, use the [Window runner](SCRIPTING.md#pinned-window-web-platform-tests).
+Wasm core replay evidence is recorded by feature in the
+[implementation ledger](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation).
+Add broader WPT suites when their facilities (test servers, certificates,
+automation and screenshot or testharness reporting) are available. See
+[WPT test types](https://web-platform-tests.org/writing-tests/index.html).
 
 Expected failures carry a reduced explanation, tracking task, platform condition
 and suite revision. Unexpected failures and crashes block the declared required
@@ -110,15 +101,13 @@ Targets: URL/HTML/CSS/JS parsers, DOM mutation sequences, image/font adapters,
 serialization/IPC, and storage recovery. Add grammar-aware generation and seeded
 malformed cases. Enforce budgets inside targets; use timeouts outside them. Keep
 small minimized regressions in source and large corpora in external test storage.
-`rustic-fuzz` (DOC-08) provides dependency-free, deterministic, blind mutation
-fuzzing (`rustic-fuzz list`) for HTML tokenizer, document and
-fragment parsers; CSS syntax, selectors, cascade, media queries and incremental
-restyling; anonymous flow normalization; paint/raster; PNG, JPEG, GIF and WebP
-decoding; font parsing and shaping; the JavaScript parser, heap, interpreter and regular expressions; and URLs, with seed replay,
-minimized reproducers, a required fixed-seed CI smoke job and a nightly fresh-seed
-campaign; see [implementation progress](IMPLEMENTATION.md). Coverage-guided
-cargo-fuzz/libFuzzer and sanitizers remain candidate tools after a
-version/toolchain review; no workflow installs or claims to run them.
+`rustic-fuzz` (DOC-08) lists the active targets with
+`cargo run --locked -p rustic-fuzz -- list`. The required smoke job replays
+all registered targets with fixed seeds. A scheduled campaign uses fresh
+seeds over the separate matrix in [fuzz.yml](../.github/workflows/fuzz.yml).
+The [M7 security review](reviews/2026-11-20-m7-security-review.md) records the
+manual AddressSanitizer run. Coverage-guided fuzzing and a hosted sanitizer
+workflow remain future tools.
 
 The `wasm-binary` target mutates version 1 module seeds and their prefixes.
 It checks section and function spans against the original input, confirms

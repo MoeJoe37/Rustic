@@ -38,8 +38,12 @@ integration and hinting remain TD-85.
 following symlinks. Defaults cap 16,384 entries, depth 16, 512 faces and 128 MiB
 of input and, separately, decoded data. A failure publishes no faces; invalid
 individual fonts are counted as rejected. `system_font_roots()` suggests native
-paths without opening them. Native font services and directory races are TD-85.
-Neither layout nor shaping performs I/O or downloads fonts.
+paths without opening them. The desktop host uses fontconfig discovery on Linux,
+DirectWrite on Windows and Core Text on macOS. The broker applies file and byte
+limits when it loads fonts identified by the platform service.
+[ADR 0078](adr/0078-platform-font-services.md) describes the adapters.
+Directory races, backend caching and advanced font support are tracked in TD-85.
+Layout and shaping consume the admitted font data.
 
 ## Segmentation and CSS wrapping
 

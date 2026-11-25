@@ -1,9 +1,12 @@
-# M3 paint and raster reference
+# Paint, CPU raster and compositing
 
-REN-04a/REN-05a turn the block-only layout reference into pixels. Two crates
-follow the architecture split: `rustic-paint` builds an immutable display list,
-and `rustic-raster` interprets it on the CPU and writes PNG. Neither uses a GPU,
-a platform graphics API, `unsafe` code or a third-party crate.
+`rustic-paint` builds an immutable display list from layout fragments.
+`rustic-raster` interprets it on the CPU and writes PNG. The CPU path is the
+pixel reference for the desktop compositor. M8 added confined GPU-process
+compositing through `rustic-gpu`, with Vulkan, Metal and Direct3D 12 and a
+CPU fallback. [ADR 0071](adr/0071-gpu-backend.md) covers that boundary and
+[PERFORMANCE.md](PERFORMANCE.md#gpu-frame-budgets) records its frame-time gate.
+This page describes core paint semantics and reference rasterization.
 
 ## Display list (`rustic-paint`)
 
@@ -43,9 +46,9 @@ beyond checking element names.
   Out-of-gamut channels clip (TD-41). Fully transparent items are dropped.
 - **Visibility.** `visibility: hidden/collapse` boxes paint nothing of their
   own; visible descendants still paint.
-- **Unsupported, fails atomically:** any `background-image`,
-  border styles other than `solid`, and everything layout already rejects
-  (text, inline content, positioning, floats, overflow, replaced elements).
+- **Unsupported, fails atomically:** background images and unsupported border
+  styles or formatting. The text, image and effect sections below describe
+  the implemented inline, replaced-element and compositing paths.
 - **Limits.** `PaintLimits::max_items` (default 400,000) and cancellation.
 
 `rustic dump-paint <file>` prints the canvas color and every item with its
@@ -482,10 +485,11 @@ group. `url()` filters fail with a typed error. See TD-58.
 
 Non-solid outline styles, non-solid text decoration styles, `text-underline-offset` and
 `text-decoration-thickness`, emphasis marks and shadows; `background-image`,
-inline-level images, `object-fit` and `image-rendering`,
+`object-fit` and `image-rendering`,
 animated image playback, gradients, non-solid borders,
 `text-shadow`, `background-blend-mode`, `backdrop-filter`, `filter` URLs, `clip-path` URLs and the
-`evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, `transform-style: preserve-3d`, scrolling offsets, coverage-conflation-free corner
+`evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, `transform-style: preserve-3d`, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported
 reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57, TD-58, TD-59, TD-80 to TD-84 and docs/ROADMAP.md (REN-04 to
-REN-07).
+REN-07). The implemented viewport and container scroll paths are described
+in [ADR 0064](adr/0064-scrolling-and-compositor-scenes.md).

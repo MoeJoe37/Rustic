@@ -25,8 +25,8 @@ was still in progress, because nothing in it depends on scripting.
 
 | Missing | Where it lands |
 | --- | --- |
-| A late declaration in a *local* file (beyond its 64 KiB prefix) is ignored; only network documents reload | Local replay is ADR 0044's design; revisit with M7 file navigation |
-| `<script src>`, `<img src>` and module specifiers resolving their query in the document's encoding (local files ignore the query, so nothing observable changes yet) | NET-02, when these URLs reach a server |
+| A local declaration beyond the bounded 64 KiB prefix is ignored | The local loader's current replay contract is [ADR 0044](adr/0044-local-html-encoding-replay.md). The network loader can reload once while encoding is tentative |
+| Document-encoding query handling for `<script src>`, `<img src>` and module specifiers | Remaining URL/loader interoperability |
 | `TextDecoderStream`, `TextEncoderStream` and worker exposure | M9 Streams and worker bindings |
 | Form submission encodings (`application/x-www-form-urlencoded`, `multipart/form-data` in a legacy encoding) | NET-07 |
 | Vectorized or table-driven fast paths for multi-byte encodings | M12, if a profile shows decoding on a critical path |
@@ -127,5 +127,5 @@ standard's text and Rustic follows the text:
 
 The crate owns no resources beyond the reverse indexes, which are built once
 per process behind `OnceLock` and are immutable afterwards. It never decides
-which encoding a resource uses: that is the caller's job (CSS Syntax for
-stylesheets today, HTML sniffing and Fetch in M6).
+which encoding a resource uses. The CSS, HTML, Fetch and Window callers
+apply the rules for their own input.

@@ -4,28 +4,30 @@ An ADR records context, choice, alternatives, consequences, and the evidence tha
 would make us revisit it. Accepted here means the initial design baseline; it
 does not mean the future subsystem is implemented. Proposed changes are reviewed
 with the relevant task and tests. Supersede records with a new numbered ADR
-instead of rewriting the history of a decision.
+instead of rewriting the history of a decision. For later implementation
+and verification, follow the [ledger](../IMPLEMENTATION.md) and
+[platform record](../PLATFORMS.md#verification-status).
 
 | Record | Decision | Status |
 | --- | --- | --- |
 | [0001](0001-original-engine.md) | Original engine/runtime with reviewed low-level libraries | Accepted baseline |
 | [0002](0002-ownership-and-execution.md) | Agent-owned mutation, typed handles, traced JS/DOM graph | Accepted baseline; prototype required before bindings |
 | [0003](0003-rendering-strategy.md) | Headless deterministic CPU reference before GPU | Accepted baseline |
-| [0004](0004-isolation-rollout.md) | Local fixtures first; enforced isolation before arbitrary remote browsing | Accepted baseline; platform implementation pending |
+| [0004](0004-isolation-rollout.md) | Local fixtures first; enforced isolation before arbitrary remote browsing | Accepted baseline. Desktop confinement delivered in M7 |
 | [0005](0005-tooling-and-compatibility.md) | Rust workspace, pinned tools, MSRV, incremental conformance and narrow CI | Accepted baseline |
 | [0006](0006-desktop-and-mobile-platforms.md) | Original engine on desktop/Android/iOS with early mobile checks | Accepted scope update |
-| [0007](0007-product-scope.md) | Required GPU/Wasm, Rustic MV2/uBO, security and competitive product targets | Accepted scope update; implementation pending |
+| [0007](0007-product-scope.md) | Required GPU/Wasm, Rustic MV2/uBO, security and competitive product targets | Accepted scope update. Implementation tracked by the roadmap |
 | [0008](0008-tokenizer-drive.md) | Token-at-a-time input drive and explicit tree-builder text-mode feedback | Accepted internal contract; initial integration in 0009 |
-| [0009](0009-parser-owned-construction.md) | Parser-owned inert construction and explicit unsupported-tree errors | Accepted; complete document construction in DOC-06b, script integration pending |
+| [0009](0009-parser-owned-construction.md) | Parser-owned inert construction and explicit unsupported-tree errors | Accepted. DOC-06b supplied document construction and WEB-05 integrated script suspension |
 | [0010](0010-template-contents.md) | Template contents as separate parser-owned fragment roots | Accepted internal contract; general fragments in 0011 |
-| [0011](0011-fragments-cloning-adoption.md) | General fragments, PI/CDATA kinds, cloning and cross-document adoption with ID maps | Accepted internal contract; bindings pending |
+| [0011](0011-fragments-cloning-adoption.md) | General fragments, PI/CDATA kinds, cloning and cross-document adoption with ID maps | Accepted internal contract. Script bindings followed in WEB-03 |
 | [0012](0012-dom-tracing-prototype.md) | Per-tree DOM/host tracing prototype and the DOM pre-insert conformance gate | Accepted prototype; real heap with JS-03 |
 | [0013](0013-any-capable-device.md) | Support any device that can run a browser, enforced by tiered CI | Accepted scope update |
 | [0014](0014-reviewed-font-adapters.md) | Bounded HarfRust/Skrifa/Wuff adapters, exact dependency review and auditing | Accepted for M3 text |
 | [0015](0015-js-value-and-memory-layout.md) | 8-byte NaN-boxed JS values, `u32`-indexed budgeted arenas, Latin-1 strings, shapes | Accepted for JS-02; collection with JS-03 |
 | [0016](0016-js-garbage-collection.md) | Nonmoving mark/sweep at safe points, side mark bits, free lists, collected shapes and atoms, ephemerons, host-object tracing shared with the DOM | Accepted for JS-03 |
 | [0017](0017-js-bytecode-interpreter.md) | Register bytecode compiled per function, frames on agent stacks instead of Rust recursion, safe points, shape-and-epoch inline caches | Accepted for JS-04 |
-| [0018](0018-parity-and-performance-leadership.md) | Feature parity with Blink/Gecko/WebKit through a pinned inventory, performance leadership gates against all three, milestones M11–M13, `engine-v4` catalog | Accepted scope update; implementation pending |
+| [0018](0018-parity-and-performance-leadership.md) | Feature parity with Blink/Gecko/WebKit through a pinned inventory, performance leadership gates against all three, milestones M11–M13, `engine-v4` catalog | Accepted scope update. Implementation tracked by the roadmap |
 | [0019](0019-static-module-evaluation.md) | Traced environments, import slots and namespaces for source text modules | Accepted for synchronous evaluation |
 | [0020](0020-document-lifecycle.md) | Host-owned document lifetimes with bounded admission and coordinated cancellation | Accepted for the headless pipeline |
 | [0021](0021-document-script-turns.md) | Document-owned script tasks and bounded microtask checkpoints | Accepted for the initial WEB-01 scheduler |
@@ -52,7 +54,7 @@ instead of rewriting the history of a decision.
 | [0042](0042-scripted-render-state.md) | Style, layout and frame validity in scripted documents | Accepted for WEB-06 |
 | [0043](0043-encoding-standard.md) | Original Encoding Standard decoders and encoders over pinned, generated indexes | Accepted for `url.encoding` (M6 entry) |
 | [0044](0044-local-html-encoding-replay.md) | Bounded local HTML encoding replay before author script | Accepted for WEB-05 |
-| [0045](0045-live-computed-style-reads.md) | Live CSSOM style declarations, shared layout flush and resource revision | Accepted design for WEB-06; initial read-only slice implemented, gate pending |
+| [0045](0045-live-computed-style-reads.md) | Live CSSOM style declarations, shared layout flush and resource revision | Accepted for WEB-06. Later CSSOM changes are recorded in [CSS.md](../CSS.md#transitions-and-animations) |
 | [0046](0046-parse-budget-degradation.md) | Parse budgets degrade: Chromium's depth cap and truncation at the node budget | Accepted for TD-02 (M6 entry) |
 | [0047](0047-mutation-observers.md) | Mutation observers over a document journal, with registrations held as node edges | Accepted for WEB-07 (`dom.observers`) |
 | [0048](0048-error-reporting-and-event-handlers.md) | Error reporting, rejection events, event handler attributes and a bounded console sink | Accepted for WEB-07 |
@@ -76,9 +78,9 @@ instead of rewriting the history of a decision.
 | [0066](0066-remote-addresses-and-windows-network-container.md) | Remote origins resolve through the system resolver in the broker and reach only public addresses (no DNS rebinding to loopback or private networks); the Windows network process runs in a `Rustic.Network` LPAC with internetClient | Accepted |
 | [0067](0067-mobile-devices-last.md) | Android and iOS device work moves to the final milestone M14; M8 is the desktop alpha, M13 desktop 1.0; mobile CI checks stay; external review recorded as an external dependency | Accepted scope update |
 | [0068](0068-gpu-process.md) | GPU process: frame compositing moves from the broker to a confined, stateless `rustic __gpu` child with crash/hang recovery and CPU fallback; hardware backends are a later record | Accepted (step 1) |
-| [0069](0069-long-lived-renderer.md) | One long-lived renderer per page driven by input and frame requests over IPC, broker-owned time, user scrolls through the page, bounded renderer replacement; `rustic drive` headless driver | Accepted (renderer side; window adoption with UI-01) |
+| [0069](0069-long-lived-renderer.md) | One long-lived renderer per page driven by input and frame requests over IPC, broker-owned time, user scrolls through the page, bounded renderer replacement; `rustic drive` headless driver | Accepted. Native window adoption followed in ADR 0074 |
 | [0070](0070-native-promise-continuations.md) | Traced native promise continuations and collection between jobs | Accepted for M9 `Array.fromAsync` |
-| [0071](0071-gpu-backend.md) | GPU backend: wgpu 26 (Vulkan, Metal, Direct3D 12) in the GPU process; compute-shader compositing byte-identical to the CPU reference; device-loss reopen; Linux GPU sandbox profile | Accepted (desktop; window surfaces and Windows/macOS GPU profiles pending) |
+| [0071](0071-gpu-backend.md) | GPU backend: wgpu 26 (Vulkan, Metal, Direct3D 12) in the GPU process; compute-shader compositing byte-identical to the CPU reference; device-loss reopen; Linux GPU sandbox profile | Accepted. Window-surface recovery and confined Windows/macOS GPU adapters followed in M8 |
 | [0072](0072-automation-protocol.md) | Automation and DevTools protocol: `rustic automate` over stdio, no listening socket, broker-enforced grants, VM debugger hooks, redacted network diagnostics | Accepted |
 | [0073](0073-accessibility.md) | Accessibility: tree built in the renderer (HTML-AAM, ARIA, AccName) and sent over IPC as a bounded wire message; AccessKit 0.25 bridges (UI Automation, NSAccessibility, AT-SPI) in the shell; editing, selection and IME composition in the engine | Accepted (desktop; real screen-reader acceptance external) |
 | [0074](0074-browser-shell-and-native-hosts.md) | UI-01 browser shell (tabs, history, address entry, find, zoom, trusted strip) on live pages; host input, IME and lifecycle; system fonts per OS and collection members | Accepted |

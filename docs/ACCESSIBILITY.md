@@ -43,10 +43,10 @@ document "Accessibility probe" @0,0 1280x178.88
 
 ## Across the process boundary
 
-The renderer is untrusted. Its tree reaches the broker as one
-`RendererMessage::Accessibility` message of at most 32 MiB (or the
-`a11y` report line of `render --report-a11y`, which `rustic view` uses
-each frame). `rustic_a11y::wire::decode` applies the same limits as the
+The renderer is untrusted. `rustic view` receives a bounded tree from its
+long-lived page renderer while the platform bridge is listening.
+`RendererMessage::Accessibility` carries at most 32 MiB. The
+`render --report-a11y` diagnostic also emits an `a11y` report line. `rustic_a11y::wire::decode` applies the same limits as the
 builder and rejects unknown roles, duplicate ids, parents that do not
 precede their children, invalid UTF-8 and counts it has not bounded.
 Node ids carry the DOM node's generation, so an id an assistive
@@ -65,9 +65,9 @@ technology asks for it.
 Assistive actions map back to `PageInput::Assistive` requests: focus,
 click (activation behaviour, as a user's click), set value (with
 `beforeinput`/`input`) and set selection; scroll-into-view has no page
-request yet.
-`rustic view` does not deliver actions yet (TD-191); `rustic drive`
-scripts do:
+request yet. `rustic view` routes supported actions to the live page.
+Browser chrome is outside the exposed page tree (TD-191). To exercise the
+same page inputs headlessly, use `rustic drive`:
 
 ```text
 a11y

@@ -69,8 +69,9 @@ make it the final thing to do.
 
 - The overall percentage moves a little (new mobile capabilities add scope
   to `perf` and `release`); no completed work loses credit.
-- M8 is the current milestone and starts with the GPU process (UI-05) and
-  the long-lived renderer (TD-182).
+- At the time of this decision, M8 was starting with the GPU process (UI-05)
+  and the long-lived renderer (TD-182). The
+  [M8 completion review](../reviews/2026-11-23-m8-completion.md) records delivery.
 - TECH_DEBT items due on mobile hosts (TD-12's Android/iOS part) move to
   the M14 row of the payoff schedule.
 

@@ -16,8 +16,8 @@ Mozilla/Firefox/Gecko, SpiderMonkey, Servo, Chromium/Blink and WebKit are exclud
 as implementation foundations on every target. A system WebView must not silently
 replace Rustic's engine on mobile.
 
-Current mobile support consists of shared-library cross-compilation checks
-(green in hosted CI on 2026-11-22 for all seven Android and iOS targets) and
+Current mobile support consists of seven shared-library cross-compilation
+checks in the [hosted platform matrix](PLATFORMS.md#verification-status) and
 the mobile isolation of [ADR 0059](adr/0059-mobile-renderer-isolation.md)
 (Proposed, MOB-07): on Android a test app (`android/`) runs the renderer in an
 isolated-process service through `crates/rustic-android`, with an instrumented
@@ -83,8 +83,8 @@ release; missing approvals cannot be represented as successful runtime support.
 | MOB-09 | M14 | Shared site/conformance corpus plus mobile editing/fonts/graphics/accessibility and measured energy/memory behavior |
 | MOB-10 | M14 | Reproducible native artifacts, supported OS/ABI policy, signing/distribution gates and security updates |
 
-Mobile CPU surface prototypes arrive alongside M3's renderer. GPU optimization
-follows a correct CPU/reference path, with surface-loss recovery and device tests.
+M14 starts mobile surface prototypes on the existing CPU renderer. GPU
+acceptance follows with reference parity, surface recovery and device tests.
 Do not assume desktop window, graphics or process interfaces work unchanged.
 
 ## Android
@@ -155,8 +155,9 @@ cargo check --locked --workspace --lib --target aarch64-linux-android
 On macOS, use `aarch64-apple-ios` or `aarch64-apple-ios-sim` with the appropriate
 Xcode SDK; use `x86_64-linux-android` for the Android emulator compile check.
 
-Add NDK/Xcode link/package checks when bridges exist, then emulator/simulator
-runtime tests. Releases additionally need real-device rendering, touch/IME,
+The separate Android emulator job already builds and packages the isolation
+fixture with the NDK and Gradle and runs its instrumented tests. Add app
+linking, simulator and device tests as the native mobile hosts land. Releases additionally need real-device rendering, touch/IME,
 accessibility, lifecycle, memory/energy, permission, profile and isolation evidence.
 Keep shared conformance fixtures identical across targets with explicit reasons
 for platform-specific expectations. Cross-compilation alone is not device support.

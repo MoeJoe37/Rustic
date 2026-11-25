@@ -187,7 +187,9 @@ same default computed-style viewport. It reports `content=(x,y,width,height)`,
 `padding=(...)` and `border=(...)`, all in CSS pixels. The golden geometry
 fixture is checked at chunk sizes 1, 7 and 65536 and exact output boundaries;
 an integration case also loads a local linked stylesheet and verifies that
-unshaped text fails with empty stdout. All dump commands remain local-only.
+unshaped text fails with empty stdout. These commands also accept HTTP(S)
+documents through the broker when the CLI is given explicit origin grants.
+See [the network loader contract](IMPLEMENTATION.md#net-02--documents-and-subresources-over-http-in-the-cli).
 
 ## Status of the M3 layout units
 

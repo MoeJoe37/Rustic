@@ -6,18 +6,10 @@ Rustic implements specified web behavior rather than a project-specific HTML or
 JavaScript dialect. Subsets are inevitable during development; publish precisely
 which algorithms, syntax, APIs, and test selections work. Standards links below
 are authoritative references, not claims that Rustic is conformant today.
-No HTML, CSS, JavaScript, or network behavior is implemented at M0.
-
-Current M1 evidence includes the original [URL/parser and origin subset](URL.md)
-with 887 pinned upstream URL-data cases, including file and non-ASCII URLs, plus named
-validation diagnostics and UTS #46 IDNA checked against all well-formed Unicode
-17.0.0 IdnaTestV2 cases and WPT `toascii.json`. This is not full browser WPT
-conformance and does not implement blob or browser binding features.
-HTML evidence now includes streaming input, tags/declarations and character
-references, with 1,079 selected declaration cases and all 4,626 cases in three
-pinned reference files; [HTML.md](HTML.md) records exact scope and provenance.
-The text-mode corpus adds 109 selected records in 282 explicit RCDATA/RAWTEXT/
-script/plaintext contexts. Tokenizer context selection is not HTML tree construction.
+The [evidence index](README.md#evidence-at-a-glance) links to the current
+pinned selections. They include parser and rendering corpora, Test262,
+Window WPT through the automation protocol, and recorded Wasm core replays.
+See [TESTING.md](TESTING.md#conformance-runners) for how the selections run.
 
 The full-product baseline targets complete required CSS/ECMAScript semantics and
 broad real-site interoperability, including GPU-backed APIs, WebAssembly and the
@@ -49,7 +41,7 @@ the discrepancy; don't silently hard-code a site-specific exception.
 | Web security | [CSP](https://www.w3.org/TR/CSP3/), [Mixed Content](https://www.w3.org/TR/mixed-content/), [Secure Contexts](https://www.w3.org/TR/secure-contexts/) | Enforce policies on every implemented loading/execution path |
 | Persistence | [Storage](https://storage.spec.whatwg.org/), [IndexedDB](https://www.w3.org/TR/IndexedDB/), [Service Workers](https://www.w3.org/TR/service-workers/) | Partition keys/quotas first; transactions/offline later |
 | Accessibility | [HTML AAM](https://www.w3.org/TR/html-aam-1.0/), [Core AAM](https://www.w3.org/TR/core-aam-1.2/), [Accessible Name](https://www.w3.org/TR/accname-1.2/) | Semantic tree, roles/names/focus and platform mapping |
-| Interoperability | [WPT](https://github.com/web-platform-tests/wpt), [WPT documentation](https://web-platform-tests.org/) | Parser data first; reftests and testharness after runner integration |
+| Interoperability | [WPT](https://github.com/web-platform-tests/wpt), [WPT documentation](https://web-platform-tests.org/) | Pinned parser data, selected static reftests and Window testharness execution |
 
 Living standards and working drafts evolve. Implement only the normative features
 selected for the milestone; proposals are not automatically part of the target.
@@ -67,10 +59,11 @@ that these specifications do not provide as a Rust implementation blueprint.
 | Supported in declared scope | Required selected tests and product flows pass for a stated version/platform |
 | Disabled | Implementation deliberately unavailable with a stated reason |
 
-Add a machine-readable feature inventory once real subsystems exist. Each entry
-will contain a stable feature ID, status, platforms, flags, spec links, milestone,
-test selection, known failures, and owning task. Do not populate a giant inventory
-with false “supported” flags just because an empty crate or binding exists.
+Use [the machine-readable catalog](../progress/catalog.json) for capability
+IDs, milestone assignment, implementation status and evidence. The
+[implementation ledger](IMPLEMENTATION.md) and subsystem guides record
+behavior and limits. The browser-by-browser parity inventory is a separate
+[M11 deliverable](ROADMAP.md#14-m11--web-platform-parity).
 
 ## Conformance results and updates
 

@@ -49,8 +49,10 @@ Pending: strict (`beStrict`) domain validation for conformance checkers, the
 `domain-to-ASCII` validation error, and blob URL registries and origin rules.
 Queries of special URLs can be encoded in a legacy document encoding with
 `UrlParser::with_query_encoding` ([ENCODING.md](ENCODING.md)).
-Successful parsing does not mean a scheme is navigable, secure, allowed by policy,
-or supported by the future network service. FTP syntax support is not an FTP client.
+Parsing produces a URL record. The broker and network host separately decide
+whether navigation is supported and whether a request has authority. The
+[network loader](IMPLEMENTATION.md#net-02--documents-and-subresources-over-http-in-the-cli)
+handles granted HTTP(S) requests. FTP support here covers URL syntax.
 
 ## Window URL and search parameters
 
@@ -131,8 +133,10 @@ assert_ne!(assigned, Origin::opaque());
 ```
 
 Tuple origins compare canonical scheme/host/normalized port. Credentials, path,
-query and fragment do not enter that comparison. An origin is not a schemeful
-site or registrable domain; public-suffix/site policy remains future work.
+query and fragment do not enter that comparison. `rustic-net` computes
+schemeful sites and registrable domains using its pinned Public Suffix List
+for cookie and partition policy. [ADR 0054](adr/0054-sites-and-cookie-policy.md)
+documents that layer.
 
 Every `Url::origin()` derivation for a non-tuple URL returns a fresh opaque origin,
 as specified for those URL-origin cases. A navigation/document layer must assign

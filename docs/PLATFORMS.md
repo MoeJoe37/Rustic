@@ -65,34 +65,24 @@ behavior evidence, not device support: device support still requires the
 native host, rendering, input, lifecycle and performance gates in the
 [roadmap](ROADMAP.md) and [mobile plan](MOBILE.md).
 
-## Current verification status (2026-11-22)
+## Verification status
 
-The tiers above describe the configured CI, and since 2026-11-22 they run
-again: the repository moved to `moejoe873/Rustic`, where GitHub Actions starts
-jobs, and the full matrix passed on `feature` at `9961c1c` (native x64 and
-ARM64 Linux, Windows and macOS; the emulated 32-bit ARM, 32-bit x86, RISC-V and
-big-endian s390x runs; the cross and mobile compile checks). Later that day
-GitHub stopped starting jobs on the new account too (failed payments or a
-spending limit), so later commits have no hosted run until it resumes; the
-[Actions page](https://github.com/moejoe873/Rustic/actions) shows each push.
+The hosted matrix is active on
+[MoeJoe37/Rustic](https://github.com/MoeJoe37/Rustic/actions). On 2026-11-25
+it passed on `feature` at [`cac4d66`](https://github.com/MoeJoe37/Rustic/actions/runs/45590499388)
+and on `main` at [`cc6aad7`](https://github.com/MoeJoe37/Rustic/actions/runs/45607870599).
+Those runs cover the native, emulated, cross and mobile jobs listed here.
+Use the run for the exact commit under review when checking later changes.
 
-From 2026-11-08 to 2026-11-22 GitHub did not start hosted jobs (an account
-billing limit), and merges were checked by the sandbox gate of
-[DEVELOPMENT.md](DEVELOPMENT.md#branches-and-merging) on one Linux x64 machine.
-The first native runs after that window found portability bugs in that work
-(Windows AppContainer profile races, macOS `dyld` under Seatbelt, missing C
-cross compilers for `ring`), all fixed and recorded in [TD-12](TECH_DEBT.md).
-If Actions stops again, this is what the sandbox gate can and cannot show:
-
-| Platform | What the sandbox gate can show |
-| --- | --- |
-| Linux x64 | Full suite, native |
-| Linux 32-bit ARM, 32-bit x86, RISC-V, big-endian s390x | Full suite under QEMU |
-| Linux aarch64 | Compile check |
-| Windows x64 and ARM64 | Compile check at most (GNU-ABI targets); no test run, nothing for the MSVC targets |
-| macOS x64 and ARM64 | Nothing: these targets cannot be built or run from a Linux sandbox |
-| Android (ARM64, 32-bit ARM, x86-64, x86) | Compile check, as in hosted CI |
-| iOS/iPadOS (device and simulator) | Compile check of the shared libraries, as in hosted CI |
+The first complete hosted matrix passed at `9961c1c` on 2026-11-22 after
+billing interruptions. It caught Windows AppContainer profile races, macOS
+Seatbelt loader issues and missing C cross compilers for `ring`. The fixes and
+remaining partial targets are tracked in [TD-12](TECH_DEBT.md#td-12--mobile-is-check-only-hosted-ci-is-intermittent).
+A Linux development environment can reproduce the Linux native and emulated
+jobs and the applicable cross-checks. Native Windows and macOS execution and
+Apple SDK checks need the corresponding runners. Local sandbox results also
+depend on whether the environment permits the namespaces and sockets used by
+the isolation tests.
 
 What hosted CI still does not cover:
 
@@ -105,7 +95,7 @@ What hosted CI still does not cover:
 - **Two cross-checks are partial.** `aarch64-pc-windows-gnullvm` and
   `loongarch64-unknown-linux-gnu` have no packaged C cross compiler for
   `ring`, so the crates that use it are left out there (TD-12).
-- **The JavaScript benchmark record for ARM64 is emulated** (TD-125, due in M8).
+- **Performance evidence is workload-specific.** Native Linux ARM64 JavaScript benchmark evidence is recorded in [JS.md](JS.md#limits-and-performance-gate-js-09). Hardware GPU and energy measurements are separate from the software Vulkan gate.
 
 The engine now has OS-specific code (the renderer and network-process sandboxes
 in `rustic-sandbox`, the desktop window in `rustic-shell`), so a change to

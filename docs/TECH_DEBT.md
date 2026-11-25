@@ -71,8 +71,8 @@ scope limits, but the short ones before them. The "before remote browsing is on 
 (formerly "M7 entry"), whose entries were meant to be paid before hostile
 remote content, is empty since 2026-11-23: its last entries (TD-161,
 TD-165, TD-134, and TD-111's exponential regular expressions) were paid by
-M8 workstream 5 and the row was removed. TD-12 (hosted jobs have stopped twice on billing; the
-Android and iOS device runs are deliberately deferred to M14).
+M8 workstream 5 and the row was removed. Hosted CI is active after earlier
+billing interruptions. TD-12's remaining device runs are scheduled for M14.
 
 ## Ledger
 
@@ -92,7 +92,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-09 | Deliberate | Workspace | `rustic-engine` holds only `Viewport` | Paid |
 | TD-10 | Deliberate | HTML parser | Processing-instruction tree construction, scripting-on trees and `selectedcontent` are covered. | Paid |
 | TD-11 | Deliberate | URL | `blob:` URLs return unsupported (`file:` paid by DOC-02b, IDNA paid by `url.idna`) | Open, `url.blob` (M9) |
-| TD-12 | Deliberate | CI / platforms | Native x64/ARM64 CI ran green on 2026-11-22 (jobs stopped again later that day on a billing limit); mobile is check-only and two cross-checks skip the crates that use ring | Open |
+| TD-12 | Deliberate | CI / platforms | Hosted desktop tests run on x64 and ARM64. Android has compile checks and an isolation emulator job. iOS is compile-checked. Two cross-checks omit the crates that need `ring` | Open |
 | TD-13 | Deliberate | Tokenizer / tree builder | Five spec state-machine functions exceed 100 lines | Open |
 | TD-14 | Watch | CI | Branch pushes and pull requests both run the full CI | Open |
 | TD-15 | Deliberate | HTML parser / URL / base | HTML and URL diagnostics not yet routed through `rustic-base` diagnostics | Open, M10 |
@@ -139,7 +139,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-56 | Deliberate | Paint | First `clip-path`: no `url()`/SVG, no `evenodd`, no `xywh()`/`rect()`/`path()`/`shape()`, full-surface layers | Open, REN-04g |
 | TD-57 | Deliberate | Paint | First transforms: `preserve-3d` flattened, layout unaware of transformed containing blocks, approximate projected curves | Open, REN-04h |
 | TD-58 | Deliberate | Paint | First shadows, blending and filters: sRGB filters, full-surface groups, no ink overflow, approximate blur under transforms | Open, REN-04i |
-| TD-59 | Deliberate | Paint | First tiled raster, damage and resize: each tile scans the whole list, no CI frame-time gate, a new filter margin repaints everything, list diff by common prefix and suffix, relayout from scratch | Open, REN-04j, M9 |
+| TD-59 | Deliberate | Paint | CPU tile culling skips irrelevant commands. Filter-margin changes still repaint everything, damage uses a common-prefix/suffix diff and resize relayouts from scratch. The CI frame-time gate covers GPU compositing on lavapipe | Open, REN-04j, M9 |
 | TD-70 | Deliberate | Layout | Atomic inlines and block-in-inline splitting: baseline, relative-offset and paint-order approximations | Open, M3 layout |
 | TD-71 | Deliberate | Layout | Sticky positioning: no overflow adjustment, no nested sticky composition, inline sticky boxes stay static | Open, M3 layout |
 | TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 53 of 91 static pages fail (writing modes, images, tables, 6 undiagnosed) | Open, REN-08 |
@@ -149,7 +149,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-82 | Deliberate | Paint | Animated GIF/WebP decode every frame but paint only the first | Open, paint.images |
 | TD-83 | Watch | Codecs | Image store budget bounds retained pixels, not outstanding `Arc` copies or the transient decode peak | Paid |
 | TD-84 | Deliberate | Codecs | Decoder speed: bit-serial VP8L/JPEG slow paths, per-pixel loops; simple VP8 filter and multi-partition frames lack reference images | Open, paint.images |
-| TD-85 | Deliberate | Fonts | Backend caches and temporary memory and handle-based traversal. System fonts by fontconfig, DirectWrite and Core Text (ADR 0078), per-OS tables and collection members are in (2026-11-23, ADR 0074) | Partly paid, M9, M9 |
+| TD-85 | Deliberate | Fonts | Backend caches and temporary memory and handle-based traversal. System fonts by fontconfig, DirectWrite and Core Text (ADR 0078), per-OS tables and collection members are in (2026-11-23, ADR 0074) | Partly paid, M9 |
 | TD-86 | Deliberate | Text | Cross-source optional ligatures, selected-break reshaping and advanced carets | Open, M9 |
 | TD-87 | Deliberate | Text | English-only auto resources, SA segmentation and Level 4 phrases | Open, M9 |
 | TD-88 | Deliberate | JS | RegExp literal patterns are not validated at parse time (167 Test262 parse files) | Paid |
@@ -189,7 +189,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-122 | Deliberate | JS | DateTimeFormat uses a limited calendar set, Gregorian pattern selection and GMT fallbacks for zone names | Open, `js.conformance` (M9) |
 | TD-123 | Deliberate | DOM / JS | Interpreter safe points used JS-only collection | Paid |
 | TD-124 | Deliberate | JS / Web IDL | DOMException has the base interface, with native stacks, derived quota exceptions and structured cloning deferred | Open |
-| TD-125 | Deliberate | JS | The JS-09 ARM64 benchmark record is from QEMU emulation: no timings from native ARM64 hardware | Paid |
+| TD-125 | Deliberate | JS | M4 used QEMU. M8 recorded native ARM64 timings on all three desktop OS families | Paid |
 | TD-126 | Deliberate | Web bindings | The page host exposes a subset of HTML and DOM interfaces | Open, DOM and HTML integration |
 | TD-127 | Deliberate | DOM | Element and attribute names use scalar UTF-8 storage | Open, DOM names and selectors |
 | TD-128 | Deliberate | Web bindings | Live NodeList length and positional access walked child links | Paid |
@@ -209,7 +209,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-142 | Bad | JS | Built-in edge bugs: weak keys, the String Iterator tag, `Object.fromEntries`, `Object.prototype`'s prototype, array `length` order and buffer checks | Paid |
 | TD-143 | Deliberate | JS | Recent-edition and stage 3 library features are missing (iterator chunking, zip, `includes` and `join`, immutable `ArrayBuffer`, `ShadowRealm`, Temporal) | Open, per ECMAScript edition (M9) |
 | TD-144 | Deliberate | JS | Proper tail calls are not implemented, as in V8 and SpiderMonkey | Open, by design |
-| TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, when hosted CI returns |
+| TD-145 | Deliberate | Process / JS | The Test262 execution gates run only by hand on an x86-64 host: no hosted CI job and no 32-bit, ARM64 or big-endian run | Open, CI portability evidence |
 | TD-146 | Watch | Encoding | Legacy multi-byte decoders and encoders run one byte or scalar value at a time, with no vectorized or table-driven fast path beyond ASCII runs | Open, M12 |
 | TD-147 | Deliberate | DOM / parser / layout | The default depth limit (256 edges) flattens deep pages earlier than Chromium's cap (514) | Open, M9 |
 | TD-148 | Watch | Web bindings / CLI | Every layout flush serializes all supported longhands for every styled element, and each computed-style read clones the element's whole record | Paid |
@@ -255,7 +255,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-188 | Deliberate | DevTools | Inline script lines are mapped to document lines by finding the script text in the document bytes, which works only for UTF-8-compatible documents; others report script-relative lines | Open, M9 (language and web APIs) |
 | TD-189 | Deliberate | DevTools / network | `network.requests` lists only requests of network documents (`--allow-origin`); local-file loads and frames' requests are not logged, and the log keeps no timing or bodies | Open, M9 (language and web APIs) |
 | TD-190 | Deliberate | DevTools | Automation protocol 1 has no CSS matched-rule or cascade inspection, no key or pointer-move input (only clicks), no DOM editing and no event timeline (profiling gives statement counts and turn metrics) | Open, M9 (CSS, layout and paint) |
-| TD-191 | Deliberate | Accessibility / desktop host | **Partly paid 2026-11-23 (ADR 0074):** `rustic view` drives a live page and passes assistive actions (focus, click, set value, set selection) to it. Remaining: `rustic view` exposes each frame's accessibility tree to the platform bridge and routes IME composition into the focused page field (TD-197), but the browser chrome (address strip, permission prompt) is not in the tree. The live renderer already accepts both (ADR 0073, `rustic drive`) **Rescheduled 2026-11-23 (M8 completion):** moved to the M10 (beta) row: per-frame accessibility trees and IME routing ship with the M10 beta, together with the screen-reader acceptance moved there. | Partly paid, M10 |
+| TD-191 | Deliberate | Accessibility / desktop host | `rustic view` exposes the live page and routes assistive actions. Browser chrome and separate frame trees still need platform accessibility integration | Partly paid, M10 |
 | TD-192 | Deliberate | Accessibility / layout | Pages with form controls cannot be laid out yet (form controls are special elements the block reference does not support), so their accessibility tree comes from the box tree without bounds, and `rustic view` cannot show them | Open, M9 CSS, layout and paint |
 | TD-193 | Deliberate | Accessibility | The whole tree is rebuilt, encoded and sent for every request and, while an assistive technology listens, for every `rustic view` frame (since 2026-11-23, ADR 0074, none while nobody listens); there are no incremental updates | Open, M12 (performance leadership) |
 | TD-194 | Deliberate | Editing | Text controls move the caret by code point (no grapheme or word movement, no Ctrl+Arrow), have no undo/redo or clipboard, fire no `select`/`selectionchange` events, and `contenteditable` is not editable | Open, M9 language and web APIs |
@@ -413,31 +413,19 @@ only blob cases are excluded).
 
 ### TD-12 — Mobile is check-only; hosted CI is intermittent
 
-`ci.yml` now tests natively on Linux, Windows and macOS for both x64 and
-ARM64, and under emulation for armv7, i686 and riscv64 (32-bit pointers and a
-third instruction set). Android and iOS still get only `cargo check`, with no
-tests on a device or simulator. Since 2026-11-08 GitHub has refused to start
-the Windows and macOS jobs because of an account billing limit, so those
-platforms have no CI evidence at all. In the meantime merges are verified in a
-local sandbox: the full Linux suite, MSRV 1.85, fuzz smoke, and `cargo check`
-for aarch64 Linux, Android (aarch64 and armv7), Windows (x86_64-gnu), iOS and
-i686. **Pay:** restore billing so the full matrix runs, then add Android/iOS
-test runs once a host exists. **Trigger:** now for billing; mobile tests with
-the mobile hosts, which are M14 since 2026-11-22 (ADR 0067).
-**Update 2026-11-22 (billing paid):** the repository moved to an account
-where Actions runs, and the full matrix ran again for the first time since
-2026-11-08 (native Linux/Windows/macOS x64 and ARM64). Its findings were
-fixed in the same pass: cross-checks lacked C compilers for ring (M6),
-now installed per target (Android uses the runner's NDK; `i686-pc-windows-msvc`
-is checked on a Windows runner); `aarch64-pc-windows-gnullvm` and
-`loongarch64-unknown-linux-gnu` have no packaged C cross compiler, so there
-the crates that use ring (`rustic-net`, `rustic-engine`, `rustic-bindings`,
-`rustic-cli`, `rustic-fuzz`) are left out of the check. What remains:
-those two partial checks, and Android/iOS test runs. The full matrix passed
-on `feature` at `9961c1c` (run 45003031562). Later on 2026-11-22 GitHub
-stopped starting jobs on the new account too ("recent account payments have
-failed or your spending limit needs to be increased"), so later commits wait
-for the next hosted run.
+The [platform matrix](PLATFORMS.md#verification-status) records hosted
+runs for native Linux, Windows and macOS on x64/ARM64, the emulated jobs,
+and compile checks. Billing interruptions previously limited verification
+to the Linux sandbox. The first complete run on 2026-11-22 (`9961c1c`, run
+45003031562) exposed Windows AppContainer profile races, macOS Seatbelt
+loader issues and missing `ring` cross compilers. Those findings were fixed.
+
+**Open:** physical Android and iOS runtime acceptance in M14, plus two
+partial cross-checks. `aarch64-pc-windows-gnullvm` and
+`loongarch64-unknown-linux-gnu` omit crates that require `ring` because the
+workflow has no packaged C cross compiler for those targets. The Android
+isolated-renderer test already runs on an emulator. See
+[ADR 0067](adr/0067-mobile-devices-last.md) for mobile scheduling.
 
 ### TD-13 — Long spec state-machine functions
 
@@ -1441,8 +1429,8 @@ codec and other OS service adapters belong to the capabilities that need
 them (ADR 0078), not to this entry.
 
 Pay before loading arbitrary remote fonts or native platform font integration:
-add global temporary/cache accounting, native service adapters and native device
-acceptance. The current host grants local files explicitly; neither shaping nor
+add global temporary/cache accounting and handle-based traversal. Native
+device acceptance follows the platform roadmap. The current host grants local files explicitly; neither shaping nor
 layout performs I/O or downloads fonts.
 **Rescheduled 2026-11-23 (M8 completion):** moved to the M9 text and codecs row: backend caches and handle-based traversal are M9 text work.
 
@@ -2446,7 +2434,7 @@ workflow runs them. They run by hand in the sandbox (x86-64, release), and
 `docs/JS.md` says the lists are not checked on other targets. Nothing shows
 the passing lists hold on 32-bit, ARM64 or big-endian (s390x) builds, where
 NaN-boxing, `libm` results for `Math` (allowed to differ in the last bit)
-and endian-sensitive buffer code differ. Pay when hosted CI returns: add a
+and endian-sensitive buffer code differ. Pay by adding a
 job that fetches the pinned revision, runs the gates on x86-64 and ARM64,
 and runs at least the built-in gate under the emulated tiers.
 

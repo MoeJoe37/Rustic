@@ -231,8 +231,9 @@ interpreter-only alpha cannot reach.
 
 ### GPU frame budgets
 
-`compositor.parity` gates the GPU compositor's frame time as well as its
-byte-exact parity. The GPU frame benchmark
+The required CI job gates byte-exact parity and frame time on lavapipe.
+Hardware frame timing and energy remain external steps of `compositor.parity`
+for the M10 beta. The GPU frame benchmark
 (`crates/rustic-gpu/examples/gpu_frame_bench.rs`) composites two generated
 scenes the way the GPU process does: it uploads the page and frame layers,
 dispatches, and reads the result back. The CPU reference

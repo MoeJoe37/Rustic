@@ -1,8 +1,9 @@
 # Rustic extensions and the uBlock Origin port
 
-Accepted product scope, 2026-11-07; **not implemented yet**. Build a Rustic-native
-extension ecosystem using Manifest V2 semantics and a maintained Rustic-specific
-uBlock Origin port. This applies to desktop, Android and iOS/iPadOS hosts.
+Rustic-native extensions, Manifest V2 APIs and the Rustic uBlock Origin port
+are planned. The [M9 desktop workstreams](ROADMAP.md#12-m9--compatibility-expansion-program)
+track their implementation. Android and iOS/iPadOS acceptance is part of
+[M14](ROADMAP.md#17-m14--mobile-devices-and-five-platform-10).
 
 ## Package and API contract
 
@@ -102,7 +103,7 @@ These describe behavior to port; Rustic's host/runtime is implemented separately
 | EXT-03/04 | Isolated worlds, background lifecycle and messaging | M4/M5 realms/tracing; spoofing, cross-world leaks, suspension and revoked-grant tests |
 | EXT-05/06 | Actions/options/storage and MV2 network/response hooks | M6 broker; deterministic multi-extension requests and private-profile tests |
 | EXT-07/08 | Signed updates, trusted permission UI and developer tools | M7 isolation; hostile package/update, revocation and debuggability tests |
-| EXT-09/10 | Desktop/mobile integration and release suite | M8/M9 device lifecycle, input/UI, isolation and supported-API corpus |
+| EXT-09/10 | Desktop/mobile integration and release suite | M9 desktop lifecycle, input/UI, isolation and supported-API corpus. Repeat mobile acceptance in M14 |
 | BLK-01/02 | Upstream feature/license inventory and reference network matcher | Pinned sources/lists and independent decision corpus; no remote authority |
 | BLK-03/04 | Cosmetic/procedural filters, scriptlets and broker integration | DOM/CSS/M6 APIs; hostile filters, cache/worker/redirect coverage and page-world separation |
 | BLK-05/06 | Rustic uBO port UI, advanced controls and transactional list updates | EXT runtime; feature-matrix regression, backup/restore and update rollback tests |

@@ -42,51 +42,47 @@ aarch64 that needs `bwrap` (bubblewrap) on `PATH` and unprivileged user
 namespaces; on Windows nothing extra. On other Linux architectures, and to
 run tests without a sandbox deliberately, set `RUSTIC_SANDBOX=0`.
 
-Keep `Cargo.lock` committed and use `--locked` so implicit resolution changes
-fail visibly; its only third-party packages are the reviewed font adapters of
-[ADR 0014](adr/0014-reviewed-font-adapters.md). The CLI accepts only `info`, `--help`,
-`--version`, the local-only `dump-dom` command described in
-[HTML_TREE.md](HTML_TREE.md#local-dump-dom-command), and `dump-style`, which
-prints computed styles for the same input ([CSS.md](CSS.md#style-dump)),
-and `dump-boxes`, which prints an initial principal-box snapshot
-([LAYOUT.md](LAYOUT.md)) without positions or painting. `dump-formatting`
-derives anonymous flow boxes and split inline continuations, with independent
-box/depth/work limits. `dump-layout` adds used geometry, line boxes and text
-fragments for block, inline and flex layout; unsupported formatting (grid,
-tables) fails explicitly rather than emitting partial output.
-`dump-paint` prints the display list for that layout and `render` writes it as a
-PNG through the CPU rasterizer ([PAINT.md](PAINT.md)). `reftest` renders a test
-page and its `rel=match`/`rel=mismatch` references and compares the pixels within
-the test's fuzzy tolerance; `cargo test -p rustic-cli --test reftests` runs the
-checked suite in `crates/rustic-cli/tests/reftests`. `hit-test --at X,Y` prints
-the topmost box at each point.
+Keep `Cargo.lock` committed and use `--locked` so dependency changes are
+explicit. The reviewed libraries and their ownership boundaries are listed in
+[DEPENDENCIES.md](DEPENDENCIES.md) and the
+[dependency manifest](../third_party/rust-dependencies.json).
+
+```sh
+cargo run --locked -p rustic-cli -- --help
+cargo run --locked -p rustic-cli -- info
+```
+
+The CLI help is the command and option reference. `dump-dom`, `dump-style`,
+`dump-boxes`, `dump-formatting`, `dump-layout`, `dump-paint` and `dump-a11y`
+inspect different stages of a document. `render` produces a PNG, `reftest`
+compares pixels and `hit-test --at X,Y` queries the output geometry. Use
+`view` for the reference desktop shell, `drive` for a live headless page,
+and `automate` for the brokered stdio inspection and input protocol.
+The [automation decision record](adr/0072-automation-protocol.md) describes
+its grants and endpoints. The [layout guide](LAYOUT.md) and [paint guide](PAINT.md)
+cover supported geometry, diagnostics and reference tests.
+
 ## Branches and merging
 
 The repository keeps two branches: `main` and one working branch, `feature`.
 All work is pushed to `feature`; once its checks pass, the maintainer's standing
 instruction is to merge it into `main` straight away. The merge gate is the
 aggregate `CI` job of GitHub Actions on
-[moejoe873/Rustic](https://github.com/moejoe873/Rustic/actions), which runs
+[MoeJoe37/Rustic](https://github.com/MoeJoe37/Rustic/actions), which runs
 every tier of [PLATFORMS.md](PLATFORMS.md) natively or under emulation. A full
 run takes an hour or more because jobs queue on the free tier, and a new push
 to `feature` cancels the run in progress, so do not push in the middle of a run
 whose emulated results you need. Run the quick local gates above before
 pushing.
 
-From 2026-11-08 to 2026-11-22 Actions could not start jobs (an account billing
-block); merges in that window were checked in a Linux sandbox instead (the
-gates above, MSRV 1.85.0, the emulated tiers and the cross/mobile compile
-checks), and each recorded the scope it ran. The repository moved from
-`MoeJoe37/Rustic` to `moejoe873/Rustic` on 2026-11-22, where Actions runs; the
-first full native run on the new account found and fixed the issues recorded in
-[TD-12](TECH_DEBT.md), and the full matrix was green on `feature` at `9961c1c`.
-Later the same day GitHub again stopped starting jobs on the new account (its
-message: failed payments or a spending limit), so commits after `9961c1c` have
-no hosted run yet. While that lasts, fall back to the sandbox gate and say in
-the commit or review which scope ran; run the full hosted matrix as soon as
-Actions starts jobs again. Successful default-branch CI also pushes a
-`chore(progress)` commit to `main`, so merge `origin/main` into `feature`
-before pushing rather than force-pushing.
+Hosted CI is running on `MoeJoe37/Rustic`. The
+[platform verification record](PLATFORMS.md#verification-status) links to
+completed full-matrix runs and preserves the November billing history.
+If hosted jobs cannot start, record the exact Linux native, MSRV, emulated
+and cross-check coverage you can run locally. Return to the full hosted gate
+when it is available. A successful default-branch run can also push a
+`chore(progress)` commit to `main`. Incorporate that history into `feature`
+with a fast-forward or merge as appropriate.
 
 The DOM `tree` example constructs nodes through the storage API, then emits an
 inspection dump. It is a runnable check of document ownership and traversal, not
@@ -111,7 +107,8 @@ to refresh generated README assets and dispatch CI for its bot commit.
 | `Quality` | Ubuntu 24.04, pinned toolchain | rustfmt, Clippy with denied warnings, rustdoc with denied warnings |
 | `Test (platform)` | Linux x64/ARM64 (Ubuntu 24.04), Windows x64 (2022)/ARM64 (11), macOS ARM64/x64 (15); pinned toolchain | Workspace all-target tests with the default renderer sandbox (bubblewrap is installed on Linux; Seatbelt denials are printed on macOS failures), doctests, CLI info smoke run; the pinned Window WPT selection on Linux; JS-09 benchmark results in the Linux ARM64 job summary |
 | `Emulated test (target)` | Ubuntu 24.04 with cross linkers and QEMU user mode | All-target tests and CLI smoke run for 32-bit ARM, 32-bit x86, RISC-V 64 and big-endian s390x (renderers run unsandboxed, since bubblewrap would start the host's emulator); 100-minute limit |
-| `Cross-check (target)` | Ubuntu 24.04 | `cargo check --all-targets` for ARMv6, musl ARM64/x64, Windows ARM64 (gnullvm), 32-bit Windows (on a Windows runner), POWER, LoongArch and FreeBSD, with a C cross compiler per target for `ring`; gnullvm and LoongArch leave out the crates that use `ring` (TD-12) |
+| `Cross-check (target)` | Ubuntu 24.04, with Windows for the MSVC job | `cargo check --all-targets` for ARMv6, musl ARM64/x64, Windows ARM64 (gnullvm), 32-bit Windows (MSVC), POWER, LoongArch and FreeBSD. gnullvm and LoongArch omit crates that need `ring` (TD-12) |
+| `GPU frame-time gate (lavapipe)` | Ubuntu 24.04 with software Vulkan | Repeated GPU-process frame timings against the M8 software-adapter budgets in [PERFORMANCE.md](PERFORMANCE.md#gpu-frame-budgets) |
 | `Parser fuzz smoke` | Ubuntu 24.04 | Replays the saved seeds and runs 20,000 fixed-seed mutations of every fuzz target; reproducers are kept as an artifact on failure |
 | `Compatibility (toolchain)` | Ubuntu 24.04; 1.85.0 and stable | Workspace all-target tests under MSRV and current stable |
 | `Mobile core (target)` | Ubuntu for Android ARM64/ARMv7/x86-64/x86; macOS for iOS ARM64 device/simulator and x86-64 simulator | Check all workspace libraries with pinned Rust (Android C dependencies built with the runner's NDK); no application linking or device execution |
@@ -129,17 +126,15 @@ duplicated in workflow env and the toolchain file, and the repository check
 verifies they agree. Update the pin and lockfile/tooling in a reviewed change;
 do not silently drift development Rust when moving stable advances.
 
-The `CI` aggregate job has a stable check name suitable for a ruleset. After a
-successful first run, the maintainer can require `CI` for `main`, prohibit force
-push/deletion, and require review if collaborators join. **Those repository
-administration settings are not configured by this commit.** They are distinct
-from adding a workflow and may require GitHub plan/administration support.
+The `CI` aggregate job has a stable check name for branch rules. The
+maintainer manages any required checks, force-push restrictions and review
+rules through repository settings.
 
 Dependabot configuration checks Cargo and GitHub Actions weekly, groups related
 update PRs, and caps open requests. Scheduled dependency checks depend on GitHub
 repository settings. Private-repository runner usage is subject to the account's
 Actions allowance. [fuzz.yml](../.github/workflows/fuzz.yml) runs a nightly
-fresh-seed campaign over every fuzz target and
+fresh-seed campaign over its selected target matrix and
 [dependencies.yml](../.github/workflows/dependencies.yml) runs `cargo deny`.
 
 ## Failure diagnosis
@@ -160,7 +155,7 @@ tests, 1,079 pinned html5lib declaration cases, all 4,626 cases in the pinned
 reference files, the 109-record/282-context text corpus and two rustdoc examples. The
 `tokenize` example exercises chunked UTF-8, tags, comments, doctypes and processing
 instructions; it does not build a DOM. [HTML.md](HTML.md) records corpus provenance,
-reproduction commands, text-mode/pull-driver contracts and unimplemented tree builder. The
+reproduction commands and text-mode/pull-driver contracts. [HTML_TREE.md](HTML_TREE.md) describes the tree builder. The
 `--suite references` importer uses a separate recorded policy without changing the earlier
 declaration selection. Repository checks validate all three fixture digests/counts/
 indices and reproduce the vendored WHATWG entity table offline. Run
@@ -183,16 +178,13 @@ the initial configuration should also be parsed/reviewed before committing.
 
 ## Workflow growth and releases
 
-See [MOBILE.md](MOBILE.md) for target triples, native host milestones and runtime
-gates. Mobile metadata checks are included in the aggregate `CI` job, while
-NDK/Xcode linking, packaging and device testing are staged with actual adapters.
-
-Parser corpora (M1), pinned CSS/flexbox WPT selections and reftests (M2/M3),
-fuzz smoke and nightly campaigns, dependency auditing, the JS-09 benchmark
-record and the pinned Window WPT selection now exist. Not yet in CI: the
-Test262 gates (manual, TD-145), a sanitizer job (the M7 AddressSanitizer run
-was by hand, see the [security review](reviews/2026-11-20-m7-security-review.md)),
-browser-hosted WPT through the M8 host adapter, and Android/iOS execution. Keep action references pinned and permissions narrow in every workflow.
+CI runs the pinned Window WPT selection through `rustic automate` on Linux
+and the Android isolation test in an emulator. The Test262 gates still use
+an external pinned checkout (TD-145). The M7 AddressSanitizer run was manual
+([security review](reviews/2026-11-20-m7-security-review.md)). The broader
+browser WPT runner, a hosted sanitizer job, physical-device Android/iOS
+checks and iOS runtime tests remain future work. See [TESTING.md](TESTING.md)
+and [MOBILE.md](MOBILE.md) for the boundaries of each gate.
 
 Release packaging/signing/publishing requires a separate reviewed workflow once
 there is an actual release contract. Do not grant CI write permission or store

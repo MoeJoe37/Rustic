@@ -31,12 +31,11 @@ The required product scope includes GPU/Wasm, a native MV2 extension ecosystem
 and a Rustic uBlock Origin port, with comparative security/privacy and performance
 gates. See [PRODUCT.md](PRODUCT.md) and [ADR 0007](adr/0007-product-scope.md).
 
-`rustic-base`, `rustic-dom`, `rustic-url`, `rustic-encoding`, `rustic-html`, `rustic-css`, `rustic-style`, `rustic-layout`, `rustic-text`, `rustic-paint`, `rustic-raster`, `rustic-codecs`, `rustic-js`, `rustic-bindings`, `rustic-net`, `rustic-storage`, `rustic-ipc`, `rustic-sandbox`, `rustic-engine`, `rustic-shell`, `rustic-android`, `rustic-cli` and the
-`rustic-fuzz` development tool now exist; see
-[implementation progress](IMPLEMENTATION.md) for their actual scope. The following
-is the target decomposition, not a requirement to create empty crates today.
+The table describes the current [Cargo workspace](../Cargo.toml) and the
+main boundary each crate owns. Specific behavior and tested limits are in the
+[implementation ledger](IMPLEMENTATION.md).
 
-| Proposed crate | Responsibilities | Primary dependencies | First milestone |
+| Crate | Responsibilities | Main boundary | First milestone |
 | --- | --- | --- | --- |
 | `rustic-base` | Typed IDs, checked geometry, byte budgets, cancellation, clocks, diagnostics | std, reviewed utility crates | M1 |
 | `rustic-url` | WHATWG URL parsing/serialization, origin records, relative resolution, UTS #46 IDNA | base; generated Unicode IDNA/NFC tables | M1 |
@@ -51,25 +50,27 @@ is the target decomposition, not a requirement to create empty crates today.
 | `rustic-raster` | Deterministic CPU display-list interpreter and surfaces | base, paint commands, codec adapters | M3 |
 | `rustic-codecs` | Bounded from-scratch decoders: inflate, PNG, JPEG, GIF and WebP | base | M3 |
 | `rustic-js` | Original ECMAScript lexer, parser, bytecode/interpreter, values, heap, built-ins | base; no DOM/network dependency | M4 |
-| `rustic-wasm` | Original bounded Wasm runtime with separate decoding, validation and execution stages. Instances own their memories, tables, globals and segments. Embedders supply typed function bindings. [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md), [ADR 0079](adr/0079-wasm-function-imports.md) | base. JS/Web integration will use explicit adapters | WASM-01–04 and numeric imports in progress, M9 |
-| `rustic-bindings` | Web IDL tooling, JS/DOM wrappers, exception conversion, selector queries, tracing edges | JS, DOM, CSS parser, style matcher; generated from pinned IDL | M5 |
-| `rustic-web` | Browser APIs beyond the DOM core (fetch, storage, workers, messaging). Not created: in M5 the Window, events and timers live in `rustic-bindings` and the task pump in `rustic-engine` ([SCRIPTING.md](SCRIPTING.md)). M6 kept `fetch()` and Web Storage there too, over `rustic-net` and `rustic-storage`; split this crate out when workers or messaging need service interfaces | JS, bindings, DOM, service interfaces | M6 |
+| `rustic-wasm` | Original bounded Wasm decoding, validation, interpreter and instance state. Hosts link supported numeric functions and globals and unshared memories explicitly | base. `rustic-bindings` connects it to Window, JS tracing, Fetch and CSP. [ADR 0077](adr/0077-wasm-decoding-and-execution-boundaries.md) | M9 |
+| `rustic-bindings` | Web IDL metadata, JS/DOM wrappers, conversions, selector queries and host tracing. Window hosts events, timing, Fetch, Web Storage, encodings, URLs, Blob and Wasm adapters | JS, DOM, style and explicit network, storage and Wasm interfaces | M5 onward |
 | `rustic-net` | Origin allowlist, own HTTP/1.1 transport with limits, timeouts, cancellation and backpressure, TLS adapter, content codings, loopback fixture server (NET-01); navigation, redirects, MIME types, Referrer Policy (NET-02); Fetch modes, CORS, preflight cache and filtered responses (NET-03); cookie jar, sites and partitioned HTTP cache (NET-04, ADR 0054); CSP and mixed content (NET-05); process keys, COOP/COEP and ORB (ADR 0057); exchanges through a network-process connector (ADR 0061); remote addresses limited to public ranges (ADR 0066) | URL, base, encoding, codecs; rustls, ring, rustls-platform-verifier, brotli-decompressor (ADR 0051) | M6 |
 | `rustic-storage` | Profiles (ephemeral, private, persistent with a lock), storage keys partitioned by top-level site, quotas, versioned checksummed atomic files with quarantine, Web Storage areas (NET-06); later IndexedDB and eviction | none (std only); callers supply origins and sites | M6/M9 |
 | `rustic-ipc` | Versioned bounded broker/renderer channel and protocol over standard streams, hostile-peer decoding (ISO-02, ADR 0056) | none (std only) | M7 |
-| `rustic-sandbox` | Operating-system confinement of renderer and network processes: the Linux seccomp-bpf programs (ADR 0058), the Windows LPAC AppContainer launcher with its job, including the `Rustic.Network` container (ADR 0060, 0066), and the macOS Seatbelt profiles applied with `sandbox_init` (ADR 0063); the only crate with `unsafe`, confined to the Windows launcher and the macOS `enter` module | windows-sys (Windows only) | M7 |
-| `rustic-extensions` | Rustic MV2 package/identity, isolated worlds, APIs, lifecycle and permissions | JS/web, broker/service interfaces; no ambient page authority | M5/M6 prototypes, M8/M9 delivery |
-| `rustic-filter` | Bounded reference/optimized filtering, list snapshots and broker policy hooks | URL/base, controlled DOM/CSS interfaces | M6–M9 |
-| `rustic-platform` | Windows/events, font discovery, graphics surfaces, OS adapters | base, platform libraries | M8 |
-| `rustic-android` | JNI entry points (integers and detached descriptors only) through which the `android/` test app's isolated-process service runs a renderer over ADR 0056 IPC (ADR 0059); its `jni` module is the crate's only `unsafe` | `rustic-cli` as a library | M7 |
-| Future Android/iOS adapters | Native surfaces, lifecycle, touch/IME, accessibility and OS service/process bridges | engine/platform contracts; JNI/NDK or Apple SDK only at the boundary | Prototype with M3; host integration M8 |
-| `rustic-compositor` | Scene updates, scrolling/transforms, GPU submission and fallback | paint, platform, graphics adapter | M8 |
-| `rustic-a11y` | Semantic accessibility tree and platform bridge | DOM semantic snapshot, layout, platform | M8 |
-| `rustic-devtools` | Inspection protocol, logs, breakpoints, performance inspection | versioned engine debug interface | M8 |
-| `rustic-engine` | Rust facade, document lifecycle and host script turns | base, HTML parser, JS runtime, Web IDL bindings and future service interfaces | M0 onward |
-| `rustic-cli` | Development host, also linkable as a library (`run_renderer_over`, `run_hosted`) for mobile hosts: the broker, a `__renderer` child per document (ADR 0056) and a `__network` child (ADR 0061), the trusted address/permission strip | engine API, sandbox, shell | M0 onward |
-| `rustic-shell` | Desktop window and event loop with CPU surface presentation (UI-02, ADR 0065); later the full browser chrome (UI-01) | winit, softbuffer | M8 (started early) |
-| `rustic-test-support` / `xtask` | Fixtures, fake services, corpus runners, dev commands | public/test interfaces | M1 onward |
+| `rustic-sandbox` | OS confinement for renderer, network and GPU processes through Linux, Windows and macOS adapters | OS-specific launch and policy. The [unsafe boundary](SECURITY.md#memory-resource-exhaustion-and-native-code) is limited to the Windows launcher and macOS Seatbelt entry | M7 onward |
+| `rustic-android` | Android isolated-renderer service adapter and narrow JNI entry points for the emulator fixture | Windowless renderer host via `rustic-cli`, with detached descriptors and versioned IPC. [ADR 0059](adr/0059-mobile-renderer-isolation.md) | M7 |
+| `rustic-a11y` | Semantic accessibility tree, names, states, focus and mapped geometry | Browser DOM and layout snapshots. `rustic-shell` implements the AccessKit platform bridges | M8 |
+| `rustic-devtools` | Inspection, console, debugger, performance and automation protocol state | Engine data and a brokered stdio transport hosted by the CLI. [ADR 0072](adr/0072-automation-protocol.md) | M8 |
+| `rustic-engine` | Host-facing document lifecycle, script turns, resource publication and rendering coordination | HTML, JS, DOM bindings and engine components. Host I/O and native windows stay outside | M0 onward |
+| `rustic-cli` | Development commands, browser broker, renderer/network/GPU entry points and desktop reference chrome | Connects shared engine code to the sandbox, shell and services. Also provides the renderer host library | M0 onward |
+| `rustic-renderer` | Windowless subprocess executable for platforms that need a separate renderer binary | CLI renderer code with the desktop window feature disabled | M8 |
+| `rustic-shell` | Desktop windows, surfaces, event loop, input/IME and platform accessibility transport | winit, softbuffer and AccessKit. The CLI owns tabs and browser policy. [ADR 0074](adr/0074-browser-shell-and-native-hosts.md) | M8 |
+| `rustic-gpu` | GPU compositing, surface and device recovery, and CPU-compatible reference arithmetic | Reviewed wgpu adapter inside the GPU process, over scenes and pixel buffers. [ADR 0071](adr/0071-gpu-backend.md) | M8 |
+| `rustic-native` | Native font discovery through DirectWrite and Core Text | Narrow OS font-service adapters. The broker validates the files it opens. [ADR 0078](adr/0078-platform-font-services.md) | M8 |
+| `rustic-fuzz` | Deterministic mutation harness, corpora, replay and minimized artifacts | Public and test interfaces of parsers, JS, Wasm, rendering, network and IPC | M1 onward |
+
+Workers, extensions and the filter engine still need their reviewed service
+interfaces. [EXTENSIONS.md](EXTENSIONS.md) records the planned authority and
+package boundaries. Native mobile surfaces, input and lifecycle integration
+are scheduled for [M14](MOBILE.md).
 
 Dependencies form a DAG. Keep the pure tokenizer, selector parser, and JavaScript
 runtime usable independently. DOM exposes mutation and read views without
@@ -257,8 +258,8 @@ wrapping mixed inline runs and splitting inline ancestors around block groups.
 Source indexes and continuation edges preserve identity without DOM reparenting.
 Anonymous styles inherit from their enclosing non-anonymous source and reset
 non-inherited values. Separate box/depth/work limits bound expansion; both trees
-use flat arenas. See [LAYOUT.md](LAYOUT.md). Other formatting contexts, inline
-geometry and general fragments remain pending. REN-04a/REN-05a add
+use flat arenas. See [LAYOUT.md](LAYOUT.md). The [layout guide](LAYOUT.md) records the later inline, float, positioning
+and flexbox work, along with the remaining formatting contexts. REN-04a/REN-05a add
 `rustic-paint` (display lists in paint order) and `rustic-raster` (exact-area CPU
 fills and PNG); see [PAINT.md](PAINT.md). Generate a box tree distinct from DOM,
 then fragments for block/inline formatting, anonymous boxes, line boxes, replaced
@@ -274,8 +275,8 @@ runs, images, clips, transforms, and stacking contexts. Hit testing shares fragm
 geometry and transforms with painting. The CPU rasterizer is the initial reference
 backend; GPU scenes/raster acceleration are a required production backend, with
 a usable CPU fallback and independent parity tests. Frame epochs
-prevent an old layout or resource completion from replacing a newer frame. Scroll
-updates can later avoid full layout when geometry is unchanged.
+prevent an old layout or resource completion from replacing a newer frame. The viewport scene can reuse cached tiles during scroll updates when geometry
+permits ([ADR 0064](adr/0064-scrolling-and-compositor-scenes.md)).
 
 ## 5. JavaScript and host execution
 
@@ -322,12 +323,12 @@ interpreter remains available on hosts without executable-memory permission.
 [ADR 0081](adr/0081-owned-wasm-instances.md), [ADR 0082](adr/0082-wasm-numeric-globals.md),
 [ADR 0083](adr/0083-wasm-js-function-imports.md), [ADR 0084](adr/0084-shared-numeric-wasm-globals.md),
 [ADR 0085](adr/0085-wasm-fixed-memory-buffers.md), [ADR 0086](adr/0086-wasm-memory64.md),
-[ADR 0087](adr/0087-wasm-resizable-buffers.md)
+[ADR 0087](adr/0087-wasm-resizable-buffers.md), [ADR 0088](adr/0088-window-wasm-tables.md)
 
-Extensions execute under distinct principals/realms through broker-checked
+The extension design assigns execution under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native
 MV2 blocking callbacks and trusted compiled filters share a deterministic request
-policy pipeline; neither grants cross-origin or native authority. The uBO port
+policy pipeline; neither grants cross-origin or native authority. The planned uBO port
 is a separately licensed application using these APIs. See [EXTENSIONS.md](EXTENSIONS.md)
 for package/permission, lifecycle, filter-data and update boundaries.
 
@@ -399,21 +400,22 @@ documented error; never reinterpret corrupted persisted state as trusted config.
 
 ## 7. Processes, IPC, and crash recovery
 
-Target: browser/broker process, renderer processes grouped by validated site/agent
-policy, network/storage services, and optionally a GPU process. Do not promise a
+The reference host separates the browser broker, page renderers, network
+process and GPU process. Storage stays brokered. Site/agent policy determines
+renderer ownership. Do not promise a
 literal process-per-tab or process-per-origin mapping: cross-origin frames,
 same-origin synchronous access, opener relationships, and agent clusters require
 an isolation policy designed together. M7 defines the mapping and tests
 (ADR 0057). Frames render in renderers of their own and the broker
 composites them, so an embedder never holds a frame's bytes or pixels
-(ADR 0062); same-site frames sharing an agent cluster wait for the M8
-shell (TD-178).
+(ADR 0062); same-site frame agent-cluster sharing remains open (TD-178).
 
 Renderers receive narrow handles instead of ambient OS privileges. Linux uses
 namespace/seccomp/broker controls (bubblewrap, ADR 0058); Windows a
 capability-less LPAC AppContainer and a job (ADR 0060); macOS a deny-by-default Seatbelt profile the renderer applies to itself with `sandbox_init` before reading input (ADR 0063, verified on native Macs).
-Android needs its own application/service isolation and broker design, and iOS
-needs the applicable platform browser-engine extension/entitlement model. Do not
+The Android emulator runs a prototype isolated renderer service. Android
+device acceptance and the iOS browser-engine entitlement and runtime
+isolation are M14 work. Do not
 assume desktop process spawning, Linux sandbox controls, or JIT availability can
 be carried across unchanged. Platform adapters map the same authority contracts
 to each OS; [ADR 0006](adr/0006-desktop-and-mobile-platforms.md) records this scope.

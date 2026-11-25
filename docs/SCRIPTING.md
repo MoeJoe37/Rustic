@@ -1,12 +1,11 @@
-# Scripted documents (M5)
+# Scripted documents and Window APIs
 
-This is the guide to how JavaScript and a document meet in Rustic. It ties
-together the decision records for M5 ([ADR 0020](adr/0020-document-lifecycle.md)
-to [ADR 0042](adr/0042-scripted-render-state.md)), which each
-describe one step, and says plainly what is not built yet. The tested contract
-of every finished unit is in [IMPLEMENTATION.md](IMPLEMENTATION.md) under
-WEB-01 to WEB-05; the plan for the rest is
-[ROADMAP §8](ROADMAP.md#8-m5--scripted-document-integration).
+This guide describes how a document, its JavaScript agent and the host work
+together. The original M5 integration is recorded in
+[ADRs 0020–0042](adr/README.md). Later milestones added network and storage
+services, a live desktop host and more Window APIs. The
+[implementation ledger](IMPLEMENTATION.md) records tested contracts and the
+[roadmap](ROADMAP.md#12-m9--compatibility-expansion-program) tracks compatibility work.
 
 ## What works today
 
@@ -149,10 +148,14 @@ second pending-byte cache. Duplicate URLs are coalesced per resource kind and
 candidate counts and URL lengths are bounded. The original timer-turn limit
 is checked before starting an interleaved timer. Scripted dumps and final
 rasterization retain the applied resources after the JS realm closes.
-**This is synchronous post-parse delivery, not asynchronous
-fetching, live file watching or streaming parser-barrier resource scheduling.**
-Static dump commands still read local files directly. This is a partial CSSOM surface and its
-regressions have not yet been run on CI. [ADR 0045](adr/0045-live-computed-style-reads.md)
+This describes local-file resource delivery. In the network host, navigated
+body bytes stream to the parser, eligible subresources load concurrently,
+and parser-blocking and deferred scripts wait for earlier stylesheets.
+The CLI services due timers while waiting. See
+[TD-134](TECH_DEBT.md#td-134--classic-completion-and-the-page-event-loop-paid)
+and the [NET-02 ledger](IMPLEMENTATION.md#net-02--documents-and-subresources-over-http-in-the-cli).
+CSSOM adds read-only stylesheet rules and declarations in
+[CSS-09](CSS.md#transitions-and-animations).
 
 `new MutationObserver(callback)` observes child-list, attribute and
 character-data changes with `subtree`, `attributeFilter` and old values.
@@ -206,20 +209,27 @@ looping deeper as the Resize Observer specification requires and
 reporting the loop error for skipped observations. Sizes come from the same
 layout snapshot as other script reads. [ADR 0050](adr/0050-resize-observer.md)
 
-What does **not** work yet:
+### Current limits
 
-| Missing | Consequence today | Planned in |
+| Area | Remaining work |
+| --- | --- |
+| CSSOM and scrolling | Pseudo-element computed style, mutable CSSOM and parts of CSSOM View remain open. See [CSS-09](CSS.md#transitions-and-animations) and [the debt ledger](TECH_DEBT.md). |
+| Observers | `IntersectionObserver` and remaining `ResizeObserver` lifetime and geometry details are tracked in TD-155. |
+| Controls and event handlers | The forms subset still lacks controls such as `select` and label association. Handler attributes in markup need CSP-aware compilation. Error reports still lack full source locations (TD-152–154). |
+| Browsing contexts | The desktop host has navigation and out-of-process frames and popups. Window-side `location`, history and cross-context scripting remain separate work (TD-130, TD-178). |
+| Browser services | `fetch()` and Web Storage are available in the supported page host. Streams, workers and IndexedDB remain M9 work. |
+
+Unimplemented Web APIs are absent from the exposed interface.
+
+## Window encoding, URL, Fetch and WebAssembly
+
+| Area | Implemented Window surface | Scope and evidence |
 | --- | --- | --- |
-| Remaining CSSOM and resource ordering | Live `getComputedStyle` has read-only methods, named and numeric indexed properties and `cssText`, but pseudo-elements, CSSOM serialization details and asynchronous/streaming stylesheet-image completion scheduling remain open ([ADR 0045](adr/0045-live-computed-style-reads.md), [TD-148](TECH_DEBT.md#td-148--computed-style-snapshots-are-eager-and-copied-per-read), [TD-149](TECH_DEBT.md#td-149--pseudo-element-getcomputedstyle-throws)). | WEB-06 |
-| `IntersectionObserver` | Not exposed; ResizeObserver approximations in TD-155 | M9 |
-| Control painting and the rest of forms | Values and focus are not painted or matched by `:focus`/`:invalid`; no `select`, labels or caret (TD-154) | M9 |
-| Error locations, handler content attributes | `ErrorEvent` has no file or line, `onclick="…"` markup is not compiled (TD-152, TD-153) | M6, M9 |
-| Frames, navigation, `location`, `history` | One top-level document per agent (TD-130) | M6 |
-| Network, storage, workers | Not present | M6, M9 |
-| Expanded WPT coverage | The initial Window baseline covers nodes, events, collections, timers and animation callbacks. New APIs need their own coverage as they land. | WEB-09 |
-
-A property that is missing is absent, not stubbed: `typeof window.fetch` is
-`"undefined"`. That rule is part of the M5 gate.
+| Text encoding | `TextEncoder.encode()` and `encodeInto()`, and `TextDecoder.decode()` with streaming state, BOM handling and fatal mode | [Encoding guide](ENCODING.md), [ADR 0075](adr/0075-web-text-encoding.md) |
+| URL | `URL`, `URL.canParse()`, `URL.parse()` and live `URLSearchParams`, including component setters on `URL` | Structured URL record and pinned Window tests. [URL guide](URL.md), [ADR 0076](adr/0076-window-url-and-search-params.md) |
+| Fetch and Blob | Buffered string, unshared fixed-length buffer, `URLSearchParams` and Blob bodies. Body readers include `text()`, `json()`, `arrayBuffer()`, `bytes()` and `blob()`. The `Blob` constructor, slicing, repeatable buffered reads and `Response.json()` are exposed | Headers and bodies follow the supported Fetch policy and consumption rules. Stream bodies, `File` and `FormData` remain open. [NET-03 ledger](IMPLEMENTATION.md#net-03--fetch-headers-request-and-response) |
+| Wasm compilation | `validate`, `compile`, `Module` reflection, `instantiate` and the Fetch-response entry points | Buffered `compileStreaming` and `instantiateStreaming` check Fetch status and Wasm MIME. Compilation follows document CSP. [Compilation evidence](IMPLEMENTATION.md#wasm-06--window-module-compilation-and-mimecsp) |
+| Wasm state and linking | Numeric function and global imports/exports, shared identity for linked numeric globals, and unshared 32-bit and 64-bit memories with fixed or resizable buffers. Standalone `WebAssembly.Table` supports `anyfunc` and `externref` in both address widths | Local module tables and indirect calls work in the interpreter. Module table linking, shared Wasm memories, wider reference-typed host calls and progressive streaming remain open. [Runtime evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), [standalone tables](IMPLEMENTATION.md#wasm-06--standalone-window-tables) |
 
 ## Crates
 
@@ -434,49 +444,22 @@ static reference.
 
 ### Pinned Window web-platform-tests
 
-The headless CLI runs upstream `testharness.js` unchanged at WPT revision
-`cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The selection covers
-`dom/nodes`, `dom/events`, `dom/collections`, `html/webappapis/timers`
-`html/webappapis/animation-frames` and the CSSOM and CSSOM View suites. Linux CI is
-configured to require an exact match to the checked-in **59 files,
-342 subtests, 272 passes and 70 expected failures**. The expectations record the names and diagnoses
-so changes in either direction require review.
-[Manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
-[Exact results](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
+The headless CLI runs upstream `testharness.js` at revision
+`cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The checked-in Linux CI baseline
+contains **132 files and 1,368 subtests**, with **1,274 passing**
+and **94 expected failures**. It includes DOM nodes/events/collections,
+HTML timers and animation frames, CSSOM and CSSOM View, text encoding, URL,
+Blob and Fetch, and Wasm constructors, reflection, globals, memories and tables.
+See the [manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)
+and [per-subtest expectations](../crates/rustic-cli/tests/fixtures/wpt-web/expectations.json)
+for exact coverage and failure reasons.
 
-The adapter maps the two standard harness URLs to local resources and
-wraps selected `.any.js` files in their Window variant. A completion
-callback records results for the runner. The CLI supplies the manual
-clock and one rendering opportunity. The candidate
-`ParentNode-querySelectorAll-removed-elements.html` depends on
-`innerHTML`, and `clearinterval-from-callback.any.js` leaves an interval
-running after completion. Both remain outside the initial selection.
-Eleven `dom/nodes` mutation-observer files load the upstream
-`mutationobservers.js` helper, which the manifest lists as a support file.
-Support files are copied beside the page and the runner rewrites any
-`src` that resolves to one, so `../constants.js` works too; `.any.js`
-files may declare `global=` lists that include `window`. The error
-reporting files cover `window.onerror`, runtime, compile and
-`setTimeout` errors, rejection events (including one raised while the
-document parses), `queueMicrotask` and the event handler processing
-algorithm. Their expected failures are the missing `location`, source
-positions (TD-152) and `onmessage`. The `Node` files cover names, values,
-parents, child lists, constants, `isSameNode`, `normalize` and
-`replaceChild`, whose expected failures come from the 16 detached
-document limit, `Attr` nodes and `DOMParser`.
-Their expected failures name APIs that are not built: `classList`,
-`Element.attributes`, Range, `normalize()`, `HTMLInputElement.type`
-reflection, script-inserted script execution (TD-133) and `Attr` nodes.
-`MutationObserver-textContent.html` needs `DOMParser` and
-`MutationObserver-inner-outer.html` needs `innerHTML`; the two `.window.js`
-observer files need the `.window.js` wrapper. They stay outside the
-selection until those land.
-The CSSOM View cases cover detached elements, fixed positioning with a
-transform and rectangle dimensions. The two new expected failures concern
-the coordinates of an empty inline in a phantom line box. The CSSOM cases cover property order, read-only declarations, and resolved
-sizes, including percentage widths and positioned boxes' auto margins. One
-new expected failure records the separate relative-inset behavior, where the
-host returns `auto` for the left and right insets.
+`tools/run_wpt_web_tests.py` wraps supported `.any.js` files as top-level
+Window pages, serves the pinned helper scripts under their expected paths,
+and reads results through `rustic automate`. The runner supplies a manual
+clock for scripted turns. Use `--driver dump-dom` when diagnosing the legacy
+report path. When a behavior change alters results, review the diagnostic
+and update the expectation with the code that accounts for it.
 
 ```sh
 cargo build --locked -p rustic-cli
@@ -485,29 +468,12 @@ python3 tools/run_wpt_web_tests.py --rustic target/debug/rustic
 
 ## Open debt
 
-| Entry | What | Due |
-| --- | --- | --- |
-| TD-118 | A realm is never freed while its agent lives | Before frames (M6) |
-| TD-124 | `DOMException` extras | M9 |
-| TD-126 | Hand-bound subset of interfaces | Each new interface family |
-| TD-127 | UTF-8 storage for element and attribute names | M9 |
-| TD-129 | Collection reads scan live nodes | First profile that shows it |
-| TD-130 | One top-level Window | M6 navigation |
-| TD-131 | Extended event delivery and error reporting | WEB-07, M9 |
-| TD-132 | Timer and frame integration details | WEB-06, WEB-07 |
-| TD-133 | Adoption of retained parser nodes and dynamic markup | M9 HTML lifecycle |
-| TD-134 | Classic-script ordering with stylesheet and timer tasks | WEB-06 |
-| TD-135 | Dynamic page imports, import maps and data module types | M6 and M9 |
-| TD-148 | Eager computed-style snapshots copied on each read | M7 entry |
-| TD-149 | Pseudo-element `getComputedStyle` throws | WEB-06 |
-| TD-150 | Dead observer registrations are dropped lazily | M7 entry |
-| TD-151 | Parser and host records resolve observers when drained | M9 HTML lifecycle |
-| TD-152 | Error reports lack locations; console has no formatter | M6 navigation |
-| TD-153 | Handler content attributes and remaining handler names | M9 HTML lifecycle |
-| TD-154 | Focus and validity are not style states; no select, labels or caret | M9 HTML lifecycle |
-| TD-155 | ResizeObserver lifetime and geometry approximations | M9 |
-
-See [TECH_DEBT.md](TECH_DEBT.md) for each entry.
+The [technical debt ledger](TECH_DEBT.md#payoff-schedule) is the source of
+current targets for remaining DOM, HTML, CSSOM and Window work. Key items
+include realm lifetime (TD-118), cross-context scripting (TD-130 and TD-178),
+dynamic markup and modules (TD-133 and TD-135), error locations and handler
+attributes (TD-152 and TD-153), and Streams (TD-169). Progressive Wasm
+compilation is tracked in TD-200.
 
 ## Adding an interface
 

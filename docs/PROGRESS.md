@@ -289,11 +289,11 @@ completed capabilities change. Superseded runs cannot overwrite newer source
 heads, and pushes never force history. Push and dispatch concurrency groups are
 separate so the follow-up validation does not cancel its source run.
 
-The canonical README follows the default branch. Feature branches can include
-fresh generated assets by running the tool before committing; their CI report is
-also available on each commit. Failed source CI does not publish fresh completion
-claims. Repository rules can independently restrict bot writes; if those are later
-enabled, the publishing job reports the failure rather than bypassing them.
+The default branch publishes the README and its companion assets. On `feature`,
+regenerate those assets before committing and use the CI summary for the exact
+revision. Review the generated [milestone table](progress/summary.md#milestones)
+for current counts and percentages. Repository rules also apply to bot writes,
+and the publishing job reports any rejection.
 
 ## Local workflow
 

@@ -8,7 +8,7 @@ Status: Accepted for TD-02 (M6 entry)
 `DocumentLimits` bounds every parser-built document: 100,000 live nodes,
 256 parent-child edges and 16 MiB of retained names and text. Until now,
 reaching any of them failed the whole parse, and the host got no document
-at all ([TD-02](../TECH_DEBT.md#td-02--depth-and-node-budgets-abort-the-whole-parse)).
+at all ([TD-02](../TECH_DEBT.md#td-02--depth-and-node-budgets-abort-the-whole-parse-paid)).
 That was safe for local fixtures, but M6 loads real pages, and browsers
 do not fail on them:
 

@@ -2,8 +2,8 @@
 
 Accepted scope update: **2026-11-07**. These are required delivery targets for
 Rustic's original engine and reference browser on Windows, macOS, Linux, Android
-and iOS/iPadOS. They are not claims about the current M1 implementation.
-[Implementation progress](IMPLEMENTATION.md) remains the source of current status.
+and iOS/iPadOS. [Implementation progress](IMPLEMENTATION.md) records delivered
+behavior and the [progress summary](progress/summary.md) tracks the open scope.
 
 | Requirement | Planned delivery | Acceptance evidence |
 | --- | --- | --- |
@@ -12,9 +12,9 @@ and iOS/iPadOS. They are not claims about the current M1 implementation.
 | Broad website support, complete CSS and JavaScript targets | M1–M9 standards pipeline and web APIs | Pinned WPT/Test262 baselines, complete feature inventory, representative site workflows and published unsupported cases |
 | Better performance than Blink, Gecko and WebKit | Measurement from M5, ratchets at M8/M10, M12 leadership gate | Reproducible comparisons against Chrome, Firefox and Safari for responsiveness, loading, memory and energy; compatibility/security gates first |
 | GPU acceleration | M3 CPU reference, M8 GPU integration, M9 parity | Hardware-accelerated composition/raster paths on all five platform families, device-loss recovery and CPU-reference parity |
-| WebAssembly support | Original runtime track after M4 foundations; M5/M9 integration | Core, JS and Web API suites, proposal inventory, traps/limits, interpreter fallback and mobile execution |
-| Rustic-only extensions using Manifest V2 | M5/M6 API prototypes, M7 isolation, M8/M9 delivery | Native Rustic package/identity, MV2 background pages/content scripts/blocking requests, permission and malicious-package tests |
-| Rebuilt uBlock Origin for Rustic | M6 filtering, M8 port integration, M9 parity | Maintained Rustic-specific uBO port, full blocking feature matrix, upstream comparison fixtures and filter-list lifecycle tests |
+| WebAssembly support | Original runtime and Window profile in M9, using M4/M5 foundations | Core, JS and Web API suites, proposal inventory, traps/limits, interpreter fallback and mobile execution |
+| Rustic-only extensions using Manifest V2 | M9 desktop capability track, M14 mobile acceptance | Native Rustic package/identity, MV2 background pages/content scripts/blocking requests, permission and malicious-package tests |
+| Rebuilt uBlock Origin for Rustic | M9 implementation and evidence, M13/M14 product acceptance | Maintained Rustic-specific uBO port, full blocking feature matrix, upstream comparison fixtures and filter-list lifecycle tests |
 
 ## Compatibility target
 
@@ -104,8 +104,9 @@ GPU acceleration is a production requirement, with an independently testable CPU
 reference/fallback. Use native Metal, Vulkan/D3D or a reviewed portable adapter
 only after platform evaluation. Validate scenes, shaders, shared buffers, color,
 text/clip/transform parity, memory budgets, device loss and service crashes.
-Hardware acceleration does not itself establish WebGL/WebGPU API compatibility;
-those web APIs have separate conformance/security work in M9.
+The desktop compositor is delivered in M8. Hardware acceptance spans the
+desktop and mobile milestones. Canvas work is in M9. WebGL and WebGPU have
+separate M11 conformance and security gates.
 
 WebAssembly is mandatory, not a proposal to evaluate away. Build Rustic's original
 bounded decoder, validator and interpreter, then JS/Web integration, reference/GC
@@ -128,7 +129,8 @@ before untrusted remote execution. See [Core](https://webassembly.github.io/spec
 ## Milestones and completion accounting
 
 Extension and filtering contracts start with M5/M6 services, not by delaying the
-first static renderer. Their required product gates land in M8/M9 after isolation.
+first static renderer. Desktop extension and filtering capabilities are tracked
+in M9 after isolation, with mobile extension acceptance in M14.
 M11 closes the feature gap with the other engines, M12 proves performance
 leadership, M13 desktop acceptance includes all goals above on Windows, macOS and Linux,
 and M14 (last, [ADR 0067](adr/0067-mobile-devices-last.md)) repeats it on Android and iOS devices, with

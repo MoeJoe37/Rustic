@@ -7,50 +7,28 @@ Deliver one observable vertical slice at a time. A milestone is complete only
 when its demonstration, tests, documentation, and applicable safety gates pass.
 Tags identify reproducible prototypes; they do not imply general browser safety.
 
-**Status (2026-11-22).** M0 has a verified baseline; only the repository-rules
-follow-up is open. M1, M2, M3, M4 and M5 are complete for their declared catalog
-scope: local HTML parses, styles, lays out, shapes text, paints and rasterizes
-to PNG on the CPU, and Rustic's own ECMAScript engine (JS-01 to JS-09, with
-Intl) runs scripts ([JS.md](JS.md)). The M4 ARM64 benchmark record is from
-QEMU emulation; native ARM64 timings are TD-125. M5 scripted documents
-(WEB-01 to WEB-09, [SCRIPTING.md](SCRIPTING.md)) closed on 2026-11-19 with the
-[completion review](reviews/2026-11-19-m5-completion.md): scripts, DOM
-bindings, events, observers, error reporting, focus, forms, the pinned WPT
-gate and the [first cross-engine report](reviews/2026-11-19-perf-01-m5.md).
-M6 controlled networking (NET-01 to NET-07) closed on 2026-11-20 with
-its [completion review](reviews/2026-11-20-m6-completion.md): HTTP(S) to
-allowlisted loopback origins, Fetch and `fetch()`, cookies, the HTTP
-cache, CSP, mixed content, profiles and Web Storage. The emulated, MSRV
-and cross tiers that M5 and M6 could not run passed in the first full hosted
-run on 2026-11-22. M7 isolation closed on 2026-11-22 with its
-[completion review](reviews/2026-11-22-m7-completion.md): desktop sandboxes
-on by default on Linux, Windows and macOS, a confined network process and
-crash recovery ([§10](#10-m7--isolation-and-security-gate)). **M8 desktop
-alpha is the current milestone**: compositor scenes and scrolling (UI-05) and
-a Linux desktop window (UI-02) are done, and frames are composited in a
-confined GPU process ([ADR 0068](adr/0068-gpu-process.md)). M9 language
-compatibility work has started alongside M8, and CSS-09 (animations and
-modern CSS) is done. **Android and iOS device work is deferred to the last
-milestone, M14** ([ADR 0067](adr/0067-mobile-devices-last.md),
-[§17](#17-m14--mobile-devices-and-five-platform-10)): the platforms stay
-release targets, and their compile checks and the Android emulator job stay
-in CI. The
-[progress summary](progress/summary.md) is the measured status and
-[implementation progress](IMPLEMENTATION.md) records each completed contract;
-neither implies more than its declared scope.
+**Status.** M0 established the repository and CI baseline. M1 through M8
+are complete for their declared scope. M1–M5 delivered the document pipeline,
+original ECMAScript interpreter and scripted pages. M6 added controlled
+networking and browser services. M7 established enforced desktop process
+isolation. M8 completed the reference desktop alpha with native Linux, Windows
+and macOS windows, long-lived page renderers, accessibility bridges, automation
+and GPU-process compositing. The
+[M8 completion review](reviews/2026-11-23-m8-completion.md) records which
+external acceptance items moved to M10.
 
-**Verification status.** Hosted CI was blocked by a billing limit from
-2026-11-08 to 2026-11-22; merges in that window were checked in a Linux
-sandbox. On 2026-11-22 the repository moved to `moejoe873/Rustic`, where
-Actions ran the full matrix natively on x64 and ARM64 Linux, Windows and macOS,
-under emulation and in every compile check. Its findings were fixed and the
-whole matrix passed on `feature` at `9961c1c`
-([run](https://github.com/moejoe873/Rustic/actions/runs/45003031562)). Later
-the same day GitHub stopped starting jobs on that account as well (failed
-payments or a spending limit), so commits after `9961c1c` wait for the next
-hosted run. Android and iOS remain compile-checked only, apart from the
-Android emulator isolation job ([TD-12](TECH_DEBT.md),
-[PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
+**M9 compatibility expansion is current.** The workstreams and test gates are
+listed in [§12](#12-m9--compatibility-expansion-program). The
+[implementation ledger](IMPLEMENTATION.md) records tested behavior, and the
+[progress summary](progress/summary.md) carries the measured delivery status.
+Native mobile host and device acceptance is scheduled for
+[M14](#17-m14--mobile-devices-and-five-platform-10). Mobile compile checks
+and the Android isolation emulator job continue during desktop development.
+
+Hosted CI and its completed evidence are tracked in
+[PLATFORMS.md](PLATFORMS.md#verification-status). The
+[current queue](#18-current-implementation-queue) records open work and
+acceptance gates.
 
 [PRODUCT.md](PRODUCT.md) makes Brave-level security/privacy, broad website/CSS/JS
 coverage, GPU acceleration, WebAssembly, Rustic-only Manifest V2 extensions and
@@ -87,7 +65,7 @@ reveals complexity. Later milestones deliberately have no fabricated estimates.
 | M5 Scripted documents | Events and JS mutations update rendered local pages | M3, M4, traced DOM | Re-estimate after M3/M4 |
 | M6 Controlled web services | Fixture-host HTTPS, Fetch policy, cookies and profiles | M5, origin model | Re-estimate after integration prototype |
 | M7 Isolated browsing | Enforced broker/renderer isolation on supported platforms | M6, IPC prototypes | Dedicated security program |
-| M8 Desktop alpha | Native Windows/macOS/Linux hosts, accessibility/inspection, GPU process and backend, extension/uBO integration | M7 per platform | Re-estimate by platform |
+| M8 Desktop alpha | Native Windows/macOS/Linux hosts, accessibility, inspection, GPU process and backend, and a reference performance harness | M7 per platform | Re-estimate by platform |
 | M9 Compatibility expansion | Broad modern site/API coverage, published test results | M8 | Open-ended feature program |
 | M10 Embedding and beta | Versioned API and maintained beta/release process | Evidence from M8/M9 | Evidence-based release decision |
 | M11 Web platform parity | Every feature Blink, Gecko or WebKit ships is implemented or has a reviewed decision; WPT/Test262 pass rates at least the best engine's | M9; media/graphics/device tracks can start after M8 | Multi-year feature program |
@@ -107,14 +85,15 @@ flowchart TD
     M4 --> M5
     M5 --> M6["M6 Controlled services"]
     M6 --> M7["M7 Isolation gate"]
-    M7 --> M8["M8 Desktop and mobile alpha"]
+    M7 --> M8["M8 Desktop alpha"]
     M8 --> M9["M9 Compatibility"]
     M9 --> M10["M10 Embedding and beta"]
     M9 --> M11["M11 Web platform parity"]
     M8 --> M12["M12 Performance leadership"]
-    M10 --> M13["M13 Full engine 1.0"]
+    M10 --> M13["M13 Desktop engine 1.0"]
     M11 --> M13
     M12 --> M13
+    M13 --> M14["M14 Mobile devices and five-platform 1.0"]
 ```
 
 The main integration path is M1 → M2 → M3 → M5 → M6 → M7. The JS track can
@@ -257,7 +236,7 @@ interpreter speed and heap size are the performance of the product everywhere.
 | JS-06 | Promise jobs, realms, module records/loading hooks and dynamic imports without ambient I/O | `js.jobs`, `js.modules` | JS-04 | **Done**: `Promise`, the job queue and async functions run (part 1, [JS.md](JS.md)); promise rejection tracking (part 2) and [static module records and graph resolution](JS.md#static-module-loading-js-06) are implemented; module environments, live bindings, namespaces and synchronous evaluation, host-provided string metadata and top-level await and dynamic imports run; [realms](JS.md#realms-js-06) with per-realm intrinsics and `$262.createRealm` are implemented |
 | JS-07 | Standalone runner and pinned Test262 harness: strict/raw/module/negative/async metadata, per-test time and memory limits | evidence for `js.conformance` (M9) | JS-04 | **Done** for M4: the runner executes `test/language` with deterministic step and heap limits and an exact passing list (21,939 of 22,427 run files, 97.8%), the implemented areas of `test/built-ins` (17,291 of 18,574, 93.1%) and of `test/intl402` (1,240 of 1,326, 93.5%); the separate module gate has 696 passes of 696 executed, with 121 proposal skips; `$262.evalScript` and `$262.createRealm` work. `$262.gc`, `$262.agent` and the declared full pass rate are TD-105 and `js.conformance` (M9) |
 | JS-08 | BigInt, RegExp (own backtracking-bounded engine, pays TD-88), proxies, generators/async, typed arrays/buffers, Intl, in measured increments | `js.advanced`, `js.buffers`, `js.intl` | JS-05–JS-07 | **Done** for M4: generators (part 1), async generators with `for await` (part 2) and RegExp (part 3, TD-88 paid; property escapes are TD-110), BigInt (part 4, TD-92 paid) and proxies with mapped `arguments` objects (part 5) and ArrayBuffer, DataView and typed arrays (part 6) and SharedArrayBuffer and Atomics within one agent (part 7; cross-agent sharing is TD-115) run ([JS.md](JS.md)); Unicode normalization, locale identifiers, locale-sensitive casing, `Intl.Locale`, `Intl.ListFormat`, shared locale negotiation and [`Intl.Collator` with `localeCompare`](JS.md#intl-collation-js-08) [`Intl.PluralRules`](JS.md#intl-plural-rules-js-08) [`Intl.NumberFormat` with number `toLocaleString`](JS.md#intl-number-formatting-js-08) [`Intl.RelativeTimeFormat`](JS.md#intl-relative-time-formatting-js-08) [`Intl.DisplayNames`](JS.md#intl-display-names-js-08) [`Intl.DurationFormat`](JS.md#intl-duration-formatting-js-08) and [`Intl.Segmenter`](JS.md#intl-segmentation-js-08) are implemented. [`Intl.DateTimeFormat` and `Intl.supportedValuesOf`](JS.md#intl-date-and-time-formatting-js-08) are implemented for the supported calendars and data. Open debt: RegExp property escapes (TD-110), full collation tailorings (TD-107), calendars, zone names and date patterns (TD-122), the fixed local time offset of `Date` (TD-108), and the size of the embedded locale data (TD-120) |
-| JS-09 | Limits and performance gate: cancellation, JS stack and heap limits, GC stress mode, the JS benchmark corpus and heap-size report (see below) | `js.limits` | JS-04; grows with JS-05–JS-08 | **Done**: limits, ropes (TD-101 paid), the eight-workload corpus with its runner and deterministic gates, the committed heap-size report and recorded x86-64 results ([JS.md](JS.md#limits-and-performance-gate-js-09)); the ARM64 record is from QEMU emulation, native ARM64 timings are TD-125 |
+| JS-09 | Limits and performance gate: cancellation, JS stack and heap limits, GC stress mode, the JS benchmark corpus and heap-size report (see below) | `js.limits` | JS-04; grows with JS-05–JS-08 | **Done**: limits, ropes (TD-101 paid), the eight-workload corpus with its runner and deterministic gates, the committed heap-size report and recorded x86-64 results ([JS.md](JS.md#limits-and-performance-gate-js-09)); the original ARM64 record used QEMU. Native ARM64 evidence followed in M8 (TD-125 paid) |
 
 ### Memory and performance design
 
@@ -323,13 +302,14 @@ as complete ECMAScript support. No JIT until a separate measured security ADR.
 
 The required Wasm track starts after values/heap/execution foundations, follows
 WASM-01–08 in [PRODUCT.md](PRODUCT.md), and integrates with M5 host policy. Its
-decoder/validator/interpreter can be tested independently and should reuse the
-JS-03 heap, budgets and cancellation; full JS/Web binding, baseline feature and
-mobile gates remain mandatory through M9.
+decoder, validator and interpreter can be tested independently. The Window
+adapter uses JS tracing, budgets and cancellation at the host boundary.
+JS/Web bindings and browser baseline work are M9 gates. Device acceptance
+follows the mobile schedule in M14.
 
 **Status:** complete on 2026-11-16 (13 of 13 catalog capabilities). The gate
 was met with one recorded exception: the ARM64 benchmark record comes from QEMU
-emulation, accepted by the maintainer, with native timings owed as TD-125.
+emulation, accepted for M4. The native reference-device run in M8 paid TD-125.
 The debt M4 left open is listed per task above and scheduled in the
 [payoff schedule](TECH_DEBT.md#payoff-schedule); none of it blocks M5.
 
@@ -719,34 +699,14 @@ on Windows, macOS and Linux with keyboard/IME, lifecycle and accessibility
 checks. Record each platform's actual status; alpha labels list known
 limitations.
 
-**Status 2026-11-22:** UI-05 scenes and scrolling (ADR 0064) and the GPU
-process boundary ([ADR 0068](adr/0068-gpu-process.md): frame compositing in
-a confined `rustic __gpu` child with crash, hang and protocol-violation
-recovery and CPU fallback) are done; UI-02 has a Linux window (ADR 0065).
-The long-lived renderer per page is done ([ADR 0069](adr/0069-long-lived-renderer.md),
-2026-11-23). M8 runs in five parallel workstreams (renderer and GPU,
-desktop hosts and shell, accessibility, DevTools and automation,
-performance harness); next in this one: the hardware GPU backends inside
-the GPU process.
-
-**DevTools and automation 2026-11-23:** UI-04 and UI-06 are done as
-[ADR 0072](adr/0072-automation-protocol.md): `rustic automate` serves DOM,
-computed style, layout, screenshots, console, statement profiles, redacted
-network diagnostics, clicks, evaluation and a source debugger
-(breakpoints, stepping, scopes) over stdio, with grants enforced by the
-broker and no remote endpoint. The WPT runner reads every report through
-it; the recorded baseline is 70 Window WPT files, 462 subtests, 387 PASS
-and 75 FAIL at the pinned revision. Gaps are TD-187 to TD-190.
-
-**Status 2026-11-23 (desktop hosts and shell):** UI-01 and UI-02 done
-([ADR 0074](adr/0074-browser-shell-and-native-hosts.md)): `rustic view` is a
-small browser (tabs, history, address entry, reload and stop, error pages,
-zoom, find, permission and download UI, profile label) in a trusted strip
-over the live page, on native Windows, macOS (x64, ARM64) and Linux
-(X11, Wayland) windows with resize, device scale including fractional
-scales, minimize and IME handled by the host, and text drawn with the
-platform's own fonts. Remaining: TD-183 (macOS pre-main sandbox), TD-196,
-TD-197 and the curated site corpus for the demo.
+The desktop shell uses long-lived renderers for live pages and confined GPU
+compositing with a CPU fallback. The automation protocol exposes inspection
+and input over brokered stdio. It also drives the
+[pinned Window WPT selection](SCRIPTING.md#pinned-window-web-platform-tests).
+The native hosts, protocol and compositor are documented in
+[ADR 0074](adr/0074-browser-shell-and-native-hosts.md),
+[ADR 0072](adr/0072-automation-protocol.md) and
+[ADR 0071](adr/0071-gpu-backend.md).
 
 **Complete 2026-11-23** ([M8 completion review](reviews/2026-11-23-m8-completion.md),
 main `25028db`): all 16 M8 capabilities are complete. Hardware GPU energy
@@ -768,7 +728,7 @@ workstream gets an owner, scoped specification, fixture corpus, and gate:
 | CSS/layout | Full flex/grid/tables; writing modes; fragmentation/printing; container queries; animations/transforms/effects | WPT reftests plus incremental/full-layout parity |
 | Document formats | SVG parsing/DOM/painting, MathML layout, XML where supported | Separate format conformance and hostile-input corpora |
 | Language | Remaining ECMAScript semantics and built-ins, RegExp/Intl. Implemented additions include `Math.sumPrecise`, `Uint8Array` base64 and hex, JSON source text and raw JSON, and `Array.fromAsync`. [JS.md](JS.md#arrayfromasync-m9) | Test262 full-selection reporting; GC/stack stress |
-| Platform APIs | Streams, workers, structured clone, messaging, URL APIs, encoding, observers. Window text encoding and URL APIs have pinned coverage. [ENCODING.md](ENCODING.md), [URL.md](URL.md) | Agent/task/cross-origin tests |
+| Platform APIs | Streams, workers, structured clone, messaging, URL APIs, encoding, observers. Window text encoding, URL APIs and buffered Blob/Fetch have pinned coverage. [Window APIs](SCRIPTING.md#window-encoding-url-fetch-and-webassembly) | Agent/task/cross-origin tests |
 | Offline/data | IndexedDB, Cache API, service workers and update/lifetime rules | Transaction/crash-recovery and partition tests |
 | Graphics/media | Canvas 2D and OffscreenCanvas; audio/video, WebGL, WebGPU and WebRTC are M11 parity work | Rendering corpora, canvas WPT and sandbox review |
 | Network | HTTP/2 and HTTP/3 via reviewed transports, WebSockets, cache/cookie compatibility | Protocol fixtures, cancellation and cross-origin tests |
@@ -780,14 +740,16 @@ workstream gets an owner, scoped specification, fixture corpus, and gate:
 
 GPU delivery is required, with per-platform parity/recovery and energy measurements.
 The extension/filtering tracks start contract prototypes in M5/M6, require M7
-authority/isolation, and reach product acceptance in M8/M9. Follow [EXTENSIONS.md](EXTENSIONS.md).
+authority/isolation and have tracked desktop implementation work in M9.
+Mobile extension acceptance is part of M14. See [EXTENSIONS.md](EXTENSIONS.md).
 They must not delay the first static renderer or scripted local document.
 Sync/accounts, a password manager and a general native plugin ABI remain separate
 scope decisions. Track DRM/proprietary-service compatibility constraints explicitly
 rather than promising access that depends on third-party eligibility.
 
 Android and iOS are in scope from early core design. Their native hosts and
-runtime gates follow the same engine milestones, rather than being optional ports.
+runtime gates are scheduled for M14, with shared-core compile checks and
+Android emulator isolation throughout development.
 
 ## 13. M10 — Embedding, releases, and maintenance
 
@@ -995,7 +957,9 @@ in the milestone sections above.
 | parallel | M9 language: binary and JSON data interchange (TD-143) | ECMAScript §23.3 and §25.5. Add the pinned `Uint8Array` directory and cover exact JSON tokens, view revalidation, malformed input and cancellation | Implemented with 89 added pinned built-in passes. [Implementation ledger](IMPLEMENTATION.md#m9-language--uint8array-and-json-data-interchange) |
 | parallel | M9 language: `Array.fromAsync` (TD-143) | ECMAScript §23.1.2.2, all 95 pinned cases, iterator cleanup, native step limits and small-heap collection | Implemented. [Implementation ledger](IMPLEMENTATION.md#m9-language--arrayfromasync), [ADR 0070](adr/0070-native-promise-continuations.md) |
 | parallel | CSS-09: transitions, animations, Web Animations, then anchor positioning, view transitions, scroll-driven animations and `@scope` (`css.animations`, `css.modern`) | Every step of both capabilities with source and test evidence; limits recorded as TD-201 to TD-207 | Done 2026-11-25 ([CSS.md](CSS.md#transitions-and-animations)) |
-| — | Hosted CI | The full matrix green on every commit; then require the `CI` check on `main` (M0 follow-up) | Green on `moejoe873/Rustic` at `e150a22` |
+| parallel | M9 Window encoding, URL and Fetch bodies | Pinned text encoding, URL and URLSearchParams, Blob and buffered Fetch fixtures | Delivered for the documented Window scope. Stream bodies and workers remain open ([Window APIs](SCRIPTING.md#window-encoding-url-fetch-and-webassembly)) |
+| parallel | WASM-05/06: WebAssembly links and streaming | Live module table imports/exports, shared memories and progressive Fetch compilation with separate Core/JS/Web evidence | Standalone `WebAssembly.Table` and local table32/table64 execution are available. Live table linking and the streaming pipeline remain open ([implementation ledger](IMPLEMENTATION.md#wasm-06--standalone-window-tables)) |
+| — | Hosted CI | Aggregate `CI` for the change under review | [Active hosted matrix and verified revisions](PLATFORMS.md#verification-status) |
 | — | External security review (`security.brave`, external dependency) | Outside reviewers return findings on the [packet](reviews/2026-11-22-m7-external-review-packet.md); findings fixed or recorded | Waiting for reviewers; due before the M10 beta |
 | — | Android and iOS devices | M14 ([§17](#17-m14--mobile-devices-and-five-platform-10)) | Deferred by ADR 0067; compile checks and the Android emulator job stay in CI |
 | done | M8 completion review | Every M8 gate with recorded evidence; M8 debt rows moved | Done 2026-11-23 ([review](reviews/2026-11-23-m8-completion.md)); GPU energy and screen-reader acceptance moved to M10 as external dependencies |
@@ -1035,7 +999,7 @@ review and a threat-model update; dependency additions get a boundary review.
 | Upstream standards/tests change | Baseline shifts without code changes | Pin revisions; update in reviewed changes with before/after counts |
 | Parity target keeps moving | Other engines ship features faster than Rustic adds them | Inventory refresh every release; prioritize features shipped by all three and by measured site breakage |
 | Leadership gap stays wide | Ratchet misses at M8/M10 | Profile the biggest gap first; fix representation before adding tiers; no gate is lowered without a reviewed plan update |
-| Native platforms go unverified | Hosted CI stops starting jobs (2026-11-08 to 2026-11-22, and again from later on 2026-11-22); merges are checked only on Linux (native x86-64 plus emulation) and compile-checked elsewhere | Keep the sandbox gate strict; when hosted jobs run again, run the whole matrix before merging and fix what it finds first, as the first run on `moejoe873/Rustic` did; consider self-hosted runners so billing cannot stop the gate |
+| Native platforms go unverified | Hosted capacity or billing interruptions leave only Linux native/emulated and cross-check evidence | Keep the sandbox gate strict; when hosted jobs run again, run the whole matrix before merging and fix what it finds first, as the first run on `moejoe873/Rustic` did; consider self-hosted runners so billing cannot stop the gate |
 | Docs drift from code | Status tables, counts or "next task" pointers contradict the progress summary | Every finishing change updates [§18](#18-current-implementation-queue) and the docs index; a milestone cannot close without its completion review; prefer links to generated numbers over copied ones (TD-08) |
 | Hand-written bindings do not scale | Each new interface repeats conversion and brand-check code; fixes are applied to one interface and missed in others | Extend the pinned IDL generator (ADR 0025) to each interface family before binding it; TD-126 tracks the hand-bound surface |
 | Script-driven layout thrash | Flush counts per turn grow with page size in WEB-06 tests | Count and bound flushes; keep the from-scratch render as the reference; no caching without the differential test |

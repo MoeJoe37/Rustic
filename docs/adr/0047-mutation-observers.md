@@ -71,7 +71,7 @@ interpret them in the bindings.
   ([TD-151](../TECH_DEBT.md#td-151--mutation-records-for-parser-and-host-edits-resolve-observers-when-drained)).
 - A disconnected registration stays on its node until a mutation looks at it
   or the node is collected, and stays in a long-lived observer's list until
-  `disconnect` ([TD-150](../TECH_DEBT.md#td-150--dead-mutation-observer-registrations-are-dropped-lazily)).
+  `disconnect` ([TD-150](../TECH_DEBT.md#td-150--dead-mutation-observer-registrations-are-dropped-lazily-paid)).
 - Once any observer exists, the page records every edit and copies old
   character data and attribute values, even if no observer asks for them.
 

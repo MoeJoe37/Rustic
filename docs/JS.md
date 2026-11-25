@@ -20,7 +20,8 @@ What M4 left for later is recorded as technical debt, not hidden: proposal
 syntax (TD-89), Annex B functions in blocks (TD-99), function source text
 (TD-106), RegExp Unicode property escapes (TD-110), full collation tailorings
 (TD-107), calendars and zone names (TD-122), the fixed local time offset
-(TD-108), stop-the-world collection (TD-95) and native ARM64 timings (TD-125).
+(TD-108) and stop-the-world collection (TD-95). M8 added native ARM64
+benchmark evidence (TD-125 paid).
 The [payoff schedule](TECH_DEBT.md#payoff-schedule) says when each is due.
 The engine is used by documents through `rustic-bindings` and `rustic-engine`;
 see [SCRIPTING.md](SCRIPTING.md).
@@ -982,13 +983,17 @@ longest pause grows with the live heap, about 0.17 ms per MiB
 live data, which is the measured trigger of TD-95; incremental marking is
 `perf.gc` (M12). The [JS-09 report](reviews/2026-11-15-m4-js09.md) records
 the native x86-64 benchmarks and the ARM64 run under QEMU emulation, whose
-checksums, peak heap sizes and collection counts match x86-64. MoeJoe
-accepted the emulated record for M4; timings from native ARM64 hardware are
-TD-125. The native Linux ARM64 CI job runs the same release corpus and
-writes its timings, processor, kernel, Rust version and source revision to
-the job summary once Actions runs again.
+checksums, peak heap sizes and collection counts match x86-64. The emulated record was accepted for M4. The
+[M8 reference-device report](reviews/2026-11-23-perf-01-m8-reference-devices.md)
+records native ARM64 runs on Linux, Windows and macOS, which paid TD-125.
+The Linux ARM64 CI job runs the release corpus and writes its timings,
+processor, kernel, Rust version and source revision to the job summary.
 
 ## Built-ins (JS-05)
+
+Annex B `escape` and `unescape` operate on UTF-16 code units, preserving
+lone surrogates. The [implementation ledger](IMPLEMENTATION.md#ecmascript-annex-b--legacy-percent-functions)
+records the pinned Test262 evidence.
 
 JS-05 installs the standard library in parts. Each part is one module under
 `crates/rustic-js/src/runtime/builtins/`. A function is a native function

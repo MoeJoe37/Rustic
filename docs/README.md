@@ -1,53 +1,34 @@
 # Rustic design and implementation guide
 
-This directory holds Rustic's plan, its design, and the record of what is
-actually built. Design documents propose; only the implementation documents and
-the [progress summary](progress/summary.md) describe working code, and every
-status there is backed by tests. Update the relevant document (and a decision
-record when a boundary changes) in the same change as the code.
+This directory holds Rustic's roadmap, design decisions and implementation
+evidence. Use the [implementation ledger](IMPLEMENTATION.md) for tested
+behavior, the [progress summary](progress/summary.md) for weighted delivery
+status and the [roadmap](ROADMAP.md) for upcoming work. Update the relevant
+guide with the code and add a decision record when a boundary changes.
 
-## Where things stand (2026-11-22)
+## Where things stand
 
 | Milestone | State | Read |
 | --- | --- | --- |
-| M0 Foundation | Done; hosted CI ran green on `moejoe873/Rustic` on 2026-11-22, then stopped again on a billing limit; requiring the `CI` check on `main` is an open admin step | [DEVELOPMENT.md](DEVELOPMENT.md) |
+| M0 Foundation | Complete for the declared scope. The aggregate `CI` job is the integration gate. Branch rules are a repository administration setting | [DEVELOPMENT.md](DEVELOPMENT.md) |
 | M1 Document core | Done (28/28 capabilities): URL, HTML tokenizer and tree builder, DOM, local `dump-dom` | [URL.md](URL.md), [HTML.md](HTML.md), [HTML_TREE.md](HTML_TREE.md), [DOM.md](DOM.md) |
 | M2 Styles | Done (8/8): CSS syntax, selectors, values, cascade with layers, media/container queries, invalidation | [CSS.md](CSS.md) |
 | M3 Static rendering | Done (17/17): block/inline/flex layout, OpenType text, images, CPU raster, `render`, reftests, hit testing | [LAYOUT.md](LAYOUT.md), [TEXT.md](TEXT.md), [PAINT.md](PAINT.md) |
-| M4 JavaScript | Done (13/13) on 2026-11-16: parser, collected heap, bytecode interpreter, standard library, modules, realms, Intl, limits and benchmark gate. The ARM64 benchmark record is from emulation (TD-125) | [JS.md](JS.md), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
+| M4 JavaScript | Complete for the declared scope. Includes the parser, collected heap, bytecode interpreter, modules, realms, Intl, limits and benchmark gate. M8 added a native ARM64 benchmark record | [JS.md](JS.md#limits-and-performance-gate-js-09), [ROADMAP §7](ROADMAP.md#7-m4--original-ecmascript-runtime) |
 | M5 Scripted documents | Complete for the declared scope (11/11). Scripts, DOM bindings, events, mutation and resize observers, error reporting, focus, forms, the pinned WPT gate and the first cross-engine report. The emulated, MSRV and native tiers passed in the first full hosted run (2026-11-22) | [SCRIPTING.md](SCRIPTING.md), [review](reviews/2026-11-19-m5-completion.md) |
 | M6 Networking | Done 2026-11-20: HTTP/1.1 transport with TLS, Fetch, CORS, cookies, CSP, cache, profiles and Web Storage over allowlisted loopback origins. Remote origins resolving to public addresses followed in M7 (ADR 0066, TD-157 paid) | [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services), [review](reviews/2026-11-20-m6-completion.md) |
 | M7 Isolation | Done 2026-11-22 (7/7 after ADR 0067). Split renderer over bounded IPC, out-of-process iframes and popups, site process keys, COOP/COEP and ORB, renderer sandboxes on by default on Linux, Windows and macOS, a confined network process on all three with crash recovery, user activation, brokered downloads and the trusted address/permission strip. The independent external review is an external dependency of the M10 beta (`security.brave`) | [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate), [review](reviews/2026-11-22-m7-completion.md) |
-| M8 Desktop alpha | Current (1/18): compositor scenes and scrolling (UI-05, ADR 0064) done; `rustic view` desktop window on Linux (UI-02, ADR 0065); frames composited in a confined GPU process with crash recovery (ADR 0068) | [ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-alpha), [IMPLEMENTATION.md](IMPLEMENTATION.md#ui-02--desktop-window) |
-| M9 Compatibility expansion | Language work includes `Math.sumPrecise`, `Uint8Array` base64 and hex, JSON source text and raw JSON, and `Array.fromAsync`. CSS-09 is done: transitions, CSS animations, Web Animations, scroll-driven animations, anchor positioning, view transitions, `@scope` integration and a read-only CSSOM ([CSS.md](CSS.md#transitions-and-animations)) | [ROADMAP §12](ROADMAP.md#12-m9--compatibility-expansion-program), [JS.md](JS.md#arrayfromasync-m9) |
-| M10 Embedding and beta | Planned | [ROADMAP §13](ROADMAP.md#13-m10--embedding-releases-and-maintenance) |
-| M11–M13 | Not started: feature parity with Blink/Gecko/WebKit, performance leadership over all three, desktop engine 1.0 | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
+| M8 Desktop alpha | Complete for the declared scope. The native shell runs on Windows, macOS and Linux. The desktop alpha includes long-lived page renderers, confined GPU compositing with CPU fallback, accessibility bridges and automation | [ROADMAP §11](ROADMAP.md#11-m8--reference-desktop-alpha), [M8 completion review](reviews/2026-11-23-m8-completion.md) |
+| M9 Compatibility expansion | Current. CSS-09, live URL setters and the initial Window encoding surface are delivered. JavaScript additions, buffered Fetch bodies and a bounded WebAssembly profile are also available. See the roadmap for compatibility work still in progress | [ROADMAP §12](ROADMAP.md#12-m9--compatibility-expansion-program), [Window APIs](SCRIPTING.md#window-encoding-url-fetch-and-webassembly), [CSS-09](CSS.md#transitions-and-animations) |
+| M10 Embedding and beta | Planned. Independent security review, hardware GPU timing and energy measurements, and screen-reader acceptance remain external gates | [ROADMAP §13](ROADMAP.md#13-m10--embedding-releases-and-maintenance) |
+| M11–M13 | Feature parity with Blink/Gecko/WebKit, performance leadership and desktop 1.0 remain open. Early compatibility and performance evidence is tracked in the catalog | [ROADMAP §14–16](ROADMAP.md#14-m11--web-platform-parity), [PERFORMANCE.md](PERFORMANCE.md#cross-engine-gates) |
 | M14 Mobile devices | Deferred to the end (ADR 0067): Android and iOS on real devices, iOS entitlement, mobile shipping and the final five-platform 1.0. Mobile compile checks and the Android emulator job stay in CI | [ROADMAP §17](ROADMAP.md#17-m14--mobile-devices-and-five-platform-10), [MOBILE.md](MOBILE.md) |
 
-The [progress summary](progress/summary.md) is regenerated from
-`progress/catalog.json` and is the measured status. Done means done for the
-milestone's declared scope; broad web compatibility is M9 work and native
-Android/iOS host acceptance is M14 work. The capability counts in this table
-come from that summary; when they disagree, the summary is right and this
-table needs an update.
-
-Two things are true of every milestone so far and are easy to miss:
-
-- **Desktop evidence is intermittent; mobile has none.** Hosted CI was blocked by a
-  billing limit from 2026-11-08 to 2026-11-22, when the repository moved to
-  `moejoe873/Rustic`. The first full run there (native x64 and ARM64 Linux,
-  Windows and macOS, the emulated tiers and every compile check) found
-  portability bugs in the work merged during the gap, which are fixed, and
-  passed on `feature` at `9961c1c`. Later that day GitHub stopped starting
-  jobs on the new account as well, so commits after `9961c1c` wait for the
-  next hosted run ([TD-12](TECH_DEBT.md),
-  [PLATFORMS.md](PLATFORMS.md#current-verification-status-2026-11-22)).
-- **Nothing runs on a phone yet, by choice.** Android and iOS device work is
-  the last milestone, M14 ([ADR 0067](adr/0067-mobile-devices-last.md),
-  [ROADMAP §17](ROADMAP.md#17-m14--mobile-devices-and-five-platform-10)).
-  Meanwhile every Android and iOS target is compile-checked, and the Android
-  isolated renderer service of [ADR 0059](adr/0059-mobile-renderer-isolation.md)
-  passes its emulator CI job; iOS isolation is a design only.
+The [progress summary](progress/summary.md) carries the exact capability counts
+and is regenerated from `progress/catalog.json`. The [platform matrix](PLATFORMS.md)
+records hosted evidence and the available test tiers. Android and iOS device
+acceptance is scheduled for M14. CI compiles their shared libraries and runs
+an Android isolated-renderer emulator test.
 
 ## Reading order
 
@@ -102,6 +83,7 @@ New to the project? Read these in order:
 | [JS.md](JS.md) | The JavaScript engine: parser, heap and collector, bytecode interpreter, built-ins, modules, realms, Intl, Test262 gates and benchmarks |
 | [ACCESSIBILITY.md](ACCESSIBILITY.md) | Accessibility tree (HTML-AAM, ARIA, AccName), platform bridges, assistive actions, editing, IME and the CI acceptance probes |
 | [SCRIPTING.md](SCRIPTING.md) | Scripted documents: lifecycle, script/timer/input/rendering turns, Web IDL, DOM bindings, events, observers, forms and their remaining limits |
+| WebAssembly (M9) | [Window surface and limits](SCRIPTING.md#window-encoding-url-fetch-and-webassembly), [core runtime and host binding evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), ADRs 0077 and 0079–0088 |
 | Networking (M6) | No separate guide yet: the [NET sections of IMPLEMENTATION.md](IMPLEMENTATION.md#net-01--http11-transport-without-tls), [ROADMAP §9](ROADMAP.md#9-m6--controlled-networking-and-browser-services) and ADRs 0051–0055 and 0066 |
 | Isolation (M7) | [SECURITY.md](SECURITY.md) for the model; the [ISO sections of IMPLEMENTATION.md](IMPLEMENTATION.md#iso-02--split-renderer-process-and-brokered-authority), [ROADMAP §10](ROADMAP.md#10-m7--isolation-and-security-gate) and ADRs 0056–0063 for what is built |
 
@@ -117,28 +99,22 @@ an earlier one's "remaining" notes.
 | URL | 887 pinned WPT URL records; all 6,389 Unicode IdnaTestV2 cases |
 | Encodings | All 40 Encoding Standard encodings from pinned indexes; 44.5 million decoder and encoder cases compared with Chromium 157, differing only where Chromium departs from the standard (242 cases, [documented](ENCODING.md#reference-comparison)) |
 | HTML | 1,079 declaration, 4,626 character-reference and 282 text-mode tokenizer cases, plus all 1,792 html5lib tree records at every two-chunk split with four expectations adapted to current HTML |
-| Scripted Window | WPT revision `cb97c571c3b1947e08b8615eeb4028a2794b23a4` through upstream `testharness.js`. The 59 files report 272 passes and 70 expected failures across 342 subtests. [Exact baseline](SCRIPTING.md#pinned-window-web-platform-tests) |
+| Scripted Window | Pinned upstream `testharness.js` selection covering DOM, CSSOM, encoding, URL, Blob/Fetch and Wasm. [Exact Window baseline](SCRIPTING.md#pinned-window-web-platform-tests) |
 | DOM | 25,230 pre-insert combinations against a specification oracle; seeded model tests |
 | CSS | 8,041 color cases; 1,115 of 1,455 in-scope pinned WPT parsing cases with a reasoned ratchet |
 | Layout and paint | Exact-geometry tests, checked reftests, 38 of 91 static css-flexbox WPT pages |
 | Text | Shaping compared against 30 committed HarfBuzz reference cases |
 | JavaScript | Pinned Test262: all 23,123 `test/language` files parse as required. Pass counts are 21,939 of 22,427 language files (97.8%), 17,739 of 18,861 gated built-ins files (94.1%), 1,240 of 1,326 gated `intl402` files (93.5%) and all 696 executed module files. Eight benchmark workloads have pinned checksums and a committed heap-size report |
-| Scripted documents | Deterministic turn-order, timer, input and frame tests on a manual clock; binding tests for identity, reentrancy, failure atomicity and collection of detached DOM/JS cycles. No WPT `dom/` or `html/` results yet (`web.conformance`) |
-| Robustness | 29 deterministic fuzz targets (`cargo run -p rustic-fuzz -- list`) with a required smoke job and a nightly campaign |
+| Scripted documents | Deterministic turn-order, timer, input and frame tests on a manual clock. Binding tests cover identity, reentrancy, failure atomicity and collection of detached DOM/JS cycles |
+| Robustness | Deterministic fuzz targets (`cargo run --locked -p rustic-fuzz -- list`), a required smoke job and a scheduled campaign over a selected matrix |
 | Platforms | Native tests on x64/ARM64 Linux, Windows and macOS; emulated 32-bit ARM/x86, RISC-V and big-endian; cross-checks for Android, iOS and eight more targets |
 
-There are no whole-WPT pass rates, no Test262 rate over the whole suite
-(each gate covers the implemented areas, and proposal features are skipped),
-no externally reviewed sandbox, no performance comparison beyond the
-[first JavaScript report](reviews/2026-11-19-perf-01-m5.md) and no releases
-yet. Third-party Rust crates are limited to the reviewed and pinned ones in
-[DEPENDENCIES.md](DEPENDENCIES.md): the font adapters
-([ADR 0014](adr/0014-reviewed-font-adapters.md)), TLS and content decoding
-([ADR 0051](adr/0051-transport-and-tls.md)) and the desktop window
-([ADR 0065](adr/0065-desktop-window-host.md)).
-Configuration in the repository is distinct from a successful hosted run;
-inspect the [Actions page](https://github.com/moejoe873/Rustic/actions) for run
-results.
+WPT and Test262 results apply to their declared selections. The independent
+security review and release gates remain open. See the [reference-device
+reports](PERFORMANCE.md#reference-devices) for measured workloads and
+[DEPENDENCIES.md](DEPENDENCIES.md) for the reviewed dependency boundaries.
+Check the [Actions page](https://github.com/MoeJoe37/Rustic/actions) for the
+result at a specific commit.
 
 ## Document conventions
 

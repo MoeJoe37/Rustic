@@ -3,8 +3,8 @@
 `rustic-dom` owns the internal node arena, checked tree mutations and retained
 payload accounting. It is usable without an HTML parser or JavaScript runtime.
 The [implementation ledger](IMPLEMENTATION.md) records the supported hierarchy,
-identity and traversal subset; [architecture](ARCHITECTURE.md) describes future
-tracing and bindings. This document specifies the character-data storage contract.
+identity and traversal subset. The [scripted-document guide](SCRIPTING.md)
+describes the Web IDL and Window surface over this storage.
 
 ## Checked text and comment edits
 
@@ -30,11 +30,12 @@ preprocessing belongs to the parser, not DOM storage.
 
 These range semantics follow the storage portion of the DOM Standard's
 [replace-data algorithm](https://dom.spec.whatwg.org/#concept-cd-replace), reviewed
-2026-11-08 against the living standard last updated 2026-11-04. This is not a full
-`CharacterData` implementation: Web IDL conversion/exception mapping, live-range
-adjustment and normalization remain pending. Edits record mutation entries
-when the document's journal is enabled ([ADR 0047](adr/0047-mutation-observers.md)). No browser conformance suite has
-been run for this storage subset.
+2026-11-08 against the living standard last updated 2026-11-04. The page
+binding supplies Web IDL conversions, exception mapping and `Node.normalize()`
+for its exposed subset. Live-range adjustment remains open. Edits record
+mutation entries when the document's journal is enabled. See
+[ADR 0047](adr/0047-mutation-observers.md) and the
+[pinned Window tests](SCRIPTING.md#pinned-window-web-platform-tests).
 
 ## Reservation, accounting and ownership
 
@@ -140,14 +141,14 @@ Reachability is per tree: holding any node keeps its whole tree, a template and
 its contents keep each other, and so do a host and its shadow root. Marking and
 destruction are iterative.
 
-`rustic-bindings` joins this to the JS collector. `DomHeap` gives each node one
-wrapper (a JS host object, the same object on every request), records the
-values a node keeps alive (event listeners), and runs one collection over both
-sides: a reachable wrapper marks its node's tree, a marked tree reports its
-nodes' wrappers and node-held values, unreachable trees are destroyed and
-their wrappers freed. A wrapper whose node the engine destroyed stays a plain
-object that names no node. The heap is bound to one document (TD-17).
-The DOC-09 prototype `HostHeap` that stood in for the JS heap is gone.
+`rustic-bindings` joins this to the JS collector. `DomHeap` preserves wrapper
+identity within each realm and records the values a node keeps alive, such
+as event listeners. A reachable wrapper marks its node's tree, and a marked
+tree reports its wrappers and node-held values. Unreachable trees and wrappers
+can then be swept. A wrapper whose node was destroyed names no live node.
+The collector can trace multiple documents registered with the same agent,
+including detached documents. See [ADR 0026](adr/0026-realm-dom-wrappers.md)
+and [ADR 0033](adr/0033-detached-documents-and-adoption.md).
 
 ## Structural invariants and the conformance gate
 
@@ -186,6 +187,6 @@ contracts above. The character-data suite covers:
 - 2,500 deterministic edits compared after every operation with an independent
   prefix/insert/suffix model for two nodes sharing a limited budget.
 
-The existing tree-link model, deep-tree destruction and deterministic dump suites
-also remain required. Allocation-failure injection and live web DOM tests are
-future work.
+The tree-link model, deep-tree destruction and deterministic dump suites also
+run alongside the [live DOM binding checks](SCRIPTING.md#evidence). Dedicated
+allocation-failure injection remains future work.

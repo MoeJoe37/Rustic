@@ -167,9 +167,10 @@ The [inert document parser](HTML_TREE.md) now implements complete document tree
 construction with scripting disabled, including foreign content and CDATA.
 The fragment parsing algorithm is implemented over UTF-8 bytes.
 The local document loader can select a legacy encoding and replay its
-retained prefix before author code runs. Transport-level encoding
-confidence and navigation replacement remain part of `url.restart`.
-[ADR 0044](adr/0044-local-html-encoding-replay.md)
+retained prefix before author code runs. The network loader applies
+transport charset confidence and may reload once on a later declaration
+while confidence remains tentative. See the [encoding guide](ENCODING.md)
+and [local replay decision](adr/0044-local-html-encoding-replay.md).
 The current API is an internal foundation, not a complete tokenizer/parser or a
 stable embedding interface. DOC-05a's initial data/tag/comment scope is complete;
 DOC-05b now has reference expansion and all four text modes; broader encoding work

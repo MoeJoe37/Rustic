@@ -1,11 +1,12 @@
 # Security architecture and browsing gates
 
-This is the target threat model. As of 2026-11-22 Rustic runs scripts, loads
-granted network origins and confines its renderer and network processes on
-Linux, Windows and macOS (status below), but it has had no independent external
-review and is not a browser for arbitrary sites. Security claims require tests
-and platform evidence, not this document alone. Reporting instructions are in the
-root [security policy](../SECURITY.md).
+This document describes the threat model and enforced boundaries. The desktop
+alpha executes scripts, loads granted origins, and confines renderer, network
+and GPU processes on supported hosts. An independent assessment and the other
+M10 beta gates remain open. The
+[platform verification record](PLATFORMS.md#verification-status) links to
+hosted evidence. Follow the root [security policy](../SECURITY.md) for private
+reporting.
 
 ## Assets, adversaries, and authority
 
@@ -104,10 +105,15 @@ and macOS (a Seatbelt profile the renderer applies to itself,
 [ADR 0063](adr/0063-macos-renderer-sandbox.md)), verified on native x64
 and ARM64 runners of all three (2026-11-22). Sockets, TLS and HTTP framing
 run in a separate network process that the broker revalidates
-([ADR 0061](adr/0061-network-process.md)), confined on all three systems;
-remote origins can be granted on the command line and reach only public
+([ADR 0061](adr/0061-network-process.md)), confined on all three desktop
+systems for normal remote browsing. Windows loopback fixture grants have a
+separate development path.
+Remote origins can be granted on the command line and reach only public
 addresses ([ADR 0066](adr/0066-remote-addresses-and-windows-network-container.md)).
-On Android the renderer runs in an isolated-process service
+The desktop compositor uses a confined GPU process with CPU fallback and
+separate hardware backend and recovery tests
+([ADR 0068](adr/0068-gpu-process.md), [ADR 0071](adr/0071-gpu-backend.md)).
+On Android the renderer prototype runs in an isolated-process service
 ([ADR 0059](adr/0059-mobile-renderer-isolation.md), Proposed); its emulator
 test passes in CI. iOS isolation is a design only; device and iOS work is the
 last milestone, M14 ([ADR 0067](adr/0067-mobile-devices-last.md)). See the

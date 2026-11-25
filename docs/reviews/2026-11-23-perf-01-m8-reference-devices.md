@@ -56,7 +56,7 @@ parity). Rustic is a bytecode interpreter; the others run their JITs.
 | `strings` | 4.1 | 5.0 | 4.7 | 4.0 | 7.8 | 12.4 |
 
 These are the first native ARM64 timings of the JS-09 corpus (Linux,
-Windows and macOS), which pays [TD-125](../TECH_DEBT.md#td-125--arm64-benchmark-timings-are-emulated).
+Windows and macOS), which pays [TD-125](../TECH_DEBT.md#td-125--arm64-benchmark-timings-are-emulated-paid).
 The M8 speed ratchet (at most 2.0) is not met by any workload on any
 device; see [PERFORMANCE.md](../PERFORMANCE.md#m8-budgets) for where that gap
 is closed.

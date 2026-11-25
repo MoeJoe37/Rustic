@@ -218,6 +218,42 @@ impl ScriptTree {
         self.layout.borrow_mut().read(&document, mode, empty, read)
     }
 
+    /// Measure the scroll and view timelines animations use; a changed
+    /// timeline restyles at the next layout.
+    fn update_scroll_timelines(&self) {
+        let sources: Vec<(u64, rustic_style::TimelineSource)> = match self.animations.try_borrow() {
+            Ok(c) => c
+                .scroll_timelines()
+                .map(|(id, s)| (id, s.clone()))
+                .collect(),
+            Err(_) => return,
+        };
+        if sources.is_empty() {
+            return;
+        }
+        let scroll = self.scroll.borrow().clone();
+        let Ok(states) = self.read_layout(Vec::new(), |geometry| {
+            Ok(sources
+                .iter()
+                .map(|(id, source)| (*id, crate::timelines::measure(geometry, &scroll, source)))
+                .collect::<Vec<_>>())
+        }) else {
+            return;
+        };
+        let mut changed = false;
+        if let Ok(mut controller) = self.animations.try_borrow_mut() {
+            for (id, state) in states {
+                if controller.scroll_timeline(id) != Some(&state) {
+                    controller.set_scroll_timeline(id, state);
+                    changed = true;
+                }
+            }
+        }
+        if changed {
+            self.animations_changed();
+        }
+    }
+
     fn mode(&self) -> Option<DocumentMode> {
         match &*self.state.borrow() {
             ScriptTreeState::Parsing(parser) => parser.live_document_mode(),
@@ -1285,7 +1321,9 @@ impl<C: Clock> ScriptedDocument<C> {
         let fired = page::fire_scroll_events(agent);
         self.page_result(fired)?;
         self.checkpoint()?;
-        // "Update animations and send events", before the callbacks.
+        // "Update animations and send events", before the callbacks;
+        // scroll-driven timelines take this frame's scroll positions.
+        self.document.update_scroll_timelines();
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         let updated = page::update_animations(agent, frame.timestamp().as_secs_f64() * 1_000.0);
         self.page_result(updated)?;

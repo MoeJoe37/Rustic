@@ -45,6 +45,8 @@ const EFFECT: &str = "AnimationEffect";
 const KEYFRAME_EFFECT: &str = "KeyframeEffect";
 const TIMELINE: &str = "AnimationTimeline";
 const DOCUMENT_TIMELINE: &str = "DocumentTimeline";
+const SCROLL_TIMELINE: &str = "ScrollTimeline";
+const VIEW_TIMELINE: &str = "ViewTimeline";
 
 /// Animation wrapper slots.
 const A_ID: u32 = 0;
@@ -57,8 +59,22 @@ const A_NAME: u32 = 5;
 /// KeyframeEffect slots: `[serial]`.
 const E_SERIAL: u32 = 0;
 
-/// Timeline slots: `[origin time in ms, or null for no timeline]`.
+/// Timeline slots: `[origin time in ms, kind, source or subject element,
+/// axis]`; the last three only for scroll and view timelines.
 const T_ORIGIN: u32 = 0;
+const T_KIND: u32 = 1;
+const T_ELEMENT: u32 = 2;
+const T_AXIS: u32 = 3;
+
+/// Timeline kinds.
+const KIND_SCROLL: f64 = 1.0;
+const KIND_VIEW: f64 = 2.0;
+const AXES: [(&str, rustic_css::ScrollAxis); 4] = [
+    ("block", rustic_css::ScrollAxis::Block),
+    ("inline", rustic_css::ScrollAxis::Inline),
+    ("x", rustic_css::ScrollAxis::X),
+    ("y", rustic_css::ScrollAxis::Y),
+];
 
 /// Finished, irrelevant script animations kept for replay before the
 /// oldest are dropped.
@@ -140,6 +156,27 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         construct_timeline,
         0,
         &[],
+        |_, _| Ok(()),
+    )?;
+    install_interface(
+        agent,
+        SCROLL_TIMELINE,
+        Some(TIMELINE),
+        construct_scroll_timeline::<false>,
+        0,
+        &[
+            ("source", "get source", timeline_element::<false>),
+            ("axis", "get axis", timeline_axis),
+        ],
+        |_, _| Ok(()),
+    )?;
+    install_interface(
+        agent,
+        VIEW_TIMELINE,
+        Some(SCROLL_TIMELINE),
+        construct_scroll_timeline::<true>,
+        0,
+        &[("subject", "get subject", timeline_element::<true>)],
         |_, _| Ok(()),
     )?;
     install_interface(
@@ -362,7 +399,167 @@ fn timeline_origin(agent: &mut Agent, timeline: Value) -> JsResult<Option<f64>> 
     }
 }
 
+/// `new ScrollTimeline({source, axis})` and `new ViewTimeline({subject,
+/// axis})` (Scroll-driven Animations §2.3, §3.3). `currentTime` is a
+/// percentage number rather than a `CSSUnitValue` (TD-217).
+fn construct_scroll_timeline<const VIEW: bool>(
+    agent: &mut Agent,
+    _: Value,
+    args: &[Value],
+) -> JsResult<Value> {
+    let interface = if VIEW { VIEW_TIMELINE } else { SCROLL_TIMELINE };
+    let Some(new_target) = agent.new_target() else {
+        return agent.type_error("timeline constructor requires new");
+    };
+    let options = args.first().copied().unwrap_or(Value::UNDEFINED);
+    // An absent source is the document's scrolling element (the
+    // viewport, kept as undefined); null leaves the timeline inactive.
+    let (mut element, mut axis) = (if VIEW { Value::NULL } else { Value::UNDEFINED }, 0.0);
+    if let Some(object) = options.as_object() {
+        let value = get(agent, object, if VIEW { "subject" } else { "source" })?;
+        if value != Value::UNDEFINED {
+            if value != Value::NULL {
+                element_id(agent, value)?;
+            }
+            element = value;
+        }
+        let value = get(agent, object, "axis")?;
+        if value != Value::UNDEFINED {
+            let text = to_usv_string(agent, value)?;
+            let Some(index) = AXES.iter().position(|(name, _)| *name == text) else {
+                return agent.type_error("axis must be block, inline, x or y");
+            };
+            axis = index as f64;
+        }
+    }
+    let proto = agent.host_prototype_from_new_target(interface, new_target)?;
+    let object = Value::object(agent.new_object_with(Some(proto))?);
+    with_root(agent, object, |agent| {
+        let kind = if VIEW { KIND_VIEW } else { KIND_SCROLL };
+        let slots = PrivateArray::new(
+            agent,
+            &[
+                Value::number(0.0),
+                Value::number(kind),
+                element,
+                Value::number(axis),
+            ],
+        )?;
+        with_page(agent, |agent, page| {
+            agent.weak_map_set(page.animations.timelines, object, slots.value())
+        })?;
+        Ok(object)
+    })
+}
+
+fn timeline_slots(agent: &mut Agent, timeline: Value) -> JsResult<Option<PrivateArray>> {
+    let slots = with_page(agent, |agent, page| {
+        Ok(agent.weak_map_get(page.animations.timelines, timeline))
+    })?;
+    Ok(PrivateArray::from_value(slots))
+}
+
+/// A scroll or view timeline object's source, or `None` for a document
+/// timeline; `Some(None)` is an inactive one.
+fn scroll_source(
+    agent: &mut Agent,
+    timeline: Value,
+) -> JsResult<Option<Option<rustic_style::TimelineSource>>> {
+    let Some(slots) = timeline_slots(agent, timeline)? else {
+        return Ok(None);
+    };
+    let kind = slots.get(agent, T_KIND)?.as_number();
+    if kind != Some(KIND_SCROLL) && kind != Some(KIND_VIEW) {
+        return Ok(None);
+    }
+    let element = slots.get(agent, T_ELEMENT)?;
+    let axis = slots.get(agent, T_AXIS)?.as_number().unwrap_or(0.0) as usize;
+    let axis = AXES
+        .get(axis)
+        .map_or(rustic_css::ScrollAxis::Block, |(_, a)| *a);
+    let node = match element {
+        Value::UNDEFINED => None,
+        Value::NULL => return Ok(Some(None)),
+        element => Some(element_id(agent, element)?),
+    };
+    Ok(Some(Some(match (kind == Some(KIND_VIEW), node) {
+        (true, Some(subject)) => rustic_style::TimelineSource::View {
+            subject,
+            axis,
+            inset: rustic_css::ViewInset(
+                rustic_css::LengthPercentageOrAuto::Auto,
+                rustic_css::LengthPercentageOrAuto::Auto,
+            ),
+        },
+        (true, None) => return Ok(Some(None)),
+        (false, Some(node)) => rustic_style::TimelineSource::Scroll {
+            scroller: rustic_style::ScrollerRef::Element(node),
+            axis,
+        },
+        (false, None) => rustic_style::TimelineSource::Scroll {
+            scroller: rustic_style::ScrollerRef::Root,
+            axis,
+        },
+    })))
+}
+
+fn timeline_element<const VIEW: bool>(
+    agent: &mut Agent,
+    this: Value,
+    _: &[Value],
+) -> JsResult<Value> {
+    let Some(slots) = timeline_slots(agent, this)? else {
+        return agent.type_error("expected a ScrollTimeline receiver");
+    };
+    let kind = slots.get(agent, T_KIND)?.as_number();
+    let element = slots.get(agent, T_ELEMENT)?;
+    match (VIEW, kind) {
+        (false, Some(KIND_SCROLL)) if element == Value::UNDEFINED => {
+            // The viewport's scrolling element.
+            let root = with_page(agent, |agent, page| {
+                page.read(agent, page.main, |_, document| {
+                    Ok(document.children(document.root()).ok().and_then(|mut c| {
+                        c.find(|&n| {
+                            document
+                                .node(n)
+                                .is_ok_and(|n| matches!(n.kind(), NodeKind::Element(_)))
+                        })
+                    }))
+                })
+            })?;
+            match root {
+                Some(root) => wrap_node(agent, root),
+                None => Ok(Value::NULL),
+            }
+        }
+        (false, Some(KIND_SCROLL)) | (true, Some(KIND_VIEW)) => Ok(element),
+        // A view timeline's source is its subject's scroll container,
+        // known only to layout (TD-217).
+        (false, Some(KIND_VIEW)) => Ok(Value::NULL),
+        _ => agent.type_error("expected a ScrollTimeline receiver"),
+    }
+}
+
+fn timeline_axis(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let Some(slots) = timeline_slots(agent, this)? else {
+        return agent.type_error("expected a ScrollTimeline receiver");
+    };
+    let axis = slots.get(agent, T_AXIS)?.as_number().unwrap_or(0.0) as usize;
+    let name = AXES.get(axis).map_or("block", |(name, _)| name);
+    agent.string(name)
+}
+
 fn timeline_current_time(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    if let Some(source) = scroll_source(agent, this)? {
+        let Some(source) = source else {
+            return Ok(Value::NULL);
+        };
+        let controller = controller(agent)?;
+        let mut controller = controller.borrow_mut();
+        let id = controller.timeline_for(source);
+        let progress = controller.scroll_timeline(id).and_then(|s| s.progress());
+        return Ok(time_value(progress));
+    }
     let Some(origin) = timeline_origin(agent, this)? else {
         return agent.type_error("expected an AnimationTimeline receiver");
     };
@@ -377,6 +574,13 @@ fn document_timeline(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value
 fn timeline_ref(agent: &mut Agent, timeline: Value) -> JsResult<TimelineRef> {
     if timeline == Value::NULL {
         return Ok(TimelineRef::None);
+    }
+    if let Some(source) = scroll_source(agent, timeline)? {
+        let Some(source) = source else {
+            return Ok(TimelineRef::None);
+        };
+        let id = controller(agent)?.borrow_mut().timeline_for(source);
+        return Ok(TimelineRef::Scroll(rustic_style::ScrollRef::whole(id)));
     }
     if timeline_origin(agent, timeline)?.is_none() {
         return agent.type_error("expected an AnimationTimeline");
@@ -1756,6 +1960,7 @@ fn animate(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let input = timing_input(agent, options)?;
     let mut composite = None;
     let mut name = None;
+    let mut timeline = None;
     if let Some(object) = options.as_object() {
         let value = get(agent, object, "composite")?;
         composite = composite_of(agent, value)?;
@@ -1765,7 +1970,7 @@ fn animate(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
         }
         let value = get(agent, object, "timeline")?;
         if value != Value::UNDEFINED {
-            timeline_ref(agent, value)?;
+            timeline = Some((value, timeline_ref(agent, value)?));
         }
     }
     let mut timing = Timing::default();
@@ -1774,10 +1979,17 @@ fn animate(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     if let Some(op) = composite {
         effect.composite = op;
     }
+    let timeline_ref = timeline
+        .as_ref()
+        .map_or(TimelineRef::Document, |(_, r)| r.clone());
     let id = controller(agent)?
         .borrow_mut()
-        .create(Some(effect), TimelineRef::Document);
+        .create(Some(effect), timeline_ref);
     let wrapper = wrapper(agent, id)?;
+    if let Some((value, _)) = timeline {
+        let slots = slots_of(agent, wrapper)?;
+        slots.set(agent, A_TIMELINE, value)?;
+    }
     if let Some(name) = name {
         let slots = slots_of(agent, wrapper)?;
         let text = agent.string(&name)?;

@@ -745,6 +745,7 @@ pub(crate) fn style_walk<'a>(
                                 compute,
                             )
                         };
+                        controller.set_ancestors(path.iter().map(|e| out[e.index].node));
                         match controller.style_element(
                             id,
                             &computed,

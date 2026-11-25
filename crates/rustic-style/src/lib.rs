@@ -62,8 +62,8 @@ mod view;
 pub use animation::{
     AnimatedValues, Animation, AnimationController, AnimationError, AnimationEvent,
     AnimationEventKind, AnimationId, ComputedTiming, EffectKeyframe, Fill, KeyframeEffect,
-    KeyframeValues, Owner, Phase, PlayStateValue, ReplaceState, ScrollTimelineState, TimelineRef,
-    Timing, distribute_offsets,
+    KeyframeValues, Owner, Phase, PlayStateValue, ReplaceState, ScrollRef, ScrollTimelineState,
+    ScrollerRef, TimelineRef, TimelineSource, Timing, ViewGeometry, distribute_offsets, length_px,
 };
 pub use cascade::{Cascade, SpecifiedStyle, StyleInputs, TreeContext, TreeScope};
 pub use computed::{ComputeContext, ComputedStyle};

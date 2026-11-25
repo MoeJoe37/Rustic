@@ -12,6 +12,7 @@ mod lifecycle;
 mod local_modules;
 mod scripting;
 mod tasks;
+mod timelines;
 mod window_tasks;
 
 pub use classic_scripts::{

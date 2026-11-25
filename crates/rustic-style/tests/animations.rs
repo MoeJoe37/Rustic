@@ -310,3 +310,86 @@ fn timing_phases_and_iterations() {
     assert_eq!(after.current_iteration, Some(2.0));
     assert!((after.progress.unwrap() - 0.5).abs() < 1e-9);
 }
+
+#[test]
+fn scroll_driven_animations_follow_their_timelines() {
+    use rustic_style::{ScrollTimelineState, ScrollerRef, TimelineSource, ViewGeometry};
+    let page = document("<!doctype html><div id=s><div id=v></div><div id=t></div></div>");
+    let doc = page.document();
+    let (s, v, t) = (find(doc, "s"), find(doc, "v"), find(doc, "t"));
+    let css = "@keyframes grow { from { width: 0px } to { width: 100px } }
+        #s { scroll-timeline: --page y }
+        #v { view-timeline-name: --card }
+        #t { animation: grow linear; animation-timeline: --page }";
+    let mut c = AnimationController::new();
+    // Before layout measures the timeline it is inactive: no effect.
+    assert_eq!(frame(&page, css, &mut c, 0.0, PropertyId::Width), "auto");
+    let timelines: Vec<_> = c
+        .scroll_timelines()
+        .map(|(id, s)| (id, s.clone()))
+        .collect();
+    assert_eq!(
+        timelines,
+        vec![(
+            timelines[0].0,
+            TimelineSource::Scroll {
+                scroller: ScrollerRef::Element(s),
+                axis: rustic_css::ScrollAxis::Y,
+            }
+        )]
+    );
+    let scroll = timelines[0].0;
+    let at = |offset| ScrollTimelineState {
+        offset: Some(offset),
+        start: 0.0,
+        end: 400.0,
+        view: None,
+    };
+    c.set_scroll_timeline(scroll, at(100.0));
+    assert_eq!(frame(&page, css, &mut c, 16.0, PropertyId::Width), "25px");
+    c.set_scroll_timeline(scroll, at(300.0));
+    assert_eq!(frame(&page, css, &mut c, 32.0, PropertyId::Width), "75px");
+
+    // animation-range narrows the attachment range.
+    let ranged = format!("{css} #t {{ animation-range: 100px 300px }}");
+    c.set_scroll_timeline(scroll, at(150.0));
+    assert_eq!(
+        frame(&page, &ranged, &mut c, 48.0, PropertyId::Width),
+        "25px"
+    );
+    c.set_scroll_timeline(scroll, at(200.0));
+    assert_eq!(
+        frame(&page, &ranged, &mut c, 64.0, PropertyId::Width),
+        "50px"
+    );
+
+    // An anonymous view() timeline of the element itself.
+    let view = "@keyframes grow { from { width: 0px } to { width: 100px } }
+        #t { animation: grow linear both; animation-timeline: view(); animation-range: contain }";
+    frame(&page, view, &mut c, 80.0, PropertyId::Width);
+    let (id, source) = c
+        .scroll_timelines()
+        .find(|(_, s)| matches!(s, TimelineSource::View { .. }))
+        .map(|(id, s)| (id, s.clone()))
+        .unwrap();
+    assert!(matches!(source, TimelineSource::View { subject, .. } if subject == t));
+    // Subject 50px tall at 500px in a 200px scrollport: cover is offsets
+    // 300..550, contain 350..500.
+    let view_at = |offset| ScrollTimelineState {
+        offset: Some(offset),
+        start: 300.0,
+        end: 550.0,
+        view: Some(ViewGeometry {
+            subject_start: 500.0,
+            subject_size: 50.0,
+            port: 200.0,
+        }),
+    };
+    c.set_scroll_timeline(id, view_at(425.0));
+    assert_eq!(frame(&page, view, &mut c, 96.0, PropertyId::Width), "50px");
+    c.set_scroll_timeline(id, view_at(320.0));
+    assert_eq!(frame(&page, view, &mut c, 112.0, PropertyId::Width), "0px");
+    // Unused timelines are dropped after a restyle.
+    assert_eq!(c.scroll_timelines().count(), 1);
+    let _ = v;
+}

@@ -22,10 +22,24 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use rustic_css::{
-    AnimationDirection, AnimationDuration, AnimationValue, CompositeOperation, DeclaredValue,
-    EasingFunction, FillMode, IterationCount, PlayState, PropertyDeclaration, PropertyId,
-    PropertyName, PropertyValue, TransitionBehavior, TransitionProperty, cycle,
+    AnimationDirection, AnimationDuration, AnimationTimeline, AnimationValue, CompositeOperation,
+    DeclaredValue, EasingFunction, FillMode, IterationCount, LengthPercentage,
+    LengthPercentageOrAuto, PlayState, PropertyDeclaration, PropertyId, PropertyName,
+    PropertyValue, RangeEdge, ScrollAxis, Scroller, TimelineRangeName, TransitionBehavior,
+    TransitionProperty, ViewInset, cycle,
 };
+
+/// `lp` in pixels, with percentages of `basis` (font-relative units, which
+/// a range offset should not use, count as pixels).
+pub fn length_px(lp: &LengthPercentage, basis: f64) -> f64 {
+    match lp {
+        LengthPercentage::Length(l) => l.to_px().unwrap_or(l.value),
+        LengthPercentage::Percentage(p) => basis * p / 100.0,
+        LengthPercentage::Calc(c) => c
+            .resolve(|l| l.to_px().unwrap_or(l.value), Some(basis))
+            .unwrap_or(0.0),
+    }
+}
 use rustic_dom::NodeId;
 
 use crate::interpolate::{AnimationType, animation_type, composite, interpolable, interpolate};
@@ -473,8 +487,66 @@ pub enum TimelineRef {
     None,
     /// A progress-based scroll or view timeline (see
     /// [`AnimationController::set_scroll_timeline`]); its time is a
-    /// percentage in `0..=100` of its range.
-    Scroll(u64),
+    /// percentage in `0..=100` of the animation's attachment range.
+    Scroll(ScrollRef),
+}
+
+/// An animation's attachment to a scroll or view timeline: the timeline
+/// and the `animation-range` it maps to `0..=100`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScrollRef {
+    /// The timeline (see [`AnimationController::scroll_timelines`]).
+    pub id: u64,
+    /// `animation-range-start`.
+    pub start: RangeEdge,
+    /// `animation-range-end`.
+    pub end: RangeEdge,
+}
+
+impl ScrollRef {
+    /// The whole timeline.
+    pub fn whole(id: u64) -> Self {
+        Self {
+            id,
+            start: RangeEdge::NORMAL,
+            end: RangeEdge::NORMAL,
+        }
+    }
+}
+
+/// The scroll container of a scroll progress timeline.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScrollerRef {
+    /// This element (`scroll(self)` or a named `scroll-timeline`).
+    Element(NodeId),
+    /// The nearest ancestor scroll container of this element
+    /// (`scroll(nearest)`), or the viewport.
+    NearestTo(NodeId),
+    /// The viewport (`scroll(root)`).
+    Root,
+}
+
+/// What a scroll or view timeline measures; the host computes its state
+/// from layout and scroll positions.
+#[derive(Clone, Debug, PartialEq)]
+pub enum TimelineSource {
+    /// A scroll progress timeline.
+    Scroll {
+        /// The scroll container.
+        scroller: ScrollerRef,
+        /// The axis.
+        axis: ScrollAxis,
+    },
+    /// A view progress timeline of `subject` in its nearest ancestor
+    /// scroll container.
+    View {
+        /// The subject element.
+        subject: NodeId,
+        /// The axis.
+        axis: ScrollAxis,
+        /// `view-timeline-inset`.
+        inset: ViewInset,
+    },
 }
 
 /// Why an animation operation failed (a `DOMException` name).
@@ -665,11 +737,82 @@ struct ElementState {
 }
 
 /// A scroll or view timeline's current state, set by layout.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ScrollTimelineState {
-    /// The current progress as a percentage, or `None` when the timeline
-    /// is inactive (no scroll container or no scrollable range).
-    pub progress: Option<f64>,
+    /// The current scroll offset along the axis, or `None` when the
+    /// timeline is inactive (no scroll container or no scrollable range).
+    pub offset: Option<f64>,
+    /// The scroll offsets at 0% and 100% (a view timeline's cover range).
+    pub start: f64,
+    /// See [`Self::start`].
+    pub end: f64,
+    /// For a view timeline: the subject's start position in the scroll
+    /// container's content and its size, and the scrollport size, along
+    /// the axis.
+    pub view: Option<ViewGeometry>,
+}
+
+/// A view timeline's geometry along its axis.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ViewGeometry {
+    /// The subject's start edge in the scroll container's content.
+    pub subject_start: f64,
+    /// The subject's size.
+    pub subject_size: f64,
+    /// The scrollport's size (less the view timeline insets).
+    pub port: f64,
+}
+
+impl ScrollTimelineState {
+    /// The progress as a percentage of the whole timeline.
+    pub fn progress(&self) -> Option<f64> {
+        let offset = self.offset?;
+        (self.end > self.start).then(|| (offset - self.start) / (self.end - self.start) * 100.0)
+    }
+
+    /// The scroll offsets of a named range (Scroll-driven Animations §4.1).
+    fn named(&self, name: TimelineRangeName) -> (f64, f64) {
+        let Some(v) = self.view else {
+            return (self.start, self.end);
+        };
+        let (p, h, s) = (v.subject_start, v.subject_size, v.port);
+        let contain = if h <= s {
+            (p + h - s, p)
+        } else {
+            (p, p + h - s)
+        };
+        match name {
+            TimelineRangeName::Cover | TimelineRangeName::Scroll => (self.start, self.end),
+            TimelineRangeName::Contain => contain,
+            TimelineRangeName::Entry => (p - s, contain.0),
+            TimelineRangeName::Exit => (contain.1, p + h),
+            TimelineRangeName::EntryCrossing => (p - s, p - s + h),
+            TimelineRangeName::ExitCrossing => (p, p + h),
+        }
+    }
+
+    /// The percentage of the whole timeline a range edge is at
+    /// (`normal` is 0% for a start and 100% for an end).
+    pub fn edge(&self, edge: &RangeEdge, is_end: bool) -> f64 {
+        let (from, to) = match edge.name {
+            Some(name) => self.named(name),
+            None => (self.start, self.end),
+        };
+        let offset = match &edge.offset {
+            None => {
+                if edge.name.is_none() {
+                    return if is_end { 100.0 } else { 0.0 };
+                }
+                if is_end { to } else { from }
+            }
+            Some(lp) => from + length_px(lp, to - from),
+        };
+        if self.end > self.start {
+            (offset - self.start) / (self.end - self.start) * 100.0
+        } else {
+            0.0
+        }
+    }
 }
 
 /// One `@keyframes` frame: offset, easing, composite and declarations.
@@ -692,6 +835,16 @@ pub struct AnimationController {
     seen: HashSet<NodeId>,
     scroll_timelines: HashMap<u64, ScrollTimelineState>,
     last_transition_progress: Option<f64>,
+    /// Timelines that CSS animations use, by id.
+    timeline_sources: BTreeMap<u64, TimelineSource>,
+    next_timeline: u64,
+    /// Timelines used by the restyle in progress.
+    used_timelines: HashSet<u64>,
+    /// Named timelines declared so far in the restyle in progress: the
+    /// declaring element, the name, and the source.
+    declared_timelines: Vec<(NodeId, Arc<str>, TimelineSource)>,
+    /// The ancestors of the element being styled, outermost first.
+    ancestors: Vec<NodeId>,
 }
 
 /// The values one element gets from its animations: declarations for the
@@ -727,8 +880,145 @@ impl AnimationController {
         match timeline {
             TimelineRef::Document => self.now,
             TimelineRef::None => None,
-            TimelineRef::Scroll(id) => self.scroll_timelines.get(id).and_then(|s| s.progress),
+            TimelineRef::Scroll(r) => {
+                let state = self.scroll_timelines.get(&r.id)?;
+                let progress = state.progress()?;
+                let start = state.edge(&r.start, false);
+                let end = state.edge(&r.end, true);
+                (end > start).then(|| (progress - start) / (end - start) * 100.0)
+            }
         }
+    }
+
+    /// The scroll and view timelines CSS animations use, for the host to
+    /// measure before each tick with [`Self::set_scroll_timeline`].
+    pub fn scroll_timelines(&self) -> impl Iterator<Item = (u64, &TimelineSource)> {
+        self.timeline_sources.iter().map(|(id, s)| (*id, s))
+    }
+
+    /// The state last set for timeline `id`.
+    pub fn scroll_timeline(&self, id: u64) -> Option<&ScrollTimelineState> {
+        self.scroll_timelines.get(&id)
+    }
+
+    /// The timeline id for `source`, registering it when new. Script
+    /// timelines (`ScrollTimeline`, `ViewTimeline`) use this too.
+    pub fn timeline_for(&mut self, source: TimelineSource) -> u64 {
+        if let Some((&id, _)) = self.timeline_sources.iter().find(|(_, s)| **s == source) {
+            self.used_timelines.insert(id);
+            return id;
+        }
+        self.next_timeline += 1;
+        let id = self.next_timeline;
+        self.timeline_sources.insert(id, source);
+        self.used_timelines.insert(id);
+        id
+    }
+
+    /// Set the ancestors (outermost first) of the element the next
+    /// [`Self::style_element`] styles; named timelines resolve through them.
+    pub fn set_ancestors(&mut self, ancestors: impl IntoIterator<Item = NodeId>) {
+        self.ancestors.clear();
+        self.ancestors.extend(ancestors);
+    }
+
+    /// Record the named timelines `node` declares, from its style.
+    fn declare_timelines(&mut self, node: NodeId, style: &ComputedStyle) {
+        let list = |p| match style.get(p) {
+            PropertyValue::Animation(v) => Some(v.clone()),
+            _ => None,
+        };
+        for view in [false, true] {
+            let (name, axis) = if view {
+                (PropertyId::ViewTimelineName, PropertyId::ViewTimelineAxis)
+            } else {
+                (
+                    PropertyId::ScrollTimelineName,
+                    PropertyId::ScrollTimelineAxis,
+                )
+            };
+            let Some(AnimationValue::TimelineNames(names)) = list(name) else {
+                continue;
+            };
+            let axes = match list(axis) {
+                Some(AnimationValue::Axes(axes)) => axes,
+                _ => Vec::new(),
+            };
+            let insets = match list(PropertyId::ViewTimelineInset) {
+                Some(AnimationValue::ViewInsets(insets)) => insets,
+                _ => Vec::new(),
+            };
+            for (index, name) in names.iter().enumerate() {
+                let Some(name) = &name.0 else {
+                    continue;
+                };
+                let axis = cycle(&axes, index).copied().unwrap_or(ScrollAxis::Block);
+                let source = if view {
+                    TimelineSource::View {
+                        subject: node,
+                        axis,
+                        inset: cycle(&insets, index).cloned().unwrap_or(ViewInset(
+                            LengthPercentageOrAuto::Auto,
+                            LengthPercentageOrAuto::Auto,
+                        )),
+                    }
+                } else {
+                    TimelineSource::Scroll {
+                        scroller: ScrollerRef::Element(node),
+                        axis,
+                    }
+                };
+                self.declared_timelines.push((node, name.clone(), source));
+            }
+        }
+    }
+
+    /// The timeline for `animation-timeline` entry `value` of `node`.
+    fn css_timeline(
+        &mut self,
+        node: NodeId,
+        value: Option<&AnimationTimeline>,
+        start: RangeEdge,
+        end: RangeEdge,
+    ) -> TimelineRef {
+        let source = match value {
+            None | Some(AnimationTimeline::Auto) => return TimelineRef::Document,
+            Some(AnimationTimeline::None) => return TimelineRef::None,
+            Some(AnimationTimeline::Named(name)) => {
+                // The nearest declaration on the element or an ancestor;
+                // later declarations on one element win.
+                let found = std::iter::once(node)
+                    .chain(self.ancestors.iter().rev().copied())
+                    .find_map(|owner| {
+                        self.declared_timelines
+                            .iter()
+                            .rev()
+                            .find(|(n, declared, _)| *n == owner && declared == name)
+                    });
+                match found {
+                    Some((_, _, source)) => source.clone(),
+                    None => return TimelineRef::None,
+                }
+            }
+            Some(AnimationTimeline::Scroll(scroller, axis)) => TimelineSource::Scroll {
+                scroller: match scroller {
+                    Scroller::Nearest => ScrollerRef::NearestTo(node),
+                    Scroller::Root => ScrollerRef::Root,
+                    Scroller::SelfElement => ScrollerRef::Element(node),
+                },
+                axis: *axis,
+            },
+            Some(AnimationTimeline::View(axis, inset_start, inset_end)) => TimelineSource::View {
+                subject: node,
+                axis: *axis,
+                inset: ViewInset(inset_start.clone(), inset_end.clone()),
+            },
+        };
+        TimelineRef::Scroll(ScrollRef {
+            id: self.timeline_for(source),
+            start,
+            end,
+        })
     }
 
     /// Record the state of a scroll or view timeline (layout calls this
@@ -1251,8 +1541,14 @@ impl AnimationController {
     pub fn set_timeline(&mut self, id: AnimationId, timeline: TimelineRef) {
         let current = self.current_time(id);
         if let Some(a) = self.animations.get_mut(&id) {
+            let progress = matches!(timeline, TimelineRef::Scroll(_));
             a.timeline = timeline;
-            if a.start_time.is_some() {
+            if progress && a.start_time.is_some() {
+                // A playing animation auto-aligns to a progress-based
+                // timeline's range at once.
+                a.start_time = Some(if a.playback_rate < 0.0 { 100.0 } else { 0.0 });
+                a.hold_time = None;
+            } else if a.start_time.is_some() {
                 a.hold_time = current;
                 a.start_time = None;
                 a.pending = Some(Pending::Play);
@@ -1375,6 +1671,17 @@ impl AnimationController {
         };
         let a = self.animations.get_mut(&id).expect("present");
         match a.pending {
+            Some(Pending::Play) if matches!(a.timeline, TimelineRef::Scroll(_)) => {
+                // Progress-based timelines auto-align the start time to the
+                // range start (or end, playing backwards).
+                if let Some(rate) = a.pending_rate.take() {
+                    a.playback_rate = rate;
+                }
+                a.start_time = Some(if a.playback_rate < 0.0 { 100.0 } else { 0.0 });
+                a.hold_time = None;
+                a.pending = None;
+                self.queue(AnimationEventKind::Ready, id);
+            }
             Some(Pending::Play) => {
                 if let Some(hold) = a.hold_time {
                     if let Some(rate) = a.pending_rate.take() {
@@ -1595,10 +1902,24 @@ impl AnimationController {
     /// [`Self::end_restyle`] lose their CSS animations and transitions.
     pub fn begin_restyle(&mut self) {
         self.seen.clear();
+        self.used_timelines.clear();
+        self.declared_timelines.clear();
     }
 
     /// Finish a whole-document restyle (see [`Self::begin_restyle`]).
     pub fn end_restyle(&mut self) {
+        // Timelines no animation uses any more are dropped.
+        let used: HashSet<u64> = self
+            .animations
+            .values()
+            .filter_map(|a| match &a.timeline {
+                TimelineRef::Scroll(r) => Some(r.id),
+                _ => None,
+            })
+            .chain(self.used_timelines.iter().copied())
+            .collect();
+        self.timeline_sources.retain(|id, _| used.contains(id));
+        self.scroll_timelines.retain(|id, _| used.contains(id));
         let gone: Vec<NodeId> = self
             .elements
             .keys()
@@ -1631,6 +1952,9 @@ impl AnimationController {
     ) -> Option<AnimatedValues> {
         self.seen.insert(node);
         let now = self.now;
+        if rendered {
+            self.declare_timelines(node, base);
+        }
         if !rendered {
             if let Some(mut state) = self.elements.remove(&node) {
                 for id in state.css_animations.drain(..) {
@@ -1698,6 +2022,9 @@ impl AnimationController {
         let fills = list(PropertyId::AnimationFillMode);
         let states = list(PropertyId::AnimationPlayState);
         let compositions = list(PropertyId::AnimationComposition);
+        let timelines = list(PropertyId::AnimationTimeline);
+        let range_starts = list(PropertyId::AnimationRangeStart);
+        let range_ends = list(PropertyId::AnimationRangeEnd);
         let easings = match base.get(PropertyId::AnimationTimingFunction) {
             PropertyValue::Easing(list) => list.as_slice().to_vec(),
             _ => vec![EasingFunction::EASE],
@@ -1718,12 +2045,45 @@ impl AnimationController {
             let Some(rule) = keyframes(name) else {
                 continue;
             };
+            let range = |list: &AnimationValue| match list {
+                AnimationValue::Ranges(v) => cycle(v, index).cloned().unwrap_or(RangeEdge::NORMAL),
+                _ => RangeEdge::NORMAL,
+            };
+            let timeline_value = match &timelines {
+                AnimationValue::Timelines(v) => cycle(v, index),
+                _ => None,
+            };
+            let timeline = self.css_timeline(
+                node,
+                timeline_value,
+                range(&range_starts),
+                range(&range_ends),
+            );
+            let progress_based = matches!(timeline, TimelineRef::Scroll(_));
+            let iterations = match &counts {
+                AnimationValue::IterationCounts(v) => cycle(v, index)
+                    .copied()
+                    .unwrap_or(IterationCount::Number(1.0))
+                    .value(),
+                _ => 1.0,
+            };
+            // A progress-based timeline spreads the iterations over the
+            // attachment range and ignores time-based delays (Scroll-driven
+            // Animations §4.3, CSS Animations 2 `auto` duration).
             let duration = match durations_at(&durations, index) {
+                _ if progress_based => {
+                    if iterations.is_finite() && iterations > 0.0 {
+                        100.0 / iterations
+                    } else {
+                        0.0
+                    }
+                }
                 AnimationDuration::Time(t) => t.as_millis(),
                 AnimationDuration::Auto => 0.0,
             };
             let timing = Timing {
                 delay: match &delays {
+                    _ if progress_based => 0.0,
                     AnimationValue::Times(v) => cycle(v, index).map_or(0.0, |t| t.as_millis()),
                     _ => 0.0,
                 },
@@ -1735,13 +2095,7 @@ impl AnimationController {
                     _ => Fill::None,
                 },
                 iteration_start: 0.0,
-                iterations: match &counts {
-                    AnimationValue::IterationCounts(v) => cycle(v, index)
-                        .copied()
-                        .unwrap_or(IterationCount::Number(1.0))
-                        .value(),
-                    _ => 1.0,
-                },
+                iterations,
                 duration,
                 direction: match &directions {
                     AnimationValue::Directions(v) => cycle(v, index)
@@ -1775,7 +2129,10 @@ impl AnimationController {
                     let timing_changed =
                         a.effect.as_ref().map(|e| &e.timing) != Some(&effect.timing);
                     a.effect = Some(effect);
-                    if timing_changed {
+                    let timeline_changed = a.timeline != timeline;
+                    if timeline_changed {
+                        self.set_timeline(id, timeline.clone());
+                    } else if timing_changed {
                         self.update_finished(id, false);
                     }
                     id
@@ -1788,12 +2145,15 @@ impl AnimationController {
                             index,
                         },
                         Some(effect),
-                        TimelineRef::Document,
+                        timeline.clone(),
                     );
                     let a = self.animations.get_mut(&id).expect("present");
                     if paused {
                         a.hold_time = Some(0.0);
                         a.css_paused = true;
+                    } else if progress_based {
+                        // Auto-aligned start time: the start of the range.
+                        a.start_time = Some(0.0);
                     } else {
                         a.start_time = self.now;
                     }

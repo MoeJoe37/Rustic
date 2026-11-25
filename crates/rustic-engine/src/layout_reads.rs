@@ -54,6 +54,8 @@ pub struct LayoutGeometry {
     pub scroll_ranges: HashMap<NodeId, [f64; 4]>,
     /// The viewport's position range, like [`Self::scroll_ranges`].
     pub viewport_scroll_range: [f64; 4],
+    /// The viewport's size in CSS pixels.
+    pub viewport_size: [f64; 2],
     /// For each element with a box: whether the viewport's position moves
     /// it (not for fixed boxes), and the scroll containers on its
     /// containing-block chain whose positions move it.

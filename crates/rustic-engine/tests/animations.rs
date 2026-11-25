@@ -174,3 +174,52 @@ transitionend:opacity:0.1:true:true,bubbled';
          if (new AnimationEvent('x', { animationName: 'n' }).animationName !== 'n') throw 'ctor2';",
     );
 }
+
+#[test]
+fn scroll_and_view_timelines_drive_script_animations() {
+    let mut engine = Engine::new(1);
+    let mut page = page(&mut engine, "<!doctype html><div id=t></div>");
+    run(
+        &mut page,
+        "var el = document.getElementById('t');
+         var tl = new ScrollTimeline({ source: el, axis: 'x' });
+         if (!(tl instanceof AnimationTimeline) || tl.source !== el || tl.axis !== 'x') throw 'scroll';
+         if (tl.currentTime !== null) throw 'inactive ' + tl.currentTime;
+         if (new ScrollTimeline().source !== document.documentElement) throw 'root';
+         if (new ScrollTimeline({ source: null }).source !== null) throw 'null';
+         var view = new ViewTimeline({ subject: el });
+         if (!(view instanceof ScrollTimeline) || view.subject !== el || view.axis !== 'block')
+             throw 'view';
+         try { new ScrollTimeline({ axis: 'diagonal' }); throw 'axis'; } catch (e) {
+             if (!(e instanceof TypeError)) throw e;
+         }
+         var a = el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 100, timeline: tl });
+         if (a.timeline !== tl) throw 'timeline';",
+    );
+    // Layout would measure the timeline; set it as the renderer would.
+    let animations = page.animations();
+    {
+        let mut controller = animations.borrow_mut();
+        let id = controller
+            .scroll_timelines()
+            .next()
+            .map(|(id, _)| id)
+            .unwrap();
+        controller.set_scroll_timeline(
+            id,
+            rustic_style::ScrollTimelineState {
+                offset: Some(30.0),
+                start: 0.0,
+                end: 60.0,
+                view: None,
+            },
+        );
+    }
+    frame(&mut page, 16);
+    run(
+        &mut page,
+        "if (tl.currentTime !== 50) throw 'progress ' + tl.currentTime;
+         if (a.startTime !== 0 || a.currentTime !== 50) throw a.startTime + ' ' + a.currentTime;
+         if (a.effect.getComputedTiming().progress !== 0.5) throw 'effect';",
+    );
+}

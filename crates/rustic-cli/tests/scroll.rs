@@ -212,3 +212,57 @@ fn scripts_scroll_the_viewport_and_containers_and_the_render_follows() {
     assert_eq!(render(&["--scroll", "0,1"]), RED);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn scroll_driven_animations_follow_the_scroll_position() {
+    let dir = std::env::temp_dir().join(format!("rustic-scroll-timeline-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let page = dir.join("page.html");
+    // #t is fixed (so the scroll does not move it) and takes the named
+    // timeline of its scrolling ancestor: 205 of a 410px range is 50%.
+    std::fs::write(
+        &page,
+        "<!doctype html><style>body{margin:0}\
+         @keyframes grow { from { width: 0px } to { width: 100px } }\
+         #s { overflow: auto; height: 100px; scroll-timeline: --s }\
+         #c { height: 500px }\
+         #t { position: fixed; top: 0; left: 0; height: 10px; background: #0f0;\
+              animation: grow linear; animation-timeline: --s }\
+         </style><div id=s><div id=t></div><div id=c></div></div>\
+         <script>document.getElementById('s').scrollTop = 205;</script>",
+    )
+    .unwrap();
+    let png = dir.join("out.png");
+    let (page_arg, png_arg) = (page.to_string_lossy(), png.to_string_lossy());
+    let output = rustic(&[
+        "render",
+        "--run-scripts",
+        "--frames",
+        "3",
+        "--viewport",
+        "200x100",
+        "--output",
+        &png_arg,
+        &page_arg,
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // The last frame: the timeline was measured after the first one.
+    let bytes = std::fs::read(dir.join("out-2.png")).unwrap();
+    let image = decode_png(&bytes, PngLimits::default(), &CancellationToken::default()).unwrap();
+    let at = |x: usize| {
+        let i = (5 * 200 + x) * 4;
+        [
+            image.pixels[i],
+            image.pixels[i + 1],
+            image.pixels[i + 2],
+            image.pixels[i + 3],
+        ]
+    };
+    assert_eq!(at(45), GREEN);
+    assert_eq!(at(55), [255, 255, 255, 255]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

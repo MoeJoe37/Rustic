@@ -2641,6 +2641,7 @@ impl LocalLayout {
                 .collect::<Result<_, LayoutReadError>>()?,
             scroll_ranges,
             viewport_scroll_range,
+            viewport_size: [viewport.width().get(), viewport.height().get()],
             scroll_chains,
         })
     }

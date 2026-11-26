@@ -45,9 +45,9 @@ construction would change the costs of standalone tables that never link.
 
 The first link of a standalone table reserves up to its declared maximum or
 65,536 entries, whichever is smaller. Additional imports reuse that allocation.
-The reservation stays with the table wrapper until collection. Function
-references still use instance-local indices. TD-208 tracks cross-instance
-function identities and function-table imports.
+The reservation stays with the table wrapper until collection.
+[ADR 0092](0092-wasm-function-table-imports.md) uses the same allocations
+for function-table imports and traces each function's defining instance.
 
 ## Validation
 

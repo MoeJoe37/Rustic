@@ -1,7 +1,7 @@
 use std::{cell::Cell, ops::Range, rc::Rc};
 
 use super::memory::MemoryPool;
-use super::table::Tables;
+use super::table::{ActiveElements, Tables};
 use super::*;
 use crate::validate::numeric::memory_access;
 use crate::{Declarations, Immediate, ImportType};
@@ -10,7 +10,8 @@ use crate::{Declarations, Immediate, ImportType};
 pub(super) struct State<'bytes> {
     pub(super) globals: Vec<GlobalSlot>,
     pub(super) tables: Tables,
-    pub(super) has_external_references: Cell<bool>,
+    pub(super) has_host_references: Cell<bool>,
+    pub(super) function_owner: Option<NonZeroU32>,
     pub(super) memories: Vec<LinearMemory>,
     data: Vec<Cow<'bytes, [u8]>>,
 }
@@ -118,6 +119,31 @@ pub(super) struct Transfer {
     pub(super) size: u64,
 }
 
+type ActiveData<'input> = (u32, Range<usize>, &'input [u8]);
+
+pub(super) struct Initializers<'input> {
+    elements: ActiveElements,
+    data: Vec<ActiveData<'input>>,
+    data_trap: Option<ExecutionError>,
+}
+
+impl Initializers<'_> {
+    pub(super) fn apply(
+        self,
+        state: &State<'_>,
+        cancellation: &CancellationToken,
+    ) -> Result<(), ExecutionError> {
+        if cancellation.is_cancelled() {
+            return Err(error(0, Fault::Cancelled));
+        }
+        self.elements.apply(&state.tables)?;
+        for (target, range, bytes) in self.data {
+            state.memories[target as usize].write(|memory| memory[range].copy_from_slice(bytes));
+        }
+        self.data_trap.map_or(Ok(()), Err)
+    }
+}
+
 impl<'bytes> State<'bytes> {
     pub(super) fn new<'input>(
         declarations: &Declarations<'input>,
@@ -129,13 +155,17 @@ impl<'bytes> State<'bytes> {
             usize,
             &mut Budget<'_>,
         ) -> Result<Cow<'bytes, [u8]>, ExecutionError>,
-    ) -> Result<Self, ExecutionError> {
-        let mut state = Self::default();
+    ) -> Result<(Self, Initializers<'input>), ExecutionError> {
         let InstanceImports {
             mut globals,
             memories: mut imported_memories,
             tables,
+            function_owner,
         } = imports;
+        let mut state = Self {
+            function_owner,
+            ..Default::default()
+        };
         for entry in &declarations.imports {
             let ImportType::Global(ty) = entry.value.ty else {
                 continue;
@@ -161,6 +191,7 @@ impl<'bytes> State<'bytes> {
             budget.spend(entry.offset, 1)?;
             let value = constant(
                 &state.globals,
+                function_owner,
                 &entry.value.initializer,
                 limits.execution.values,
                 budget,
@@ -196,10 +227,16 @@ impl<'bytes> State<'bytes> {
             let memory = LinearMemory::local(entry.value, &pool, entry.offset, budget)?;
             append(&mut state.memories, memory, entry.offset)?;
         }
-        let (allocated_tables, active_elements) =
-            Tables::new(declarations, &state.globals, tables, limits, budget)?;
+        let (allocated_tables, active_elements) = Tables::new(
+            declarations,
+            &state.globals,
+            tables,
+            function_owner,
+            limits,
+            budget,
+        )?;
         state.tables = allocated_tables;
-        state.has_external_references.set(!tables.is_empty());
+        state.has_host_references.set(!tables.is_empty());
         let mut active_segments = Vec::new();
         let mut segment_trap = None;
         // A trapping element segment stops instantiation before data writes.
@@ -213,6 +250,7 @@ impl<'bytes> State<'bytes> {
             let passive = if let Some(active) = &entry.value.active {
                 let address = constant(
                     &state.globals,
+                    function_owner,
                     &active.offset,
                     limits.execution.values,
                     budget,
@@ -244,17 +282,15 @@ impl<'bytes> State<'bytes> {
             };
             append(&mut state.data, passive, entry.offset)?;
         }
-        // Finish fallible preparation before copying the checked prefix.
-        // A guest bounds trap preserves earlier segment writes.
         budget.spend(0, 0)?;
-        active_elements.apply(&state.tables)?;
-        for (target, range, bytes) in active_segments {
-            state.memories[target as usize].write(|memory| memory[range].copy_from_slice(bytes));
-        }
-        if let Some(trap) = segment_trap {
-            return Err(trap);
-        }
-        Ok(state)
+        Ok((
+            state,
+            Initializers {
+                elements: active_elements,
+                data: active_segments,
+                data_trap: segment_trap,
+            },
+        ))
     }
 
     pub(super) fn size(&self, memory: u32) -> Value {
@@ -395,6 +431,7 @@ impl<'bytes> State<'bytes> {
 
 pub(super) fn constant(
     globals: &[GlobalSlot],
+    function_owner: Option<NonZeroU32>,
     instructions: &[Instruction],
     stack_limit: usize,
     budget: &mut Budget<'_>,
@@ -408,7 +445,7 @@ pub(super) fn constant(
             (Opcode::Core(0x23), Immediate::Index(index)) => globals[*index as usize].value(),
             (Opcode::Core(0xd0), Immediate::HeapType(ty)) => Slot::Ref(Reference::null(*ty)),
             (Opcode::Core(0xd2), Immediate::Index(index)) => {
-                Slot::Ref(Reference::Function(Some(*index)))
+                Slot::Ref(FunctionAddress::reference(function_owner, *index))
             }
             (op, immediate) => Slot::Number(
                 numeric::apply(op, immediate, &mut values).map_err(|kind| error(offset, kind))?,

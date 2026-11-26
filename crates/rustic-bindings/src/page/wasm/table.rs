@@ -1,10 +1,13 @@
 //! Standalone Window tables and live wrappers over module tables.
 
 use rustic_js::runtime::ErrorKind;
-use rustic_wasm::{ExternalReference, ExternalTable, Limits, TableType};
+use rustic_wasm::{
+    ExternalReference, FunctionAddress, Limits, ReferenceRoot, ReferenceTable, TableEntry,
+    TableType,
+};
 
 use super::super::events::PrivateArray;
-use super::instance::{self, Runtime};
+use super::instance::{self, function_owner, owner_value, root_value};
 use super::*;
 
 const TABLE: &str = "WebAssembly.Table";
@@ -13,34 +16,18 @@ const TABLE_LIMIT: u32 = 65_536;
 
 struct Table {
     address: AddressType,
+    functions: bool,
     storage: Storage,
 }
 
 enum Storage {
-    Standalone {
-        functions: bool,
-        capacity: u32,
-        maximum: Option<u64>,
-    },
-    Module {
-        index: u32,
-        functions: bool,
-    },
+    Standalone { capacity: u32, maximum: Option<u64> },
+    Module { index: u32 },
 }
 
 enum Entries {
-    Linked(Rc<ExternalTable>),
-    Standalone {
-        values: PrivateArray,
-        functions: bool,
-        capacity: u32,
-    },
-    Module {
-        owner: Value,
-        runtime: Rc<Runtime>,
-        index: u32,
-        functions: bool,
-    },
+    Shared(ReferenceTable),
+    Standalone { values: PrivateArray, capacity: u32 },
 }
 
 pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
@@ -94,8 +81,8 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let proto = agent.host_prototype_from_new_target(TABLE, target)?;
     let state = Table {
         address,
+        functions,
         storage: Storage::Standalone {
-            functions,
             capacity: maximum.unwrap_or(u64::MAX).min(u64::from(TABLE_LIMIT)) as u32,
             maximum,
         },
@@ -120,10 +107,8 @@ pub(super) fn export(
     let proto = prototype(agent, TABLE)?;
     let state = Table {
         address: ty.limits.address_type,
-        storage: Storage::Module {
-            index,
-            functions: matches!(ty.element_type, ValueType::Ref { heap_type: -16, .. }),
-        },
+        functions: ty.element_type == reference_type(true),
+        storage: Storage::Module { index },
     };
     let wrapper = Value::object(agent.new_host_state(TABLE, proto, state, 0)?);
     with_root(agent, wrapper, |agent| {
@@ -138,39 +123,24 @@ fn find(agent: &Agent, value: Value) -> Option<Rc<Table>> {
     agent.host_state(value.as_object()?, TABLE)
 }
 
-pub(super) fn accepts_import(agent: &Agent, value: Value, ty: TableType) -> bool {
-    matches!(
-        ty.element_type,
-        ValueType::Ref {
-            nullable: true,
-            heap_type: -17
-        }
-    ) && find(agent, value).is_some_and(|table| {
-        matches!(
-            table.storage,
-            Storage::Standalone {
-                functions: false,
-                ..
-            } | Storage::Module {
-                functions: false,
-                ..
-            }
-        )
-    })
+fn reference_type(functions: bool) -> ValueType {
+    ValueType::Ref {
+        nullable: true,
+        heap_type: if functions { -16 } else { -17 },
+    }
 }
 
-pub(super) fn link(agent: &mut Agent, value: Value, ty: TableType) -> JsResult<ExternalTable> {
-    let table = find(agent, value).expect("resolved external table");
+pub(super) fn accepts_import(agent: &Agent, value: Value, ty: TableType) -> bool {
+    find(agent, value).is_some_and(|table| ty.element_type == reference_type(table.functions))
+}
+
+pub(super) fn link(agent: &mut Agent, value: Value, ty: TableType) -> JsResult<ReferenceTable> {
+    let table = find(agent, value).expect("resolved table");
     let handle = match entries(agent, value, &table)? {
-        Entries::Linked(storage) => (*storage).clone(),
-        Entries::Module { runtime, index, .. } => {
-            runtime.external_table(index).expect("external table")
-        }
-        Entries::Standalone {
-            values, capacity, ..
-        } => {
+        Entries::Shared(storage) => storage,
+        Entries::Standalone { values, capacity } => {
             let Storage::Standalone { maximum, .. } = table.storage else {
-                unreachable!("standalone external table");
+                unreachable!("standalone table");
             };
             let length = values.len(agent)?;
             if table.address != ty.limits.address_type
@@ -190,10 +160,13 @@ pub(super) fn link(agent: &mut Agent, value: Value, ty: TableType) -> JsResult<E
                 agent,
                 value,
                 values,
-                Limits {
-                    address_type: table.address,
-                    min: u64::from(length),
-                    max: maximum,
+                TableType {
+                    limits: Limits {
+                        address_type: table.address,
+                        min: u64::from(length),
+                        max: maximum,
+                    },
+                    element_type: ty.element_type,
                 },
                 capacity,
             );
@@ -213,18 +186,18 @@ fn promote(
     agent: &mut Agent,
     wrapper: Value,
     values: PrivateArray,
-    limits: Limits,
+    ty: TableType,
     capacity: u32,
-) -> JsResult<ExternalTable> {
-    let charge = ExternalTable::storage_bytes(capacity as usize);
-    agent.spend_native_work(limits.min)?;
+) -> JsResult<ReferenceTable> {
+    let charge = ReferenceTable::storage_bytes(capacity as usize);
+    agent.spend_native_work(ty.limits.min)?;
     let handle = agent.with_host_memory(charge, |agent| {
-        let handle = ExternalTable::new(limits, capacity as usize, None).ok_or(OutOfMemory)?;
-        for index in 0..limits.min as u32 {
+        let handle = ReferenceTable::new(ty, capacity as usize).ok_or(OutOfMemory)?;
+        for index in 0..ty.limits.min as u32 {
             agent.check_native_work()?;
             let value = values.get(agent, index)?;
-            let written = handle.set(u64::from(index), external_reference(Some(value)));
-            debug_assert!(written);
+            let entry = shared_entry(agent, ty.element_type == reference_type(true), Some(value))?;
+            assert!(handle.set(u64::from(index), entry));
         }
         Ok(handle)
     })?;
@@ -243,11 +216,9 @@ fn promote(
 
 fn trace_storage(state: &dyn std::any::Any, mark: &mut dyn FnMut(Value)) {
     let storage = state
-        .downcast_ref::<ExternalTable>()
-        .expect("external table storage");
-    storage.visit_external_references(&mut |reference| {
-        mark(Value::from_host_identity(reference.identity()));
-    });
+        .downcast_ref::<ReferenceTable>()
+        .expect("table storage");
+    storage.visit_reference_roots(&mut |root: ReferenceRoot| mark(root_value(root)));
 }
 
 fn receiver(agent: &mut Agent, this: Value) -> JsResult<Rc<Table>> {
@@ -262,30 +233,27 @@ fn entries(agent: &mut Agent, this: Value, table: &Table) -> JsResult<Entries> {
         Ok(agent.weak_map_get(page.wasm_links, this))
     })?;
     let entries = match table.storage {
-        Storage::Standalone {
-            functions,
-            capacity,
-            ..
-        } => {
+        Storage::Standalone { capacity, .. } => {
             if let Some(storage) = backing
                 .as_object()
-                .and_then(|id| agent.host_state(id, TABLE_STORAGE))
+                .and_then(|id| agent.host_state::<ReferenceTable>(id, TABLE_STORAGE))
             {
-                Entries::Linked(storage)
+                Entries::Shared((*storage).clone())
             } else {
                 Entries::Standalone {
                     values: PrivateArray::from_value(backing).expect("standalone table entries"),
-                    functions,
                     capacity,
                 }
             }
         }
-        Storage::Module { index, functions } => Entries::Module {
-            owner: backing,
-            runtime: instance::find(agent, backing).expect("exported table owner"),
-            index,
-            functions,
-        },
+        Storage::Module { index } => {
+            let runtime = instance::find(agent, backing).expect("exported table owner");
+            Entries::Shared(
+                runtime
+                    .shared_table(index)
+                    .expect("exported table allocation"),
+            )
+        }
     };
     Ok(entries)
 }
@@ -306,41 +274,54 @@ fn size_value(agent: &mut Agent, length: u64, address: AddressType) -> JsResult<
     }
 }
 
-fn local_function(agent: &mut Agent, owner: Value, value: Option<Value>) -> JsResult<Option<u32>> {
-    let value = value.unwrap_or(Value::NULL);
+fn default_entry(functions: bool, value: Option<Value>) -> Value {
+    value.unwrap_or(if functions {
+        Value::NULL
+    } else {
+        Value::UNDEFINED
+    })
+}
+
+fn entry(agent: &mut Agent, functions: bool, value: Option<Value>) -> JsResult<Value> {
+    let value = default_entry(functions, value);
+    if functions && value != Value::NULL && host::function_record(agent, value)?.is_none() {
+        return agent
+            .type_error("WebAssembly function table entries must be Wasm functions or null");
+    }
+    Ok(value)
+}
+
+fn shared_entry(agent: &mut Agent, functions: bool, value: Option<Value>) -> JsResult<TableEntry> {
+    let value = default_entry(functions, value);
     if value == Value::NULL {
-        return Ok(None);
+        return Ok(TableEntry::Null);
+    }
+    if !functions {
+        return Ok(TableEntry::External(ExternalReference::new(
+            value.host_identity(),
+        )));
     }
     let Some(record) = host::function_record(agent, value)? else {
         return agent
             .type_error("WebAssembly function table entries must be Wasm functions or null");
     };
     let (instance, function) = host::function_parts(agent, record)?;
-    if instance == owner {
-        return Ok(Some(function));
-    }
-    let record = host::instance_record(agent, owner)?;
-    let imports = PrivateArray::from_value(record.get(agent, 0)?).expect("function imports");
-    for index in 0..imports.len(agent)? {
-        agent.spend_native_work(1)?;
-        if imports.get(agent, index)? == value {
-            return Ok(Some(index));
-        }
-    }
-    agent.type_error("this WebAssembly table requires functions linked to its instance")
+    let owner = function_owner(instance).ok_or(OutOfMemory)?;
+    Ok(TableEntry::Function(FunctionAddress::owned(
+        owner, function,
+    )))
 }
 
-fn entry(agent: &mut Agent, functions: bool, value: Option<Value>) -> JsResult<Value> {
-    let value = value.unwrap_or(if functions {
-        Value::NULL
-    } else {
-        Value::UNDEFINED
-    });
-    if functions && value != Value::NULL && host::function_record(agent, value)?.is_none() {
-        return agent
-            .type_error("WebAssembly function table entries must be Wasm functions or null");
+fn read_shared(agent: &mut Agent, entry: TableEntry) -> JsResult<Value> {
+    match entry {
+        TableEntry::Null => Ok(Value::NULL),
+        TableEntry::External(reference) => Ok(Value::from_host_identity(reference.identity())),
+        TableEntry::Function(address) => {
+            let owner = owner_value(address.owner().expect("host-linked function owner"));
+            let runtime = instance::find(agent, owner).expect("reachable function owner");
+            instance::function(agent, owner, &runtime, address.index())
+        }
     }
-    Ok(value)
 }
 
 fn append(agent: &mut Agent, entries: PrivateArray, count: u32, value: Value) -> JsResult<()> {
@@ -366,9 +347,8 @@ fn check_index(agent: &mut Agent, entries: PrivateArray, index: u64) -> JsResult
 fn length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let table = receiver(agent, this)?;
     let length = match entries(agent, this, &table)? {
-        Entries::Linked(storage) => storage.length(),
+        Entries::Shared(storage) => storage.length(),
         Entries::Standalone { values, .. } => u64::from(values.len(agent)?),
-        Entries::Module { runtime, index, .. } => runtime.table_len(index).expect("exported table"),
     };
     size_value(agent, length, table.address)
 }
@@ -377,37 +357,18 @@ fn get(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let table = receiver(agent, this)?;
     let index = index(agent, arg(args, 0), table.address)?;
     match entries(agent, this, &table)? {
-        Entries::Linked(storage) => storage.get(index).map(external_value).ok_or_else(|| {
-            agent.throw(
-                ErrorKind::RangeError,
-                "WebAssembly table index out of bounds",
-            )
-        }),
+        Entries::Shared(storage) => {
+            let entry = storage.get(index).ok_or_else(|| {
+                agent.throw(
+                    ErrorKind::RangeError,
+                    "WebAssembly table index out of bounds",
+                )
+            })?;
+            read_shared(agent, entry)
+        }
         Entries::Standalone { values, .. } => {
             let index = check_index(agent, values, index)?;
             values.get(agent, index)
-        }
-        Entries::Module {
-            owner,
-            runtime,
-            index: table,
-            functions,
-        } => {
-            if functions {
-                match runtime.function_table_get(table, index) {
-                    Some(Some(function)) => {
-                        return instance::function(agent, owner, &runtime, function);
-                    }
-                    Some(None) => return Ok(Value::NULL),
-                    None => {}
-                }
-            } else if let Some(reference) = runtime.external_table_get(table, index) {
-                return Ok(external_value(reference));
-            }
-            Err(agent.throw(
-                ErrorKind::RangeError,
-                "WebAssembly table index out of bounds",
-            ))
         }
     }
 }
@@ -417,39 +378,19 @@ fn set(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let index = index(agent, arg(args, 0), table.address)?;
     let value = args.get(1).copied();
     match entries(agent, this, &table)? {
-        Entries::Linked(storage) => {
-            if !storage.set(index, external_reference(value)) {
+        Entries::Shared(storage) => {
+            let entry = shared_entry(agent, table.functions, value)?;
+            if !storage.set(index, entry) {
                 return Err(agent.throw(
                     ErrorKind::RangeError,
                     "WebAssembly table index out of bounds",
                 ));
             }
         }
-        Entries::Standalone {
-            values, functions, ..
-        } => {
-            let value = entry(agent, functions, value)?;
+        Entries::Standalone { values, .. } => {
+            let value = entry(agent, table.functions, value)?;
             let index = check_index(agent, values, index)?;
             values.set(agent, index, value)?;
-        }
-        Entries::Module {
-            owner,
-            runtime,
-            index: table,
-            functions,
-        } => {
-            let updated = if functions {
-                let function = local_function(agent, owner, value)?;
-                runtime.function_table_set(table, index, function)
-            } else {
-                runtime.external_table_set(table, index, external_reference(value))
-            };
-            if !updated {
-                return Err(agent.throw(
-                    ErrorKind::RangeError,
-                    "WebAssembly table index out of bounds",
-                ));
-            }
         }
     }
     Ok(Value::UNDEFINED)
@@ -460,9 +401,10 @@ fn grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let count = index(agent, arg(args, 0), table.address)?;
     let value = args.get(1).copied();
     match entries(agent, this, &table)? {
-        Entries::Linked(storage) => {
+        Entries::Shared(storage) => {
+            let entry = shared_entry(agent, table.functions, value)?;
             let mut result = Value::UNDEFINED;
-            let previous = storage.grow(count, external_reference(value), |work| {
+            let previous = storage.grow(count, entry, |work| {
                 agent.spend_native_work(work as u64)?;
                 result = size_value(agent, storage.length(), table.address)?;
                 Ok::<(), Abrupt>(())
@@ -472,12 +414,8 @@ fn grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             }
             Ok(result)
         }
-        Entries::Standalone {
-            values,
-            functions,
-            capacity,
-        } => {
-            let value = entry(agent, functions, value)?;
+        Entries::Standalone { values, capacity } => {
+            let value = entry(agent, table.functions, value)?;
             // Converting the count can run script and grow this same table.
             let old = values.len(agent)?;
             if count > u64::from(capacity - old) {
@@ -487,45 +425,5 @@ fn grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             append(agent, values, count as u32, value)?;
             Ok(result)
         }
-        Entries::Module {
-            owner,
-            runtime,
-            index,
-            functions,
-        } => {
-            let function = if functions {
-                local_function(agent, owner, value)?
-            } else {
-                None
-            };
-            let Some(work) = runtime.table_growth_work(index, count) else {
-                return Err(agent.throw(ErrorKind::RangeError, "cannot grow WebAssembly table"));
-            };
-            agent.spend_native_work(work as u64)?;
-            let old = runtime.table_len(index).expect("exported table");
-            let result = size_value(agent, old, table.address)?;
-            let token = agent.cancellation().unwrap_or_default();
-            let previous = if functions {
-                runtime.grow_function_table(index, count, function, &token)
-            } else {
-                runtime.grow_external_table(index, count, external_reference(value), &token)
-            }
-            .map_err(|error| instance::execution_error(agent, error, false))?;
-            if previous.is_none() {
-                return Err(agent.throw(ErrorKind::RangeError, "cannot grow WebAssembly table"));
-            }
-            Ok(result)
-        }
     }
-}
-
-fn external_reference(value: Option<Value>) -> Option<ExternalReference> {
-    let value = value.unwrap_or(Value::UNDEFINED);
-    (value != Value::NULL).then_some(ExternalReference::new(value.host_identity()))
-}
-
-fn external_value(value: Option<ExternalReference>) -> Value {
-    value.map_or(Value::NULL, |reference| {
-        Value::from_host_identity(reference.identity())
-    })
 }

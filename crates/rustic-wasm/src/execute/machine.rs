@@ -132,12 +132,7 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                 self.tail_call(*function as usize)?
             }
             (op @ Opcode::Core(0x11 | 0x13), Immediate::Indices(ty, table)) => {
-                let function = self.indirect(*ty, *table)?;
-                if op == Opcode::Core(0x13) {
-                    self.tail_call(function)?;
-                } else {
-                    self.call(function)?;
-                }
+                self.call_indirect(*ty, *table, op == Opcode::Core(0x13))?;
             }
             (Opcode::Core(0x1a), _) => {
                 self.pop();
@@ -212,7 +207,8 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                 self.push(Slot::Number(Value::I32(i32::from(is_null))))?;
             }
             (Opcode::Core(0xd2), Immediate::Index(function)) => {
-                self.push(Slot::Ref(Reference::Function(Some(*function))))?;
+                let owner = self.state.borrow().function_owner;
+                self.push(Slot::Ref(FunctionAddress::reference(owner, *function)))?;
             }
             (Opcode::Core(0xd4), _) => {
                 let value = self.pop().reference();
@@ -313,15 +309,25 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
         self.calls.last_mut().expect("open call")
     }
 
-    fn indirect(&mut self, ty: u32, table: u32) -> Result<usize, ExecutionError> {
+    fn call_indirect(&mut self, ty: u32, table: u32, tail: bool) -> Result<(), ExecutionError> {
         let index = self.pop().address();
-        let value = self.state.borrow().tables.get(table, index, self.offset)?;
-        let Reference::Function(Some(function)) = value else {
+        let state = self.state.borrow();
+        let value = state.tables.get(table, index, self.offset)?;
+        let Reference::Function(address) = value else {
             return Err(error(self.offset, Fault::NullReference));
         };
-        let callee = self.instance.function(function as usize);
+        let owner = state.function_owner;
+        drop(state);
+        let expected = self.instance.signature(ty);
+        if address.owner() != owner {
+            if tail {
+                self.leave_for_tail_call(expected.params.len())?;
+            }
+            return self.call_host(HostCall::Indirect { address, expected }, None, expected);
+        }
+        let function = address.index() as usize;
+        let callee = self.instance.function(function);
         if callee.type_index() != ty {
-            let expected = self.instance.signature(ty);
             let actual = self.instance.signature(callee.type_index());
             if actual.params.len() != expected.params.len()
                 || actual.results.len() != expected.results.len()
@@ -334,15 +340,24 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                 return Err(error(self.offset, Fault::IndirectCallTypeMismatch));
             }
         }
-        Ok(function as usize)
+        if tail {
+            self.tail_call(function)
+        } else {
+            self.call(function)
+        }
     }
 
     fn tail_call(&mut self, function: usize) -> Result<(), ExecutionError> {
-        let index = self.current().control_base;
         let count = self.instance.function_signature(function).params.len();
-        self.keep_at(self.controls[index].height, count)?;
-        self.pop_call();
+        self.leave_for_tail_call(count)?;
         self.call(function)
+    }
+
+    fn leave_for_tail_call(&mut self, params: usize) -> Result<(), ExecutionError> {
+        let index = self.current().control_base;
+        self.keep_at(self.controls[index].height, params)?;
+        self.pop_call();
+        Ok(())
     }
 
     fn open(&mut self, opcode: Opcode, block: BlockType, jump: Jump) -> Result<(), ExecutionError> {
@@ -389,7 +404,10 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
         let offset = self.offset;
         let executable = self.instance;
         let (function, prepared) = match executable.function(function) {
-            Callee::Host(import) => return self.call_host(function, import),
+            Callee::Host(import) => {
+                let signature = executable.signature(import.type_index);
+                return self.call_host(HostCall::Import(function), Some(import), signature);
+            }
             Callee::Local(index, local) => (index, local),
         };
         let signature = executable.signature(prepared.function.type_index);
@@ -435,17 +453,27 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
 
     fn call_host(
         &mut self,
-        index: usize,
-        import: &BoundFunction<'_>,
+        target: HostCall<'_>,
+        import: Option<&BoundFunction<'_>>,
+        signature: &FunctionType,
     ) -> Result<(), ExecutionError> {
         let offset = self.offset;
-        let signature = self.instance.signature(import.type_index);
         let params = signature.params.len();
         let result_count = signature.results.len();
         let additional = result_count.saturating_sub(params);
         let start = self.operands.len() - params;
         self.check_values(additional)?;
         self.budget.spend(offset, params + result_count)?;
+        if matches!(target, HostCall::Indirect { .. })
+            && !signature
+                .params
+                .iter()
+                .chain(&signature.results)
+                .copied()
+                .all(is_numeric)
+        {
+            return Err(error(offset, Fault::UnsupportedInstruction));
+        }
         self.operands
             .try_reserve(additional)
             .map_err(|_| error(offset, Fault::LimitExceeded))?;
@@ -466,13 +494,16 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                 .map(|ty| Slot::zero(ty).number()),
         );
 
-        let called = if let Some(callback) = import.callback {
+        let called = if let Some(callback) = import.and_then(|import| import.callback) {
             callback(&arguments, &mut results, self.budget.cancellation)
         } else {
             match self.dispatch.as_mut() {
-                Some(Dispatch::Plain(dispatch)) => dispatch(index, &arguments, &mut results),
+                Some(Dispatch::Plain(dispatch)) => match target {
+                    HostCall::Import(index) => dispatch(index, &arguments, &mut results),
+                    HostCall::Indirect { .. } => Err(HostTrap),
+                },
                 Some(Dispatch::Tracing(dispatch)) => {
-                    let trace = self.state.borrow().has_external_references.get();
+                    let trace = self.state.borrow().has_host_references.get();
                     let mut roots = if trace {
                         self.budget
                             .spend(offset, self.locals.len() + self.operands.len())?;
@@ -480,8 +511,8 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                     } else {
                         [].iter().chain(&[])
                     }
-                    .filter_map(Slot::external_reference);
-                    dispatch(index, &arguments, &mut results, &mut roots)
+                    .filter_map(Slot::host_root);
+                    dispatch(target, &arguments, &mut results, &mut roots)
                 }
                 None => Err(HostTrap),
             }

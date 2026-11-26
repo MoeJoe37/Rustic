@@ -133,6 +133,12 @@ impl Value {
         Self(identity)
     }
 
+    /// Restore an object from an embedder-held arena index. The handle must
+    /// refer to a live, traced object in the same agent.
+    pub const fn from_host_object_index(index: u32) -> Self {
+        Self(TAG_OBJECT << TAG_SHIFT | index as u64)
+    }
+
     /// A Number; every NaN becomes the canonical NaN.
     #[inline]
     pub fn number(n: f64) -> Value {

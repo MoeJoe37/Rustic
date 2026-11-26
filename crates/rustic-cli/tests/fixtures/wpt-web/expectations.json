@@ -3882,33 +3882,27 @@
     },
     {
       "name": "imports: BufferSource argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
+      "status": "PASS"
     },
     {
       "name": "imports: Module argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
+      "status": "PASS"
     },
     {
       "name": "imports with empty module names: BufferSource argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
+      "status": "PASS"
     },
     {
       "name": "imports with empty module names: Module argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
+      "status": "PASS"
     },
     {
       "name": "imports with empty names: BufferSource argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
+      "status": "PASS"
     },
     {
       "name": "imports with empty names: Module argument",
-      "status": "FAIL",
-      "message": "promise_test: Unhandled rejection with value: object \"LinkError: invalid WebAssembly import\""
+      "status": "PASS"
     },
     {
       "name": "exports with empty name: function: BufferSource argument",
@@ -4924,18 +4918,15 @@
     },
     {
       "name": "imports",
-      "status": "FAIL",
-      "message": "invalid WebAssembly import"
+      "status": "PASS"
     },
     {
       "name": "imports with empty module names",
-      "status": "FAIL",
-      "message": "invalid WebAssembly import"
+      "status": "PASS"
     },
     {
       "name": "imports with empty names",
-      "status": "FAIL",
-      "message": "invalid WebAssembly import"
+      "status": "PASS"
     },
     {
       "name": "exports with empty name: function",

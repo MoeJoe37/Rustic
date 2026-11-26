@@ -34,8 +34,8 @@ preserves the existing guest bounds and growth behavior at both entry points.
 
 Local function references require no native handles into the JS heap.
 [ADR 0090](0090-live-wasm-external-tables.md) adds tracing for module-defined
-external-reference table exports. TD-208 tracks shared ownership for table
-imports of function tables and unrelated function instances.
+external-reference table exports. [ADR 0092](0092-wasm-function-table-imports.md) extends this boundary to
+function-table imports and independently defined function addresses.
 
 ## Validation
 

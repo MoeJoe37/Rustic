@@ -40,8 +40,9 @@ referencing them. Visiting current edges allows normal cyclic collection.
 ## Consequences and revisit trigger
 
 [ADR 0091](0091-wasm-external-table-imports.md) extends this design to
-external-reference imports and roots start-time state. TD-208 tracks
-cross-instance function identity and function-table imports.
+external-reference imports and roots start-time state.
+[ADR 0092](0092-wasm-function-table-imports.md) extends tracing to linked
+function identities.
 
 ## Validation
 

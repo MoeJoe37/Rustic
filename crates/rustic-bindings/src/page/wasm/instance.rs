@@ -1,6 +1,8 @@
-use std::{any::Any, collections::HashMap};
+use std::{any::Any, cell::OnceCell, collections::HashMap, num::NonZeroU32};
 
-use rustic_wasm::{ExecutionError, ExecutionErrorKind, Instance, InstanceImports, InstanceLimits};
+use rustic_wasm::{
+    ExecutionError, ExecutionErrorKind, Instance, InstanceImports, InstanceLimits, ReferenceRoot,
+};
 
 use super::super::events::PrivateArray;
 use super::*;
@@ -11,13 +13,30 @@ pub(super) const RUNTIME_ERROR: &str = "WebAssembly.RuntimeError";
 
 pub(super) type Runtime = Instance<'static, 'static>;
 
+type RuntimeSlot = OnceCell<Rc<Runtime>>;
+
+pub(super) fn function_owner(instance: Value) -> Option<NonZeroU32> {
+    NonZeroU32::new(instance.as_object()?.index().checked_add(1)?)
+}
+
+pub(super) fn owner_value(owner: NonZeroU32) -> Value {
+    Value::from_host_object_index(owner.get() - 1)
+}
+
+pub(super) fn root_value(root: ReferenceRoot) -> Value {
+    match root {
+        ReferenceRoot::External(reference) => Value::from_host_identity(reference.identity()),
+        ReferenceRoot::FunctionOwner(owner) => owner_value(owner),
+    }
+}
+
 fn trace_runtime(state: &dyn Any, mark: &mut dyn FnMut(Value)) {
-    let runtime = state
-        .downcast_ref::<Runtime>()
+    let slot = state
+        .downcast_ref::<RuntimeSlot>()
         .expect("Wasm instance state");
-    runtime.visit_external_references(&mut |reference| {
-        mark(Value::from_host_identity(reference.identity()));
-    });
+    if let Some(runtime) = slot.get() {
+        runtime.visit_reference_roots(&mut |root| mark(root_value(root)));
+    }
 }
 
 pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
@@ -154,7 +173,7 @@ fn instantiate_module(
     proto: ObjectId,
 ) -> JsResult<Value> {
     let token = agent.cancellation().unwrap_or_default();
-    let (runtime, allocation) = compilation_work(agent, module.bytes.len(), |agent| {
+    let (object, prepared) = compilation_work(agent, module.bytes.len(), |agent| {
         // The branded module owns immutable bytes that passed the same validation limits.
         let validated = checked(&module.bytes, &Options::default(), &token)
             .map_err(|error| error.throw(agent))?;
@@ -226,8 +245,15 @@ fn instantiate_module(
         let allocation = compilation_scratch(module.bytes.len())
             + limits.memory_bytes
             + limits.table_storage_bytes();
-        let runtime = agent.with_host_memory(allocation, |agent| {
-            Instance::prepare_owned_with_imports(
+        let object = Value::object(agent.new_traced_host_state(
+            INSTANCE,
+            proto,
+            RuntimeSlot::new(),
+            allocation + size_of::<Runtime>() + 2 * size_of::<usize>(),
+            Some(trace_runtime),
+        )?);
+        with_root(agent, object, |agent| {
+            let prepared = Instance::prepare_owned_with_imports(
                 validated,
                 limits,
                 &token,
@@ -235,19 +261,17 @@ fn instantiate_module(
                     globals: &state.globals,
                     memories: &state.memories,
                     tables: &state.tables,
+                    function_owner: Some(function_owner(object).ok_or(OutOfMemory)?),
                 },
             )
-            .map_err(|error| execution_error(agent, error, true))
-        })?;
-        Ok((runtime, allocation))
+            .map_err(|error| execution_error(agent, error, true))?;
+            let slot = agent
+                .host_state::<RuntimeSlot>(object.as_object().expect("instance object"), INSTANCE)
+                .expect("instance state slot");
+            assert!(slot.set(prepared.instance()).is_ok());
+            Ok((object, prepared))
+        })
     })?;
-    let object = Value::object(agent.new_traced_host_state(
-        INSTANCE,
-        proto,
-        runtime,
-        allocation,
-        Some(trace_runtime),
-    )?);
     with_root(agent, object, |agent| {
         let functions = PrivateArray::new(agent, &[])?;
         let record = PrivateArray::new(
@@ -263,6 +287,9 @@ fn instantiate_module(
         with_page(agent, |agent, page| {
             agent.weak_map_set(page.wasm_calls, object, record.value())
         })?;
+        prepared
+            .initialize(&token)
+            .map_err(|error| execution_error(agent, error, true))?;
         let runtime = find(agent, object).expect("new WebAssembly instance");
         host::with_dispatch(agent, bindings.functions, true, |dispatch| {
             runtime.run_start_with_reference_roots(&token, dispatch)
@@ -388,7 +415,10 @@ pub(super) fn function(
 }
 
 pub(super) fn find(agent: &Agent, value: Value) -> Option<Rc<Runtime>> {
-    agent.host_state(value.as_object()?, INSTANCE)
+    agent
+        .host_state::<RuntimeSlot>(value.as_object()?, INSTANCE)?
+        .get()
+        .cloned()
 }
 
 fn exports(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {

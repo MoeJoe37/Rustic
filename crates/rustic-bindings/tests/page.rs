@@ -2168,9 +2168,10 @@ fn wasm_exported_function_tables_share_guest_state_and_preserve_identity() {
             assert(linked === foreign, 'import re-export identity');
             table.set(at(1), foreign);
             assert(table.get(at(1)) === foreign && call(at(1)) === 17, 'existing import used by table');
-            assert(rejects(TypeError, () => table.set(at(1), unrelated)), 'a foreign function needs a binding');
+            table.set(at(1), unrelated);
+            assert(table.get(at(1)) === unrelated && call(at(1)) === 17, 'independently defined function identity and call');
             assert(rejects(TypeError, () => table.set(at(1), new WebAssembly.Memory({initial:0}))), 'memory is not a function');
-            assert(table.get(at(1)) === foreign, 'failed write preserves entry');
+            assert(table.get(at(1)) === unrelated, 'failed write preserves entry');
             assert(grow(at(1)) === at(3) && table.length === at(4), 'guest growth visible to JS');
             assert(table.grow(at(1), answer) === at(4) && call(at(4)) === 42, 'JS growth visible to guest');
             assert(rejects(RangeError, () => table.grow(at(1))) && table.length === at(5), 'growth limit');
@@ -2440,6 +2441,154 @@ fn wasm_external_table_imports_share_identity_growth_and_start_roots() {
             return 0;
         }}, 42);
         assert(value.get(0) === 42, 'set uses the promoted backing after coercion');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}
+
+#[test]
+fn wasm_function_table_imports_share_addresses_and_keep_trapping_owners_alive() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    install_wasm_collector(&mut agent);
+    let outcome = agent.evaluate(r#"
+        const header = [0,97,115,109,1,0,0,0];
+        function assert(condition, message) { if (!condition) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        function section(id, bytes) { return [id, bytes.length, ...bytes]; }
+        function body(locals, instructions) {
+            return [locals.length + instructions.length + 1, ...locals, ...instructions, 11];
+        }
+        function named(name, kind, index) {
+            return [name.length, ...Array.from(name, c => c.charCodeAt(0)), kind, index];
+        }
+        function compile(sections) {
+            return new WebAssembly.Module(Uint8Array.of(...header, ...sections.flat()));
+        }
+        function source(parameter) {
+            const type = parameter ? [1,96,1,127,1,127] : [1,96,0,1,127];
+            return new WebAssembly.Instance(compile([
+                section(1,type), section(3,[1,0]),
+                section(7,[1,...named('run',0,0)]),
+                section(10,[1,...body([0], [65,23])])
+            ])).exports.run;
+        }
+        function callbackSource(f) {
+            return new WebAssembly.Instance(compile([
+                section(1,[2,96,0,0,96,0,1,127]),
+                section(2,[1,1,109,1,102,0,0]), section(3,[1,1]),
+                section(7,[1,...named('run',0,1)]),
+                section(10,[1,...body([0], [16,0,65,31])])
+            ]), {m:{f}}).exports.run;
+        }
+        function provider(wide) {
+            return new WebAssembly.Instance(compile([
+                section(4,[1,112,wide ? 5 : 1,3,5]),
+                section(7,[1,...named('table',1,0)])
+            ])).exports.table;
+        }
+        function consumer(wide, trap) {
+            const address = wide ? 126 : 127;
+            const c = n => [wide ? 66 : 65, n];
+            const limits = [112,wide ? 5 : 1,3,5];
+            const segment = (table, offset) => [2,table,...c(offset),11,0,1,1];
+            const elements = trap ? [2,...segment(1,1),...segment(0,8)] : [1,...segment(1,1)];
+            const hold = [...c(0),37,0,33,0, ...c(0),208,112,38,0,
+                16,0, ...c(0),32,0,38,1];
+            return compile([
+                section(1,[4,96,0,0, 96,0,1,127, 96,1,address,1,127, 96,1,address,1,address]),
+                section(2,[3,1,109,1,97,1,...limits, 1,109,1,98,1,...limits, 1,109,1,102,0,0]),
+                section(3,[6,1,2,2,0,3,0]),
+                section(7,[7,...named('a',1,0),...named('b',1,1),
+                    ...named('call',0,2),...named('tail',0,3),...named('hold',0,4),
+                    ...named('grow',0,5),...named('copy',0,6)]),
+                section(9,elements),
+                section(10,[6,
+                    ...body([0], [65,42]),
+                    ...body([0], [32,0,17,1,0]),
+                    ...body([0], [32,0,19,1,1]),
+                    ...body([1,1,112], hold),
+                    ...body([0], [208,112,32,0,252,15,1]),
+                    ...body([0], [...c(1),...c(0),...c(2),252,14,1,0])
+                ])
+            ]);
+        }
+        function exercise(wide, supplied) {
+            const at = n => wide ? BigInt(n) : n;
+            const table = supplied ?? new WebAssembly.Table({
+                element:'anyfunc', address:wide ? 'i64' : 'i32', initial:at(3), maximum:at(5)
+            });
+            function seed() {
+                const foreign = source(false);
+                table.set(at(0), foreign);
+                return new WeakRef(foreign);
+            }
+            const weak = seed();
+            table.set(at(2), source(true));
+            const imports = {m:{a:table,b:table,f:collect}};
+            const exports = new WebAssembly.Instance(consumer(wide,false), imports).exports;
+            assert(exports.a === table && exports.b === table, 're-exported table aliases');
+            assert(table.get(at(0)) === weak.deref() && exports.call(at(0)) === 23, 'prelinked function identity');
+            const hidden = table.get(at(1));
+            assert(hidden === table.get(at(1)) && exports.tail(at(1)) === 42, 'active function and direct tail call');
+            assert(rejects(WebAssembly.RuntimeError, () => exports.call(at(2))), 'cross-instance signature mismatch');
+            exports.hold();
+            assert(table.get(at(0)) === weak.deref() && exports.tail(at(0)) === 23, 'suspended foreign function and cross-instance tail call');
+            exports.copy();
+            assert(table.get(at(1)) === weak.deref() && table.get(at(2)) === hidden, 'overlapping copy preserves both addresses');
+            assert(exports.grow(at(1)) === at(3) && table.get(at(3)) === null, 'guest growth in original table');
+            assert(table.grow(at(1), hidden) === at(4) && exports.call(at(4)) === 42, 'host growth preserves guest function');
+            assert(rejects(RangeError, () => table.grow(at(1))) && table.length === at(5), 'allocating maximum');
+            assert(rejects(WebAssembly.RuntimeError,
+                () => new WebAssembly.Instance(consumer(wide,true), imports)), 'trapping segment fails instantiation');
+            collect();
+            const retained = table.get(at(1));
+            assert(retained !== hidden && retained() === 42 && exports.call(at(1)) === 42,
+                'published initializer retains the trapping instance');
+            let target;
+            function seedCallback() {
+                const run = callbackSource(() => {
+                    table.set(at(3), null);
+                    collect();
+                    assert(target.deref() !== undefined, 'indirect call retains selected owner');
+                });
+                table.set(at(3), run);
+                target = new WeakRef(run);
+            }
+            seedCallback();
+            assert(exports.call(at(3)) === 31 && table.get(at(3)) === null, 'callback cleared selected entry');
+            table.set(at(0), null);
+            assert(rejects(WebAssembly.RuntimeError, () => exports.call(at(0))), 'null traps');
+            collect();
+            assert(weak.deref() === undefined && target.deref() === undefined, 'overwritten functions are reclaimable');
+        }
+        exercise(false);
+        exercise(true);
+        exercise(false, provider(false));
+        exercise(true, provider(true));
+
+        const m = consumer(false,false);
+        const table = new WebAssembly.Table({element:'anyfunc',initial:3,maximum:5});
+        const wrong = [
+            new WebAssembly.Table({element:'externref',initial:3,maximum:5}),
+            new WebAssembly.Table({element:'anyfunc',initial:2,maximum:5}),
+            new WebAssembly.Table({element:'anyfunc',initial:3,maximum:6}),
+            new WebAssembly.Table({element:'anyfunc',address:'i64',initial:3n,maximum:5n})
+        ];
+        for (const incompatible of wrong) {
+            assert(rejects(WebAssembly.LinkError, () => new WebAssembly.Instance(m, {
+                m:{a:table,b:incompatible,f:collect}
+            })), 'check type, current minimum, maximum and width');
+            assert(table.get(1) === null, 'link mismatch applies no active writes');
+        }
         true
     "#);
     if let Err(rustic_js::EvalError::Throw(value)) = outcome {

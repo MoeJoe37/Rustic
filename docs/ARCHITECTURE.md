@@ -313,23 +313,27 @@ one. Each memory has an address width and shares the byte budget of its
 allocating owner. Local tables also carry their declared address width and
 share an instance-wide entry budget with passive element segments. Standalone
 Window tables initially keep reference entries in a private array traced through
-the wrapper's ephemeron. At its first Wasm link, a standalone `externref` table
-moves its entries to a shared interpreter allocation with a heap reservation
-for bounded growth. Exports of module-defined tables trace the allocating
-instance. Imports keep their source wrappers and share the backing allocation
-and its budget. Re-exports return those same wrappers. The instance caches function
-wrappers by function index and traces JavaScript values reachable from its guest
-state. The interpreter checks full-width guest ranges before converting them
-to host indices. A dispatched import runs with all guest store borrows released
-and any external references in suspended frames rooted for the call. The realm
-keeps its bindings and propagates JavaScript exceptions. The
-interpreter remains available on hosts without executable-memory permission.
+the wrapper's ephemeron. On its first Wasm link, a standalone table moves its
+entries to a shared interpreter allocation with a heap reservation for bounded
+growth. Imports retain their source wrappers and the allocation remains on
+its owner's budget. Re-exports return those same wrappers.
+
+A function address contains its defining instance's host identity and function
+index. The instance caches function wrappers and the collector follows
+external references and function owners reachable from guest state. The host
+attaches code and import records to the rooted instance before applying active
+segments. A completed write into a shared table can keep the defining instance
+alive after an initialization trap. For dispatched imports and cross-instance
+indirect calls, guest store borrows are released and suspended frames' references
+are rooted for the call. The interpreter checks full-width table indices before
+converting them to host indices. The realm propagates JavaScript exceptions,
+and the interpreter remains available without executable-memory permission.
 [ADR 0080](adr/0080-window-wasm-module-compilation.md),
 [ADR 0081](adr/0081-owned-wasm-instances.md), [ADR 0082](adr/0082-wasm-numeric-globals.md),
 [ADR 0083](adr/0083-wasm-js-function-imports.md), [ADR 0084](adr/0084-shared-numeric-wasm-globals.md),
 [ADR 0085](adr/0085-wasm-fixed-memory-buffers.md), [ADR 0086](adr/0086-wasm-memory64.md),
 [ADR 0087](adr/0087-wasm-resizable-buffers.md), [ADR 0088](adr/0088-window-wasm-tables.md),
-[ADR 0089](adr/0089-live-wasm-function-tables.md), [ADR 0090](adr/0090-live-wasm-external-tables.md), [ADR 0091](adr/0091-wasm-external-table-imports.md)
+[ADR 0089](adr/0089-live-wasm-function-tables.md), [ADR 0090](adr/0090-live-wasm-external-tables.md), [ADR 0091](adr/0091-wasm-external-table-imports.md), [ADR 0092](adr/0092-wasm-function-table-imports.md)
 
 The extension design assigns execution under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native

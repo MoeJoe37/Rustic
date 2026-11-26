@@ -1,10 +1,12 @@
 use rustic_wasm::{
-    ExecutionError, ExecutionErrorKind, ExternalReference, ExternalTable, HostTrap, LinearMemory,
-    NumericGlobal, TracingHostDispatch,
+    ExecutionError, ExecutionErrorKind, HostCall, HostTrap, LinearMemory, NumericGlobal,
+    ReferenceRoot, ReferenceTable, TracingHostDispatch,
 };
 
 use super::super::events::PrivateArray;
-use super::instance::{LINK_ERROR, RUNTIME_ERROR, Runtime, execution_error, find};
+use super::instance::{
+    LINK_ERROR, RUNTIME_ERROR, Runtime, execution_error, find, owner_value, root_value,
+};
 use super::*;
 
 // Direct numeric calls can cross instance boundaries without calling the
@@ -24,7 +26,7 @@ pub(super) struct Bindings {
 pub(super) struct LinkedState {
     pub globals: Vec<NumericGlobal>,
     pub memories: Vec<LinearMemory>,
-    pub tables: Vec<ExternalTable>,
+    pub tables: Vec<ReferenceTable>,
 }
 
 pub(super) fn read_imports(
@@ -184,9 +186,9 @@ pub(super) fn with_dispatch<T>(
     execute: impl FnOnce(&mut TracingHostDispatch<'_>) -> Result<T, ExecutionError>,
 ) -> JsResult<T> {
     let mut failure = None;
-    let result = execute(&mut |index, arguments, results, roots| {
+    let result = execute(&mut |target, arguments, results, roots| {
         with_reference_roots(agent, roots, |agent| {
-            dispatch(agent, bindings, index, arguments, results)
+            dispatch(agent, bindings, target, arguments, results)
         })
         .map_err(|error| {
             failure = Some(error);
@@ -217,7 +219,7 @@ pub(super) fn invoke(
 
 fn with_reference_roots<T>(
     agent: &mut Agent,
-    roots: &mut dyn Iterator<Item = ExternalReference>,
+    roots: &mut dyn Iterator<Item = ReferenceRoot>,
     operation: impl FnOnce(&mut Agent) -> JsResult<T>,
 ) -> JsResult<T> {
     let Some(first) = roots.next() else {
@@ -230,11 +232,7 @@ fn with_reference_roots<T>(
         for (index, reference) in std::iter::once(first).chain(roots).enumerate() {
             agent.check_native_work()?;
             let index = u32::try_from(index).map_err(|_| OutOfMemory)?;
-            values.set(
-                agent,
-                index,
-                Value::from_host_identity(reference.identity()),
-            )?;
+            values.set(agent, index, root_value(reference))?;
         }
         operation(agent)
     })
@@ -243,7 +241,7 @@ fn with_reference_roots<T>(
 fn dispatch(
     agent: &mut Agent,
     bindings: PrivateArray,
-    index: usize,
+    target: HostCall<'_>,
     arguments: &[WasmValue],
     results: &mut [WasmValue],
 ) -> JsResult<()> {
@@ -257,7 +255,31 @@ fn dispatch(
             ));
         }
         page.wasm_call_depth.set(depth + 1);
-        let result = invoke_binding(agent, bindings, index, arguments, results);
+        let result = match target {
+            HostCall::Import(index) => invoke_binding(agent, bindings, index, arguments, results),
+            HostCall::Indirect { address, expected } => {
+                let owner = owner_value(address.owner().expect("host-linked function owner"));
+                with_root(agent, owner, |agent| {
+                    let runtime = find(agent, owner).expect("rooted function owner");
+                    let actual = runtime
+                        .function_type_at(address.index())
+                        .expect("function signature");
+                    agent.spend_native_work(
+                        (expected.params.len() + expected.results.len()) as u64,
+                    )?;
+                    if actual != expected {
+                        return Err(wasm_error(
+                            agent,
+                            RUNTIME_ERROR,
+                            "indirect function type mismatch",
+                        ));
+                    }
+                    let values = invoke(agent, owner, &runtime, address.index(), arguments)?;
+                    results.copy_from_slice(&values);
+                    Ok(())
+                })
+            }
+        };
         page.wasm_call_depth.set(depth);
         result
     })

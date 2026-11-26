@@ -537,7 +537,7 @@ fn active_segment_bounds_and_preparation_limits_are_checked_before_start() {
 
 #[test]
 fn imported_external_table_growth_uses_the_allocating_pool() {
-    use rustic_wasm::{ExternalReference, InstanceImports};
+    use rustic_wasm::{ExternalReference, InstanceImports, TableEntry};
 
     let owner_bytes = module(&[
         (4, &[2, 0x6f, 1, 1, 4, 0x6f, 1, 1, 4]),
@@ -558,7 +558,7 @@ fn imported_external_table_growth_uses_the_allocating_pool() {
         table_elements: 1,
         ..Default::default()
     };
-    let consumer = Instance::prepare_owned_with_imports(
+    let prepared = Instance::prepare_owned_with_imports(
         validated(&consumer_bytes),
         consumer_limits,
         &token,
@@ -568,6 +568,9 @@ fn imported_external_table_growth_uses_the_allocating_pool() {
         },
     )
     .unwrap();
+
+    let consumer = prepared.instance();
+    prepared.initialize(&token).unwrap();
 
     let cancelled = CancellationToken::default();
     cancelled.cancel();
@@ -599,7 +602,7 @@ fn imported_external_table_growth_uses_the_allocating_pool() {
         Some(2)
     );
     assert_eq!(shared.length(), 4);
-    assert_eq!(shared.get(1), Some(Some(reference)));
+    assert_eq!(shared.get(1), Some(TableEntry::External(reference)));
     assert_eq!(
         consumer.grow_external_table(0, 1, None, &token).unwrap(),
         None

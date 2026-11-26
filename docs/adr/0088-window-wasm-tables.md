@@ -35,8 +35,8 @@ Standalone tables share the normal heap budget. [ADR 0089](0089-live-wasm-functi
 adds live module-defined function table exports, and
 [ADR 0090](0090-live-wasm-external-tables.md) adds external-reference table
 exports. [ADR 0091](0091-wasm-external-table-imports.md) makes standalone
-external-reference tables linkable. Function tables still need a shared
-reference identity.
+external-reference tables linkable. [ADR 0092](0092-wasm-function-table-imports.md) applies shared allocation
+and traced function addresses to function tables.
 
 ## Validation
 

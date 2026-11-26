@@ -3434,8 +3434,8 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Function-table imports, shared memories,
-reference-valued host calls and the progressive response pipeline remain open.
+Shared memories, reference-valued host and cross-instance calls, and the
+progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3571,16 +3571,16 @@ instance's entry budget, including entries in other tables and passive segments.
 
 A function read from a table shares the wrapper used by ordinary exports.
 Functions reachable through the table alone are wrapped on demand. A table
-can store null, a function belonging to its instance, or a Wasm function the
-instance already imports. JavaScript calls to a wrapper still require a
-numeric signature. The collector follows table wrappers to their instances,
-and instances trace their cached functions and imported objects.
-[ADR 0089](adr/0089-live-wasm-function-tables.md) records the ownership
-boundary and TD-208 tracks cross-instance table sharing.
+can store null or any branded Wasm function in the agent. JavaScript calls
+to a wrapper still require a numeric signature. The collector follows table
+wrappers to their allocating instances, and traces the defining instances
+of functions stored in each allocation. [ADR 0089](adr/0089-live-wasm-function-tables.md)
+records the original export path. [ADR 0092](adr/0092-wasm-function-table-imports.md)
+extends it to independently defined functions.
 
 Six previously failing `Instance` and `instantiate` subtests now pass. They
 exercise table exports under ordinary and empty names, including both promise
-overloads. The two files now pass 77 of 86 subtests.
+overloads. With function-table imports, all 86 subtests in those files pass.
 
 Window also exposes module-defined nullable external-reference tables in both
 address widths. JavaScript reads and writes the same entries as guest code.
@@ -3605,3 +3605,25 @@ imports are rooted during start, so collection in callbacks can follow private
 guest state and suspended frames. Regression tests exercise shared identity,
 growth, overlap, import mismatch, initializer ordering and start-time GC.
 [ADR 0091](adr/0091-wasm-external-table-imports.md)
+
+
+### WASM-06 — Function-table imports
+
+Window links standalone and exported nullable `funcref` tables in both address
+widths. They use the same import matching, growth pool, alias tracking and
+re-export identity as `externref`. Entries retain the function's defining
+instance and index, so a table write or bulk copy preserves function identity
+across instances. Indirect and indirect tail calls check the callee's signature
+before entering it. When they cross instances, the dispatcher exchanges scalar
+numeric values under the existing call-depth and work limits.
+
+The host attaches runtime and import records before applying active segments.
+Functions published by an earlier segment remain live if a later segment
+traps. Regression tests cover the failed-instantiation prefix, collection while
+a function remains reachable only from a suspended frame or an active callee,
+reclamation after overwrite, exact maxima, and aliasing between table indices.
+
+The pinned Window `Instance` and `instantiate` WPT files gained nine passes for
+function-table imports, including empty module or field names and both promise
+overloads. The full pinned Window selection has 1,289 passes and 79 expected
+failures. [ADR 0092](adr/0092-wasm-function-table-imports.md)

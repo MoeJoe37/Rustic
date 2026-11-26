@@ -6,6 +6,10 @@ use crate::{Declarations, ElementItems, ElementMode, ImportType, Limits, TableTy
 
 const OUT_OF_BOUNDS: Fault = Fault::TableOutOfBounds;
 
+const FUNCREF: ValueType = ValueType::Ref {
+    nullable: true,
+    heap_type: -16,
+};
 const EXTERNREF: ValueType = ValueType::Ref {
     nullable: true,
     heap_type: -17,
@@ -125,35 +129,53 @@ impl Table {
     }
 }
 
-/// A nullable external-reference table shared in one host's reference domain.
-/// The allocator owns entry limits and the host must trace its live identities.
-#[derive(Clone)]
-pub struct ExternalTable(Rc<Table>);
+/// One entry in a host-linked nullable reference table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TableEntry {
+    /// Null in the table's declared reference type.
+    Null,
+    /// An instance-bound function address.
+    Function(FunctionAddress),
+    /// An identity supplied by the embedder.
+    External(ExternalReference),
+}
 
-impl ExternalTable {
-    /// Allocate an independent table. Host-specific entry limits do not change
-    /// the declared maximum used during import matching.
-    pub fn new(
-        limits: Limits,
-        entry_limit: usize,
-        initial: Option<ExternalReference>,
-    ) -> Option<Self> {
-        if !limits.fits(limits.address_type.max_table_elements()) {
+impl TableEntry {
+    fn reference(self, ty: ValueType) -> Option<Reference> {
+        match (ty, self) {
+            (FUNCREF, Self::Null) => Some(Reference::NullFunction),
+            (EXTERNREF, Self::Null) => Some(Reference::NullExtern),
+            (FUNCREF, Self::Function(address)) if address.owner().is_some() => {
+                Some(Reference::Function(address))
+            }
+            (EXTERNREF, Self::External(reference)) => Some(Reference::Extern(reference)),
+            _ => None,
+        }
+    }
+}
+
+/// A nullable function or external-reference table shared in one host store.
+/// The allocator owns entry limits and the host traces its live identities.
+#[derive(Clone)]
+pub struct ReferenceTable(Rc<Table>);
+
+impl ReferenceTable {
+    /// Allocate an independent table. Host entry limits do not change the
+    /// declared maximum used during import matching.
+    pub fn new(ty: TableType, entry_limit: usize) -> Option<Self> {
+        if !ty.limits.fits(ty.limits.address_type.max_table_elements()) {
             return None;
         }
-        let count = usize::try_from(limits.min).ok()?;
+        let initial = TableEntry::Null.reference(ty.element_type)?;
+        let count = usize::try_from(ty.limits.min).ok()?;
         let pool = Rc::new(TablePool {
             used: Cell::new(0),
             limit: entry_limit,
         });
-        let ty = TableType {
-            limits,
-            element_type: EXTERNREF,
-        };
-        Table::allocate(ty, count, external(initial), &pool).map(Self)
+        Table::allocate(ty, count, initial, &pool).map(Self)
     }
 
-    /// Heap reservation for this standalone allocation and its growth.
+    /// Heap reservation for a standalone allocation and its growth.
     pub const fn storage_bytes(entry_limit: usize) -> usize {
         entry_limit
             .saturating_mul(size_of::<Reference>())
@@ -163,7 +185,7 @@ impl ExternalTable {
     /// Check the current size, declared maximum, address width and element type.
     pub fn matches(&self, ty: TableType) -> bool {
         let actual = self.0.ty.limits;
-        ty.element_type == EXTERNREF
+        ty.element_type == self.0.ty.element_type
             && actual.address_type == ty.limits.address_type
             && self.length() >= ty.limits.min
             && ty
@@ -177,41 +199,49 @@ impl ExternalTable {
         self.0.len()
     }
 
-    /// Read an entry. The inner `None` represents null.
-    pub fn get(&self, index: u64) -> Option<Option<ExternalReference>> {
-        match *self.0.entries.borrow().get(usize::try_from(index).ok()?)? {
-            Reference::Extern(reference) => Some(Some(reference)),
-            Reference::NullExtern => Some(None),
-            Reference::Function(_) => unreachable!("validated external table entry"),
-        }
+    /// Read a table entry by its full-width index.
+    pub fn get(&self, index: u64) -> Option<TableEntry> {
+        Some(
+            match *self.0.entries.borrow().get(usize::try_from(index).ok()?)? {
+                Reference::NullFunction | Reference::NullExtern => TableEntry::Null,
+                Reference::Function(address) => TableEntry::Function(address),
+                Reference::Extern(reference) => TableEntry::External(reference),
+            },
+        )
     }
 
-    /// Replace an entry. An invalid index leaves the table unchanged.
-    pub fn set(&self, index: u64, value: Option<ExternalReference>) -> bool {
-        let Ok(index) = usize::try_from(index) else {
+    /// Replace an entry if its type and index match.
+    pub fn set(&self, index: u64, value: TableEntry) -> bool {
+        let (Ok(index), Some(value)) = (
+            usize::try_from(index),
+            value.reference(self.0.ty.element_type),
+        ) else {
             return false;
         };
         let mut entries = self.0.entries.borrow_mut();
         let Some(slot) = entries.get_mut(index) else {
             return false;
         };
-        *slot = external(value);
+        *slot = value;
         true
     }
 
-    /// Grow against the allocating owner's limits. The host charges work
-    /// before mutation and the previous size is returned upon success.
+    /// Grow against the allocating owner's limits. Charge work before mutation
+    /// and return the previous size upon success.
     pub fn grow<E>(
         &self,
         count: u64,
-        value: Option<ExternalReference>,
+        value: TableEntry,
         charge: impl FnOnce(usize) -> Result<(), E>,
     ) -> Result<Option<u64>, E> {
-        self.0.grow(count, external(value), charge)
+        let Some(value) = value.reference(self.0.ty.element_type) else {
+            return Ok(None);
+        };
+        self.0.grow(count, value, charge)
     }
 
-    /// Visit live external identities. The visitor must not reenter the table.
-    pub fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
+    /// Visit live host identities. The visitor must not reenter the table.
+    pub fn visit_reference_roots(&self, visitor: &mut dyn FnMut(ReferenceRoot)) {
         trace_entries(&self.0.entries.borrow(), visitor);
     }
 }
@@ -220,11 +250,9 @@ fn external(value: Option<ExternalReference>) -> Reference {
     value.map_or(Reference::NullExtern, Reference::Extern)
 }
 
-fn trace_entries(entries: &[Reference], visitor: &mut dyn FnMut(ExternalReference)) {
-    for entry in entries {
-        if let Reference::Extern(reference) = *entry {
-            visitor(reference);
-        }
+fn trace_entries(entries: &[Reference], visitor: &mut dyn FnMut(ReferenceRoot)) {
+    for reference in entries.iter().filter_map(|entry| entry.host_root()) {
+        visitor(reference);
     }
 }
 
@@ -239,45 +267,62 @@ impl Instance<'_, '_> {
         Some(self.state.borrow().tables.tables.get(table as usize)?.len())
     }
 
-    /// Retain a handle to a nullable external table. The embedder must keep
-    /// the allocating owner's heap reservation alive while this handle is used.
-    pub fn external_table(&self, index: u32) -> Option<ExternalTable> {
+    /// Retain a handle in the same host store. The embedder keeps the
+    /// allocation owner alive and traces the table's host identities.
+    pub fn shared_table(&self, index: u32) -> Option<ReferenceTable> {
         let state = self.state.borrow();
-        let table = state.tables.reference_table(index, -17)?;
-        state.has_external_references.set(true);
-        Some(ExternalTable(Rc::clone(table)))
+        let table = state.tables.tables.get(index as usize)?;
+        match table.ty.element_type {
+            FUNCREF if state.function_owner.is_some() => {}
+            EXTERNREF => {}
+            _ => return None,
+        }
+        state.has_host_references.set(true);
+        Some(ReferenceTable(Rc::clone(table)))
+    }
+
+    /// Retain a handle specifically to a nullable external table.
+    pub fn external_table(&self, index: u32) -> Option<ReferenceTable> {
+        self.state.borrow().tables.reference_table(index, -17)?;
+        self.shared_table(index)
     }
 
     /// Read an external table entry. The inner `None` represents null.
     pub fn external_table_get(&self, table: u32, index: u64) -> Option<Option<ExternalReference>> {
-        self.external_table(table)?.get(index)
+        match self.external_table(table)?.get(index)? {
+            TableEntry::Null => Some(None),
+            TableEntry::External(reference) => Some(Some(reference)),
+            TableEntry::Function(_) => unreachable!("external table element"),
+        }
     }
 
     /// Write a host identity or null to a nullable external table.
-    /// The embedder must keep the identity alive whenever it is reachable.
     pub fn external_table_set(
         &self,
         table: u32,
         index: u64,
         reference: Option<ExternalReference>,
     ) -> bool {
-        self.external_table(table)
-            .is_some_and(|table| table.set(index, reference))
+        self.external_table(table).is_some_and(|table| {
+            table.set(
+                index,
+                reference.map_or(TableEntry::Null, TableEntry::External),
+            )
+        })
     }
 
-    /// Visit the external identities reachable from persistent guest state.
-    /// Imported tables are traced by their allocating host. The visitor
-    /// must not reenter the instance.
-    pub fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
+    /// Visit host identities in persistent guest state. Imported tables are
+    /// traced through their owners. The visitor must not reenter the instance.
+    pub fn visit_reference_roots(&self, visitor: &mut dyn FnMut(ReferenceRoot)) {
         let state = self.state.borrow();
-        if !state.has_external_references.get() {
+        if !state.has_host_references.get() {
             return;
         }
-        state.tables.visit_external_references(visitor);
+        state.tables.visit_reference_roots(visitor);
         for reference in state
             .globals
             .iter()
-            .filter_map(|slot| slot.value().external_reference())
+            .filter_map(|slot| slot.value().host_root())
         {
             visitor(reference);
         }
@@ -306,15 +351,20 @@ impl Instance<'_, '_> {
         )
     }
 
-    /// Read a function table entry. The inner `None` represents a null reference.
+    /// Read a local function index. The inner `None` represents null.
+    /// Use [`Self::shared_table`] for entries owned by another instance.
     pub fn function_table_get(&self, table: u32, index: u64) -> Option<Option<u32>> {
         let state = self.state.borrow();
         let table = state.tables.reference_table(table, -16)?;
         let index = usize::try_from(index).ok()?;
-        let Reference::Function(function) = *table.entries.borrow().get(index)? else {
-            unreachable!("validated function table entry")
-        };
-        Some(function)
+        match *table.entries.borrow().get(index)? {
+            Reference::NullFunction => Some(None),
+            Reference::Function(address) if address.owner() == state.function_owner => {
+                Some(Some(address.index()))
+            }
+            Reference::Function(_) => None,
+            _ => unreachable!("validated function table entry"),
+        }
     }
 
     /// Write a function by its index in this instance, or write null. Invalid
@@ -324,11 +374,11 @@ impl Instance<'_, '_> {
             return false;
         }
         let mut state = self.state.borrow_mut();
+        let value = function.map_or(Reference::NullFunction, |index| {
+            FunctionAddress::reference(state.function_owner, index)
+        });
         state.tables.reference_table(table, -16).is_some()
-            && state
-                .tables
-                .set(table, index, Reference::Function(function), 0)
-                .is_ok()
+            && state.tables.set(table, index, value, 0).is_ok()
     }
 
     /// Return the work growth would require, if admitted by the table and
@@ -359,13 +409,11 @@ impl Instance<'_, '_> {
         if function.is_some_and(|index| self.function_type_at(index).is_none()) {
             return Ok(None);
         }
-        self.grow_host_table(
-            table,
-            count,
-            -16,
-            Reference::Function(function),
-            cancellation,
-        )
+        let owner = self.state.borrow().function_owner;
+        let value = function.map_or(Reference::NullFunction, |index| {
+            FunctionAddress::reference(owner, index)
+        });
+        self.grow_host_table(table, count, -16, value, cancellation)
     }
 
     /// Grow a nullable external table and fill the new entries with the host
@@ -399,8 +447,8 @@ impl Instance<'_, '_> {
         let previous = state
             .tables
             .grow_entries(table, count, value, 0, &mut budget)?;
-        if previous.is_some() && count != 0 && matches!(value, Reference::Extern(_)) {
-            state.has_external_references.set(true);
+        if previous.is_some() && count != 0 && value.host_root().is_some() {
+            state.has_host_references.set(true);
         }
         Ok(previous)
     }
@@ -410,7 +458,8 @@ impl Tables {
     pub(super) fn new(
         declarations: &Declarations<'_>,
         globals: &[GlobalSlot],
-        mut imports: &[ExternalTable],
+        mut imports: &[ReferenceTable],
+        function_owner: Option<NonZeroU32>,
         limits: InstanceLimits,
         budget: &mut Budget<'_>,
     ) -> Result<(Self, ActiveElements), ExecutionError> {
@@ -431,7 +480,7 @@ impl Tables {
             let Some((table, rest)) = imports.split_first() else {
                 return Err(error(entry.offset, Fault::MissingImport));
             };
-            if !table.matches(ty) {
+            if !table.matches(ty) || (ty.element_type == FUNCREF && function_owner.is_none()) {
                 return Err(error(entry.offset, Fault::ImportTypeMismatch));
             }
             append(&mut state.tables, Rc::clone(&table.0), entry.offset)?;
@@ -450,7 +499,7 @@ impl Tables {
             budget.spend(offset, 1)?;
             budget.spend(offset, count)?;
             let initial = match &table.initializer {
-                Some(expr) => constant(globals, expr, stack_limit, budget)?,
+                Some(expr) => constant(globals, function_owner, expr, stack_limit, budget)?,
                 None => Slot::zero(table.ty.element_type),
             };
             let table = Table::allocate(table.ty, count, initial.reference(), &state.pool)
@@ -482,6 +531,7 @@ impl Tables {
                             &element.items,
                             index,
                             globals,
+                            function_owner,
                             stack_limit,
                             offset,
                             budget,
@@ -489,7 +539,14 @@ impl Tables {
                     }
                 }
                 ElementMode::Active(segment) => {
-                    let start = constant(globals, &segment.offset, stack_limit, budget)?.address();
+                    let start = constant(
+                        globals,
+                        function_owner,
+                        &segment.offset,
+                        stack_limit,
+                        budget,
+                    )?
+                    .address();
                     let target = &state.tables[segment.target as usize];
                     let range = match checked_range(
                         target.len() as usize,
@@ -514,6 +571,7 @@ impl Tables {
                             &element.items,
                             index,
                             globals,
+                            function_owner,
                             stack_limit,
                             offset,
                             budget,
@@ -569,9 +627,9 @@ impl Tables {
         .then_some(table)
     }
 
-    fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
+    fn visit_reference_roots(&self, visitor: &mut dyn FnMut(ReferenceRoot)) {
         for table in &self.tables[self.imported..] {
-            if table.ty.element_type == EXTERNREF {
+            if matches!(table.ty.element_type, ValueType::Ref { .. }) {
                 trace_entries(&table.entries.borrow(), visitor);
             }
         }
@@ -686,15 +744,18 @@ fn element_value(
     items: &ElementItems,
     index: usize,
     globals: &[GlobalSlot],
+    function_owner: Option<NonZeroU32>,
     stack_limit: usize,
     offset: usize,
     budget: &mut Budget<'_>,
 ) -> Result<Reference, ExecutionError> {
     budget.spend(offset, 0)?;
     Ok(match items {
-        ElementItems::Functions(indexes) => Reference::Function(Some(indexes[index])),
+        ElementItems::Functions(indexes) => {
+            FunctionAddress::reference(function_owner, indexes[index])
+        }
         ElementItems::Expressions(expr) => {
-            constant(globals, &expr[index], stack_limit, budget)?.reference()
+            constant(globals, function_owner, &expr[index], stack_limit, budget)?.reference()
         }
     })
 }

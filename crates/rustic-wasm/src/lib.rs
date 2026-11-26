@@ -19,10 +19,10 @@ pub use binary::{
     scan_module,
 };
 pub use execute::{
-    ExecutionError, ExecutionErrorKind, ExecutionLimits, ExternalReference, ExternalTable,
-    FunctionImport, HostDispatch, HostTrap, Instance, InstanceImports, InstanceLimits,
+    ExecutionError, ExecutionErrorKind, ExecutionLimits, ExternalReference, FunctionAddress,
+    FunctionImport, HostCall, HostDispatch, HostTrap, Instance, InstanceImports, InstanceLimits,
     LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES, NumericGlobal, NumericInstance,
-    TracingHostDispatch, Value,
+    PreparedInstance, ReferenceRoot, ReferenceTable, TableEntry, TracingHostDispatch, Value,
 };
 pub use instructions::{
     BlockType, Immediate, Instruction, InstructionLimits, Opcode, decode_instructions,

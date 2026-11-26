@@ -12,13 +12,27 @@ type Callback<'host> = dyn Fn(&[Value], &mut [Value], &CancellationToken) -> Res
 pub type HostDispatch<'host> =
     dyn FnMut(usize, &[Value], &mut [Value]) -> Result<(), HostTrap> + 'host;
 
-/// A numeric host dispatcher with the external identities in suspended frames.
-/// The identities must be kept alive for the duration of the callback.
+/// A numeric call that leaves the current instance.
+#[derive(Clone, Copy)]
+pub enum HostCall<'a> {
+    /// An explicitly bound import by function index.
+    Import(usize),
+    /// An indirect call through a function address owned by another instance.
+    Indirect {
+        /// The defining instance and index.
+        address: FunctionAddress,
+        /// The caller's expected signature, checked before invoking the callee.
+        expected: &'a FunctionType,
+    },
+}
+
+/// A numeric host dispatcher with the host identities in suspended frames.
+/// These identities and any indirect target must stay live during the call.
 pub type TracingHostDispatch<'host> = dyn FnMut(
-        usize,
+        HostCall<'_>,
         &[Value],
         &mut [Value],
-        &mut dyn Iterator<Item = ExternalReference>,
+        &mut dyn Iterator<Item = ReferenceRoot>,
     ) -> Result<(), HostTrap>
     + 'host;
 

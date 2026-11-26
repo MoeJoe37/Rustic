@@ -3,6 +3,8 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     fmt,
+    num::NonZeroU32,
+    rc::Rc,
 };
 
 use rustic_base::CancellationToken;
@@ -21,11 +23,11 @@ mod state;
 mod table;
 
 use imports::{BoundFunction, Dispatch};
-pub use imports::{FunctionImport, HostDispatch, HostTrap, TracingHostDispatch};
+pub use imports::{FunctionImport, HostCall, HostDispatch, HostTrap, TracingHostDispatch};
 pub use memory::{LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES};
 pub use state::NumericGlobal;
-use state::State;
-pub use table::ExternalTable;
+use state::{Initializers, State};
+pub use table::{ReferenceTable, TableEntry};
 
 /// A WebAssembly number crossing the interpreter boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,10 +95,10 @@ impl Slot {
         }
     }
 
-    fn external_reference(&self) -> Option<ExternalReference> {
+    fn host_root(&self) -> Option<ReferenceRoot> {
         match *self {
-            Self::Ref(Reference::Extern(reference)) => Some(reference),
-            _ => None,
+            Self::Ref(reference) => reference.host_root(),
+            Self::Number(_) => None,
         }
     }
 
@@ -133,9 +135,51 @@ impl ExternalReference {
     }
 }
 
+/// A function index together with the embedder's identity for its defining
+/// instance. An unowned address stays inside the local interpreter.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FunctionAddress {
+    owner: Option<NonZeroU32>,
+    index: u32,
+}
+
+impl FunctionAddress {
+    /// Bind an index to its defining instance in the same host store.
+    pub const fn owned(owner: NonZeroU32, index: u32) -> Self {
+        Self {
+            owner: Some(owner),
+            index,
+        }
+    }
+
+    /// The defining instance's host identity, when embedded.
+    pub const fn owner(self) -> Option<NonZeroU32> {
+        self.owner
+    }
+
+    /// The function index in the defining instance.
+    pub const fn index(self) -> u32 {
+        self.index
+    }
+
+    fn reference(owner: Option<NonZeroU32>, index: u32) -> Reference {
+        Reference::Function(Self { owner, index })
+    }
+}
+
+/// A host identity reachable from a live guest reference.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReferenceRoot {
+    /// An identity in an external reference.
+    External(ExternalReference),
+    /// The owning instance of a function reference.
+    FunctionOwner(NonZeroU32),
+}
+
 #[derive(Clone, Copy)]
 enum Reference {
-    Function(Option<u32>),
+    Function(FunctionAddress),
+    NullFunction,
     Extern(ExternalReference),
     NullExtern,
 }
@@ -143,14 +187,22 @@ enum Reference {
 impl Reference {
     fn null(heap_type: i64) -> Self {
         match heap_type {
-            -16 => Self::Function(None),
+            -16 => Self::NullFunction,
             -17 => Self::NullExtern,
             _ => unreachable!("validated abstract reference type"),
         }
     }
 
     fn is_null(self) -> bool {
-        matches!(self, Self::Function(None) | Self::NullExtern)
+        matches!(self, Self::NullFunction | Self::NullExtern)
+    }
+
+    fn host_root(self) -> Option<ReferenceRoot> {
+        match self {
+            Self::Extern(reference) => Some(ReferenceRoot::External(reference)),
+            Self::Function(address) => address.owner.map(ReferenceRoot::FunctionOwner),
+            Self::NullFunction | Self::NullExtern => None,
+        }
     }
 }
 
@@ -327,16 +379,17 @@ pub struct InstanceImports<'a> {
     pub globals: &'a [NumericGlobal],
     /// Unshared linear memory bindings.
     pub memories: &'a [LinearMemory],
-    /// Nullable external-reference table bindings.
-    pub tables: &'a [ExternalTable],
+    /// Nullable reference table bindings.
+    pub tables: &'a [ReferenceTable],
+    /// Host identity of this instance. Required when linking function tables.
+    pub function_owner: Option<NonZeroU32>,
 }
 
 /// An executable instance with globals, linear memories and tables.
 ///
 /// State changes remain visible across invocations, including changes made
-/// before a trap. Function references stay within the instance. External
-/// identities supplied through tables must remain live while reachable from
-/// the instance or an active invocation. Host calls exchange scalar numbers.
+/// before a trap. The host traces references reachable from an instance and
+/// its suspended invocations. Cross-instance calls exchange scalar numbers.
 pub struct Instance<'module, 'bytes> {
     executable: Executable<'module, 'bytes>,
     state: RefCell<State<'bytes>>,
@@ -382,13 +435,15 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
             imports,
             &mut budget,
         )?;
-        let state = RefCell::new(State::new(
+        let (state, initializers) = State::new(
             module.module().declarations(),
             InstanceImports::default(),
             limits,
             &mut budget,
             |bytes, _, _| Ok(Cow::Borrowed(bytes)),
-        )?);
+        )?;
+        initializers.apply(&state, cancellation)?;
+        let state = RefCell::new(state);
         executable.run_start(&state, cancellation, None)?;
         Ok(Self { executable, state })
     }
@@ -479,7 +534,7 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
     }
 
     /// Invoke a numeric function and expose roots in suspended guest frames to
-    /// each host call. See also [`Self::visit_external_references`] for state roots.
+    /// each host call. See also [`Self::visit_reference_roots`] for state roots.
     pub fn invoke_function_with_reference_roots(
         &self,
         function: u32,
@@ -529,13 +584,14 @@ impl Instance<'static, 'static> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, ExecutionError> {
-        let instance = Self::prepare_owned(
+        let (instance, initializers) = Self::prepare_owned(
             module,
             limits,
             cancellation,
             false,
             InstanceImports::default(),
         )?;
+        initializers.apply(&instance.state.borrow(), cancellation)?;
         instance
             .executable
             .run_start(&instance.state, cancellation, None)?;
@@ -557,9 +613,11 @@ impl Instance<'static, 'static> {
         let imports = InstanceImports {
             globals,
             memories,
-            tables: &[],
+            ..Default::default()
         };
-        let instance = Self::prepare_owned(module, limits, cancellation, true, imports)?;
+        let (instance, initializers) =
+            Self::prepare_owned(module, limits, cancellation, true, imports)?;
+        initializers.apply(&instance.state.borrow(), cancellation)?;
         instance.executable.run_start(
             &instance.state,
             cancellation,
@@ -568,15 +626,21 @@ impl Instance<'static, 'static> {
         Ok(instance)
     }
 
-    /// Prepare an owned instance with imports. Before publishing the instance,
-    /// root its imported objects and run [`Self::run_start_with_reference_roots`].
-    pub fn prepare_owned_with_imports(
-        module: ValidatedModule<'_>,
+    /// Prepare an owned instance with imports. Function-table writes can
+    /// retain the instance even if initialization traps. Keep the instance's
+    /// owner and import records reachable before applying the initializers.
+    pub fn prepare_owned_with_imports<'input>(
+        module: ValidatedModule<'input>,
         limits: InstanceLimits,
         cancellation: &CancellationToken,
         imports: InstanceImports<'_>,
-    ) -> Result<Self, ExecutionError> {
-        Self::prepare_owned(module, limits, cancellation, true, imports)
+    ) -> Result<PreparedInstance<'input>, ExecutionError> {
+        let (instance, initializers) =
+            Self::prepare_owned(module, limits, cancellation, true, imports)?;
+        Ok(PreparedInstance {
+            instance: Rc::new(instance),
+            initializers,
+        })
     }
 
     /// Run the start function at most once, with the same root protocol as an
@@ -590,13 +654,13 @@ impl Instance<'static, 'static> {
             .run_start(&self.state, cancellation, Some(Dispatch::Tracing(dispatch)))
     }
 
-    fn prepare_owned(
-        module: ValidatedModule<'_>,
+    fn prepare_owned<'input>(
+        module: ValidatedModule<'input>,
         limits: InstanceLimits,
         cancellation: &CancellationToken,
         allow_imports: bool,
         state_imports: InstanceImports<'_>,
-    ) -> Result<Self, ExecutionError> {
+    ) -> Result<(Self, Initializers<'input>), ExecutionError> {
         let module = module.into_module();
         let declarations = module.declarations;
         let mut budget = Budget {
@@ -626,7 +690,7 @@ impl Instance<'static, 'static> {
             Profile::LocalState,
             &mut budget,
         )?;
-        let state = RefCell::new(State::new(
+        let (state, initializers) = State::new(
             &declarations,
             state_imports,
             limits,
@@ -640,7 +704,8 @@ impl Instance<'static, 'static> {
                 owned.extend_from_slice(bytes);
                 Ok(Cow::Owned(owned))
             },
-        )?);
+        )?;
+        let state = RefCell::new(state);
         let executable = Executable {
             types: Cow::Owned(declarations.types),
             start: Cell::new(declarations.start.map(|entry| entry.value)),
@@ -649,7 +714,27 @@ impl Instance<'static, 'static> {
             exports,
             limits: limits.execution,
         };
-        Ok(Self { executable, state })
+        Ok((Self { executable, state }, initializers))
+    }
+}
+
+/// Prepared code and state with staged element and data writes.
+pub struct PreparedInstance<'input> {
+    instance: Rc<Instance<'static, 'static>>,
+    initializers: Initializers<'input>,
+}
+
+impl PreparedInstance<'_> {
+    /// Retain the instance before any staged writes become visible.
+    pub fn instance(&self) -> Rc<Instance<'static, 'static>> {
+        Rc::clone(&self.instance)
+    }
+
+    /// Apply in segment order. A guest bounds trap leaves the completed
+    /// writes visible to existing importers.
+    pub fn initialize(self, cancellation: &CancellationToken) -> Result<(), ExecutionError> {
+        self.initializers
+            .apply(&self.instance.state.borrow(), cancellation)
     }
 }
 

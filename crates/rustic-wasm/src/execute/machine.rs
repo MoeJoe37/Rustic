@@ -9,7 +9,7 @@ pub(super) fn invoke<'bytes>(
     arguments: &[Value],
     entry_work: usize,
     cancellation: &CancellationToken,
-    dispatch: Option<&mut HostDispatch<'_>>,
+    dispatch: Option<Dispatch<'_, '_>>,
 ) -> Result<Vec<Value>, ExecutionError> {
     let mut machine = Machine {
         instance,
@@ -87,7 +87,7 @@ struct Control {
 struct Machine<'instance, 'module, 'bytes, 'state, 'token, 'dispatch, 'host> {
     instance: &'instance Executable<'module, 'bytes>,
     state: &'state RefCell<State<'bytes>>,
-    dispatch: Option<&'dispatch mut HostDispatch<'host>>,
+    dispatch: Option<Dispatch<'dispatch, 'host>>,
     calls: Vec<Call>,
     controls: Vec<Control>,
     locals: Vec<Slot>,
@@ -468,10 +468,23 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
 
         let called = if let Some(callback) = import.callback {
             callback(&arguments, &mut results, self.budget.cancellation)
-        } else if let Some(dispatch) = self.dispatch.as_mut() {
-            dispatch(index, &arguments, &mut results)
         } else {
-            Err(HostTrap)
+            match self.dispatch.as_mut() {
+                Some(Dispatch::Plain(dispatch)) => dispatch(index, &arguments, &mut results),
+                Some(Dispatch::Tracing(dispatch)) => {
+                    let trace = self.state.borrow().has_external_references;
+                    let mut roots = if trace {
+                        self.budget
+                            .spend(offset, self.locals.len() + self.operands.len())?;
+                        self.locals.iter().chain(&self.operands)
+                    } else {
+                        [].iter().chain(&[])
+                    }
+                    .filter_map(Slot::external_reference);
+                    dispatch(index, &arguments, &mut results, &mut roots)
+                }
+                None => Err(HostTrap),
+            }
         };
         self.budget.spend(offset, 0)?;
         called.map_err(|_| error(offset, Fault::HostTrap))?;

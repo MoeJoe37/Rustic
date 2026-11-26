@@ -265,7 +265,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-198 | Deliberate | Network / CLI | Frame and popup documents are read whole in the broker before their renderer parses them; only top-level documents stream | Open, M12 |
 | TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M10 |
 | TD-200 | Deliberate | WebAssembly | Module compilation runs as bounded promise jobs over buffered input | Open, M9 |
-| TD-208 | Deliberate | WebAssembly | Exported function tables hold references in their owning instance’s index space. Table imports, unrelated function references and module-defined external-reference table exports need store-wide tracing | Open, M9 language and web APIs |
+| TD-208 | Deliberate | WebAssembly | Exported function tables hold references in their owning instance’s index space. Table imports and independently linked function references need store-wide ownership | Open, M9 language and web APIs |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3410,9 +3410,11 @@ pseudo-element tree once the compositor has per-element layers (M11).
 
 [ADR 0089](adr/0089-live-wasm-function-tables.md) exposes module-defined
 function tables with their existing instance-local reference representation.
-The host can write functions defined or imported in that instance. Unrelated
-functions and external JavaScript values need reference identities that guest
-stacks, globals, tables and passive segments can trace across reentrant calls.
+The host can write functions defined or imported in that instance.
+[ADR 0090](adr/0090-live-wasm-external-tables.md) adds local external-reference
+table exports with tracing for guest state and suspended frames. Table imports
+and independently linked function references still need shared ownership
+across instances.
 
 **Pay** with shared store entries and traced reference ownership. Test aliases,
 active-segment writes, indirect signature checks, collection after overwrites,

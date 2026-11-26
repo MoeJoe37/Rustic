@@ -3434,7 +3434,7 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Module table imports, external-reference exports, shared memories,
+Module table imports, shared memories,
 reference-valued host calls and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
@@ -3581,3 +3581,12 @@ boundary and TD-208 tracks cross-instance table sharing.
 Six previously failing `Instance` and `instantiate` subtests now pass. They
 exercise table exports under ordinary and empty names, including both promise
 overloads. The two files now pass 77 of 86 subtests.
+
+Window also exposes module-defined nullable external-reference tables in both
+address widths. JavaScript reads and writes the same entries as guest code.
+Guest initialization uses null, and omitted JavaScript write and grow values
+use undefined. The instance traces native references in guest state. Suspended
+guest locals and operands stay rooted across imported calls, including JS
+callbacks that reenter Wasm. The Window regression covers collection during a
+callback, collection after overwriting an entry, identity, shared mutation,
+bounds and failed growth. [ADR 0090](adr/0090-live-wasm-external-tables.md)

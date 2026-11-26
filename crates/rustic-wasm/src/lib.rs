@@ -19,9 +19,9 @@ pub use binary::{
     scan_module,
 };
 pub use execute::{
-    ExecutionError, ExecutionErrorKind, ExecutionLimits, FunctionImport, HostDispatch, HostTrap,
-    Instance, InstanceLimits, LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES, NumericGlobal,
-    NumericInstance, Value,
+    ExecutionError, ExecutionErrorKind, ExecutionLimits, ExternalReference, FunctionImport,
+    HostDispatch, HostTrap, Instance, InstanceLimits, LinearMemory, MEMORY_PAGE_BYTES,
+    MEMORY32_MAX_PAGES, NumericGlobal, NumericInstance, TracingHostDispatch, Value,
 };
 pub use instructions::{
     BlockType, Immediate, Instruction, InstructionLimits, Opcode, decode_instructions,

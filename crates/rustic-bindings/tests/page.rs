@@ -2187,3 +2187,117 @@ fn wasm_exported_function_tables_share_guest_state_and_preserve_identity() {
     }
     assert_eq!(outcome.unwrap(), Value::TRUE);
 }
+
+#[test]
+fn wasm_exported_external_tables_trace_guest_state_and_suspended_frames() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    let collect = agent
+        .new_native_function(
+            |agent, _, _| {
+                let host = agent.execution_host().expect("page collector");
+                host.collect(agent)?;
+                Ok(Value::UNDEFINED)
+            },
+            "collect",
+            0,
+        )
+        .unwrap();
+    let key = agent.heap.key("collect").unwrap();
+    agent
+        .set(agent.intrinsics.global, key, Value::object(collect), true)
+        .unwrap();
+    let outcome = agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        function rangeError(call) {
+            try { call(); } catch (error) { return error instanceof RangeError; }
+            return false;
+        }
+        function section(kind, bytes) { return [kind, bytes.length, ...bytes]; }
+        function body(locals, instructions) {
+            return [locals.length + instructions.length + 1, ...locals, ...instructions, 11];
+        }
+        function exportOf(name, kind, index) {
+            return [name.length, ...Array.from(name, char => char.charCodeAt(0)), kind, index];
+        }
+        function module(wide) {
+            const c = wide ? 66 : 65;
+            const addr = wide ? 126 : 127;
+            const nullRef = [208,111];
+            const get = i => [c,i,37,0];
+            const clear = i => [c,i,...nullRef,38,0];
+            // During the imported call, one object is held only in the caller's
+            // local, another only on its operand stack.
+            const move = [ ...get(0), 33,0, ...clear(0),
+                c,0, ...get(1), ...clear(1), 16,5, 38,0, 32,0, 36,0 ];
+            const restore = [c,1,35,0,38,0,...nullRef,36,0];
+            return new WebAssembly.Module(Uint8Array.of(
+                0,97,115,109,1,0,0,0,
+                ...section(1, [3,96,0,0, 96,1,addr,1,127, 96,1,addr,1,addr]),
+                ...section(2, [1,1,109,1,102,0,0]),
+                ...section(3, [5,0,0,1,2,0]),
+                ...section(4, [1,111,wide ? 5 : 1,3,6]),
+                ...section(6, [1,111,1,...nullRef,11]),
+                ...section(7, [6, ...exportOf('table',1,0), ...exportOf('alias',1,0),
+                    ...exportOf('move',0,1), ...exportOf('restore',0,2),
+                    ...exportOf('isNull',0,3), ...exportOf('grow',0,4)]),
+                ...section(10, [5, ...body([1,1,111], move), ...body([0], restore),
+                    ...body([0], [32,0,37,0,209]),
+                    ...body([0], [...nullRef,32,0,252,15,0]),
+                    ...body([0], [16,0])])
+            ));
+        }
+        function exercise(wide) {
+            const at = i => wide ? BigInt(i) : i;
+            let live;
+            let calls = 0;
+            live = new WebAssembly.Instance(module(wide), {m:{f() {
+                calls++;
+                assert(live.isNull(at(0)) && live.isNull(at(1)), 'reentrant guest sees cleared entries');
+                collect();
+            }}}).exports;
+            const {table, alias, move, restore, grow, isNull} = live;
+            assert(table === alias && table instanceof WebAssembly.Table, 'external table aliases and brand');
+            assert(table.length === at(3) && isNull(at(0)) && table.get(at(0)) === null, 'guest initializes with null');
+            table.set(at(0), {tag:'local'});
+            table.set(at(1), {tag:'operand'});
+            move();
+            assert(calls === 1 && table.get(at(0)).tag === 'operand', 'suspended operand stays live');
+            assert(table.get(at(1)) === null, 'local is now held only by the Wasm global');
+            restore();
+            assert(table.get(at(1)).tag === 'local', 'external global and suspended local stay live');
+
+            const marker = Symbol('external');
+            table.set(at(0), marker);
+            assert(table.get(at(0)) === marker && !isNull(at(0)), 'symbol identity');
+            assert(table.grow(at(1), 123456789012345678901n) === at(3), 'host grow');
+            assert(table.get(at(3)) === 123456789012345678901n, 'full BigInt value');
+            assert(grow(at(1)) === at(4) && table.get(at(4)) === null, 'guest grow');
+            assert(table.grow(at(1)) === at(5) && table.get(at(5)) === undefined, 'host grow default');
+            table.set(at(2));
+            assert(table.get(at(2)) === undefined && !isNull(at(2)), 'undefined is not null');
+            assert(rangeError(() => table.grow(at(1), marker)) && table.length === at(6), 'failed grow preserves length');
+            const out = wide ? 4294967296n : 0xffffffff;
+            assert(rangeError(() => table.set(out, marker)) && rangeError(() => table.get(out)), 'full-width bounds');
+            return table;
+        }
+        const table = exercise(false);
+        exercise(true);
+        assert(table.get(1).tag === 'local', 'table wrapper retains its instance and references');
+        function forgetEntry() {
+            const weak = new WeakRef(table.get(1));
+            table.set(1, null);
+            return weak;
+        }
+        const weak = forgetEntry();
+        collect();
+        assert(weak.deref() === undefined, 'overwritten references are reclaimable');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}

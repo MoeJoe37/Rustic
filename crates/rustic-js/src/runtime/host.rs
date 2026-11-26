@@ -12,6 +12,9 @@ use super::object::{
 use super::shape::PropertyKey;
 use super::value::{ObjectId, StringId, Value};
 
+/// Visit JS-owned edges without running script or mutating the heap.
+pub type TraceHostState = fn(&dyn Any, &mut dyn FnMut(Value));
+
 /// Account for the entry and spare capacity in the host prototype table.
 pub(crate) const HOST_INTERFACE_BYTES: usize =
     size_of::<((u16, &'static str), ObjectId)>() + size_of::<usize>();
@@ -62,6 +65,20 @@ impl Agent {
         state: T,
         extra_bytes: usize,
     ) -> JsResult<ObjectId> {
+        self.new_traced_host_state(interface, prototype, state, extra_bytes, None)
+    }
+
+    /// Allocate branded native state whose visitor reports its live JS values.
+    /// The visitor runs during marking and must neither reenter the agent nor
+    /// mutate the traced state.
+    pub fn new_traced_host_state<T: Any>(
+        &mut self,
+        interface: &'static str,
+        prototype: ObjectId,
+        state: T,
+        extra_bytes: usize,
+        trace: Option<TraceHostState>,
+    ) -> JsResult<ObjectId> {
         let bytes = size_of::<T>()
             .checked_add(2 * size_of::<usize>())
             .and_then(|bytes| bytes.checked_add(extra_bytes))
@@ -75,6 +92,7 @@ impl Agent {
             interface,
             state: Rc::new(state),
             bytes,
+            trace,
         });
         Ok(self.heap.alloc_object(object)?)
     }

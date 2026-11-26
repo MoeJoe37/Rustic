@@ -10,6 +10,7 @@ use crate::{Declarations, Immediate, ImportType};
 pub(super) struct State<'bytes> {
     pub(super) globals: Vec<GlobalSlot>,
     pub(super) tables: Tables,
+    pub(super) has_external_references: bool,
     pub(super) memories: Vec<LinearMemory>,
     data: Vec<Cow<'bytes, [u8]>>,
 }

@@ -18,9 +18,74 @@ struct Table {
 }
 
 impl Instance<'_, '_> {
+    /// Read the declared type of a module-defined table.
+    pub fn table_type(&self, table: u32) -> Option<TableType> {
+        Some(self.state.borrow().tables.tables.get(table as usize)?.ty)
+    }
+
+    /// Read the current length of a module-defined table.
+    pub fn table_len(&self, table: u32) -> Option<u64> {
+        Some(
+            self.state
+                .borrow()
+                .tables
+                .tables
+                .get(table as usize)?
+                .entries
+                .len() as u64,
+        )
+    }
+
+    /// Read an external table entry. The inner `None` represents null.
+    pub fn external_table_get(&self, table: u32, index: u64) -> Option<Option<ExternalReference>> {
+        let state = self.state.borrow();
+        let table = state.tables.reference_table(table, -17)?;
+        match table.entries.get(usize::try_from(index).ok()?)? {
+            Reference::Extern(reference) => Some(Some(*reference)),
+            Reference::NullExtern => Some(None),
+            Reference::Function(_) => unreachable!("validated external table entry"),
+        }
+    }
+
+    /// Write a host identity or null to a nullable external table.
+    /// The embedder must keep the identity alive whenever it is reachable.
+    pub fn external_table_set(
+        &self,
+        table: u32,
+        index: u64,
+        reference: Option<ExternalReference>,
+    ) -> bool {
+        let mut state = self.state.borrow_mut();
+        let value = reference.map_or(Reference::NullExtern, Reference::Extern);
+        if state.tables.reference_table(table, -17).is_none()
+            || state.tables.set(table, index, value, 0).is_err()
+        {
+            return false;
+        }
+        state.has_external_references |= reference.is_some();
+        true
+    }
+
+    /// Visit the external identities reachable from persistent guest state.
+    /// The visitor must not reenter the instance.
+    pub fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
+        let state = self.state.borrow();
+        if !state.has_external_references {
+            return;
+        }
+        state.tables.visit_external_references(visitor);
+        for reference in state
+            .globals
+            .iter()
+            .filter_map(|slot| slot.value().external_reference())
+        {
+            visitor(reference);
+        }
+    }
+
     /// Read the declared limits of a nullable, module-defined function table.
     pub fn function_table_limits(&self, table: u32) -> Option<Limits> {
-        Some(self.state.borrow().tables.function_table(table)?.ty.limits)
+        Some(self.state.borrow().tables.reference_table(table, -16)?.ty.limits)
     }
 
     /// Read the current length of a nullable function table.
@@ -29,7 +94,7 @@ impl Instance<'_, '_> {
             self.state
                 .borrow()
                 .tables
-                .function_table(table)?
+                .reference_table(table, -16)?
                 .entries
                 .len() as u64,
         )
@@ -38,7 +103,7 @@ impl Instance<'_, '_> {
     /// Read a function table entry. The inner `None` represents a null reference.
     pub fn function_table_get(&self, table: u32, index: u64) -> Option<Option<u32>> {
         let state = self.state.borrow();
-        let table = state.tables.function_table(table)?;
+        let table = state.tables.reference_table(table, -16)?;
         let index = usize::try_from(index).ok()?;
         let Reference::Function(function) = *table.entries.get(index)? else {
             unreachable!("validated function table entry")
@@ -53,7 +118,7 @@ impl Instance<'_, '_> {
             return false;
         }
         let mut state = self.state.borrow_mut();
-        state.tables.function_table(table).is_some()
+        state.tables.reference_table(table, -16).is_some()
             && state
                 .tables
                 .set(table, index, Reference::Function(function), 0)
@@ -63,8 +128,14 @@ impl Instance<'_, '_> {
     /// Return the work growth would require, if admitted by the table and
     /// instance limits. The host can charge that work before entering the store.
     pub fn function_table_growth_work(&self, table: u32, count: u64) -> Option<usize> {
+        self.function_table_limits(table)?;
+        self.table_growth_work(table, count)
+    }
+
+    /// Preview the admitted work for growing a module-defined table.
+    pub fn table_growth_work(&self, table: u32, count: u64) -> Option<usize> {
         let state = self.state.borrow();
-        state.tables.function_table(table)?;
+        state.tables.tables.get(table as usize)?;
         state.tables.growth(table, count).map(|(_, _, work)| work)
     }
 
@@ -80,17 +151,50 @@ impl Instance<'_, '_> {
         if function.is_some_and(|index| self.function_type_at(index).is_none()) {
             return Ok(None);
         }
+        self.grow_host_table(
+            table,
+            count,
+            -16,
+            Reference::Function(function),
+            cancellation,
+        )
+    }
+
+    /// Grow a nullable external table and fill the new entries with the host
+    /// identity or null. The embedder must keep reachable identities alive.
+    pub fn grow_external_table(
+        &self,
+        table: u32,
+        count: u64,
+        reference: Option<ExternalReference>,
+        cancellation: &CancellationToken,
+    ) -> Result<Option<u64>, ExecutionError> {
+        let value = reference.map_or(Reference::NullExtern, Reference::Extern);
+        self.grow_host_table(table, count, -17, value, cancellation)
+    }
+
+    fn grow_host_table(
+        &self,
+        table: u32,
+        count: u64,
+        heap_type: i64,
+        value: Reference,
+        cancellation: &CancellationToken,
+    ) -> Result<Option<u64>, ExecutionError> {
         let mut state = self.state.borrow_mut();
-        if state.tables.function_table(table).is_none() {
+        if state.tables.reference_table(table, heap_type).is_none() {
             return Ok(None);
         }
         let mut budget = Budget {
             remaining: self.executable.limits.invocation_work,
             cancellation,
         };
-        state
+        let previous = state
             .tables
-            .grow_entries(table, count, Reference::Function(function), 0, &mut budget)
+            .grow_entries(table, count, value, 0, &mut budget)?;
+        state.has_external_references |=
+            count != 0 && previous.is_some() && matches!(value, Reference::Extern(_));
+        Ok(previous)
     }
 }
 
@@ -226,16 +330,29 @@ impl Tables {
             .index_value(table.entries.len() as u64)
     }
 
-    fn function_table(&self, index: u32) -> Option<&Table> {
+    fn reference_table(&self, index: u32, heap_type: i64) -> Option<&Table> {
         let table = self.tables.get(index as usize)?;
-        matches!(
-            table.ty.element_type,
-            ValueType::Ref {
+        (table.ty.element_type
+            == ValueType::Ref {
                 nullable: true,
-                heap_type: -16
-            }
-        )
+                heap_type,
+            })
         .then_some(table)
+    }
+
+    fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
+        let tables = self
+            .tables
+            .iter()
+            .filter(|table| {
+                matches!(table.ty.element_type, ValueType::Ref { heap_type: -17, .. })
+            })
+            .map(|table| &table.entries);
+        for entry in tables.chain(&self.elements).flatten() {
+            if let Reference::Extern(reference) = *entry {
+                visitor(reference);
+            }
+        }
     }
 
     fn growth(&self, table: u32, count: u64) -> Option<(usize, usize, usize)> {

@@ -1,5 +1,6 @@
 use rustic_wasm::{
-    ExecutionError, ExecutionErrorKind, HostDispatch, HostTrap, LinearMemory, NumericGlobal,
+    ExecutionError, ExecutionErrorKind, ExternalReference, HostTrap, LinearMemory, NumericGlobal,
+    TracingHostDispatch,
 };
 
 use super::super::events::PrivateArray;
@@ -170,11 +171,14 @@ pub(super) fn with_dispatch<T>(
     agent: &mut Agent,
     bindings: PrivateArray,
     linking: bool,
-    execute: impl FnOnce(&mut HostDispatch<'_>) -> Result<T, ExecutionError>,
+    execute: impl FnOnce(&mut TracingHostDispatch<'_>) -> Result<T, ExecutionError>,
 ) -> JsResult<T> {
     let mut failure = None;
-    let result = execute(&mut |index, arguments, results| {
-        dispatch(agent, bindings, index, arguments, results).map_err(|error| {
+    let result = execute(&mut |index, arguments, results, roots| {
+        with_reference_roots(agent, roots, |agent| {
+            dispatch(agent, bindings, index, arguments, results)
+        })
+        .map_err(|error| {
             failure = Some(error);
             HostTrap
         })
@@ -197,7 +201,32 @@ pub(super) fn invoke(
     let bindings = PrivateArray::from_value(record.get(agent, 0)?).expect("function bindings");
     let token = agent.cancellation().unwrap_or_default();
     with_dispatch(agent, bindings, false, |dispatch| {
-        runtime.invoke_function_with_host(function, arguments, &token, dispatch)
+        runtime.invoke_function_with_reference_roots(function, arguments, &token, dispatch)
+    })
+}
+
+fn with_reference_roots<T>(
+    agent: &mut Agent,
+    roots: &mut dyn Iterator<Item = ExternalReference>,
+    operation: impl FnOnce(&mut Agent) -> JsResult<T>,
+) -> JsResult<T> {
+    let Some(first) = roots.next() else {
+        return operation(agent);
+    };
+    // Private array writes do not enter script. Install the roots before
+    // making the host call, which may collect or reenter Wasm.
+    let values = PrivateArray::new(agent, &[])?;
+    with_root(agent, values.value(), |agent| {
+        for (index, reference) in std::iter::once(first).chain(roots).enumerate() {
+            agent.check_native_work()?;
+            let index = u32::try_from(index).map_err(|_| OutOfMemory)?;
+            values.set(
+                agent,
+                index,
+                Value::from_host_identity(reference.identity()),
+            )?;
+        }
+        operation(agent)
     })
 }
 

@@ -339,11 +339,12 @@ pub(crate) enum Internal {
     },
     /// A host object's embedder data.
     Host(u64),
-    /// Native host state without JavaScript GC edges.
+    /// Native host state with an optional JavaScript edge visitor.
     HostState {
         interface: &'static str,
         state: std::rc::Rc<dyn std::any::Any>,
         bytes: usize,
+        trace: Option<super::host::TraceHostState>,
     },
     /// A read-only Web IDL indexed property getter and its source.
     HostIndexed(super::host_indexed::IndexedHost),

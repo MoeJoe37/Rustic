@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{any::Any, collections::HashMap};
 
 use rustic_wasm::{ExecutionError, ExecutionErrorKind, Instance, InstanceLimits};
 
@@ -10,6 +10,13 @@ pub(super) const LINK_ERROR: &str = "WebAssembly.LinkError";
 pub(super) const RUNTIME_ERROR: &str = "WebAssembly.RuntimeError";
 
 pub(super) type Runtime = Instance<'static, 'static>;
+
+fn trace_runtime(state: &dyn Any, mark: &mut dyn FnMut(Value)) {
+    let runtime = state.downcast_ref::<Runtime>().expect("Wasm instance state");
+    runtime.visit_external_references(&mut |reference| {
+        mark(Value::from_host_identity(reference.identity()));
+    });
+}
 
 pub(super) fn install(agent: &mut Agent, namespace: ObjectId) -> JsResult<()> {
     let proto = agent.new_object_with(Some(agent.intrinsics.object_prototype))?;
@@ -181,7 +188,7 @@ fn instantiate_module(
                                 table.value.ty.element_type,
                                 ValueType::Ref {
                                     nullable: true,
-                                    heap_type: -16
+                                    heap_type: -16 | -17
                                 }
                             )
                         })
@@ -212,7 +219,7 @@ fn instantiate_module(
         // Reserve the instance's possible guest growth against the JS heap.
         let allocation = compilation_scratch(module.bytes.len())
             + limits.memory_bytes
-            + limits.table_elements * 2 * size_of::<usize>();
+            + limits.table_storage_bytes();
         let runtime = agent.with_host_memory(allocation, |agent| {
             host::with_dispatch(agent, bindings.functions, true, |dispatch| {
                 Instance::instantiate_owned_with_host(
@@ -221,13 +228,22 @@ fn instantiate_module(
                     &token,
                     &state.globals,
                     &state.memories,
-                    dispatch,
+                    // Start runs before any module table can hold a host identity.
+                    &mut |index, arguments, results| {
+                        dispatch(index, arguments, results, &mut std::iter::empty())
+                    },
                 )
             })
         })?;
         Ok((runtime, allocation))
     })?;
-    let object = Value::object(agent.new_host_state(INSTANCE, proto, runtime, allocation)?);
+    let object = Value::object(agent.new_traced_host_state(
+        INSTANCE,
+        proto,
+        runtime,
+        allocation,
+        Some(trace_runtime),
+    )?);
     with_root(agent, object, |agent| {
         let functions = PrivateArray::new(agent, &[])?;
         let record = PrivateArray::new(
@@ -298,10 +314,8 @@ fn populate_exports(
                         }
                     }
                     ExportIndex::Table(index) => {
-                        let limits = runtime
-                            .function_table_limits(index)
-                            .expect("admitted function table");
-                        table::export(agent, instance, index, limits.address_type)?
+                        let ty = runtime.table_type(index).expect("admitted reference table");
+                        table::export(agent, instance, index, ty)?
                     }
                     _ => unreachable!("admitted exports checked before instantiation"),
                 };

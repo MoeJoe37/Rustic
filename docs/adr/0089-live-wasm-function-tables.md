@@ -32,9 +32,10 @@ preserves the existing guest bounds and growth behavior at both entry points.
 
 ## Consequences and revisit trigger
 
-Local references require no native handles into the JS heap. TD-208 tracks
-the store and tracing design needed for table imports, unrelated function
-instances and module-defined external-reference table exports.
+Local function references require no native handles into the JS heap.
+[ADR 0090](0090-live-wasm-external-tables.md) adds tracing for module-defined
+external-reference table exports. TD-208 tracks shared ownership for table
+imports and unrelated function instances.
 
 ## Validation
 

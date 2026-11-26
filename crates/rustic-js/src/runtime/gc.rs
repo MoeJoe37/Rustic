@@ -502,7 +502,11 @@ impl Marker<'_> {
                         self.value(Value::object(owner));
                     }
                 }
-                Some(Internal::HostState { .. }) => {}
+                Some(Internal::HostState { state, trace, .. }) => {
+                    if let Some(trace) = trace {
+                        trace(state.as_ref(), &mut |value| self.value(value));
+                    }
+                }
                 // The target is weak: cleared after marking if nothing
                 // else reaches it.
                 Some(Internal::WeakRef(_)) => self.weak_refs.push(index),

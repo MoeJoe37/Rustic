@@ -1,6 +1,7 @@
-//! Standalone Window tables and live wrappers over module function tables.
+//! Standalone Window tables and live wrappers over module tables.
 
 use rustic_js::runtime::ErrorKind;
+use rustic_wasm::{ExternalReference, TableType};
 
 use super::super::events::PrivateArray;
 use super::instance::{self, Runtime};
@@ -16,7 +17,7 @@ struct Table {
 
 enum Storage {
     Standalone { functions: bool, capacity: u32 },
-    Module { index: u32 },
+    Module { index: u32, functions: bool },
 }
 
 enum Entries {
@@ -29,6 +30,7 @@ enum Entries {
         owner: Value,
         runtime: Rc<Runtime>,
         index: u32,
+        functions: bool,
     },
 }
 
@@ -105,12 +107,15 @@ pub(super) fn export(
     agent: &mut Agent,
     owner: Value,
     index: u32,
-    address: AddressType,
+    ty: TableType,
 ) -> JsResult<Value> {
     let proto = prototype(agent, TABLE)?;
     let state = Table {
-        address,
-        storage: Storage::Module { index },
+        address: ty.limits.address_type,
+        storage: Storage::Module {
+            index,
+            functions: matches!(ty.element_type, ValueType::Ref { heap_type: -16, .. }),
+        },
     };
     let wrapper = Value::object(agent.new_host_state(TABLE, proto, state, 0)?);
     with_root(agent, wrapper, |agent| {
@@ -140,10 +145,11 @@ fn state(agent: &mut Agent, this: Value) -> JsResult<(Rc<Table>, Entries)> {
             functions,
             capacity,
         },
-        Storage::Module { index } => Entries::Module {
+        Storage::Module { index, functions } => Entries::Module {
             owner: backing,
             runtime: instance::find(agent, backing).expect("exported table owner"),
             index,
+            functions,
         },
     };
     Ok((table, entries))
@@ -226,9 +232,7 @@ fn length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let (table, entries) = state(agent, this)?;
     let length = match entries {
         Entries::Standalone { values, .. } => u64::from(values.len(agent)?),
-        Entries::Module { runtime, index, .. } => runtime
-            .function_table_len(index)
-            .expect("exported function table"),
+        Entries::Module { runtime, index, .. } => runtime.table_len(index).expect("exported table"),
     };
     size_value(agent, length, table.address)
 }
@@ -245,14 +249,23 @@ fn get(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             owner,
             runtime,
             index: table,
-        } => match runtime.function_table_get(table, index) {
-            Some(Some(function)) => instance::function(agent, owner, &runtime, function),
-            Some(None) => Ok(Value::NULL),
-            None => Err(agent.throw(
-                ErrorKind::RangeError,
-                "WebAssembly table index out of bounds",
-            )),
-        },
+            functions,
+        } => {
+            if functions {
+                match runtime.function_table_get(table, index) {
+                    Some(Some(function)) => {
+                        return instance::function(agent, owner, &runtime, function);
+                    }
+                    Some(None) => return Ok(Value::NULL),
+                    None => {}
+                }
+            } else if let Some(reference) = runtime.external_table_get(table, index) {
+                return Ok(reference.map_or(Value::NULL, |reference| {
+                    Value::from_host_identity(reference.identity())
+                }));
+            }
+            Err(agent.throw(ErrorKind::RangeError, "WebAssembly table index out of bounds"))
+        }
     }
 }
 
@@ -272,9 +285,15 @@ fn set(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             owner,
             runtime,
             index: table,
+            functions,
         } => {
-            let function = local_function(agent, owner, value)?;
-            if !runtime.function_table_set(table, index, function) {
+            let updated = if functions {
+                let function = local_function(agent, owner, value)?;
+                runtime.function_table_set(table, index, function)
+            } else {
+                runtime.external_table_set(table, index, external_reference(value))
+            };
+            if !updated {
                 return Err(agent.throw(
                     ErrorKind::RangeError,
                     "WebAssembly table index out of bounds",
@@ -309,24 +328,35 @@ fn grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             owner,
             runtime,
             index,
+            functions,
         } => {
-            let function = local_function(agent, owner, value)?;
-            let Some(work) = runtime.function_table_growth_work(index, count) else {
+            let function = if functions {
+                local_function(agent, owner, value)?
+            } else {
+                None
+            };
+            let Some(work) = runtime.table_growth_work(index, count) else {
                 return Err(agent.throw(ErrorKind::RangeError, "cannot grow WebAssembly table"));
             };
             agent.spend_native_work(work as u64)?;
-            let old = runtime
-                .function_table_len(index)
-                .expect("exported function table");
+            let old = runtime.table_len(index).expect("exported table");
             let result = size_value(agent, old, table.address)?;
             let token = agent.cancellation().unwrap_or_default();
-            let previous = runtime
-                .grow_function_table(index, count, function, &token)
-                .map_err(|error| instance::execution_error(agent, error, false))?;
+            let previous = if functions {
+                runtime.grow_function_table(index, count, function, &token)
+            } else {
+                runtime.grow_external_table(index, count, external_reference(value), &token)
+            }
+            .map_err(|error| instance::execution_error(agent, error, false))?;
             if previous.is_none() {
                 return Err(agent.throw(ErrorKind::RangeError, "cannot grow WebAssembly table"));
             }
             Ok(result)
         }
     }
+}
+
+fn external_reference(value: Option<Value>) -> Option<ExternalReference> {
+    let value = value.unwrap_or(Value::UNDEFINED);
+    (value != Value::NULL).then_some(ExternalReference::new(value.host_identity()))
 }

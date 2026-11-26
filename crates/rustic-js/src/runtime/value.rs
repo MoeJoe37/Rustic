@@ -122,6 +122,17 @@ impl Value {
     /// `NaN`.
     pub const NAN: Value = Value(CANONICAL_NAN);
 
+    /// Encode this value as an opaque identity for a native store.
+    pub const fn host_identity(self) -> u64 {
+        self.0
+    }
+
+    /// Decode a native identity previously encoded by [`Self::host_identity`].
+    /// Heap handles must belong to the same live heap and be traced while held.
+    pub const fn from_host_identity(identity: u64) -> Self {
+        Self(identity)
+    }
+
     /// A Number; every NaN becomes the canonical NaN.
     #[inline]
     pub fn number(n: f64) -> Value {

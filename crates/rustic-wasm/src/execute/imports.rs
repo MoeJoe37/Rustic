@@ -12,6 +12,21 @@ type Callback<'host> = dyn Fn(&[Value], &mut [Value], &CancellationToken) -> Res
 pub type HostDispatch<'host> =
     dyn FnMut(usize, &[Value], &mut [Value]) -> Result<(), HostTrap> + 'host;
 
+/// A numeric host dispatcher with the external identities in suspended frames.
+/// The identities must be kept alive for the duration of the callback.
+pub type TracingHostDispatch<'host> = dyn FnMut(
+        usize,
+        &[Value],
+        &mut [Value],
+        &mut dyn Iterator<Item = ExternalReference>,
+    ) -> Result<(), HostTrap>
+    + 'host;
+
+pub(super) enum Dispatch<'call, 'host> {
+    Plain(&'call mut HostDispatch<'host>),
+    Tracing(&'call mut TracingHostDispatch<'host>),
+}
+
 /// A trap reported by an imported host function.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct HostTrap;

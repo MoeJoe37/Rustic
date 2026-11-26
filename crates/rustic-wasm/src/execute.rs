@@ -15,8 +15,8 @@ mod numeric;
 mod state;
 mod table;
 
-use imports::BoundFunction;
-pub use imports::{FunctionImport, HostDispatch, HostTrap};
+use imports::{BoundFunction, Dispatch};
+pub use imports::{FunctionImport, HostDispatch, HostTrap, TracingHostDispatch};
 pub use memory::{LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES};
 pub use state::NumericGlobal;
 use state::State;
@@ -87,6 +87,13 @@ impl Slot {
         }
     }
 
+    fn external_reference(&self) -> Option<ExternalReference> {
+        match *self {
+            Self::Ref(Reference::Extern(reference)) => Some(reference),
+            _ => None,
+        }
+    }
+
     fn i32(self) -> i32 {
         let Value::I32(value) = self.number() else {
             unreachable!("validated i32 operand");
@@ -103,9 +110,27 @@ impl Slot {
     }
 }
 
+/// An opaque identity supplied by the embedder and never inspected by Wasm.
+/// The embedder is responsible for tracing the values these identities name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExternalReference(u64);
+
+impl ExternalReference {
+    /// Wrap an embedder-defined identity.
+    pub const fn new(identity: u64) -> Self {
+        Self(identity)
+    }
+
+    /// Recover the embedder-defined identity.
+    pub const fn identity(self) -> u64 {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Reference {
     Function(Option<u32>),
+    Extern(ExternalReference),
     NullExtern,
 }
 
@@ -272,6 +297,13 @@ pub struct InstanceLimits {
     pub table_elements: usize,
 }
 
+impl InstanceLimits {
+    /// Entry storage for the maximum combined table and passive segment length.
+    pub const fn table_storage_bytes(&self) -> usize {
+        self.table_elements.saturating_mul(size_of::<Reference>())
+    }
+}
+
 impl Default for InstanceLimits {
     fn default() -> Self {
         Self {
@@ -285,9 +317,9 @@ impl Default for InstanceLimits {
 /// An executable instance with globals, linear memories and tables.
 ///
 /// State changes remain visible across invocations, including changes made
-/// before a trap. Function references stay within the instance. An external
-/// reference can hold null until the host bridge supplies external identities.
-/// Host calls through [`Self::invoke`] exchange scalar numbers.
+/// before a trap. Function references stay within the instance. External
+/// identities supplied through tables must remain live while reachable from
+/// the instance or an active invocation. Host calls exchange scalar numbers.
 pub struct Instance<'module, 'bytes> {
     executable: Executable<'module, 'bytes>,
     state: RefCell<State<'bytes>>,
@@ -426,6 +458,38 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         arguments: &[Value],
         cancellation: &CancellationToken,
         dispatch: &mut HostDispatch<'_>,
+    ) -> Result<Vec<Value>, ExecutionError> {
+        self.invoke_dispatched(
+            function,
+            arguments,
+            cancellation,
+            Dispatch::Plain(dispatch),
+        )
+    }
+
+    /// Invoke a numeric function and expose roots in suspended guest frames to
+    /// each host call. See also [`Self::visit_external_references`] for state roots.
+    pub fn invoke_function_with_reference_roots(
+        &self,
+        function: u32,
+        arguments: &[Value],
+        cancellation: &CancellationToken,
+        dispatch: &mut TracingHostDispatch<'_>,
+    ) -> Result<Vec<Value>, ExecutionError> {
+        self.invoke_dispatched(
+            function,
+            arguments,
+            cancellation,
+            Dispatch::Tracing(dispatch),
+        )
+    }
+
+    fn invoke_dispatched(
+        &self,
+        function: u32,
+        arguments: &[Value],
+        cancellation: &CancellationToken,
+        dispatch: Dispatch<'_, '_>,
     ) -> Result<Vec<Value>, ExecutionError> {
         if self.function_type_at(function).is_none() {
             return Err(error(0, Fault::UnknownExport));
@@ -603,7 +667,15 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         dispatch: Option<&mut HostDispatch<'_>>,
     ) -> Result<(), ExecutionError> {
         if let Some(start) = self.start {
-            machine::invoke(self, state, start as usize, &[], 0, cancellation, dispatch)?;
+            machine::invoke(
+                self,
+                state,
+                start as usize,
+                &[],
+                0,
+                cancellation,
+                dispatch.map(Dispatch::Plain),
+            )?;
         }
         Ok(())
     }

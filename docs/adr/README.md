@@ -99,6 +99,7 @@ and verification, follow the [ledger](../IMPLEMENTATION.md) and
 | [0087](0087-wasm-resizable-buffers.md) | Resizable unshared Wasm memory and detachable buffer modes | Accepted for M9 |
 | [0088](0088-window-wasm-tables.md) | Standalone Window Wasm tables and JavaScript reference tracing | Accepted for M9 |
 | [0089](0089-live-wasm-function-tables.md) | Live module-defined Wasm function table exports and wrapper identity | Accepted for M9 |
+| [0090](0090-live-wasm-external-tables.md) | Live module-defined Wasm external-reference table exports and tracing | Accepted for M9 |
 
 ## Records by area
 

@@ -39,10 +39,9 @@ referencing them. Visiting current edges allows normal cyclic collection.
 
 ## Consequences and revisit trigger
 
-Each instance retains its own module-defined tables. TD-208 tracks table
-imports and cross-instance reference ownership. Revisit start-time rooting
-when linked tables or reference-valued host parameters can supply external
-identities during instantiation.
+[ADR 0091](0091-wasm-external-table-imports.md) extends this design to
+external-reference imports and roots start-time state. TD-208 tracks
+cross-instance function identity and function-table imports.
 
 ## Validation
 

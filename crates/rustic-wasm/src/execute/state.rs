@@ -10,7 +10,7 @@ use crate::{Declarations, Immediate, ImportType};
 pub(super) struct State<'bytes> {
     pub(super) globals: Vec<GlobalSlot>,
     pub(super) tables: Tables,
-    pub(super) has_external_references: bool,
+    pub(super) has_external_references: Cell<bool>,
     pub(super) memories: Vec<LinearMemory>,
     data: Vec<Cow<'bytes, [u8]>>,
 }
@@ -121,8 +121,7 @@ pub(super) struct Transfer {
 impl<'bytes> State<'bytes> {
     pub(super) fn new<'input>(
         declarations: &Declarations<'input>,
-        mut imports: &[NumericGlobal],
-        mut imported_memories: &[LinearMemory],
+        imports: InstanceImports<'_>,
         limits: InstanceLimits,
         budget: &mut Budget<'_>,
         mut retain_data: impl FnMut(
@@ -132,12 +131,17 @@ impl<'bytes> State<'bytes> {
         ) -> Result<Cow<'bytes, [u8]>, ExecutionError>,
     ) -> Result<Self, ExecutionError> {
         let mut state = Self::default();
+        let InstanceImports {
+            mut globals,
+            memories: mut imported_memories,
+            tables,
+        } = imports;
         for entry in &declarations.imports {
             let ImportType::Global(ty) = entry.value.ty else {
                 continue;
             };
             budget.spend(entry.offset, 1)?;
-            let Some((global, remaining)) = imports.split_first() else {
+            let Some((global, remaining)) = globals.split_first() else {
                 return Err(error(entry.offset, Fault::MissingImport));
             };
             if ty != global.ty() {
@@ -148,9 +152,9 @@ impl<'bytes> State<'bytes> {
                 GlobalSlot::Shared(global.clone()),
                 entry.offset,
             )?;
-            imports = remaining;
+            globals = remaining;
         }
-        if !imports.is_empty() {
+        if !globals.is_empty() {
             return Err(error(0, Fault::ImportTypeMismatch));
         }
         for entry in &declarations.globals {
@@ -170,7 +174,6 @@ impl<'bytes> State<'bytes> {
                 entry.offset,
             )?;
         }
-        state.tables = Tables::new(declarations, &state.globals, limits, budget)?;
         for entry in &declarations.imports {
             let ImportType::Memory(ty) = entry.value.ty else {
                 continue;
@@ -193,9 +196,18 @@ impl<'bytes> State<'bytes> {
             let memory = LinearMemory::local(entry.value, &pool, entry.offset, budget)?;
             append(&mut state.memories, memory, entry.offset)?;
         }
+        let (allocated_tables, active_elements) =
+            Tables::new(declarations, &state.globals, tables, limits, budget)?;
+        state.tables = allocated_tables;
+        state.has_external_references.set(!tables.is_empty());
         let mut active_segments = Vec::new();
         let mut segment_trap = None;
-        for entry in &declarations.data {
+        // A trapping element segment stops instantiation before data writes.
+        for entry in declarations
+            .data
+            .iter()
+            .filter(|_| active_elements.trap.is_none())
+        {
             budget.spend(entry.offset, 1)?;
             let bytes = entry.value.bytes;
             let passive = if let Some(active) = &entry.value.active {
@@ -235,6 +247,7 @@ impl<'bytes> State<'bytes> {
         // Finish fallible preparation before copying the checked prefix.
         // A guest bounds trap preserves earlier segment writes.
         budget.spend(0, 0)?;
+        active_elements.apply(&state.tables)?;
         for (target, range, bytes) in active_segments {
             state.memories[target as usize].write(|memory| memory[range].copy_from_slice(bytes));
         }

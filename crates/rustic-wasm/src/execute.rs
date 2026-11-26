@@ -1,4 +1,9 @@
-use std::{borrow::Cow, cell::RefCell, collections::HashMap, fmt};
+use std::{
+    borrow::Cow,
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    fmt,
+};
 
 use rustic_base::CancellationToken;
 
@@ -20,6 +25,7 @@ pub use imports::{FunctionImport, HostDispatch, HostTrap, TracingHostDispatch};
 pub use memory::{LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES};
 pub use state::NumericGlobal;
 use state::State;
+pub use table::ExternalTable;
 
 /// A WebAssembly number crossing the interpreter boundary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -314,6 +320,17 @@ impl Default for InstanceLimits {
     }
 }
 
+/// Imports in the separate index spaces of an owned instance.
+#[derive(Clone, Copy, Default)]
+pub struct InstanceImports<'a> {
+    /// Numeric global bindings.
+    pub globals: &'a [NumericGlobal],
+    /// Unshared linear memory bindings.
+    pub memories: &'a [LinearMemory],
+    /// Nullable external-reference table bindings.
+    pub tables: &'a [ExternalTable],
+}
+
 /// An executable instance with globals, linear memories and tables.
 ///
 /// State changes remain visible across invocations, including changes made
@@ -367,8 +384,7 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         )?;
         let state = RefCell::new(State::new(
             module.module().declarations(),
-            &[],
-            &[],
+            InstanceImports::default(),
             limits,
             &mut budget,
             |bytes, _, _| Ok(Cow::Borrowed(bytes)),
@@ -513,7 +529,13 @@ impl Instance<'static, 'static> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
     ) -> Result<Self, ExecutionError> {
-        let instance = Self::prepare_owned(module, limits, cancellation, false, &[], &[])?;
+        let instance = Self::prepare_owned(
+            module,
+            limits,
+            cancellation,
+            false,
+            InstanceImports::default(),
+        )?;
         instance
             .executable
             .run_start(&instance.state, cancellation, None)?;
@@ -532,11 +554,40 @@ impl Instance<'static, 'static> {
         memories: &[LinearMemory],
         dispatch: &mut HostDispatch<'_>,
     ) -> Result<Self, ExecutionError> {
-        let instance = Self::prepare_owned(module, limits, cancellation, true, globals, memories)?;
-        instance
-            .executable
-            .run_start(&instance.state, cancellation, Some(dispatch))?;
+        let imports = InstanceImports {
+            globals,
+            memories,
+            tables: &[],
+        };
+        let instance = Self::prepare_owned(module, limits, cancellation, true, imports)?;
+        instance.executable.run_start(
+            &instance.state,
+            cancellation,
+            Some(Dispatch::Plain(dispatch)),
+        )?;
         Ok(instance)
+    }
+
+    /// Prepare an owned instance with imports. Before publishing the instance,
+    /// root its imported objects and run [`Self::run_start_with_reference_roots`].
+    pub fn prepare_owned_with_imports(
+        module: ValidatedModule<'_>,
+        limits: InstanceLimits,
+        cancellation: &CancellationToken,
+        imports: InstanceImports<'_>,
+    ) -> Result<Self, ExecutionError> {
+        Self::prepare_owned(module, limits, cancellation, true, imports)
+    }
+
+    /// Run the start function at most once, with the same root protocol as an
+    /// ordinary export invocation. The embedder keeps persistent state live.
+    pub fn run_start_with_reference_roots(
+        &self,
+        cancellation: &CancellationToken,
+        dispatch: &mut TracingHostDispatch<'_>,
+    ) -> Result<(), ExecutionError> {
+        self.executable
+            .run_start(&self.state, cancellation, Some(Dispatch::Tracing(dispatch)))
     }
 
     fn prepare_owned(
@@ -544,8 +595,7 @@ impl Instance<'static, 'static> {
         limits: InstanceLimits,
         cancellation: &CancellationToken,
         allow_imports: bool,
-        globals: &[NumericGlobal],
-        memories: &[LinearMemory],
+        state_imports: InstanceImports<'_>,
     ) -> Result<Self, ExecutionError> {
         let module = module.into_module();
         let declarations = module.declarations;
@@ -578,8 +628,7 @@ impl Instance<'static, 'static> {
         )?;
         let state = RefCell::new(State::new(
             &declarations,
-            globals,
-            memories,
+            state_imports,
             limits,
             &mut budget,
             |bytes, offset, budget| {
@@ -594,7 +643,7 @@ impl Instance<'static, 'static> {
         )?);
         let executable = Executable {
             types: Cow::Owned(declarations.types),
-            start: declarations.start.map(|entry| entry.value),
+            start: Cell::new(declarations.start.map(|entry| entry.value)),
             imports,
             functions,
             exports,
@@ -612,7 +661,7 @@ enum Profile {
 
 struct Executable<'module, 'bytes> {
     types: Cow<'module, [Declaration<FunctionType>]>,
-    start: Option<u32>,
+    start: Cell<Option<u32>>,
     imports: Vec<BoundFunction<'module>>,
     functions: Vec<PreparedFunction<'module>>,
     exports: HashMap<Cow<'bytes, str>, usize>,
@@ -647,7 +696,7 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         })?;
         Ok(Self {
             types: Cow::Borrowed(&declarations.types),
-            start: declarations.start.as_ref().map(|entry| entry.value),
+            start: Cell::new(declarations.start.as_ref().map(|entry| entry.value)),
             imports,
             functions,
             exports,
@@ -659,18 +708,10 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         &self,
         state: &RefCell<State<'bytes>>,
         cancellation: &CancellationToken,
-        dispatch: Option<&mut HostDispatch<'_>>,
+        dispatch: Option<Dispatch<'_, '_>>,
     ) -> Result<(), ExecutionError> {
-        if let Some(start) = self.start {
-            machine::invoke(
-                self,
-                state,
-                start as usize,
-                &[],
-                0,
-                cancellation,
-                dispatch.map(Dispatch::Plain),
-            )?;
+        if let Some(start) = self.start.take() {
+            machine::invoke(self, state, start as usize, &[], 0, cancellation, dispatch)?;
         }
         Ok(())
     }

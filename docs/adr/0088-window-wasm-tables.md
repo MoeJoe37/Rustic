@@ -34,8 +34,9 @@ the page's existing ephemeron map.
 Standalone tables share the normal heap budget. [ADR 0089](0089-live-wasm-function-tables.md)
 adds live module-defined function table exports, and
 [ADR 0090](0090-live-wasm-external-tables.md) adds external-reference table
-exports. Table imports and independently linked function references still need
-a shared representation.
+exports. [ADR 0091](0091-wasm-external-table-imports.md) makes standalone
+external-reference tables linkable. Function tables still need a shared
+reference identity.
 
 ## Validation
 

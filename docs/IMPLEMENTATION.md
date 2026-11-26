@@ -3434,7 +3434,7 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Module table imports, shared memories,
+Function-table imports, shared memories,
 reference-valued host calls and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
@@ -3590,3 +3590,18 @@ guest locals and operands stay rooted across imported calls, including JS
 callbacks that reenter Wasm. The Window regression covers collection during a
 callback, collection after overwriting an entry, identity, shared mutation,
 bounds and failed growth. [ADR 0090](adr/0090-live-wasm-external-tables.md)
+
+### WASM-06 — External-reference table imports
+
+A module can import a standalone or previously exported nullable `externref`
+table in either address width. Matching uses the table's current length,
+declared maximum, address width and element type. A re-export returns the
+original wrapper. Multiple import indices for one allocation share growth
+and use overlap-safe copy. The allocation owner retains its slot budget.
+
+Active elements write to imported tables before start. Initialization commits
+the completed segment prefix on a guest bounds trap. The instance and its
+imports are rooted during start, so collection in callbacks can follow private
+guest state and suspended frames. Regression tests exercise shared identity,
+growth, overlap, import mismatch, initializer ordering and start-time GC.
+[ADR 0091](adr/0091-wasm-external-table-imports.md)

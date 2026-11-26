@@ -1,13 +1,14 @@
 //! Standalone Window tables and live wrappers over module tables.
 
 use rustic_js::runtime::ErrorKind;
-use rustic_wasm::{ExternalReference, TableType};
+use rustic_wasm::{ExternalReference, ExternalTable, Limits, TableType};
 
 use super::super::events::PrivateArray;
 use super::instance::{self, Runtime};
 use super::*;
 
 const TABLE: &str = "WebAssembly.Table";
+const TABLE_STORAGE: &str = "WebAssembly table storage";
 const TABLE_LIMIT: u32 = 65_536;
 
 struct Table {
@@ -16,11 +17,19 @@ struct Table {
 }
 
 enum Storage {
-    Standalone { functions: bool, capacity: u32 },
-    Module { index: u32, functions: bool },
+    Standalone {
+        functions: bool,
+        capacity: u32,
+        maximum: Option<u64>,
+    },
+    Module {
+        index: u32,
+        functions: bool,
+    },
 }
 
 enum Entries {
+    Linked(Rc<ExternalTable>),
     Standalone {
         values: PrivateArray,
         functions: bool,
@@ -72,12 +81,10 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let initial = index(agent, initial, address)?;
     let key = agent.heap.key("maximum")?;
     let maximum = agent.get(descriptor, key)?;
-    let maximum = if maximum == Value::UNDEFINED {
-        address.max_table_elements()
-    } else {
-        index(agent, maximum, address)?
-    };
-    if initial > maximum {
+    let maximum = (maximum != Value::UNDEFINED)
+        .then(|| index(agent, maximum, address))
+        .transpose()?;
+    if maximum.is_some_and(|maximum| initial > maximum) {
         return Err(agent.throw(ErrorKind::RangeError, "invalid WebAssembly table limits"));
     }
     let value = entry(agent, functions, args.get(1).copied())?;
@@ -89,7 +96,8 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         address,
         storage: Storage::Standalone {
             functions,
-            capacity: maximum.min(u64::from(TABLE_LIMIT)) as u32,
+            capacity: maximum.unwrap_or(u64::MAX).min(u64::from(TABLE_LIMIT)) as u32,
+            maximum,
         },
     };
     let object = Value::object(agent.new_host_state(TABLE, proto, state, 0)?);
@@ -126,13 +134,130 @@ pub(super) fn export(
     Ok(wrapper)
 }
 
-fn state(agent: &mut Agent, this: Value) -> JsResult<(Rc<Table>, Entries)> {
-    let Some(table) = this
-        .as_object()
-        .and_then(|id| agent.host_state::<Table>(id, TABLE))
-    else {
-        return agent.type_error("invalid WebAssembly.Table receiver");
+fn find(agent: &Agent, value: Value) -> Option<Rc<Table>> {
+    agent.host_state(value.as_object()?, TABLE)
+}
+
+pub(super) fn accepts_import(agent: &Agent, value: Value, ty: TableType) -> bool {
+    matches!(
+        ty.element_type,
+        ValueType::Ref {
+            nullable: true,
+            heap_type: -17
+        }
+    ) && find(agent, value).is_some_and(|table| {
+        matches!(
+            table.storage,
+            Storage::Standalone {
+                functions: false,
+                ..
+            } | Storage::Module {
+                functions: false,
+                ..
+            }
+        )
+    })
+}
+
+pub(super) fn link(agent: &mut Agent, value: Value, ty: TableType) -> JsResult<ExternalTable> {
+    let table = find(agent, value).expect("resolved external table");
+    let handle = match entries(agent, value, &table)? {
+        Entries::Linked(storage) => (*storage).clone(),
+        Entries::Module { runtime, index, .. } => {
+            runtime.external_table(index).expect("external table")
+        }
+        Entries::Standalone {
+            values, capacity, ..
+        } => {
+            let Storage::Standalone { maximum, .. } = table.storage else {
+                unreachable!("standalone external table");
+            };
+            let length = values.len(agent)?;
+            if table.address != ty.limits.address_type
+                || u64::from(length) < ty.limits.min
+                || ty
+                    .limits
+                    .max
+                    .is_some_and(|max| maximum.is_none_or(|actual| actual > max))
+            {
+                return Err(wasm_error(
+                    agent,
+                    instance::LINK_ERROR,
+                    "WebAssembly table type mismatch",
+                ));
+            }
+            return promote(
+                agent,
+                value,
+                values,
+                Limits {
+                    address_type: table.address,
+                    min: u64::from(length),
+                    max: maximum,
+                },
+                capacity,
+            );
+        }
     };
+    if !handle.matches(ty) {
+        return Err(wasm_error(
+            agent,
+            instance::LINK_ERROR,
+            "WebAssembly table type mismatch",
+        ));
+    }
+    Ok(handle)
+}
+
+fn promote(
+    agent: &mut Agent,
+    wrapper: Value,
+    values: PrivateArray,
+    limits: Limits,
+    capacity: u32,
+) -> JsResult<ExternalTable> {
+    let charge = ExternalTable::storage_bytes(capacity as usize);
+    agent.spend_native_work(limits.min)?;
+    let handle = agent.with_host_memory(charge, |agent| {
+        let handle = ExternalTable::new(limits, capacity as usize, None).ok_or(OutOfMemory)?;
+        for index in 0..limits.min as u32 {
+            agent.check_native_work()?;
+            let value = values.get(agent, index)?;
+            let written = handle.set(u64::from(index), external_reference(Some(value)));
+            debug_assert!(written);
+        }
+        Ok(handle)
+    })?;
+    let storage = agent.new_traced_host_state(
+        TABLE_STORAGE,
+        agent.intrinsics.object_prototype,
+        handle.clone(),
+        charge,
+        Some(trace_storage),
+    )?;
+    with_page(agent, |agent, page| {
+        agent.weak_map_set(page.wasm_links, wrapper, Value::object(storage))
+    })?;
+    Ok(handle)
+}
+
+fn trace_storage(state: &dyn std::any::Any, mark: &mut dyn FnMut(Value)) {
+    let storage = state
+        .downcast_ref::<ExternalTable>()
+        .expect("external table storage");
+    storage.visit_external_references(&mut |reference| {
+        mark(Value::from_host_identity(reference.identity()));
+    });
+}
+
+fn receiver(agent: &mut Agent, this: Value) -> JsResult<Rc<Table>> {
+    match find(agent, this) {
+        Some(table) => Ok(table),
+        None => agent.type_error("invalid WebAssembly.Table receiver"),
+    }
+}
+
+fn entries(agent: &mut Agent, this: Value, table: &Table) -> JsResult<Entries> {
     let backing = with_page(agent, |agent, page| {
         Ok(agent.weak_map_get(page.wasm_links, this))
     })?;
@@ -140,11 +265,21 @@ fn state(agent: &mut Agent, this: Value) -> JsResult<(Rc<Table>, Entries)> {
         Storage::Standalone {
             functions,
             capacity,
-        } => Entries::Standalone {
-            values: PrivateArray::from_value(backing).expect("standalone table entries"),
-            functions,
-            capacity,
-        },
+            ..
+        } => {
+            if let Some(storage) = backing
+                .as_object()
+                .and_then(|id| agent.host_state(id, TABLE_STORAGE))
+            {
+                Entries::Linked(storage)
+            } else {
+                Entries::Standalone {
+                    values: PrivateArray::from_value(backing).expect("standalone table entries"),
+                    functions,
+                    capacity,
+                }
+            }
+        }
         Storage::Module { index, functions } => Entries::Module {
             owner: backing,
             runtime: instance::find(agent, backing).expect("exported table owner"),
@@ -152,7 +287,7 @@ fn state(agent: &mut Agent, this: Value) -> JsResult<(Rc<Table>, Entries)> {
             functions,
         },
     };
-    Ok((table, entries))
+    Ok(entries)
 }
 
 fn index(agent: &mut Agent, value: Value, address: AddressType) -> JsResult<u64> {
@@ -229,8 +364,9 @@ fn check_index(agent: &mut Agent, entries: PrivateArray, index: u64) -> JsResult
 }
 
 fn length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
-    let (table, entries) = state(agent, this)?;
-    let length = match entries {
+    let table = receiver(agent, this)?;
+    let length = match entries(agent, this, &table)? {
+        Entries::Linked(storage) => storage.length(),
         Entries::Standalone { values, .. } => u64::from(values.len(agent)?),
         Entries::Module { runtime, index, .. } => runtime.table_len(index).expect("exported table"),
     };
@@ -238,9 +374,15 @@ fn length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 }
 
 fn get(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let (table, entries) = state(agent, this)?;
+    let table = receiver(agent, this)?;
     let index = index(agent, arg(args, 0), table.address)?;
-    match entries {
+    match entries(agent, this, &table)? {
+        Entries::Linked(storage) => storage.get(index).map(external_value).ok_or_else(|| {
+            agent.throw(
+                ErrorKind::RangeError,
+                "WebAssembly table index out of bounds",
+            )
+        }),
         Entries::Standalone { values, .. } => {
             let index = check_index(agent, values, index)?;
             values.get(agent, index)
@@ -260,9 +402,7 @@ fn get(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
                     None => {}
                 }
             } else if let Some(reference) = runtime.external_table_get(table, index) {
-                return Ok(reference.map_or(Value::NULL, |reference| {
-                    Value::from_host_identity(reference.identity())
-                }));
+                return Ok(external_value(reference));
             }
             Err(agent.throw(
                 ErrorKind::RangeError,
@@ -273,10 +413,18 @@ fn get(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 }
 
 fn set(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let (table, entries) = state(agent, this)?;
+    let table = receiver(agent, this)?;
     let index = index(agent, arg(args, 0), table.address)?;
     let value = args.get(1).copied();
-    match entries {
+    match entries(agent, this, &table)? {
+        Entries::Linked(storage) => {
+            if !storage.set(index, external_reference(value)) {
+                return Err(agent.throw(
+                    ErrorKind::RangeError,
+                    "WebAssembly table index out of bounds",
+                ));
+            }
+        }
         Entries::Standalone {
             values, functions, ..
         } => {
@@ -308,10 +456,22 @@ fn set(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 }
 
 fn grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let (table, entries) = state(agent, this)?;
+    let table = receiver(agent, this)?;
     let count = index(agent, arg(args, 0), table.address)?;
     let value = args.get(1).copied();
-    match entries {
+    match entries(agent, this, &table)? {
+        Entries::Linked(storage) => {
+            let mut result = Value::UNDEFINED;
+            let previous = storage.grow(count, external_reference(value), |work| {
+                agent.spend_native_work(work as u64)?;
+                result = size_value(agent, storage.length(), table.address)?;
+                Ok::<(), Abrupt>(())
+            })?;
+            if previous.is_none() {
+                return Err(agent.throw(ErrorKind::RangeError, "cannot grow WebAssembly table"));
+            }
+            Ok(result)
+        }
         Entries::Standalone {
             values,
             functions,
@@ -362,4 +522,10 @@ fn grow(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 fn external_reference(value: Option<Value>) -> Option<ExternalReference> {
     let value = value.unwrap_or(Value::UNDEFINED);
     (value != Value::NULL).then_some(ExternalReference::new(value.host_identity()))
+}
+
+fn external_value(value: Option<ExternalReference>) -> Value {
+    value.map_or(Value::NULL, |reference| {
+        Value::from_host_identity(reference.identity())
+    })
 }

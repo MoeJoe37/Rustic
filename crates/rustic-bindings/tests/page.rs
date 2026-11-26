@@ -2194,21 +2194,7 @@ fn wasm_exported_external_tables_trace_guest_state_and_suspended_frames() {
     let mut agent = Agent::new().unwrap();
     page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
     agent.heap.set_gc_stress(true);
-    let collect = agent
-        .new_native_function(
-            |agent, _, _| {
-                let host = agent.execution_host().expect("page collector");
-                host.collect(agent)?;
-                Ok(Value::UNDEFINED)
-            },
-            "collect",
-            0,
-        )
-        .unwrap();
-    let key = agent.heap.key("collect").unwrap();
-    agent
-        .set(agent.intrinsics.global, key, Value::object(collect), true)
-        .unwrap();
+    install_wasm_collector(&mut agent);
     let outcome = agent.evaluate(r#"
         function assert(condition, message) { if (!condition) throw message; }
         function rangeError(call) {
@@ -2294,6 +2280,166 @@ fn wasm_exported_external_tables_trace_guest_state_and_suspended_frames() {
         const weak = forgetEntry();
         collect();
         assert(weak.deref() === undefined, 'overwritten references are reclaimable');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}
+
+fn install_wasm_collector(agent: &mut Agent) {
+    let collect = agent
+        .new_native_function(
+            |agent, _, _| {
+                let host = agent.execution_host().expect("page collector");
+                host.collect(agent)?;
+                Ok(Value::UNDEFINED)
+            },
+            "collect",
+            0,
+        )
+        .unwrap();
+    let key = agent.heap.key("collect").unwrap();
+    agent
+        .set(agent.intrinsics.global, key, Value::object(collect), true)
+        .unwrap();
+}
+
+#[test]
+fn wasm_external_table_imports_share_identity_growth_and_start_roots() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    install_wasm_collector(&mut agent);
+    let outcome = agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        const header = [0,97,115,109,1,0,0,0];
+        function section(kind, bytes) { return [kind, bytes.length, ...bytes]; }
+        function body(locals, instructions) {
+            return [locals.length + instructions.length + 1, ...locals, ...instructions, 11];
+        }
+        function exportOf(name, kind, index) {
+            return [name.length, ...Array.from(name, char => char.charCodeAt(0)), kind, index];
+        }
+        function module(wide, trapping, exposeTables = true) {
+            const c = i => [wide ? 66 : 65,i];
+            const addr = wide ? 126 : 127;
+            const limits = [111,wide ? 5 : 1,4,6];
+            const nullRef = [208,111];
+            const get = i => [...c(i),37,0];
+            const clear = i => [...c(i),...nullRef,38,0];
+            const segment = i => [6,1,...c(i),11,111,1,...nullRef,11];
+            const start = [...get(0),36,0, ...get(1),33,0, ...clear(0),...clear(1),
+                16,0, ...c(1),32,0,38,1];
+            const restore = [...c(0),35,0,38,0,...nullRef,36,0];
+            return new WebAssembly.Module(Uint8Array.of(
+                ...header,
+                ...section(1, [2,96,0,0, 96,1,addr,1,addr]),
+                ...section(2, [3,1,109,1,97,1,...limits, 1,109,1,98,1,...limits, 1,109,1,102,0,0]),
+                ...section(3, [4,0,0,0,1]),
+                ...section(4, [1,111,wide ? 5 : 1,1,2]),
+                ...section(6, [1,111,1,...nullRef,11]),
+                ...section(7, [exposeTables ? 6 : 3,
+                    ...(exposeTables ? [...exportOf('first',1,0), ...exportOf('second',1,1),
+                        ...exportOf('local',1,2)] : []),
+                    ...exportOf('restore',0,2), ...exportOf('overlap',0,3), ...exportOf('grow',0,4)]),
+                ...section(8, [1]),
+                ...section(9, trapping ? [2,...segment(3),...segment(6)] : [1,...segment(3)]),
+                ...section(10, [4, ...body([1,1,111], start), ...body([0], restore),
+                    ...body([0], [...c(1),...c(0),...c(2),252,14,1,0]),
+                    ...body([0], [...nullRef,32,0,252,15,0])])
+            ));
+        }
+        function provider(wide) {
+            return new WebAssembly.Instance(new WebAssembly.Module(Uint8Array.of(
+                ...header, ...section(4,[1,111,wide ? 5 : 1,4,6]),
+                ...section(7,[1,...exportOf('table',1,0)])
+            ))).exports.table;
+        }
+        function exercise(wide, supplied) {
+            const at = i => wide ? BigInt(i) : i;
+            const table = supplied ?? new WebAssembly.Table({
+                element:'externref', address:wide ? 'i64' : 'i32', initial:at(3), maximum:at(6)
+            });
+            if (!supplied) table.grow(at(1));
+            table.set(at(0), {tag:'global'});
+            table.set(at(1), {tag:'local'});
+            table.set(at(3), {tag:'active'});
+            const m = module(wide,false);
+            let called = false;
+            const exports = new WebAssembly.Instance(m, {m:{a:table,b:table,f() {
+                called = true;
+                assert(table.get(at(0)) === null && table.get(at(1)) === null, 'start writes visible to import');
+                assert(table.get(at(3)) === null, 'active writes happen before start');
+                collect();
+            }}}).exports;
+            assert(called && exports.first === table && exports.second === table, 'both aliases preserve identity');
+            assert(exports.local !== table && exports.local.get(at(0)) === null, 'local table follows imported indices');
+            collect();
+            exports.restore();
+            assert(table.get(at(0)).tag === 'global' && table.get(at(1)).tag === 'local', 'start roots survived');
+            const first = table.get(at(0));
+            const second = table.get(at(1));
+            exports.overlap();
+            assert(table.get(at(1)) === first && table.get(at(2)) === second, 'overlap resolves backing identity');
+            assert(exports.grow(at(1)) === at(4), 'guest growth uses allocating table');
+            assert(table.grow(at(1)) === at(5) && table.get(at(5)) === undefined, 'host grow uses same length');
+            assert(exports.grow(at(1)) === at(-1) && table.length === at(6), 'shared maximum enforced');
+            table.set(at(3), second);
+            assert(rejects(WebAssembly.RuntimeError, () => new WebAssembly.Instance(module(wide,true), {
+                m:{a:table,b:table,f() { throw 'unreachable start'; }}
+            })), 'trapping active segment prevents start');
+            assert(table.get(at(3)) === null && table.get(at(2)) === second, 'completed initializer prefix remains');
+            const failure = {};
+            try {
+                new WebAssembly.Instance(m, {m:{a:table,b:table,f() { throw failure; }}});
+                throw 'start was expected to throw';
+            } catch (error) { assert(error === failure, 'start propagates callback exception'); }
+            assert(table.get(at(0)) === null && table.get(at(1)) === null, 'start writes survive traps');
+        }
+        exercise(false);
+        exercise(true);
+        exercise(false, provider(false));
+        exercise(true, provider(true));
+
+        let weakTable;
+        function exportedGrowth() {
+            const table = new WebAssembly.Table({element:'externref',initial:4,maximum:6});
+            weakTable = new WeakRef(table);
+            return new WebAssembly.Instance(module(false,false,false), {
+                m:{a:table,b:table,f(){}}
+            }).exports.grow;
+        }
+        const grow = exportedGrowth();
+        collect();
+        assert(grow(1) === 4 && weakTable.deref().length === 5, 'instance retains unexported imports');
+
+        const m = module(false,false);
+        const value = new WebAssembly.Table({element:'externref',initial:4,maximum:6});
+        const wrongCases = [
+            new WebAssembly.Table({element:'anyfunc',initial:4,maximum:6}),
+            new WebAssembly.Table({element:'externref',initial:3,maximum:6}),
+            new WebAssembly.Table({element:'externref',initial:4,maximum:7}),
+            new WebAssembly.Table({element:'externref',initial:4}),
+            new WebAssembly.Table({element:'externref',address:'i64',initial:4n,maximum:6n})
+        ];
+        for (const wrong of wrongCases) {
+            assert(rejects(WebAssembly.LinkError, () => new WebAssembly.Instance(m, {
+                m:{a:wrong,b:value,f() { throw 'unreachable start'; }}
+            })), 'check kind, current size, declared maximum and width');
+        }
+        // Index conversion is allowed to link and promote the receiver.
+        value.set({valueOf() {
+            new WebAssembly.Instance(m, {m:{a:value,b:value,f(){}}});
+            return 0;
+        }}, 42);
+        assert(value.get(0) === 42, 'set uses the promoted backing after coercion');
         true
     "#);
     if let Err(rustic_js::EvalError::Throw(value)) = outcome {

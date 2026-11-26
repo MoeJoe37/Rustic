@@ -1,6 +1,6 @@
 use rustic_wasm::{
-    ExecutionError, ExecutionErrorKind, ExternalReference, HostTrap, LinearMemory, NumericGlobal,
-    TracingHostDispatch,
+    ExecutionError, ExecutionErrorKind, ExternalReference, ExternalTable, HostTrap, LinearMemory,
+    NumericGlobal, TracingHostDispatch,
 };
 
 use super::super::events::PrivateArray;
@@ -17,12 +17,14 @@ pub(super) struct Bindings {
     pub functions: PrivateArray,
     pub globals: PrivateArray,
     pub memories: PrivateArray,
+    pub tables: PrivateArray,
 }
 
 #[derive(Default)]
 pub(super) struct LinkedState {
     pub globals: Vec<NumericGlobal>,
     pub memories: Vec<LinearMemory>,
+    pub tables: Vec<ExternalTable>,
 }
 
 pub(super) fn read_imports(
@@ -49,6 +51,7 @@ pub(super) fn read_imports(
                 ImportType::Function(_) => agent.is_callable(value),
                 ImportType::Global(ty) => global::accepts_import(agent, value, ty),
                 ImportType::Memory(_) => memory::find(agent, value).is_some(),
+                ImportType::Table(ty) => table::accepts_import(agent, value, ty),
                 _ => false,
             };
             if !accepted {
@@ -131,7 +134,14 @@ pub(super) fn link(
                 bindings.memories.set(agent, index, value)?;
                 memories.push((*memory).clone());
             }
-            _ => unreachable!("only function, memory and numeric global bindings reach linking"),
+            ImportType::Table(ty) => {
+                let tables = &mut linked.tables;
+                tables.try_reserve(1).map_err(|_| OutOfMemory)?;
+                let index = u32::try_from(tables.len()).map_err(|_| OutOfMemory)?;
+                bindings.tables.set(agent, index, value)?;
+                tables.push(table::link(agent, value, ty)?);
+            }
+            _ => unreachable!("only admitted Wasm bindings reach linking"),
         }
     }
     Ok(linked)

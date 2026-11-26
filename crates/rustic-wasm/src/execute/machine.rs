@@ -472,7 +472,7 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
             match self.dispatch.as_mut() {
                 Some(Dispatch::Plain(dispatch)) => dispatch(index, &arguments, &mut results),
                 Some(Dispatch::Tracing(dispatch)) => {
-                    let trace = self.state.borrow().has_external_references;
+                    let trace = self.state.borrow().has_external_references.get();
                     let mut roots = if trace {
                         self.budget
                             .spend(offset, self.locals.len() + self.operands.len())?;

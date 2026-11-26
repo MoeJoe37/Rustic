@@ -1,20 +1,231 @@
+use std::{cell::Cell, ops::Range, rc::Rc};
+
 use super::state::{GlobalSlot, Transfer, checked_range, constant};
 use super::*;
-use crate::{Declarations, ElementItems, ElementMode, Limits, TableType};
+use crate::{Declarations, ElementItems, ElementMode, ImportType, Limits, TableType};
 
 const OUT_OF_BOUNDS: Fault = Fault::TableOutOfBounds;
 
+const EXTERNREF: ValueType = ValueType::Ref {
+    nullable: true,
+    heap_type: -17,
+};
+
 #[derive(Default)]
 pub(super) struct Tables {
-    tables: Vec<Table>,
+    tables: Vec<Rc<Table>>,
+    imported: usize,
     elements: Vec<Vec<Reference>>,
-    used: usize,
+    pool: Rc<TablePool>,
+}
+
+#[derive(Default)]
+struct TablePool {
+    used: Cell<usize>,
     limit: usize,
 }
 
+impl TablePool {
+    fn admits(&self, count: usize) -> bool {
+        count <= self.limit - self.used.get()
+    }
+
+    fn add(&self, count: usize) {
+        self.used.set(self.used.get() + count);
+    }
+
+    fn remove(&self, count: usize) {
+        self.used.set(self.used.get() - count);
+    }
+}
+
 struct Table {
-    entries: Vec<Reference>,
+    entries: RefCell<Vec<Reference>>,
     ty: TableType,
+    pool: Rc<TablePool>,
+}
+
+impl Drop for Table {
+    fn drop(&mut self) {
+        self.pool.remove(self.entries.get_mut().len());
+    }
+}
+
+impl Drop for Tables {
+    fn drop(&mut self) {
+        for segment in &self.elements {
+            self.pool.remove(segment.len());
+        }
+    }
+}
+
+impl Table {
+    fn allocate(
+        ty: TableType,
+        count: usize,
+        initial: Reference,
+        pool: &Rc<TablePool>,
+    ) -> Option<Rc<Self>> {
+        if !pool.admits(count) {
+            return None;
+        }
+        let mut entries = Vec::new();
+        entries.try_reserve_exact(count).ok()?;
+        entries.resize(count, initial);
+        pool.add(count);
+        Some(Rc::new(Self {
+            entries: RefCell::new(entries),
+            ty,
+            pool: Rc::clone(pool),
+        }))
+    }
+
+    fn len(&self) -> u64 {
+        self.entries.borrow().len() as u64
+    }
+
+    fn growth(&self, count: u64) -> Option<(usize, usize, usize)> {
+        let count = usize::try_from(count)
+            .ok()
+            .filter(|&count| self.pool.admits(count))?;
+        let entries = self.entries.borrow();
+        let limits = self.ty.limits;
+        let max = limits
+            .max
+            .unwrap_or_else(|| limits.address_type.max_table_elements());
+        let new = entries
+            .len()
+            .checked_add(count)
+            .filter(|&new| new as u64 <= max)?;
+        let work = if new > entries.capacity() { new } else { count };
+        Some((count, new, work))
+    }
+
+    fn grow<E>(
+        &self,
+        count: u64,
+        value: Reference,
+        charge: impl FnOnce(usize) -> Result<(), E>,
+    ) -> Result<Option<u64>, E> {
+        let Some((added, new, work)) = self.growth(count) else {
+            return Ok(None);
+        };
+        charge(work)?;
+        if self.growth(count) != Some((added, new, work)) {
+            return Ok(None);
+        }
+        let mut entries = self.entries.borrow_mut();
+        let old = entries.len();
+        if entries.try_reserve_exact(added).is_err() {
+            return Ok(None);
+        }
+        entries.resize(new, value);
+        self.pool.add(added);
+        Ok(Some(old as u64))
+    }
+}
+
+/// A nullable external-reference table shared in one host's reference domain.
+/// The allocator owns entry limits and the host must trace its live identities.
+#[derive(Clone)]
+pub struct ExternalTable(Rc<Table>);
+
+impl ExternalTable {
+    /// Allocate an independent table. Host-specific entry limits do not change
+    /// the declared maximum used during import matching.
+    pub fn new(
+        limits: Limits,
+        entry_limit: usize,
+        initial: Option<ExternalReference>,
+    ) -> Option<Self> {
+        if !limits.fits(limits.address_type.max_table_elements()) {
+            return None;
+        }
+        let count = usize::try_from(limits.min).ok()?;
+        let pool = Rc::new(TablePool {
+            used: Cell::new(0),
+            limit: entry_limit,
+        });
+        let ty = TableType {
+            limits,
+            element_type: EXTERNREF,
+        };
+        Table::allocate(ty, count, external(initial), &pool).map(Self)
+    }
+
+    /// Heap reservation for this standalone allocation and its growth.
+    pub const fn storage_bytes(entry_limit: usize) -> usize {
+        entry_limit
+            .saturating_mul(size_of::<Reference>())
+            .saturating_add(size_of::<Table>() + size_of::<TablePool>() + 4 * size_of::<usize>())
+    }
+
+    /// Check the current size, declared maximum, address width and element type.
+    pub fn matches(&self, ty: TableType) -> bool {
+        let actual = self.0.ty.limits;
+        ty.element_type == EXTERNREF
+            && actual.address_type == ty.limits.address_type
+            && self.length() >= ty.limits.min
+            && ty
+                .limits
+                .max
+                .is_none_or(|limit| actual.max.is_some_and(|max| max <= limit))
+    }
+
+    /// Current number of entries.
+    pub fn length(&self) -> u64 {
+        self.0.len()
+    }
+
+    /// Read an entry. The inner `None` represents null.
+    pub fn get(&self, index: u64) -> Option<Option<ExternalReference>> {
+        match *self.0.entries.borrow().get(usize::try_from(index).ok()?)? {
+            Reference::Extern(reference) => Some(Some(reference)),
+            Reference::NullExtern => Some(None),
+            Reference::Function(_) => unreachable!("validated external table entry"),
+        }
+    }
+
+    /// Replace an entry. An invalid index leaves the table unchanged.
+    pub fn set(&self, index: u64, value: Option<ExternalReference>) -> bool {
+        let Ok(index) = usize::try_from(index) else {
+            return false;
+        };
+        let mut entries = self.0.entries.borrow_mut();
+        let Some(slot) = entries.get_mut(index) else {
+            return false;
+        };
+        *slot = external(value);
+        true
+    }
+
+    /// Grow against the allocating owner's limits. The host charges work
+    /// before mutation and the previous size is returned upon success.
+    pub fn grow<E>(
+        &self,
+        count: u64,
+        value: Option<ExternalReference>,
+        charge: impl FnOnce(usize) -> Result<(), E>,
+    ) -> Result<Option<u64>, E> {
+        self.0.grow(count, external(value), charge)
+    }
+
+    /// Visit live external identities. The visitor must not reenter the table.
+    pub fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
+        trace_entries(&self.0.entries.borrow(), visitor);
+    }
+}
+
+fn external(value: Option<ExternalReference>) -> Reference {
+    value.map_or(Reference::NullExtern, Reference::Extern)
+}
+
+fn trace_entries(entries: &[Reference], visitor: &mut dyn FnMut(ExternalReference)) {
+    for entry in entries {
+        if let Reference::Extern(reference) = *entry {
+            visitor(reference);
+        }
+    }
 }
 
 impl Instance<'_, '_> {
@@ -23,28 +234,23 @@ impl Instance<'_, '_> {
         Some(self.state.borrow().tables.tables.get(table as usize)?.ty)
     }
 
-    /// Read the current length of a module-defined table.
+    /// Read the current length of a table in the instance's index space.
     pub fn table_len(&self, table: u32) -> Option<u64> {
-        Some(
-            self.state
-                .borrow()
-                .tables
-                .tables
-                .get(table as usize)?
-                .entries
-                .len() as u64,
-        )
+        Some(self.state.borrow().tables.tables.get(table as usize)?.len())
+    }
+
+    /// Retain a handle to a nullable external table. The embedder must keep
+    /// the allocating owner's heap reservation alive while this handle is used.
+    pub fn external_table(&self, index: u32) -> Option<ExternalTable> {
+        let state = self.state.borrow();
+        let table = state.tables.reference_table(index, -17)?;
+        state.has_external_references.set(true);
+        Some(ExternalTable(Rc::clone(table)))
     }
 
     /// Read an external table entry. The inner `None` represents null.
     pub fn external_table_get(&self, table: u32, index: u64) -> Option<Option<ExternalReference>> {
-        let state = self.state.borrow();
-        let table = state.tables.reference_table(table, -17)?;
-        match table.entries.get(usize::try_from(index).ok()?)? {
-            Reference::Extern(reference) => Some(Some(*reference)),
-            Reference::NullExtern => Some(None),
-            Reference::Function(_) => unreachable!("validated external table entry"),
-        }
+        self.external_table(table)?.get(index)
     }
 
     /// Write a host identity or null to a nullable external table.
@@ -55,22 +261,16 @@ impl Instance<'_, '_> {
         index: u64,
         reference: Option<ExternalReference>,
     ) -> bool {
-        let mut state = self.state.borrow_mut();
-        let value = reference.map_or(Reference::NullExtern, Reference::Extern);
-        if state.tables.reference_table(table, -17).is_none()
-            || state.tables.set(table, index, value, 0).is_err()
-        {
-            return false;
-        }
-        state.has_external_references |= reference.is_some();
-        true
+        self.external_table(table)
+            .is_some_and(|table| table.set(index, reference))
     }
 
     /// Visit the external identities reachable from persistent guest state.
-    /// The visitor must not reenter the instance.
+    /// Imported tables are traced by their allocating host. The visitor
+    /// must not reenter the instance.
     pub fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
         let state = self.state.borrow();
-        if !state.has_external_references {
+        if !state.has_external_references.get() {
             return;
         }
         state.tables.visit_external_references(visitor);
@@ -102,8 +302,7 @@ impl Instance<'_, '_> {
                 .borrow()
                 .tables
                 .reference_table(table, -16)?
-                .entries
-                .len() as u64,
+                .len(),
         )
     }
 
@@ -112,7 +311,7 @@ impl Instance<'_, '_> {
         let state = self.state.borrow();
         let table = state.tables.reference_table(table, -16)?;
         let index = usize::try_from(index).ok()?;
-        let Reference::Function(function) = *table.entries.get(index)? else {
+        let Reference::Function(function) = *table.entries.borrow().get(index)? else {
             unreachable!("validated function table entry")
         };
         Some(function)
@@ -143,7 +342,9 @@ impl Instance<'_, '_> {
     pub fn table_growth_work(&self, table: u32, count: u64) -> Option<usize> {
         let state = self.state.borrow();
         state.tables.tables.get(table as usize)?;
-        state.tables.growth(table, count).map(|(_, _, work)| work)
+        state.tables.tables[table as usize]
+            .growth(count)
+            .map(|(_, _, work)| work)
     }
 
     /// Grow a function table using the same budget and limits as guest growth.
@@ -176,8 +377,7 @@ impl Instance<'_, '_> {
         reference: Option<ExternalReference>,
         cancellation: &CancellationToken,
     ) -> Result<Option<u64>, ExecutionError> {
-        let value = reference.map_or(Reference::NullExtern, Reference::Extern);
-        self.grow_host_table(table, count, -17, value, cancellation)
+        self.grow_host_table(table, count, -17, external(reference), cancellation)
     }
 
     fn grow_host_table(
@@ -199,8 +399,9 @@ impl Instance<'_, '_> {
         let previous = state
             .tables
             .grow_entries(table, count, value, 0, &mut budget)?;
-        state.has_external_references |=
-            count != 0 && previous.is_some() && matches!(value, Reference::Extern(_));
+        if previous.is_some() && count != 0 && matches!(value, Reference::Extern(_)) {
+            state.has_external_references.set(true);
+        }
         Ok(previous)
     }
 }
@@ -209,13 +410,37 @@ impl Tables {
     pub(super) fn new(
         declarations: &Declarations<'_>,
         globals: &[GlobalSlot],
+        mut imports: &[ExternalTable],
         limits: InstanceLimits,
         budget: &mut Budget<'_>,
-    ) -> Result<Self, ExecutionError> {
+    ) -> Result<(Self, ActiveElements), ExecutionError> {
         let mut state = Self {
-            limit: limits.table_elements,
-            ..Self::default()
+            pool: Rc::new(TablePool {
+                used: Cell::new(0),
+                limit: limits.table_elements,
+            }),
+            tables: Vec::new(),
+            imported: 0,
+            elements: Vec::new(),
         };
+        for entry in &declarations.imports {
+            let ImportType::Table(ty) = entry.value.ty else {
+                continue;
+            };
+            budget.spend(entry.offset, 1)?;
+            let Some((table, rest)) = imports.split_first() else {
+                return Err(error(entry.offset, Fault::MissingImport));
+            };
+            if !table.matches(ty) {
+                return Err(error(entry.offset, Fault::ImportTypeMismatch));
+            }
+            append(&mut state.tables, Rc::clone(&table.0), entry.offset)?;
+            imports = rest;
+        }
+        if !imports.is_empty() {
+            return Err(error(0, Fault::ImportTypeMismatch));
+        }
+        state.imported = state.tables.len();
         let stack_limit = limits.execution.values;
         for entry in &declarations.tables {
             let offset = entry.offset;
@@ -223,27 +448,17 @@ impl Tables {
             let count = usize::try_from(table.ty.limits.min)
                 .map_err(|_| error(offset, Fault::LimitExceeded))?;
             budget.spend(offset, 1)?;
-            state.reserve(count, offset)?;
             budget.spend(offset, count)?;
             let initial = match &table.initializer {
                 Some(expr) => constant(globals, expr, stack_limit, budget)?,
                 None => Slot::zero(table.ty.element_type),
             };
-            let mut entries = Vec::new();
-            entries
-                .try_reserve_exact(count)
-                .map_err(|_| error(offset, Fault::LimitExceeded))?;
-            entries.resize(count, initial.reference());
-            append(
-                &mut state.tables,
-                Table {
-                    entries,
-                    ty: table.ty,
-                },
-                offset,
-            )?;
+            let table = Table::allocate(table.ty, count, initial.reference(), &state.pool)
+                .ok_or_else(|| error(offset, Fault::LimitExceeded))?;
+            append(&mut state.tables, table, offset)?;
         }
 
+        let mut active = ActiveElements::default();
         for entry in &declarations.elements {
             let offset = entry.offset;
             let element = &entry.value;
@@ -255,7 +470,9 @@ impl Tables {
             let mut passive = Vec::new();
             match &element.mode {
                 ElementMode::Passive => {
-                    state.reserve(count, offset)?;
+                    if !state.pool.admits(count) {
+                        return Err(error(offset, Fault::LimitExceeded));
+                    }
                     budget.spend(offset, count)?;
                     passive
                         .try_reserve_exact(count)
@@ -271,37 +488,46 @@ impl Tables {
                         )?);
                     }
                 }
-                ElementMode::Active(active) => {
-                    let start = constant(globals, &active.offset, stack_limit, budget)?.address();
-                    let target = &mut state.tables[active.target as usize].entries;
-                    let range =
-                        checked_range(target.len(), start, count as u64, offset, OUT_OF_BOUNDS)?;
+                ElementMode::Active(segment) => {
+                    let start = constant(globals, &segment.offset, stack_limit, budget)?.address();
+                    let target = &state.tables[segment.target as usize];
+                    let range = match checked_range(
+                        target.len() as usize,
+                        start,
+                        count as u64,
+                        offset,
+                        OUT_OF_BOUNDS,
+                    ) {
+                        Ok(range) => range,
+                        Err(trap) => {
+                            active.trap = Some(trap);
+                            break;
+                        }
+                    };
                     budget.spend(offset, count)?;
-                    // No state is exposed until every segment and the start function succeed.
-                    for (index, slot) in target[range].iter_mut().enumerate() {
-                        *slot = element_value(
+                    let mut values = Vec::new();
+                    values
+                        .try_reserve_exact(count)
+                        .map_err(|_| error(offset, Fault::LimitExceeded))?;
+                    for index in 0..count {
+                        values.push(element_value(
                             &element.items,
                             index,
                             globals,
                             stack_limit,
                             offset,
                             budget,
-                        )?;
+                        )?);
                     }
+                    append(&mut active.writes, (segment.target, range, values), offset)?;
                 }
                 ElementMode::Declarative => {}
             }
+            let len = passive.len();
             append(&mut state.elements, passive, offset)?;
+            state.pool.add(len);
         }
-        Ok(state)
-    }
-
-    fn reserve(&mut self, entries: usize, offset: usize) -> Result<(), ExecutionError> {
-        if entries > self.limit - self.used {
-            return Err(error(offset, Fault::LimitExceeded));
-        }
-        self.used += entries;
-        Ok(())
+        Ok((state, active))
     }
 
     pub(super) fn get(
@@ -310,7 +536,7 @@ impl Tables {
         index: u64,
         offset: usize,
     ) -> Result<Reference, ExecutionError> {
-        let entries = &self.tables[table as usize].entries;
+        let entries = self.tables[table as usize].entries.borrow();
         let range = checked_range(entries.len(), index, 1, offset, OUT_OF_BOUNDS)?;
         Ok(entries[range.start])
     }
@@ -322,7 +548,7 @@ impl Tables {
         value: Reference,
         offset: usize,
     ) -> Result<(), ExecutionError> {
-        let entries = &mut self.tables[table as usize].entries;
+        let mut entries = self.tables[table as usize].entries.borrow_mut();
         let range = checked_range(entries.len(), index, 1, offset, OUT_OF_BOUNDS)?;
         entries[range.start] = value;
         Ok(())
@@ -330,14 +556,10 @@ impl Tables {
 
     pub(super) fn size(&self, table: u32) -> Value {
         let table = &self.tables[table as usize];
-        table
-            .ty
-            .limits
-            .address_type
-            .index_value(table.entries.len() as u64)
+        table.ty.limits.address_type.index_value(table.len())
     }
 
-    fn reference_table(&self, index: u32, heap_type: i64) -> Option<&Table> {
+    fn reference_table(&self, index: u32, heap_type: i64) -> Option<&Rc<Table>> {
         let table = self.tables.get(index as usize)?;
         (table.ty.element_type
             == ValueType::Ref {
@@ -348,38 +570,14 @@ impl Tables {
     }
 
     fn visit_external_references(&self, visitor: &mut dyn FnMut(ExternalReference)) {
-        let tables = self
-            .tables
-            .iter()
-            .filter(|table| matches!(table.ty.element_type, ValueType::Ref { heap_type: -17, .. }))
-            .map(|table| &table.entries);
-        for entry in tables.chain(&self.elements).flatten() {
-            if let Reference::Extern(reference) = *entry {
-                visitor(reference);
+        for table in &self.tables[self.imported..] {
+            if table.ty.element_type == EXTERNREF {
+                trace_entries(&table.entries.borrow(), visitor);
             }
         }
-    }
-
-    fn growth(&self, table: u32, count: u64) -> Option<(usize, usize, usize)> {
-        let table = &self.tables[table as usize];
-        let count = usize::try_from(count)
-            .ok()
-            .filter(|&count| count <= self.limit - self.used)?;
-        let limits = table.ty.limits;
-        let max = limits
-            .max
-            .unwrap_or_else(|| limits.address_type.max_table_elements());
-        let new = table
-            .entries
-            .len()
-            .checked_add(count)
-            .filter(|&new| new as u64 <= max)?;
-        let work = if new > table.entries.capacity() {
-            new
-        } else {
-            count
-        };
-        Some((count, new, work))
+        for segment in &self.elements {
+            trace_entries(segment, visitor);
+        }
     }
 
     pub(super) fn grow(
@@ -403,18 +601,7 @@ impl Tables {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<Option<u64>, ExecutionError> {
-        let Some((count, new, work)) = self.growth(table, count) else {
-            return Ok(None);
-        };
-        budget.spend(offset, work)?;
-        let table = &mut self.tables[table as usize];
-        let old = table.entries.len();
-        if table.entries.try_reserve_exact(count).is_err() {
-            return Ok(None);
-        }
-        table.entries.resize(new, value);
-        self.used += count;
-        Ok(Some(old as u64))
+        self.tables[table as usize].grow(count, value, |work| budget.spend(offset, work))
     }
 
     pub(super) fn init(
@@ -426,7 +613,7 @@ impl Tables {
         budget: &mut Budget<'_>,
     ) -> Result<(), ExecutionError> {
         let source = &self.elements[element as usize];
-        let target = &mut self.tables[table as usize].entries;
+        let mut target = self.tables[table as usize].entries.borrow_mut();
         let (src, dst) = transfer.ranges(source.len(), target.len(), offset, OUT_OF_BOUNDS)?;
         budget.spend(offset, dst.len())?;
         target[dst].copy_from_slice(&source[src]);
@@ -435,7 +622,7 @@ impl Tables {
 
     pub(super) fn drop_element(&mut self, element: u32) {
         let previous = std::mem::take(&mut self.elements[element as usize]);
-        self.used -= previous.len();
+        self.pool.remove(previous.len());
     }
 
     pub(super) fn copy(
@@ -446,24 +633,19 @@ impl Tables {
         offset: usize,
         budget: &mut Budget<'_>,
     ) -> Result<(), ExecutionError> {
-        let (destination, source) = (destination as usize, source as usize);
+        let target = &self.tables[destination as usize];
+        let origin = &self.tables[source as usize];
         let (src, dst) = transfer.ranges(
-            self.tables[source].entries.len(),
-            self.tables[destination].entries.len(),
+            origin.len() as usize,
+            target.len() as usize,
             offset,
             OUT_OF_BOUNDS,
         )?;
         budget.spend(offset, dst.len())?;
-        if destination == source {
-            self.tables[destination].entries.copy_within(src, dst.start);
+        if Rc::ptr_eq(target, origin) {
+            target.entries.borrow_mut().copy_within(src, dst.start);
         } else {
-            let (before, after) = self.tables.split_at_mut(destination.max(source));
-            let (target, origin) = if destination < source {
-                (&mut before[destination], &after[0])
-            } else {
-                (&mut after[0], &before[source])
-            };
-            target.entries[dst].copy_from_slice(&origin.entries[src]);
+            target.entries.borrow_mut()[dst].copy_from_slice(&origin.entries.borrow()[src]);
         }
         Ok(())
     }
@@ -477,11 +659,26 @@ impl Tables {
         budget: &mut Budget<'_>,
         offset: usize,
     ) -> Result<(), ExecutionError> {
-        let entries = &mut self.tables[table as usize].entries;
+        let mut entries = self.tables[table as usize].entries.borrow_mut();
         let range = checked_range(entries.len(), index, count, offset, OUT_OF_BOUNDS)?;
         budget.spend(offset, range.len())?;
         entries[range].fill(value);
         Ok(())
+    }
+}
+
+#[derive(Default)]
+pub(super) struct ActiveElements {
+    writes: Vec<(u32, Range<usize>, Vec<Reference>)>,
+    pub(super) trap: Option<ExecutionError>,
+}
+
+impl ActiveElements {
+    pub(super) fn apply(self, tables: &Tables) -> Result<(), ExecutionError> {
+        for (target, range, values) in self.writes {
+            tables.tables[target as usize].entries.borrow_mut()[range].copy_from_slice(&values);
+        }
+        self.trap.map_or(Ok(()), Err)
     }
 }
 

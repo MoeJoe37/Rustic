@@ -534,3 +534,74 @@ fn active_segment_bounds_and_preparation_limits_are_checked_before_start() {
         Fault::Cancelled
     );
 }
+
+#[test]
+fn imported_external_table_growth_uses_the_allocating_pool() {
+    use rustic_wasm::{ExternalReference, InstanceImports};
+
+    let owner_bytes = module(&[
+        (4, &[2, 0x6f, 1, 1, 4, 0x6f, 1, 1, 4]),
+        (9, &[1, 5, 0x6f, 1, 0xd0, 0x6f, 0x0b]),
+    ]);
+    let owner_limits = InstanceLimits {
+        table_elements: 4,
+        ..Default::default()
+    };
+    let token = CancellationToken::default();
+    let owner = Instance::instantiate_owned(validated(&owner_bytes), owner_limits, &token).unwrap();
+    let shared = owner.external_table(0).unwrap();
+    let consumer_bytes = module(&[
+        (2, &[1, 1, b'm', 1, b't', 1, 0x6f, 1, 1, 4]),
+        (4, &[1, 0x6f, 1, 1, 4]),
+    ]);
+    let consumer_limits = InstanceLimits {
+        table_elements: 1,
+        ..Default::default()
+    };
+    let consumer = Instance::prepare_owned_with_imports(
+        validated(&consumer_bytes),
+        consumer_limits,
+        &token,
+        InstanceImports {
+            tables: std::slice::from_ref(&shared),
+            ..InstanceImports::default()
+        },
+    )
+    .unwrap();
+
+    let cancelled = CancellationToken::default();
+    cancelled.cancel();
+    let reference = ExternalReference::new(u64::MAX);
+    assert_eq!(
+        consumer
+            .grow_external_table(0, 1, Some(reference), &cancelled)
+            .unwrap_err()
+            .kind,
+        Fault::Cancelled
+    );
+    assert_eq!(shared.length(), 1);
+    assert_eq!(
+        consumer
+            .grow_external_table(0, 1, Some(reference), &token)
+            .unwrap(),
+        Some(1)
+    );
+    assert_eq!(owner.external_table_get(0, 1), Some(Some(reference)));
+    assert_eq!(
+        consumer.grow_external_table(1, 1, None, &token).unwrap(),
+        None
+    );
+    assert_eq!(owner.grow_external_table(1, 1, None, &token).unwrap(), None);
+
+    drop(owner);
+    assert_eq!(
+        consumer.grow_external_table(0, 2, None, &token).unwrap(),
+        Some(2)
+    );
+    assert_eq!(shared.length(), 4);
+    assert_eq!(shared.get(1), Some(Some(reference)));
+    assert_eq!(
+        consumer.grow_external_table(0, 1, None, &token).unwrap(),
+        None
+    );
+}

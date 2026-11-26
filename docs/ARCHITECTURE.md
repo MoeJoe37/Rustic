@@ -312,10 +312,12 @@ growth. Mode changes move the bytes into a new generation and detach the old
 one. Each memory has an address width and shares the byte budget of its
 allocating owner. Local tables also carry their declared address width and
 share an instance-wide entry budget with passive element segments. Standalone
-Window tables keep reference entries in a private array traced through the
-table wrapper's ephemeron. Their entries and growth use the JavaScript heap
-budget. A module's exported table traces its owning instance and reads or
-mutates that instance's interpreter entries. The instance caches function
+Window tables initially keep reference entries in a private array traced through
+the wrapper's ephemeron. At its first Wasm link, a standalone `externref` table
+moves its entries to a shared interpreter allocation with a heap reservation
+for bounded growth. Exports of module-defined tables trace the allocating
+instance. Imports keep their source wrappers and share the backing allocation
+and its budget. Re-exports return those same wrappers. The instance caches function
 wrappers by function index and traces JavaScript values reachable from its guest
 state. The interpreter checks full-width guest ranges before converting them
 to host indices. A dispatched import runs with all guest store borrows released
@@ -327,7 +329,7 @@ interpreter remains available on hosts without executable-memory permission.
 [ADR 0083](adr/0083-wasm-js-function-imports.md), [ADR 0084](adr/0084-shared-numeric-wasm-globals.md),
 [ADR 0085](adr/0085-wasm-fixed-memory-buffers.md), [ADR 0086](adr/0086-wasm-memory64.md),
 [ADR 0087](adr/0087-wasm-resizable-buffers.md), [ADR 0088](adr/0088-window-wasm-tables.md),
-[ADR 0089](adr/0089-live-wasm-function-tables.md), [ADR 0090](adr/0090-live-wasm-external-tables.md)
+[ADR 0089](adr/0089-live-wasm-function-tables.md), [ADR 0090](adr/0090-live-wasm-external-tables.md), [ADR 0091](adr/0091-wasm-external-table-imports.md)
 
 The extension design assigns execution under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native

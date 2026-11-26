@@ -1,6 +1,6 @@
 use std::{any::Any, collections::HashMap};
 
-use rustic_wasm::{ExecutionError, ExecutionErrorKind, Instance, InstanceLimits};
+use rustic_wasm::{ExecutionError, ExecutionErrorKind, Instance, InstanceImports, InstanceLimits};
 
 use super::super::events::PrivateArray;
 use super::*;
@@ -130,12 +130,16 @@ fn start(
             with_root(agent, globals.value(), |agent| {
                 let memories = PrivateArray::new(agent, &[])?;
                 with_root(agent, memories.value(), |agent| {
-                    let bindings = host::Bindings {
-                        functions,
-                        globals,
-                        memories,
-                    };
-                    instantiate_module(agent, module, resolved, bindings, proto)
+                    let tables = PrivateArray::new(agent, &[])?;
+                    with_root(agent, tables.value(), |agent| {
+                        let bindings = host::Bindings {
+                            functions,
+                            globals,
+                            memories,
+                            tables,
+                        };
+                        instantiate_module(agent, module, resolved, bindings, proto)
+                    })
                 })
             })
         })
@@ -182,18 +186,18 @@ fn instantiate_module(
                 }
                 ExportIndex::Memory(_) => true,
                 ExportIndex::Table(index) => {
-                    declarations
-                        .tables
-                        .get(index as usize)
-                        .is_some_and(|table| {
+                    match (index as usize).checked_sub(state.tables.len()) {
+                        Some(local) => declarations.tables.get(local).is_some_and(|table| {
                             matches!(
                                 table.value.ty.element_type,
                                 ValueType::Ref {
                                     nullable: true,
-                                    heap_type: -16 | -17
+                                    heap_type: -16 | -17,
                                 }
                             )
-                        })
+                        }),
+                        None => true,
+                    }
                 }
                 _ => false,
             };
@@ -223,19 +227,17 @@ fn instantiate_module(
             + limits.memory_bytes
             + limits.table_storage_bytes();
         let runtime = agent.with_host_memory(allocation, |agent| {
-            host::with_dispatch(agent, bindings.functions, true, |dispatch| {
-                Instance::instantiate_owned_with_host(
-                    validated,
-                    limits,
-                    &token,
-                    &state.globals,
-                    &state.memories,
-                    // Start runs before any module table can hold a host identity.
-                    &mut |index, arguments, results| {
-                        dispatch(index, arguments, results, &mut std::iter::empty())
-                    },
-                )
-            })
+            Instance::prepare_owned_with_imports(
+                validated,
+                limits,
+                &token,
+                InstanceImports {
+                    globals: &state.globals,
+                    memories: &state.memories,
+                    tables: &state.tables,
+                },
+            )
+            .map_err(|error| execution_error(agent, error, true))
         })?;
         Ok((runtime, allocation))
     })?;
@@ -255,10 +257,15 @@ fn instantiate_module(
                 functions.value(),
                 bindings.globals.value(),
                 bindings.memories.value(),
+                bindings.tables.value(),
             ],
         )?;
         with_page(agent, |agent, page| {
             agent.weak_map_set(page.wasm_calls, object, record.value())
+        })?;
+        let runtime = find(agent, object).expect("new WebAssembly instance");
+        host::with_dispatch(agent, bindings.functions, true, |dispatch| {
+            runtime.run_start_with_reference_roots(&token, dispatch)
         })?;
         let exports = Value::object(agent.new_object_with(None)?);
         with_root(agent, exports, |agent| {
@@ -316,8 +323,13 @@ fn populate_exports(
                         }
                     }
                     ExportIndex::Table(index) => {
-                        let ty = runtime.table_type(index).expect("admitted reference table");
-                        table::export(agent, instance, index, ty)?
+                        let imported = bindings.tables.get(agent, index)?;
+                        if imported != Value::UNDEFINED {
+                            imported
+                        } else {
+                            let ty = runtime.table_type(index).expect("admitted reference table");
+                            table::export(agent, instance, index, ty)?
+                        }
                     }
                     _ => unreachable!("admitted exports checked before instantiation"),
                 };

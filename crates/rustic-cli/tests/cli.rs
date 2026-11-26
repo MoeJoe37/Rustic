@@ -428,15 +428,19 @@ fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_par
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(String::from_utf8_lossy(&output.stdout).contains(" line=0\n"));
-    // Inline tables are not supported yet: no partial output.
+    // Form controls are not laid out yet: no partial output.
     fs::write(
         &path,
-        "<style>* {margin:0}</style><main>a <span style=display:inline-table>b</span></main>",
+        "<style>* {margin:0}</style><main>a <select></select></main>",
     )
     .unwrap();
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert_eq!(output.status.code(), Some(1));
-    assert!(stderr(&output).contains("FormattingContext"));
+    assert!(
+        stderr(&output).contains("SpecialElement"),
+        "{}",
+        stderr(&output)
+    );
     assert!(output.stdout.is_empty());
     fs::remove_dir_all(base).unwrap();
 }

@@ -765,7 +765,19 @@ every one reported its height. No recursion: nested tables are more frames.
   RTL. `vertical-align` `top`, `middle`, `bottom` and `baseline` (others act
   as `baseline`) moves a cell's content by growing its top padding in the
   used geometry, so the cell's border box fills its slot.
-- Refused: table parts that would need anonymous table boxes (TD-211).
+- Anonymous boxes (CSS Tables 3 §3.9.1): the node builder fixes up each
+  box's flattened children. In a table, row group or row, runs of other
+  content are wrapped in an anonymous row (cells in a table or group) or
+  cell (anything else in a row), and whitespace-only runs are dropped;
+  column groups keep only columns. Elsewhere, runs of misparented table
+  parts (with the whitespace between them) are wrapped in an anonymous
+  table, which is fixed up in turn, so a lone `display: table-cell` box
+  becomes table, row and cell. Their styles inherit from the box whose
+  children they wrap; like anonymous blocks they have no fragment of
+  their own. `inline-table` boxes are atomic inlines sized like a table,
+  with the first line's baseline.
+- Without fonts (the block-only reference), anonymous table boxes are not
+  generated and misparented parts are refused (TD-211).
 
 ### Evidence
 
@@ -774,8 +786,8 @@ WPT `css-tables/parsing` cases joined the `css.conformance` gate (all 26
 pass). `crates/rustic-layout/tests/tables.rs` checks exact geometry for
 column and row sizing, slots with `colspan`/`rowspan`, specified and
 centred tables, fixed layout, captions, header and footer groups,
-specified heights with baseline and bottom alignment, RTL and the refusal
-of misparented parts; `flow/table.rs` unit-tests the column algorithms.
+specified heights with baseline and bottom alignment, RTL, anonymous
+tables, rows and cells, and inline tables; `flow/table.rs` unit-tests the column algorithms.
 
 Specification basis, reviewed 2026-11-27: CSS 2.2
 [§17](https://www.w3.org/TR/CSS22/tables.html), CSS Tables 3

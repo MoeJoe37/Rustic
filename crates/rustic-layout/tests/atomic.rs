@@ -308,11 +308,12 @@ fn nested_split_inline_boxes_reopen_in_order() {
 #[test]
 fn unsupported_atomic_content_still_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
-    // `inline-grid` is laid out since `layout.grid` (tests/grid.rs).
-    let html = "<p>x<span style='display:inline-table'></span>";
+    // `inline-grid` and `inline-table` are laid out since `layout.grid`
+    // and `layout.tables` (tests/grid.rs, tests/tables.rs); controls are not.
+    let html = "<p>x<button style='display:inline-block'></button>";
     match try_layout(html, "", 100.0) {
         Err(FlowError::Unsupported { reason, .. }) => {
-            assert_eq!(reason, UnsupportedFlow::FormattingContext, "{html}");
+            assert_eq!(reason, UnsupportedFlow::SpecialElement, "{html}");
         }
         other => panic!("{html}: {other:?}"),
     }

@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "504b8a2e90cd00030f08b3bb470fa70c1e226fde0e862844c564a17be822e6ac",
-  "percent": "51.81",
+  "source_fingerprint": "eadf1f262ad90eef3a3b1d35061efa71b5bd3e0ac5ddc430f34ea316b828b5d1",
+  "percent": "51.92",
   "verified_percent": "50.24",
-  "partial_percent": "1.57",
+  "partial_percent": "1.68",
   "completed": 118,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 5,
       "total": 54,
-      "percent": "10.93",
+      "percent": "11.46",
       "verified_percent": "8.00",
-      "partial_percent": "2.93"
+      "partial_percent": "3.46"
     },
     {
       "id": "M10",
@@ -3015,8 +3015,24 @@
             },
             {
               "label": "Anonymous table boxes (CSS Tables 3 \u00a73.9) for misparented parts and text, and inline tables",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/table.rs",
+                  "marker": "pub(super) fn fixup("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn misparented_cells_get_an_anonymous_table_and_row"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn inline_tables_sit_on_the_line"
+                }
+              ]
             },
             {
               "label": "Collapsing borders, column boxes and widths, percentage widths, empty-cells and visibility: collapse",
@@ -3029,7 +3045,7 @@
               "evidence": []
             }
           ],
-          "credit": "40.00",
+          "credit": "60.00",
           "engine_share": "0.58"
         },
         {
@@ -3067,10 +3083,10 @@
       "completed": 7,
       "in_progress": 1,
       "total": 11,
-      "contribution": "3.88",
-      "percent": "64.70",
+      "contribution": "4.00",
+      "percent": "66.66",
       "verified_percent": "60.78",
-      "partial_percent": "3.92"
+      "partial_percent": "5.88"
     },
     {
       "id": "paint",

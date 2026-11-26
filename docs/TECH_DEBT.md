@@ -268,7 +268,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
 | TD-210 | Deliberate | Layout | css-grid WPT comparison: 89 of 168 static pages fail, every one reviewed (writing modes, masonry, subgrid baselines, logical properties, Ahem text) | Open, `layout.grid` (M9) |
-| TD-211 | Deliberate | Layout | Table subset: well-formed tables only (no anonymous table boxes, so misparented table parts, text in rows and `inline-table` are refused), separated borders only, `<col>` widths, percentage cell widths, `visibility: collapse`, `empty-cells` and relative positioning of table parts ignored | Open, `layout.tables` (M9) |
+| TD-211 | Deliberate | Layout | Table subset: separated borders only, `<col>` widths, percentage cell widths, `visibility: collapse`, `empty-cells` and relative positioning of table parts ignored | Open, `layout.tables` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3460,20 +3460,17 @@ is a ratchet: a listed page that passes fails the test.
 **Pay:** shrink the list with TD-209; bundle Ahem in the test fonts.
 
 ### TD-211 — Table layout subset
-`layout.tables` lays out tables whose structure the HTML parser builds:
-a table holding captions, column groups, row groups and rows, rows holding
-cells. Whitespace between parts is dropped; anything else (a
-`display: table-cell` box outside a row, text or blocks directly in a row or
-table, `inline-table`) is refused as an unsupported formatting context,
-because the anonymous table, row and cell boxes of CSS Tables 3 §3.9 are
-not generated yet. Only the separated borders model exists:
-`border-collapse: collapse` drops the spacing and keeps every cell border.
-Column and column group boxes get no geometry (`<col width>` and column
-backgrounds are ignored), percentage cell widths act as `auto` in the
-automatic algorithm, `visibility: collapse` and `empty-cells: hide` change
-nothing, and table parts are not relatively positioned. Extra height of
-spanning cells and of a taller table is shared by rows in proportion to
-their heights.
-**Pay:** the remaining `layout.tables` steps (anonymous boxes and inline
-tables; collapsing borders and columns; HTML presentational hints and the
-pinned css-tables layout pages).
+`layout.tables` lays out tables with anonymous table boxes (CSS Tables 3
+§3.9.1) when fonts are available; the block-only reference without fonts
+still refuses misparented table parts. Only the separated borders model
+exists: `border-collapse: collapse` drops the spacing and keeps every cell
+border. Column and column group boxes get no geometry (`<col width>` and
+column backgrounds are ignored), percentage cell widths act as `auto` in
+the automatic algorithm, `visibility: collapse` and `empty-cells: hide`
+change nothing, and table parts are not relatively positioned. Anonymous
+table boxes inherit from the box whose children they wrap rather than from
+each other, and an inline table's baseline is its first line in preorder
+(a top caption's, if any). Extra height of spanning cells and of a taller
+table is shared by rows in proportion to their heights.
+**Pay:** the remaining `layout.tables` steps (collapsing borders and
+columns; HTML presentational hints and the pinned css-tables layout pages).

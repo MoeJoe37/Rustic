@@ -250,12 +250,56 @@ fn right_to_left_tables_mirror_their_columns() {
 }
 
 #[test]
-fn table_parts_outside_tables_are_still_refused() {
-    let html = page("", "<div style='display: table-cell'>x</div>");
-    assert!(try_boxes(&html).is_err());
+fn misparented_cells_get_an_anonymous_table_and_row() {
+    let html = page(
+        ".cell { display: table-cell }",
+        &format!(
+            "<div id=wrap><div id=c1 class=cell>{}</div>\n<div id=c2 class=cell>{}</div></div>",
+            b("i1", 50, 20),
+            b("i2", 30, 10)
+        ),
+    );
+    let m = boxes(&html);
+    // No spacing (the anonymous table inherits the div's 0) or padding.
+    assert_eq!(m["c1"], (0.0, 0.0, 50.0, 20.0));
+    assert_eq!(m["c2"], (50.0, 0.0, 30.0, 20.0));
+    // Baseline alignment: a block without lines has its bottom as baseline.
+    assert_eq!(m["i2"], (50.0, 10.0, 30.0, 10.0));
+    assert_eq!(m["wrap"].3, 20.0);
+}
+
+#[test]
+fn other_content_in_tables_and_rows_gets_anonymous_rows_and_cells() {
+    let html = page(
+        ".t { display: table } .r { display: table-row } .c { display: table-cell }",
+        &format!(
+            "<div id=t class=t><div class=r>{}<div id=c class=c>{}</div></div>{}</div>",
+            b("loose", 30, 10),
+            b("ic", 20, 10),
+            b("row2", 40, 5)
+        ),
+    );
+    let m = boxes(&html);
+    // The block in the row becomes a cell; the block in the table a row
+    // with one cell, whose width sets the first column.
+    assert_eq!(m["loose"], (0.0, 0.0, 30.0, 10.0));
+    assert_eq!(m["c"], (40.0, 0.0, 20.0, 10.0));
+    assert_eq!(m["row2"], (0.0, 10.0, 40.0, 5.0));
+    assert_eq!(m["t"], (0.0, 0.0, 60.0, 15.0));
+}
+
+#[test]
+fn inline_tables_sit_on_the_line() {
     let html = page(
         "",
-        "<div style='display: table'><div>block in a table</div></div>",
+        &format!(
+            "<div id=p><span id=it style='display:inline-table; border-spacing:0'>\
+             <span style='display:table-cell'>{}</span></span></div>",
+            b("inner", 40, 20)
+        ),
     );
-    assert!(try_boxes(&html).is_err());
+    let m = boxes(&html);
+    assert_eq!(m["it"].2, 40.0);
+    assert_eq!(m["it"].3, 20.0);
+    assert_eq!(m["inner"].0, 0.0);
 }

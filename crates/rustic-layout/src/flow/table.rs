@@ -11,14 +11,13 @@
 //! fixed algorithm from the first row when `table-layout: fixed` has a
 //! definite width. Captions and cells are then laid out at their widths;
 //! rows take the tallest cell (with baseline alignment), spanning cells
-//! grow their last rows, a taller specified table height is shared by the
+//! grow the rows they span, a taller specified table height is shared by the
 //! rows, and `vertical-align` moves a cell's content inside its slot.
 //!
-//! The separated borders model only: `border-collapse: collapse` uses no
-//! spacing and keeps every border. Only well-formed tables are laid out (the
-//! structure the HTML parser builds); anonymous table boxes, column widths,
-//! percentages, `visibility: collapse` and `empty-cells` are later steps
-//! (TD-211).
+//! [`fixup`] generates anonymous table, row and cell boxes while flow nodes
+//! are built. The separated borders model only: `border-collapse: collapse`
+//! uses no spacing and keeps every border; column widths, percentages,
+//! `visibility: collapse` and `empty-cells` are later steps (TD-211).
 
 use rustic_css::{
     BorderCollapse, CaptionSide, Direction, LengthPercentage, PropertyId as P, PropertyValue as V,
@@ -26,11 +25,12 @@ use rustic_css::{
 };
 use rustic_style::ComputedStyle;
 
-use super::{Bfc, Engine, FlowError, Frame};
+use super::{Bfc, Engine, FlowError, Frame, Item, Work};
 use crate::height::HeightConstraint;
 use crate::intrinsic::{self, Intrinsic, Resolver, Sizing};
 use crate::sizing::{box_edges, lp, measure_in_band};
 use crate::{BlockMeasure, CssPx, Edges};
+use crate::{BoxKind, BoxSnapshot};
 
 const EMPTY: BlockMeasure = BlockMeasure {
     content_width: CssPx::ZERO,
@@ -67,7 +67,7 @@ impl TablePart {
     pub(super) fn of(display: rustic_css::Display) -> Option<Self> {
         use rustic_css::Display as D;
         Some(match display {
-            D::Table => Self::Table,
+            D::Table | D::InlineTable => Self::Table,
             D::TableCaption => Self::Caption,
             D::TableHeaderGroup => Self::HeaderGroup,
             D::TableRowGroup => Self::BodyGroup,
@@ -119,6 +119,92 @@ impl TablePart {
                 | Self::Column
         )
     }
+}
+
+/// One child after table fixup: a flattened item, or an anonymous table
+/// box around items (fixed up again when it is built).
+#[derive(Debug)]
+pub(super) enum Out {
+    Item(Item),
+    Wrap(TablePart, Vec<Item>),
+}
+
+fn part_of(boxes: &[BoxSnapshot], item: Item) -> Option<TablePart> {
+    match item {
+        Item::Block(c) => match boxes[c].kind() {
+            BoxKind::Element(d) => TablePart::of(d),
+            BoxKind::Text => None,
+        },
+        _ => None,
+    }
+}
+
+/// Generate anonymous table boxes among the flattened children `items` of
+/// a box with table role `parent` (CSS Tables 3 §3.9.1): in a table, row
+/// group or row, runs of other content are wrapped in an anonymous row
+/// (cells in a table or group) or cell (other content in a row), and
+/// whitespace-only runs are dropped; columns keep only columns. Elsewhere,
+/// runs of table parts that are misparented (with the whitespace between
+/// them) are wrapped in an anonymous table. Wrappers are fixed up again
+/// when built, so a misparented cell becomes table, row and cell.
+pub(super) fn fixup(
+    parent: Option<TablePart>,
+    boxes: &[BoxSnapshot],
+    items: Vec<Item>,
+    work: &mut Work<'_>,
+) -> Result<Vec<Out>, FlowError> {
+    let mut out = Vec::with_capacity(items.len());
+    let mut run: Vec<Item> = Vec::new();
+    let mut spaces: Vec<Item> = Vec::new();
+    match parent.filter(|p| p.needs_proper_children()) {
+        Some(p) => {
+            let wrapper = match p {
+                TablePart::Row => Some(TablePart::Cell),
+                TablePart::Column => None,
+                _ => Some(TablePart::Row),
+            };
+            let flush = |run: &mut Vec<Item>, out: &mut Vec<Out>| {
+                let content = run.iter().any(|i| !matches!(i, Item::Whitespace(_)));
+                let taken = std::mem::take(run);
+                if let (true, Some(w)) = (content, wrapper) {
+                    out.push(Out::Wrap(w, taken));
+                }
+            };
+            for item in items {
+                work.charge(1)?;
+                if part_of(boxes, item).is_some_and(|c| c.fits_in(Some(p))) {
+                    flush(&mut run, &mut out);
+                    out.push(Out::Item(item));
+                } else {
+                    run.push(item);
+                }
+            }
+            flush(&mut run, &mut out);
+        }
+        None => {
+            for item in items {
+                work.charge(1)?;
+                let misparented = part_of(boxes, item).is_some_and(|c| !c.fits_in(parent));
+                if misparented {
+                    run.append(&mut spaces);
+                    run.push(item);
+                } else if matches!(item, Item::Whitespace(_)) && !run.is_empty() {
+                    spaces.push(item);
+                } else {
+                    if !run.is_empty() {
+                        out.push(Out::Wrap(TablePart::Table, std::mem::take(&mut run)));
+                    }
+                    out.extend(spaces.drain(..).map(Out::Item));
+                    out.push(Out::Item(item));
+                }
+            }
+            if !run.is_empty() {
+                out.push(Out::Wrap(TablePart::Table, run));
+            }
+            out.extend(spaces.into_iter().map(Out::Item));
+        }
+    }
+    Ok(out)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

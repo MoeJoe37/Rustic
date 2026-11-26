@@ -384,11 +384,8 @@ fn relative_inline_boxes_shift_their_fragments() {
 #[test]
 fn unsupported_inline_content_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
+    // `inline-table` is laid out since `layout.tables` (tests/tables.rs).
     for (html, reason) in [
-        (
-            "<p>x<span style='display:inline-table'>x</span>",
-            UnsupportedFlow::FormattingContext,
-        ),
         ("<p>x<input>", UnsupportedFlow::SpecialElement),
         ("<p>x<select></select>", UnsupportedFlow::SpecialElement),
     ] {

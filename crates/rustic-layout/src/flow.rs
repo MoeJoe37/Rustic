@@ -42,6 +42,7 @@ use crate::{
     GeometryError, LayoutLimits, MeasureError,
 };
 use rustic_text::FontDatabase;
+use table::Out;
 
 /// Work units (box visits, float scans, chain steps) one layout may spend.
 ///
@@ -496,7 +497,9 @@ fn supported_atomic(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
         return Err(fail(UnsupportedFlow::SpecialElement));
     }
     match b.kind() {
-        BoxKind::Element(Display::InlineBlock | Display::InlineFlex | Display::InlineGrid) => {}
+        BoxKind::Element(
+            Display::InlineBlock | Display::InlineFlex | Display::InlineGrid | Display::InlineTable,
+        ) => {}
         BoxKind::Element(Display::Inline) if replaced => {}
         _ => return Err(fail(UnsupportedFlow::FormattingContext)),
     }
@@ -613,8 +616,10 @@ fn build_nodes<'a>(
 }
 
 /// Refuse table structure that would need anonymous table boxes (CSS
-/// Tables 3 §3.9, TD-211): a table part outside its proper parent, or other
-/// content directly inside a table, row group, row or column group.
+/// Tables 3 §3.9): a table part outside its proper parent, or other content
+/// directly inside a table, row group, row or column group. The block-only
+/// builder generates none (TD-211); with fonts, [`table::fixup`] does, and
+/// this check only guards its result.
 fn check_table_parent(nodes: &[Node<'_>], index: usize) -> Result<(), FlowError> {
     let n = &nodes[index];
     let parent = n.parent.and_then(|p| nodes[p].table);
@@ -883,10 +888,56 @@ enum Pending {
         container: usize,
         entries: Vec<Entry>,
     },
+    /// An anonymous table, row or cell around `items` of `container`.
+    Wrapper {
+        parent: usize,
+        container: usize,
+        part: table::TablePart,
+        items: Vec<Item>,
+    },
+}
+
+/// Which boxes need anonymous table boxes among their flattened children
+/// (CSS Tables 3 §3.9.1): tables, row groups and rows with other content,
+/// and the block containers of misparented table parts.
+fn table_wrapper_owners(tree: &BoxTree, kinds: &[Participation]) -> Vec<bool> {
+    let boxes = tree.boxes();
+    let part = |i: usize| match boxes[i].kind() {
+        BoxKind::Element(d) => table::TablePart::of(d),
+        BoxKind::Text => None,
+    };
+    let mut need = vec![false; boxes.len()];
+    for (j, b) in boxes.iter().enumerate() {
+        let Some(q) = b.parent() else {
+            continue;
+        };
+        let parent = part(q);
+        if parent.is_some_and(table::TablePart::needs_proper_children) {
+            let proper = part(j).is_some_and(|p| p.fits_in(parent));
+            if !proper && kinds[j] != Participation::Whitespace {
+                need[q] = true;
+            }
+            continue;
+        }
+        if part(j).is_some_and(|p| !p.fits_in(parent)) {
+            // The block container whose flattened items hold this box.
+            let mut owner = q;
+            while kinds[owner] == Participation::Mixed {
+                match boxes[owner].parent() {
+                    Some(p) => owner = p,
+                    None => break,
+                }
+            }
+            need[owner] = true;
+        }
+    }
+    need
 }
 
 /// Anonymous block styles for every block container that mixes inline
-/// content with block-level boxes (CSS 2.2 §9.2.1.1).
+/// content with block-level boxes (CSS 2.2 §9.2.1.1), and anonymous table,
+/// row and cell styles where table fixup needs them: `of[i]` is the block
+/// style, followed by the table, row and cell styles.
 fn anonymous_styles(
     tree: &BoxTree,
     ends: &[usize],
@@ -895,7 +946,21 @@ fn anonymous_styles(
     let boxes = tree.boxes();
     let mut styles = Vec::new();
     let mut of = vec![None; boxes.len()];
+    let tables = table_wrapper_owners(tree, kinds);
     for (i, b) in boxes.iter().enumerate() {
+        if tables[i] {
+            let style = b.style().ok_or(FlowError::InvalidSnapshot)?;
+            of[i] = Some(styles.len());
+            for display in [
+                Display::Block,
+                Display::Table,
+                Display::TableRow,
+                Display::TableCell,
+            ] {
+                styles.push(style.anonymous_flow(display));
+            }
+            continue;
+        }
         let flex = match b.kind() {
             BoxKind::Element(
                 Display::Block
@@ -987,7 +1052,7 @@ fn build_text_nodes<'a>(
         work.charge(1)?;
         let parent = match &pending {
             Pending::Box { parent, .. } => *parent,
-            Pending::Anonymous { parent, .. } => Some(*parent),
+            Pending::Anonymous { parent, .. } | Pending::Wrapper { parent, .. } => Some(*parent),
         };
         let depth = match parent {
             Some(p) => nodes[p].depth.checked_add(1).ok_or(FlowError::DepthLimit)?,
@@ -996,7 +1061,7 @@ fn build_text_nodes<'a>(
         if depth > limits.max_depth {
             return Err(FlowError::DepthLimit);
         }
-        match pending {
+        let (index, container, style, items) = match pending {
             Pending::Box {
                 source,
                 parent,
@@ -1036,102 +1101,45 @@ fn build_text_nodes<'a>(
                     continue;
                 }
                 let items = flatten(ends, kinds, source, work)?;
-                let has_block = items.iter().any(|i| matches!(i, Item::Block(_)));
-                let has_inline = items.iter().any(|i| matches!(i, Item::Inline(_)));
-                if has_inline
-                    && nodes[index]
-                        .table
-                        .is_some_and(table::TablePart::needs_proper_children)
-                {
-                    return Err(FlowError::Unsupported {
-                        node: nodes[index].node,
-                        reason: UnsupportedFlow::FormattingContext,
-                    });
+                (index, source, style, items)
+            }
+            Pending::Wrapper {
+                parent,
+                container,
+                part,
+                items,
+            } => {
+                if nodes.len() >= limits.max_boxes {
+                    return Err(FlowError::BoxLimit);
                 }
-                if !has_block && !nodes[index].flex_container && !nodes[index].grid_container {
-                    if has_inline {
-                        let entries: Vec<Entry> = items
-                            .iter()
-                            .map(|i| match *i {
-                                Item::Inline(c) | Item::Whitespace(c) => Ok(Entry::Box(c)),
-                                _ => Err(FlowError::InvalidSnapshot),
-                            })
-                            .collect::<Result<_, _>>()?;
-                        let ifc = inline::build(tree, ends, style, &entries, fonts, work)?;
-                        ifcs.push(ifc);
-                        let k = ifcs.len() - 1;
-                        nodes[index].inline = Some(k);
-                        push_atomics(&mut stack, &ifcs[k], k, index);
-                    }
-                    continue;
-                }
-                // Group inline runs; push in reverse so preorder is kept.
-                let mut groups: Vec<Pending> = Vec::new();
-                let mut run: Vec<Entry> = Vec::new();
-                let mut run_inline = false;
-                // Inline boxes split by the block-level boxes seen so far.
-                let mut open: Vec<usize> = Vec::new();
-                for item in items {
-                    match item {
-                        Item::Block(c) => {
-                            if run_inline {
-                                for &o in open.iter().rev() {
-                                    run.push(Entry::Close {
-                                        source: o,
-                                        last: false,
-                                    });
-                                }
-                                groups.push(Pending::Anonymous {
-                                    parent: index,
-                                    container: source,
-                                    entries: std::mem::take(&mut run),
-                                });
-                            }
-                            run.clear();
-                            run_inline = false;
-                            for &o in &open {
-                                run.push(Entry::Open {
-                                    source: o,
-                                    first: false,
-                                });
-                            }
-                            groups.push(Pending::Box {
-                                source: c,
-                                parent: Some(index),
-                                atomic: None,
-                            });
-                        }
-                        Item::Inline(c) => {
-                            run.push(Entry::Box(c));
-                            run_inline = true;
-                        }
-                        Item::Whitespace(c) => run.push(Entry::Box(c)),
-                        Item::Open(c) => {
-                            run.push(Entry::Open {
-                                source: c,
-                                first: true,
-                            });
-                            open.push(c);
-                            run_inline = true;
-                        }
-                        Item::Close(c) => {
-                            run.push(Entry::Close {
-                                source: c,
-                                last: true,
-                            });
-                            open.pop();
-                            run_inline = true;
-                        }
-                    }
-                }
-                if run_inline {
-                    groups.push(Pending::Anonymous {
-                        parent: index,
-                        container: source,
-                        entries: run,
-                    });
-                }
-                stack.extend(groups.into_iter().rev());
+                let slot = match part {
+                    table::TablePart::Table => 1,
+                    table::TablePart::Row => 2,
+                    _ => 3,
+                };
+                let style = anonymous_of[container]
+                    .and_then(|i| anonymous.get(i + slot))
+                    .ok_or(FlowError::InvalidSnapshot)?;
+                let mut node = new_node(
+                    &nodes,
+                    container,
+                    &boxes[container],
+                    style,
+                    Some(parent),
+                    depth,
+                )?;
+                node.anonymous = true;
+                node.natural = None;
+                node.flex_container = false;
+                node.grid_container = false;
+                node.table = Some(part);
+                node.span = (1, 1);
+                node.flex_item = nodes[parent].flex_container && node.scheme == Scheme::Flow;
+                node.grid_item = nodes[parent].grid_container && node.scheme == Scheme::Flow;
+                nodes.push(node);
+                let index = nodes.len() - 1;
+                check_table_parent(&nodes, index)?;
+                (index, container, style, items)
             }
             Pending::Anonymous {
                 parent,
@@ -1168,8 +1176,134 @@ fn build_text_nodes<'a>(
                 nodes.push(node);
                 let index = nodes.len() - 1;
                 push_atomics(&mut stack, &ifcs[k], k, index);
+                continue;
+            }
+        };
+        // Anonymous table boxes (CSS Tables 3 §3.9).
+        let items = table::fixup(nodes[index].table, boxes, items, work)?;
+        let has_block = items
+            .iter()
+            .any(|i| matches!(i, Out::Item(Item::Block(_)) | Out::Wrap(..)));
+        let has_inline = items
+            .iter()
+            .any(|i| matches!(i, Out::Item(Item::Inline(_))));
+        if !has_block && !nodes[index].flex_container && !nodes[index].grid_container {
+            if has_inline {
+                let entries: Vec<Entry> = items
+                    .iter()
+                    .map(|i| match *i {
+                        Out::Item(Item::Inline(c) | Item::Whitespace(c)) => Ok(Entry::Box(c)),
+                        _ => Err(FlowError::InvalidSnapshot),
+                    })
+                    .collect::<Result<_, _>>()?;
+                let ifc = inline::build(tree, ends, style, &entries, fonts, work)?;
+                ifcs.push(ifc);
+                let k = ifcs.len() - 1;
+                nodes[index].inline = Some(k);
+                push_atomics(&mut stack, &ifcs[k], k, index);
+            }
+            continue;
+        }
+        // Group inline runs; push in reverse so preorder is kept.
+        let mut groups: Vec<Pending> = Vec::new();
+        let mut run: Vec<Entry> = Vec::new();
+        let mut run_inline = false;
+        // Inline boxes split by the block-level boxes seen so far.
+        let mut open: Vec<usize> = Vec::new();
+        for item in items {
+            let item = match item {
+                Out::Item(item) => item,
+                Out::Wrap(part, inner) => {
+                    if run_inline {
+                        for &o in open.iter().rev() {
+                            run.push(Entry::Close {
+                                source: o,
+                                last: false,
+                            });
+                        }
+                        groups.push(Pending::Anonymous {
+                            parent: index,
+                            container,
+                            entries: std::mem::take(&mut run),
+                        });
+                    }
+                    run.clear();
+                    run_inline = false;
+                    for &o in &open {
+                        run.push(Entry::Open {
+                            source: o,
+                            first: false,
+                        });
+                    }
+                    groups.push(Pending::Wrapper {
+                        parent: index,
+                        container,
+                        part,
+                        items: inner,
+                    });
+                    continue;
+                }
+            };
+            match item {
+                Item::Block(c) => {
+                    if run_inline {
+                        for &o in open.iter().rev() {
+                            run.push(Entry::Close {
+                                source: o,
+                                last: false,
+                            });
+                        }
+                        groups.push(Pending::Anonymous {
+                            parent: index,
+                            container,
+                            entries: std::mem::take(&mut run),
+                        });
+                    }
+                    run.clear();
+                    run_inline = false;
+                    for &o in &open {
+                        run.push(Entry::Open {
+                            source: o,
+                            first: false,
+                        });
+                    }
+                    groups.push(Pending::Box {
+                        source: c,
+                        parent: Some(index),
+                        atomic: None,
+                    });
+                }
+                Item::Inline(c) => {
+                    run.push(Entry::Box(c));
+                    run_inline = true;
+                }
+                Item::Whitespace(c) => run.push(Entry::Box(c)),
+                Item::Open(c) => {
+                    run.push(Entry::Open {
+                        source: c,
+                        first: true,
+                    });
+                    open.push(c);
+                    run_inline = true;
+                }
+                Item::Close(c) => {
+                    run.push(Entry::Close {
+                        source: c,
+                        last: true,
+                    });
+                    open.pop();
+                    run_inline = true;
+                }
             }
         }
+        if run_inline {
+            groups.push(Pending::Anonymous {
+                parent: index,
+                container,
+                entries: run,
+            });
+        }
+        stack.extend(groups.into_iter().rev());
     }
     Ok(nodes)
 }
@@ -1747,10 +1881,13 @@ impl<'a, 'c> Engine<'a, 'c> {
         pf: &Frame,
     ) -> Result<(), FlowError> {
         let replaced = self.replaced_size(i, pf.width.get(), pf.definite)?;
+        let forced = match self.nodes[i].table {
+            Some(table::TablePart::Table) => Some(self.table_width(i, pf.width.get())?),
+            _ => replaced.map(|(w, _)| w),
+        };
         let n = &self.nodes[i];
         // `inline-block` widths are shrink-to-fit like floats (CSS 2.2 §10.3.9).
-        let measure =
-            position::measure_float(n.style, pf.width, n.intrinsic, replaced.map(|(w, _)| w))?;
+        let measure = position::measure_float(n.style, pf.width, n.intrinsic, forced)?;
         self.begin(i, measure, pf)?;
         self.force_height(i, replaced)?;
         self.nodes[i].top_resolved = true;
@@ -1771,7 +1908,8 @@ impl<'a, 'c> Engine<'a, 'c> {
         let height = m.margin.top.get() + n.border_height.get() + m.margin.bottom.get();
         let content_top = m.margin.top.get() + m.border.top.get() + m.padding.top.get();
         let own = n.natural.is_none() && !scroll_container(n.overflow);
-        let last = !n.flex_container && !n.grid_container;
+        // An inline table's baseline is its first row's (CSS 2.2 §17.5.3).
+        let last = !n.flex_container && !n.grid_container && n.table.is_none();
         let baseline = match own {
             true => self.content_baseline(i, last)?,
             false => None,
@@ -2869,11 +3007,13 @@ impl Engine<'_, '_> {
                 count += 1;
             }
         }
-        let owner = |i: usize| -> usize {
-            match self.nodes[i].parent {
-                Some(p) if self.nodes[i].anonymous => p,
-                _ => i,
+        // The nearest box with a fragment (anonymous boxes can nest:
+        // anonymous table, row and cell boxes).
+        let owner = |mut i: usize| -> usize {
+            while let Some(p) = self.nodes[i].parent.filter(|_| self.nodes[i].anonymous) {
+                i = p;
             }
+            i
         };
         let mut lines_out = Vec::new();
         let mut line_order = Vec::new();

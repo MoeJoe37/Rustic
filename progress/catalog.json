@@ -2745,8 +2745,24 @@
             },
             {
               "label": "Anonymous table boxes (CSS Tables 3 §3.9) for misparented parts and text, and inline tables",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/table.rs",
+                  "marker": "pub(super) fn fixup("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn misparented_cells_get_an_anonymous_table_and_row"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn inline_tables_sit_on_the_line"
+                }
+              ]
             },
             {
               "label": "Collapsing borders, column boxes and widths, percentage widths, empty-cells and visibility: collapse",

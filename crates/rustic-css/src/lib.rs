@@ -82,7 +82,7 @@ pub use flex::{
 };
 pub use grid::{
     AutoFlow, GridAreas, GridLine, GridTemplate, GridValue, MAX_REPEAT, NamedArea, RepeatCount,
-    TrackBreadth, TrackComponent, TrackSize,
+    SubgridNames, TrackBreadth, TrackComponent, TrackSize,
 };
 pub use length::{Length, LengthPercentage, LengthUnit};
 pub use media::{

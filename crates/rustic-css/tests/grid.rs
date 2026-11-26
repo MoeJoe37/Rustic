@@ -56,6 +56,20 @@ const VALID: &[(&str, &str)] = &[
         "grid-auto-columns: 1fr minmax(min-content, 10px)",
         "grid-auto-columns: 1fr minmax(min-content, 10px)",
     ),
+    // Subgrids.
+    ("grid-template-rows: subgrid", "grid-template-rows: subgrid"),
+    (
+        "grid-template-columns: SUBGRID [a] [] [b c]",
+        "grid-template-columns: subgrid [a] [] [b c]",
+    ),
+    (
+        "grid-template-columns: subgrid [a] repeat(auto-fill, [b] []) repeat(2, [c])",
+        "grid-template-columns: subgrid [a] repeat(auto-fill, [b] []) repeat(2, [c])",
+    ),
+    (
+        "grid-template: subgrid / subgrid [x]",
+        "grid-template-rows: subgrid; grid-template-columns: subgrid [x]; grid-template-areas: none",
+    ),
     // Areas.
     ("grid-template-areas: none", "grid-template-areas: none"),
     (
@@ -174,6 +188,15 @@ const INVALID: &[&str] = &[
     "grid-template-columns: repeat(2, repeat(2, 10px))",
     "grid-template-columns: [span] 10px",
     "grid-template-columns: [auto] 10px",
+    "grid-template-rows: subgrid subgrid",
+    "grid-template-rows: subgrid none",
+    "grid-template-rows: subgrid [a] 1px",
+    "grid-template-rows: subgrid repeat(auto-fit, [a])",
+    "grid-template-rows: subgrid repeat(2, 1px)",
+    "grid-template-rows: subgrid repeat(0, [a])",
+    "grid-template-rows: subgrid repeat(auto-fill, [a]) repeat(auto-fill, [b])",
+    "grid-auto-rows: subgrid",
+    "grid-template: \"a\" / subgrid",
     "grid-auto-rows: none",
     "grid-template-areas: \"a b\" \"a\"",
     "grid-template-areas: \"a b a\"",

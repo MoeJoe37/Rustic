@@ -610,8 +610,10 @@ four placement longhands and the `grid-row`, `grid-column`, `grid-area`,
 `grid-template` and `grid` shorthands, plus `justify-items`, `justify-self`
 (with `legacy`), `place-content`/`-items`/`-self`, `flow-start`/`flow-end`,
 overflow positions on `normal` and the `grid-gap` aliases. Track lists keep
-their written structure; `repeat()` counts clamp at 10,000. `subgrid` and
-masonry are not parsed (TD-209).
+their written structure; `repeat()` counts clamp at 10,000.
+`grid-template-rows`/`-columns` also take `subgrid` with a line name list
+(`[]` entries count, `repeat()` with a count or `auto-fill`). Masonry is not
+parsed (TD-209).
 
 ### Algorithm
 
@@ -665,11 +667,42 @@ metered by the flow work budget. Absolutely positioned grids carry their
 `min-height`/`max-height` into their row sizing, and a `max-*` size below
 the `min-*` size yields to it when auto repetitions are counted.
 
+### Subgrid
+
+A grid item that is itself a grid container with `subgrid` in an axis
+adopts the tracks it spans in its parent there (CSS Grid 2 §9); without a
+grid parent `subgrid` behaves as `none`. The parent registers each subgrid
+item with its span, the parent's names for the spanned lines (reversed for
+a subgrid against the parent's inline direction) and the parent's gap. The
+subgrid's explicit grid in that axis is those tracks, with the inherited
+names plus its own line name list; lines clamp to it and it has no implicit
+tracks, its content alignment there is `start`, and it always fills its
+area. A subgrid placed with an automatic span spans its named lines minus
+one.
+
+- Columns: the parent sizes its columns with the subgrid's items in place
+  of the subgrid, collected through any depth of nested subgrids from a
+  work stack. The subgrid's margin, border and padding add to the
+  contributions of items at its edges, and half the difference between its
+  gap and its parent's to the other sides; an empty subgrid contributes one
+  item with its edges. After aligning its columns the parent hands each
+  subgrid its track sizes and starts.
+- Rows: a row subgrid records its items' row contributions (its own row
+  subgrids' already folded in) whenever it sizes its rows. The parent uses
+  them, adjusted the same way, in place of the subgrid's height, then
+  lays the subgrid out again at its area height with the sized rows.
+- Gaps: a `normal` gap keeps the parent's gutters, distributed space
+  included; a subgrid's own gap is centred in each parent gutter, so the
+  tracks beside it grow or shrink. The outer tracks lose the subgrid's
+  margin, border and padding.
+
+Baseline sharing does not cross subgrid boundaries (TD-209).
+
 ### Evidence
 
 `crates/rustic-css/tests/grid.rs` covers valid and invalid values and
 shorthand expansion; the pinned WPT `css-grid/parsing` and
-`css-align/parsing` cases joined the `css.conformance` gate (2293 of 2664
+`css-align/parsing` cases joined the `css.conformance` gate (2353 of 2724
 in-scope cases pass, three grid cases reviewed as failures).
 `crates/rustic-layout/tests/grid.rs` has nineteen scenarios with exact
 geometry (fixed and flexible tracks with gaps, areas and named lines, auto
@@ -677,10 +710,16 @@ placement with spans, dense and column flow, negative lines, intrinsic and
 inline grids, row sizing and stretch, content and self alignment, RTL,
 `auto-fit` collapse, `order`, abspos `min-height`, clamped lines, anonymous
 items, grid-area containing blocks, baseline alignment, inline-grid
-baselines, repetitions against min/max sizes); `flow/grid.rs` unit-tests the sizing and placement algorithms
+baselines, repetitions against min/max sizes, and five subgrid scenarios:
+column and row subgrids sizing parent tracks, inherited and own line names
+with an own gap, nested subgrids with automatic spans, and an LTR subgrid
+in an RTL grid); `flow/grid.rs` unit-tests the sizing and placement
+algorithms
 directly. `tests/wpt_grid.rs` compares the 168 static `checkLayout` pages
-of the pinned css-grid directory (`tools/import_wpt_grid_tests.py`): 76
-pass and the other 92 are reviewed failures (TD-210).
+of the pinned css-grid directory (`tools/import_wpt_grid_tests.py`): 79
+pass and the other 89 are reviewed failures (TD-210). The pinned
+`css-grid/subgrid` parsing cases joined the `css.conformance` gate with
+the subgrid step (all 60 pass).
 
 Specification basis, reviewed 2026-11-26: CSS Grid Layout 2
 [§6–§11](https://drafts.csswg.org/css-grid-2/) and CSS Box Alignment 3

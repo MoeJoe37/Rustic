@@ -519,6 +519,8 @@ struct Engine<'a, 'c> {
     grids: Vec<grid::GridRun>,
     /// Final lines of laid-out grid containers, for positioned descendants.
     grid_geometry: HashMap<usize, grid::GridGeometry>,
+    /// Subgrids' links to their parent grids, by subgrid node.
+    subgrids: HashMap<usize, grid::Subgrid>,
     ifcs: Vec<Ifc<'a>>,
     /// Lines per inline formatting context, relative to its content origin.
     line_sets: Vec<Option<LineSet>>,
@@ -2357,6 +2359,7 @@ impl BlockLayout {
             flexes: Vec::new(),
             grids: Vec::new(),
             grid_geometry: HashMap::new(),
+            subgrids: HashMap::new(),
             work,
             ifcs,
             line_sets,

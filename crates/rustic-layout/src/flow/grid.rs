@@ -14,13 +14,17 @@
 //! items crossing flexible tracks), maximization, flexible lengths and
 //! stretched `auto` tracks. Baseline-aligned items share row baselines,
 //! and a finished run keeps its lines so positioned descendants can use
-//! grid areas as containing blocks (§9). Limits (subgrid, masonry, vertical
-//! writing modes) are TD-209; the WPT comparison's reviewed failures are
-//! TD-210.
+//! grid areas as containing blocks (§9). Subgrids (§9 of CSS Grid 2) adopt
+//! their parent's tracks: the parent sizes its columns with the subgrid's
+//! items in place of the subgrid (gathered without recursion through nested
+//! subgrids), and its rows from contributions a row subgrid records while it
+//! is measured; the subgrid is then laid out again with the parent's track
+//! sizes. Limits (masonry, vertical writing modes, subgrid baselines) are
+//! TD-209; the WPT comparison's reviewed failures are TD-210.
 
 use rustic_css::{
     AlignKeyword as K, Alignment, Direction, Gap, GridLine, GridTemplate, GridValue,
-    OverflowPosition, PropertyId as P, PropertyValue as V, RepeatCount, TrackBreadth,
+    OverflowPosition, PropertyId as P, PropertyValue as V, RepeatCount, SubgridNames, TrackBreadth,
     TrackComponent, TrackSize,
 };
 use rustic_style::ComputedStyle;
@@ -103,7 +107,7 @@ enum Available {
 
 /// An item's contributions in one axis (outer sizes).
 #[derive(Clone, Copy, Debug, Default)]
-struct Contribution {
+pub(super) struct Contribution {
     start: usize,
     end: usize,
     minimum: f64,
@@ -145,6 +149,8 @@ struct Item {
     /// the latest layout (`None`: synthesized from the border box).
     first_baseline: Option<f64>,
     last_baseline: Option<f64>,
+    /// A subgrid in the (column, row) axis.
+    subgrid: (bool, bool),
 }
 
 impl Item {
@@ -184,6 +190,8 @@ pub(super) struct GridRun {
     column_names: Vec<Vec<String>>,
     row_names: Vec<Vec<String>>,
     origin: (i64, i64),
+    /// This container is a subgrid in the (column, row) axis.
+    subgrid: (bool, bool),
     phase: Phase,
     queue: Vec<Request>,
     current: Option<usize>,
@@ -282,6 +290,198 @@ pub(super) struct GridGeometry {
     columns: AxisLines,
     rows: AxisLines,
     rtl: bool,
+}
+
+/// What a subgrid adopts from its parent grid in one axis (CSS Grid 2 §9).
+#[derive(Clone, Debug, Default)]
+struct SubAxis {
+    /// Parent tracks the subgrid spans.
+    count: usize,
+    /// The parent's names for each spanned line, in the subgrid's order.
+    names: Vec<Vec<String>>,
+    /// The parent's gap, the used value of a `normal` gap.
+    parent_gap: f64,
+    /// The subgrid's track sizes and track start offsets (plus the end of
+    /// the last track) once the parent has sized its tracks.
+    sizes: Option<(Vec<f64>, Vec<f64>)>,
+}
+
+/// A subgrid's link to its parent grid, keyed by the subgrid's node.
+#[derive(Clone, Debug, Default)]
+pub(super) struct Subgrid {
+    columns: Option<SubAxis>,
+    rows: Option<SubAxis>,
+    /// Row contributions of the subgrid's items in its own tracks, and its
+    /// row gap, from its latest layout; the parent sizes its rows with them.
+    recorded: Option<(Vec<Contribution>, f64)>,
+}
+
+/// Whether `style` declares `subgrid` for the template property `p`.
+fn declares_subgrid(style: &ComputedStyle, p: P) -> bool {
+    matches!(
+        style.get(p),
+        V::Grid(GridValue::Template(GridTemplate::Subgrid(_)))
+    )
+}
+
+/// The explicit lines of a subgridded axis: the parent's spanned tracks,
+/// their inherited line names and the subgrid's own `<line-name-list>`.
+fn subgrid_explicit(
+    list: &[SubgridNames],
+    axis: &SubAxis,
+    work: &mut Work<'_>,
+) -> Result<Explicit, FlowError> {
+    let lines = axis.count + 1;
+    let fixed: usize = list
+        .iter()
+        .map(|e| match e {
+            SubgridNames::Names(_) => 1,
+            SubgridNames::Repeat(Some(n), l) => (*n as usize).saturating_mul(l.len()),
+            SubgridNames::Repeat(None, _) => 0,
+        })
+        .fold(0, usize::saturating_add);
+    let mut own: Vec<Vec<String>> = Vec::new();
+    for entry in list {
+        match entry {
+            SubgridNames::Names(names) => own.push(names.clone()),
+            SubgridNames::Repeat(count, l) => {
+                // `auto-fill` repeats as often as the unnamed lines allow.
+                let times = match count {
+                    Some(n) => *n as usize,
+                    None => lines.saturating_sub(fixed) / l.len().max(1),
+                };
+                for _ in 0..times {
+                    if own.len() >= lines {
+                        break;
+                    }
+                    work.charge(l.len())?;
+                    own.extend(l.iter().cloned());
+                }
+            }
+        }
+        if own.len() >= lines {
+            break;
+        }
+    }
+    own.truncate(lines);
+    let mut names = axis.names.clone();
+    names.resize(lines, Vec::new());
+    for (line, extra) in own.into_iter().enumerate() {
+        work.charge(1)?;
+        names[line].extend(extra);
+    }
+    Ok(Explicit {
+        sizes: vec![TrackSize::AUTO; axis.count],
+        names,
+        auto_fit: None,
+    })
+}
+
+/// A subgrid's gap in an adopted axis: its own, or the parent's for
+/// `normal` (§9).
+fn subgrid_gap(
+    style: &ComputedStyle,
+    p: P,
+    basis: Option<f64>,
+    axis: Option<&SubAxis>,
+) -> Result<f64, FlowError> {
+    match (style.get(p), axis) {
+        (V::Gap(Gap::Normal), Some(axis)) => Ok(axis.parent_gap),
+        _ => gap(style, p, basis),
+    }
+}
+
+/// The fixed margin, border and padding on one physical side (`left`, or
+/// else right), for intrinsic contributions.
+fn fixed_side(style: &ComputedStyle, left: bool) -> Result<f64, FlowError> {
+    let (padding, margin) = if left {
+        (P::PaddingLeft, P::MarginLeft)
+    } else {
+        (P::PaddingRight, P::MarginRight)
+    };
+    let padding = match style.get(padding) {
+        V::LengthPercentage(v) => intrinsic::fixed(v)?.unwrap_or(0.0).max(0.0),
+        _ => return Err(FlowError::InvalidSnapshot),
+    };
+    let (_, border) = box_edges(style, 0.0)?;
+    let border = if left { border.left } else { border.right };
+    Ok(padding + border.get() + intrinsic::fixed_margin(style, margin)?)
+}
+
+/// A subgrid's track sizes and starts (from its content edge, plus the end
+/// of its last track) from its parent's aligned tracks `range`. A `normal`
+/// gap (`None`) keeps the parent's gutters, content distribution included;
+/// its own gap is centred in them. The outer tracks lose the subgrid's
+/// margin, border and padding (`edges`); `reversed` lists the tracks in
+/// the subgrid's opposite inline direction.
+fn subgrid_sizes(
+    pos: &[f64],
+    tracks: &[Track],
+    range: (usize, usize),
+    gap: Option<f64>,
+    edges: (f64, f64),
+    reversed: bool,
+) -> (Vec<f64>, Vec<f64>) {
+    let (a, b) = range;
+    let n = b - a;
+    let end_of = |t: usize| pos[t] + tracks[t].base;
+    // (start, end) of each subgrid line.
+    let line = |l: usize| -> (f64, f64) {
+        if l == 0 {
+            let edge = pos[a] + edges.0;
+            (edge, edge)
+        } else if l == n {
+            let edge = (end_of(b - 1) - edges.1).max(pos[a] + edges.0);
+            (edge, edge)
+        } else {
+            let (before, after) = (end_of(a + l - 1), pos[a + l]);
+            match gap {
+                None => (before, after),
+                Some(g) => {
+                    let middle = (before + after) / 2.0;
+                    (middle - g / 2.0, middle + g / 2.0)
+                }
+            }
+        }
+    };
+    let origin = line(0).1;
+    let width = line(n).0 - origin;
+    let mut spans: Vec<(f64, f64)> = (0..n)
+        .map(|t| {
+            let s = line(t).1 - origin;
+            (s, (line(t + 1).0 - origin).max(s))
+        })
+        .collect();
+    if reversed {
+        spans = spans
+            .into_iter()
+            .rev()
+            .map(|(s, e)| (width - e, width - s))
+            .collect();
+    }
+    let sizes = spans.iter().map(|(s, e)| e - s).collect();
+    let mut starts: Vec<f64> = spans.iter().map(|(s, _)| *s).collect();
+    starts.push(spans.last().map_or(0.0, |(_, e)| *e));
+    (sizes, starts)
+}
+
+/// A subgrid's own gap in an adopted axis, or `None` for `normal`.
+fn own_gap(style: &ComputedStyle, p: P, basis: f64) -> Result<Option<f64>, FlowError> {
+    match style.get(p) {
+        V::Gap(Gap::Normal) => Ok(None),
+        _ => gap(style, p, Some(basis)).map(Some),
+    }
+}
+
+fn fixed_track(size: f64) -> Track {
+    Track {
+        min: Breadth::Fixed(size),
+        max: Breadth::Fixed(size),
+        fit: None,
+        base: 0.0,
+        limit: 0.0,
+        collapsed: false,
+    }
 }
 
 fn grid_value(style: &ComputedStyle, p: P) -> Result<&GridValue, FlowError> {
@@ -1374,22 +1574,43 @@ impl Engine<'_, '_> {
     ) -> Result<GridRun, FlowError> {
         let style = self.nodes[c].style;
         let direction = self.nodes[c].direction;
-        let column_gap = gap(style, P::ColumnGap, width)?;
-        let row_gap = gap(style, P::RowGap, height)?;
         let template = |p| -> Result<GridTemplate, FlowError> {
             match grid_value(style, p)? {
                 GridValue::Template(t) => Ok(t.clone()),
                 _ => Err(FlowError::InvalidSnapshot),
             }
         };
-        let mut columns = expand(
-            &template(P::GridTemplateColumns)?,
+        let column_template = template(P::GridTemplateColumns)?;
+        let row_template = template(P::GridTemplateRows)?;
+        // `subgrid` adopts the parent's tracks when the parent registered
+        // this container as one of its items; otherwise it is `none`.
+        let link = self.subgrids.get(&c).cloned().unwrap_or_default();
+        let adopted = |t: &GridTemplate, axis: Option<SubAxis>| match t {
+            GridTemplate::Subgrid(_) => axis,
+            _ => None,
+        };
+        let sub_columns = adopted(&column_template, link.columns);
+        let sub_rows = adopted(&row_template, link.rows);
+        let column_gap = subgrid_gap(style, P::ColumnGap, width, sub_columns.as_ref())?;
+        let row_gap = subgrid_gap(style, P::RowGap, height, sub_rows.as_ref())?;
+        let explicit_axis = |t: &GridTemplate,
+                             axis: Option<&SubAxis>,
+                             space: RepeatSpace,
+                             gap: f64,
+                             work: &mut Work<'_>| match (t, axis) {
+            (GridTemplate::Subgrid(list), Some(axis)) => subgrid_explicit(list, axis, work),
+            (t, _) => expand(t, space, gap, work),
+        };
+        let mut columns = explicit_axis(
+            &column_template,
+            sub_columns.as_ref(),
             column_space,
             column_gap,
             &mut self.work,
         )?;
-        let mut rows = expand(
-            &template(P::GridTemplateRows)?,
+        let mut rows = explicit_axis(
+            &row_template,
+            sub_rows.as_ref(),
             row_space,
             row_gap,
             &mut self.work,
@@ -1405,13 +1626,14 @@ impl Engine<'_, '_> {
         // Areas extend the explicit grid (tracks sized by `grid-auto-*`,
         // §7.3) and name their edge lines.
         if let GridValue::Areas(Some(areas)) = grid_value(style, P::GridTemplateAreas)? {
+            // A subgridded axis keeps the parent's tracks.
             let from = columns.sizes.len();
-            while columns.sizes.len() < areas.columns() {
+            while sub_columns.is_none() && columns.sizes.len() < areas.columns() {
                 let size = auto_columns[(columns.sizes.len() - from) % auto_columns.len()].clone();
                 columns.add_track(&size);
             }
             let from = rows.sizes.len();
-            while rows.sizes.len() < areas.cells.len() {
+            while sub_rows.is_none() && rows.sizes.len() < areas.cells.len() {
                 let size = auto_rows[(rows.sizes.len() - from) % auto_rows.len()].clone();
                 rows.add_track(&size);
             }
@@ -1482,14 +1704,76 @@ impl Engine<'_, '_> {
                 &line(P::GridRowEnd)?,
                 &mut self.work,
             )?;
-            let clamp = |s: Span| match s {
-                Span::Definite(a, b) => {
+            // A subgrid child with an automatic span spans its explicit
+            // line names (§9).
+            let subgrid = (
+                child.grid_container && declares_subgrid(s, P::GridTemplateColumns),
+                child.grid_container && declares_subgrid(s, P::GridTemplateRows),
+            );
+            let named_span = |p, start, end| -> Result<Option<i64>, FlowError> {
+                let unspanned = |l: &GridLine| {
+                    matches!(l, GridLine::Auto) || matches!(l, GridLine::Line { span: false, .. })
+                };
+                if !(unspanned(&line(start)?) && unspanned(&line(end)?))
+                    || !matches!(line(end)?, GridLine::Auto)
+                {
+                    return Ok(None);
+                }
+                let V::Grid(GridValue::Template(GridTemplate::Subgrid(list))) = s.get(p) else {
+                    return Ok(None);
+                };
+                let mut count = 0_i64;
+                for e in list {
+                    count = count.saturating_add(match e {
+                        SubgridNames::Names(_) => 1,
+                        SubgridNames::Repeat(Some(n), l) => {
+                            i64::from(*n).saturating_mul(l.len() as i64)
+                        }
+                        SubgridNames::Repeat(None, _) => 0,
+                    });
+                }
+                Ok((count > 1).then_some(count - 1))
+            };
+            let with_names = |span: Span, n: Option<i64>| match (span, n) {
+                (Span::Auto(_), Some(n)) => Span::Auto(n),
+                (Span::Definite(a, _), Some(n)) => Span::Definite(a, a.saturating_add(n)),
+                (span, _) => span,
+            };
+            let column = if subgrid.0 {
+                with_names(
+                    column,
+                    named_span(P::GridTemplateColumns, P::GridColumnStart, P::GridColumnEnd)?,
+                )
+            } else {
+                column
+            };
+            let row = if subgrid.1 {
+                with_names(
+                    row,
+                    named_span(P::GridTemplateRows, P::GridRowStart, P::GridRowEnd)?,
+                )
+            } else {
+                row
+            };
+            let clamp = |s: Span, axis: Option<&SubAxis>| match (s, axis) {
+                // A subgridded axis has no implicit tracks: lines clamp to
+                // its explicit grid.
+                (Span::Definite(a, b), Some(axis)) => {
+                    let n = axis.count as i64;
+                    let a = a.clamp(0, n - 1);
+                    Span::Definite(a, b.clamp(a + 1, n))
+                }
+                (Span::Auto(k), Some(axis)) => Span::Auto(k.clamp(1, axis.count as i64)),
+                (Span::Definite(a, b), None) => {
                     let a = clamp_line(a);
                     Span::Definite(a, clamp_line(b).max(a + 1))
                 }
-                Span::Auto(n) => Span::Auto(n.clamp(1, MAX_TRACKS)),
+                (Span::Auto(n), None) => Span::Auto(n.clamp(1, MAX_TRACKS)),
             };
-            spans.push((clamp(column), clamp(row)));
+            spans.push((
+                clamp(column, sub_columns.as_ref()),
+                clamp(row, sub_rows.as_ref()),
+            ));
             let replaced = child.natural.is_some();
             let mut justify = alignment(s, P::JustifySelf)?;
             if justify.keyword == K::Auto {
@@ -1536,6 +1820,7 @@ impl Engine<'_, '_> {
                     area: (0.0, 0.0),
                     first_baseline: None,
                     last_baseline: None,
+                    subgrid,
                 },
             ));
             i = next;
@@ -1559,6 +1844,12 @@ impl Engine<'_, '_> {
             c1 = c1.max(*b);
             r0 = r0.min(*c);
             r1 = r1.max(*d);
+        }
+        if let Some(axis) = &sub_columns {
+            (c0, c1) = (0, axis.count as i64);
+        }
+        if let Some(axis) = &sub_rows {
+            (r0, r1) = (0, axis.count as i64);
         }
         let c1 = c1.min(c0 + MAX_TRACKS);
         let r1 = r1.min(r0 + MAX_TRACKS);
@@ -1588,6 +1879,17 @@ impl Engine<'_, '_> {
         };
         let mut column_tracks = build(&columns, &auto_columns, c0, c1, width, &mut self.work)?;
         let mut row_tracks = build(&rows, &auto_rows, r0, r1, height, &mut self.work)?;
+        // Adopted tracks take the sizes the parent gave them.
+        for (tracks, axis) in [
+            (&mut column_tracks, &sub_columns),
+            (&mut row_tracks, &sub_rows),
+        ] {
+            if let Some((sizes, _)) = axis.as_ref().and_then(|a| a.sizes.as_ref()) {
+                for (t, &size) in tracks.iter_mut().zip(sizes) {
+                    *t = fixed_track(size);
+                }
+            }
+        }
         // Ranges past the track limit clamp into the last track.
         let range =
             |start: i64, end: i64, from: i64, to: i64| -> Result<(usize, usize), FlowError> {
@@ -1630,6 +1932,59 @@ impl Engine<'_, '_> {
                 }
             }
         }
+        // Register subgrid items with what they adopt from this grid; sizes
+        // from an earlier layout stay until the parent sizes its tracks.
+        for item in &items {
+            if !(item.subgrid.0 || item.subgrid.1) {
+                continue;
+            }
+            let reversed = self.nodes[item.node].direction != direction;
+            let names_for = |names: &[Vec<String>],
+                             origin: i64,
+                             range: (usize, usize),
+                             reversed: bool,
+                             work: &mut Work<'_>|
+             -> Result<Vec<Vec<String>>, FlowError> {
+                work.charge(range.1 - range.0 + 1)?;
+                let mut out: Vec<Vec<String>> = (range.0..=range.1)
+                    .map(|t| {
+                        usize::try_from(t as i64 + origin)
+                            .ok()
+                            .and_then(|l| names.get(l))
+                            .cloned()
+                            .unwrap_or_default()
+                    })
+                    .collect();
+                if reversed {
+                    out.reverse();
+                }
+                Ok(out)
+            };
+            let column_names =
+                names_for(&columns.names, c0, item.columns, reversed, &mut self.work)?;
+            let row_names = names_for(&rows.names, r0, item.rows, false, &mut self.work)?;
+            let entry = self.subgrids.entry(item.node).or_default();
+            let axis = |old: Option<SubAxis>, range: (usize, usize), names, parent_gap| {
+                let count = range.1 - range.0;
+                SubAxis {
+                    count,
+                    names,
+                    parent_gap,
+                    sizes: old.and_then(|a| a.sizes).filter(|s| s.0.len() == count),
+                }
+            };
+            let old = entry.columns.take();
+            entry.columns = item
+                .subgrid
+                .0
+                .then(|| axis(old, item.columns, column_names, column_gap));
+            let old = entry.rows.take();
+            entry.rows = item
+                .subgrid
+                .1
+                .then(|| axis(old, item.rows, row_names, row_gap));
+        }
+        let start = Alignment::new(K::Start);
         Ok(GridRun {
             container: c,
             direction,
@@ -1640,13 +1995,23 @@ impl Engine<'_, '_> {
             columns: column_tracks,
             rows: row_tracks,
             items,
-            justify_content: alignment(style, P::JustifyContent)?,
-            align_content: alignment(style, P::AlignContent)?,
+            // Adopted tracks fill the subgrid exactly.
+            justify_content: if sub_columns.is_some() {
+                start
+            } else {
+                alignment(style, P::JustifyContent)?
+            },
+            align_content: if sub_rows.is_some() {
+                start
+            } else {
+                alignment(style, P::AlignContent)?
+            },
             column_pos: Vec::new(),
             row_pos: Vec::new(),
             column_names: columns.names.clone(),
             row_names: rows.names.clone(),
             origin: (c0, r0),
+            subgrid: (sub_columns.is_some(), sub_rows.is_some()),
             phase: Phase::Measure,
             queue: Vec::new(),
             current: None,
@@ -1764,6 +2129,123 @@ impl Engine<'_, '_> {
         })
     }
 
+    /// Column contributions of `run`'s items. A column subgrid contributes
+    /// its own items to this grid's tracks instead (§9), through any depth
+    /// of nested subgrids without recursion: its margin, border and padding
+    /// add to the items at its edges, and half the difference between its
+    /// gap and its parent's to the other sides.
+    fn column_contributions(&mut self, run: &GridRun) -> Result<Vec<Contribution>, FlowError> {
+        struct Pending {
+            node: usize,
+            /// First spanned track of `run`.
+            offset: usize,
+            count: usize,
+            /// The subgrid's columns run against `run`'s.
+            reversed: bool,
+            /// Extras inherited at the start and end edges.
+            start: f64,
+            end: f64,
+            parent_gap: f64,
+        }
+        let mut out = Vec::with_capacity(run.items.len());
+        let mut stack = Vec::new();
+        for item in &run.items {
+            self.work.charge(1)?;
+            if item.subgrid.0 {
+                stack.push(Pending {
+                    node: item.node,
+                    offset: item.columns.0,
+                    count: item.columns.1 - item.columns.0,
+                    reversed: self.nodes[item.node].direction != run.direction,
+                    start: 0.0,
+                    end: 0.0,
+                    parent_gap: run.column_gap,
+                });
+            } else {
+                out.push(self.column_contribution(item, &run.columns)?);
+            }
+        }
+        let rtl = run.direction == Direction::Rtl;
+        while let Some(f) = stack.pop() {
+            self.work.charge(1)?;
+            let sub = self.grid_setup(
+                f.node,
+                None,
+                None,
+                RepeatSpace::default(),
+                RepeatSpace::default(),
+                false,
+            )?;
+            let style = self.nodes[f.node].style;
+            let sub_direction = self.nodes[f.node].direction;
+            // Edges in `run`'s inline direction.
+            let (start, end) = (fixed_side(style, !rtl)?, fixed_side(style, rtl)?);
+            let (start, end) = (start + f.start, end + f.end);
+            let half = (sub.column_gap - f.parent_gap) / 2.0;
+            if sub.items.is_empty() {
+                let size = (start + end).max(0.0);
+                out.push(Contribution {
+                    start: f.offset,
+                    end: f.offset + f.count,
+                    minimum: size,
+                    min_content: size,
+                    max_content: size,
+                });
+                continue;
+            }
+            for item in &sub.items {
+                self.work.charge(1)?;
+                let (a, b) = item.columns;
+                let (a, b) = if f.reversed {
+                    (f.count - b, f.count - a)
+                } else {
+                    (a, b)
+                };
+                let extra_start = if a == 0 { start } else { half };
+                let extra_end = if b == f.count { end } else { half };
+                if item.subgrid.0 {
+                    stack.push(Pending {
+                        node: item.node,
+                        offset: f.offset + a,
+                        count: b - a,
+                        reversed: f.reversed ^ (self.nodes[item.node].direction != sub_direction),
+                        start: extra_start,
+                        end: extra_end,
+                        parent_gap: sub.column_gap,
+                    });
+                    continue;
+                }
+                let mut mapped = *item;
+                mapped.columns = (f.offset + a, f.offset + b);
+                let mut c = self.column_contribution(&mapped, &run.columns)?;
+                let extra = extra_start + extra_end;
+                c.minimum = (c.minimum + extra).max(0.0);
+                c.min_content = (c.min_content + extra).max(0.0);
+                c.max_content = (c.max_content + extra).max(0.0);
+                out.push(c);
+            }
+        }
+        Ok(out)
+    }
+
+    /// The track starts a subgrid adopted from its parent in one axis, if
+    /// the parent has sized them.
+    fn adopted_starts(
+        &self,
+        c: usize,
+        columns: bool,
+        subgridded: bool,
+        count: usize,
+    ) -> Option<Vec<f64>> {
+        if !subgridded {
+            return None;
+        }
+        let entry = self.subgrids.get(&c)?;
+        let axis = if columns { &entry.columns } else { &entry.rows };
+        let (_, starts) = axis.as_ref()?.sizes.as_ref()?;
+        (starts.len() == count + 1).then(|| starts.clone())
+    }
+
     /// Intrinsic inline sizes of a grid container (§11.1 under min- and
     /// max-content constraints).
     pub(super) fn grid_intrinsic(&mut self, i: usize) -> Result<Intrinsic, FlowError> {
@@ -1777,11 +2259,7 @@ impl Engine<'_, '_> {
             fill: (minimum > 0.0).then_some(minimum),
         };
         let mut run = self.grid_setup(i, None, None, columns, RepeatSpace::default(), false)?;
-        let contributions: Vec<Contribution> = run
-            .items
-            .iter()
-            .map(|item| self.column_contribution(item, &run.columns))
-            .collect::<Result<_, _>>()?;
+        let contributions = self.column_contributions(&run)?;
         let mut sizes = [0.0; 2];
         for (slot, available) in [Available::MinContent, Available::MaxContent]
             .into_iter()
@@ -1828,11 +2306,7 @@ impl Engine<'_, '_> {
             fill: None,
         };
         let mut run = self.grid_setup(c, Some(width), height, columns, rows, true)?;
-        let contributions: Vec<Contribution> = run
-            .items
-            .iter()
-            .map(|item| self.column_contribution(item, &run.columns))
-            .collect::<Result<_, _>>()?;
+        let contributions = self.column_contributions(&run)?;
         size_tracks(
             &mut run.columns,
             run.column_gap,
@@ -1852,6 +2326,9 @@ impl Engine<'_, '_> {
             content(run.justify_content),
             rtl,
         );
+        if let Some(starts) = self.adopted_starts(c, true, run.subgrid.0, run.columns.len()) {
+            run.column_pos = starts;
+        }
         // Lay every item out at its area width.
         let mut queue = Vec::with_capacity(run.items.len());
         for idx in (0..run.items.len()).rev() {
@@ -1869,6 +2346,39 @@ impl Engine<'_, '_> {
                 width: w,
                 height,
             });
+        }
+        // Column subgrids adopt the sized columns they span.
+        for item in &run.items {
+            if !item.subgrid.0 {
+                continue;
+            }
+            self.work.charge(item.columns.1 - item.columns.0)?;
+            let n = &self.nodes[item.node];
+            let side = |left: bool| {
+                if left {
+                    item.margin.left.get() + item.border.left.get() + item.padding.left.get()
+                } else {
+                    item.margin.right.get() + item.border.right.get() + item.padding.right.get()
+                }
+            };
+            let edges = (side(!rtl), side(rtl));
+            let basis = area_from(&run.column_pos, &run.columns, item.columns) - edges.0 - edges.1;
+            let gap = own_gap(n.style, P::ColumnGap, basis.max(0.0))?;
+            let sizes = subgrid_sizes(
+                &run.column_pos,
+                &run.columns,
+                item.columns,
+                gap,
+                edges,
+                n.direction != run.direction,
+            );
+            if let Some(axis) = self
+                .subgrids
+                .get_mut(&item.node)
+                .and_then(|e| e.columns.as_mut())
+            {
+                axis.sizes = Some(sizes);
+            }
         }
         run.queue = queue;
         self.grids.push(run);
@@ -1900,6 +2410,12 @@ impl Engine<'_, '_> {
         item.auto_margin = [t.is_none(), r.is_none(), b.is_none(), l.is_none()];
         let extras = item.horizontal_extras();
         let available = area - item.margin.left.get() - item.margin.right.get() - extras;
+        if item.subgrid.0 {
+            // A subgrid always fills its area in an adopted axis (§9).
+            item.auto_margin[1] = false;
+            item.auto_margin[3] = false;
+            return Ok(available.max(0.0));
+        }
         let resolver = Resolver::new(s, Some(area), extras, n.intrinsic);
         let (specified, minimum, maximum) = resolver.widths(available)?;
         let stretch =
@@ -2014,8 +2530,49 @@ impl Engine<'_, '_> {
         }
         let shims = baseline_shims(&self.grids[k].items, &heights);
         let mut contributions = Vec::with_capacity(count);
+        let parent_gap = self.grids[k].row_gap;
         for idx in 0..count {
             let item = self.grids[k].items[idx];
+            if item.subgrid.1 {
+                // A row subgrid contributes its items' recorded rows (§9),
+                // with its edges and gap difference as extra margin.
+                let (list, sub_gap) = self
+                    .subgrids
+                    .get(&item.node)
+                    .and_then(|e| e.recorded.clone())
+                    .unwrap_or((Vec::new(), parent_gap));
+                self.work.charge(list.len())?;
+                let top = item.margin.top.get() + item.border.top.get() + item.padding.top.get();
+                let bottom =
+                    item.margin.bottom.get() + item.border.bottom.get() + item.padding.bottom.get();
+                let span = item.rows.1 - item.rows.0;
+                let half = (sub_gap - parent_gap) / 2.0;
+                if list.is_empty() {
+                    let size = (top + bottom).max(0.0);
+                    contributions.push(Contribution {
+                        start: item.rows.0,
+                        end: item.rows.1,
+                        minimum: size,
+                        min_content: size,
+                        max_content: size,
+                    });
+                }
+                for c in list {
+                    if c.end > span {
+                        continue;
+                    }
+                    let extra = if c.start == 0 { top } else { half }
+                        + if c.end == span { bottom } else { half };
+                    contributions.push(Contribution {
+                        start: item.rows.0 + c.start,
+                        end: item.rows.0 + c.end,
+                        minimum: (c.minimum + extra).max(0.0),
+                        min_content: (c.min_content + extra).max(0.0),
+                        max_content: (c.max_content + extra).max(0.0),
+                    });
+                }
+                continue;
+            }
             let n = &self.nodes[item.node];
             let extras = item.vertical_extras();
             let margins = item.margin.top.get() + item.margin.bottom.get();
@@ -2034,6 +2591,12 @@ impl Engine<'_, '_> {
             });
         }
         let container = self.grids[k].container;
+        if self.grids[k].subgrid.1 {
+            // The parent sizes this subgrid's rows with these.
+            if let Some(entry) = self.subgrids.get_mut(&container) {
+                entry.recorded = Some((contributions.clone(), parent_gap));
+            }
+        }
         let constraint = self.nodes[container].constraint()?;
         let run = &mut self.grids[k];
         let available = match run.definite_height {
@@ -2076,6 +2639,11 @@ impl Engine<'_, '_> {
             content(run.align_content),
             false,
         );
+        let subgridded = run.subgrid.1;
+        let rows_len = run.rows.len();
+        if let Some(starts) = self.adopted_starts(container, false, subgridded, rows_len) {
+            self.grids[k].row_pos = starts;
+        }
         // Final heights.
         let mut queue = Vec::new();
         for idx in (0..count).rev() {
@@ -2095,7 +2663,30 @@ impl Engine<'_, '_> {
                 && !item.auto_margin[0]
                 && !item.auto_margin[2]
                 && against_area.specified().is_none();
-            let (height, definite) = if let Some(h) = against_area.definite() {
+            let (height, definite) = if item.subgrid.1 {
+                // A row subgrid fills its area and adopts the sized rows.
+                let height = (area - margins - extras).max(0.0);
+                let top = item.margin.top.get() + item.border.top.get() + item.padding.top.get();
+                let bottom =
+                    item.margin.bottom.get() + item.border.bottom.get() + item.padding.bottom.get();
+                let gap = own_gap(n.style, P::RowGap, height)?;
+                let sizes = subgrid_sizes(
+                    &run.row_pos,
+                    &run.rows,
+                    item.rows,
+                    gap,
+                    (top, bottom),
+                    false,
+                );
+                if let Some(axis) = self
+                    .subgrids
+                    .get_mut(&item.node)
+                    .and_then(|e| e.rows.as_mut())
+                {
+                    axis.sizes = Some(sizes);
+                }
+                (height, true)
+            } else if let Some(h) = against_area.definite() {
                 (h.get(), true)
             } else if stretch {
                 let target = (area - margins - extras).max(0.0);
@@ -2112,7 +2703,7 @@ impl Engine<'_, '_> {
                 || (item.laid.is_none()
                     && height == item.natural
                     && self.grids[k].definite_height.is_none());
-            if unchanged || n.natural.is_some() {
+            if (unchanged && !item.subgrid.1) || n.natural.is_some() {
                 continue;
             }
             queue.push(Request {

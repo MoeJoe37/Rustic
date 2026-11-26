@@ -2,9 +2,9 @@
 //! Editor's Draft reviewed 2026-11-26) and their shorthands.
 //!
 //! Track lists keep their written structure (line names, `repeat()`) so they
-//! serialize as declared; layout expands them. `subgrid` and `masonry` are
-//! not parsed (TD-209). Line names are `<custom-ident>`s other than `span`
-//! and `auto`.
+//! serialize as declared; layout expands them. `subgrid` keeps its line name
+//! list the same way; `masonry` is not parsed (TD-209). Line names are
+//! `<custom-ident>`s other than `span` and `auto`.
 
 use std::fmt;
 
@@ -199,6 +199,47 @@ pub enum GridTemplate {
     None,
     /// A track list (at most one auto repeat, validated when parsed).
     Tracks(Vec<TrackComponent>),
+    /// `subgrid <line-name-list>?` (CSS Grid 2 §9): the axis adopts the
+    /// parent grid's tracks; the list names the subgrid's own lines.
+    Subgrid(Vec<SubgridNames>),
+}
+
+/// One entry of a subgrid's `<line-name-list>`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SubgridNames {
+    /// `[<custom-ident>*]`, one line (an empty set still counts).
+    Names(Vec<String>),
+    /// `repeat(<integer> | auto-fill, <line-names>+)`; `None` is
+    /// `auto-fill`.
+    Repeat(Option<u32>, Vec<Vec<String>>),
+}
+
+impl SubgridNames {
+    fn fmt_list(f: &mut fmt::Formatter<'_>, list: &[Vec<String>]) -> fmt::Result {
+        for (i, names) in list.iter().enumerate() {
+            if i > 0 {
+                f.write_str(" ")?;
+            }
+            write_names(f, names)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for SubgridNames {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Names(names) => write_names(f, names),
+            Self::Repeat(count, list) => {
+                match count {
+                    Some(n) => write!(f, "repeat({n}, ")?,
+                    None => f.write_str("repeat(auto-fill, ")?,
+                }
+                Self::fmt_list(f, list)?;
+                f.write_str(")")
+            }
+        }
+    }
 }
 
 impl fmt::Display for GridTemplate {
@@ -206,6 +247,13 @@ impl fmt::Display for GridTemplate {
         match self {
             Self::None => f.write_str("none"),
             Self::Tracks(list) => write_components(f, list),
+            Self::Subgrid(list) => {
+                f.write_str("subgrid")?;
+                for entry in list {
+                    write!(f, " {entry}")?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -607,7 +655,51 @@ fn template(parts: &[&Value]) -> Option<GridTemplate> {
             return Some(GridTemplate::None);
         }
     }
+    if let [first, rest @ ..] = parts {
+        if is_keyword(first, "subgrid") {
+            return subgrid_names(rest).map(GridTemplate::Subgrid);
+        }
+    }
     track_list(parts, false).map(GridTemplate::Tracks)
+}
+
+/// `<line-name-list>`: `[ <line-names> | <name-repeat> ]+`, at most one
+/// `repeat(auto-fill, ...)`.
+fn subgrid_names(parts: &[&Value]) -> Option<Vec<SubgridNames>> {
+    let mut out = Vec::new();
+    let mut auto_fill = false;
+    for v in parts {
+        if let Some(names) = line_names(v) {
+            out.push(SubgridNames::Names(names));
+            continue;
+        }
+        let args = arguments(v, "repeat")?;
+        let [count, list] = args.as_slice() else {
+            return None;
+        };
+        let [count] = count.as_slice() else {
+            return None;
+        };
+        let count = if is_keyword(count, "auto-fill") {
+            if auto_fill {
+                return None;
+            }
+            auto_fill = true;
+            None
+        } else {
+            let n = integer(count)?;
+            if n < 1 {
+                return None;
+            }
+            Some(u32::try_from(n).ok()?.min(MAX_REPEAT))
+        };
+        let list: Vec<Vec<String>> = list.iter().map(|v| line_names(v)).collect::<Option<_>>()?;
+        if list.is_empty() {
+            return None;
+        }
+        out.push(SubgridNames::Repeat(count, list));
+    }
+    Some(out)
 }
 
 /// The cell tokens of one `grid-template-areas` string (CSS Grid 2 §7.3).

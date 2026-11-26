@@ -394,3 +394,105 @@ fn auto_repetitions_count_against_min_and_max_sizes() {
     ));
     assert_eq!(b["a"].1, 140.0);
 }
+
+#[test]
+fn column_subgrid_items_size_and_use_the_parent_tracks() {
+    // The subgrid's first item sizes the parent's `auto` column, with the
+    // subgrid's 10px left padding added at that edge: 40 + 10 = 50.
+    let style = ".g { display: grid; width: 400px; grid-template-columns: auto 100px 1fr;
+                      column-gap: 10px }
+                 .s { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1;
+                      padding-left: 10px; border-right: 4px solid }
+                 #a { width: 40px }";
+    let b = boxes(&page(
+        style,
+        "<div class=g><div class=s id=s><div id=a></div><div id=b></div><div id=c></div></div>\
+         <div id=p></div><div id=q></div><div id=r></div></div>",
+    ));
+    assert_eq!(b["s"], (0.0, 0.0, 400.0, 0.0));
+    assert_eq!((b["a"].0, b["a"].2), (10.0, 40.0));
+    // The subgrid's columns line up with the parent's (50, 100, 230).
+    assert_eq!((b["b"].0, b["b"].2), (60.0, 100.0));
+    assert_eq!((b["p"].0, b["p"].2), (0.0, 50.0));
+    assert_eq!((b["q"].0, b["q"].2), (60.0, 100.0));
+    assert_eq!((b["r"].0, b["r"].2), (170.0, 230.0));
+    // The last track loses the border at the subgrid's end edge.
+    assert_eq!((b["c"].0, b["c"].2), (170.0, 226.0));
+}
+
+#[test]
+fn row_subgrid_items_size_the_parent_rows() {
+    let style = ".g { display: grid; grid-template-columns: 100px 100px;
+                      grid-template-rows: auto auto; row-gap: 5px }
+                 .s { display: grid; grid-template-rows: subgrid; grid-row: 1 / 3;
+                      grid-column: 2 }
+                 #x { height: 30px } #y { height: 50px } #z { height: 20px }";
+    let b = boxes(&page(
+        style,
+        "<div class=g><div id=x></div><div class=s id=s><div id=y></div><div id=z></div></div>\
+         <div id=w></div></div>",
+    ));
+    // Rows: max(30, 50) = 50 and 20; the subgrid spans both and the gap.
+    assert_eq!(b["s"], (100.0, 0.0, 100.0, 75.0));
+    assert_eq!((b["y"].1, b["y"].3), (0.0, 50.0));
+    assert_eq!((b["z"].1, b["z"].3), (55.0, 20.0));
+    // A stretched parent item fills the second row.
+    assert_eq!((b["w"].1, b["w"].3), (55.0, 20.0));
+}
+
+#[test]
+fn subgrids_adopt_parent_line_names_and_keep_their_own_gap() {
+    // Parent lines at 0, 100 | 120, 220 | 240, 340. With a 0px gap the
+    // subgrid's lines sit mid-gutter, at 110 and 230.
+    let style = ".g { display: grid; width: 340px;
+                      grid-template-columns: [a] 100px [b] 100px [c] 100px [d];
+                      column-gap: 20px }
+                 .s { display: grid; grid-template-columns: subgrid [x] [y];
+                      grid-column: a / d; column-gap: 0 }
+                 #i { grid-column: b / d } #j { grid-column: y } #k { grid-column: 3 }";
+    let b = boxes(&page(
+        style,
+        "<div class=g><div class=s><div id=i></div><div id=j></div><div id=k></div></div></div>",
+    ));
+    assert_eq!((b["i"].0, b["i"].2), (110.0, 230.0));
+    assert_eq!((b["j"].0, b["j"].2), (110.0, 120.0));
+    assert_eq!((b["k"].0, b["k"].2), (230.0, 110.0));
+}
+
+#[test]
+fn nested_subgrids_and_auto_spans_reach_the_root_grid() {
+    // A subgrid with no placement spans as many tracks as it names lines
+    // minus one; a subgrid inside it still sizes the root's columns.
+    let style = ".g { display: grid; grid-template-columns: auto auto auto; width: 300px;
+                      justify-content: start }
+                 .s { display: grid; grid-template-columns: subgrid [p] [q] [r] }
+                 .t { display: grid; grid-template-columns: subgrid; grid-column: 1 / 3 }
+                 #m { width: 70px } #n { width: 30px; grid-column: 2 }";
+    let b = boxes(&page(
+        style,
+        "<div class=g><div class=s id=s><div class=t><div id=m></div><div id=n></div></div>\
+         </div><div id=o></div></div>",
+    ));
+    assert_eq!(b["s"].2, 100.0);
+    assert_eq!((b["m"].0, b["m"].2), (0.0, 70.0));
+    assert_eq!((b["n"].0, b["n"].2), (70.0, 30.0));
+    // The third column is empty, so the next item wraps to it.
+    assert_eq!((b["o"].0, b["o"].2), (100.0, 0.0));
+}
+
+#[test]
+fn an_ltr_subgrid_in_an_rtl_grid_reverses_the_adopted_tracks() {
+    // RTL parent columns from the right: 50px at 350..400, 100px at
+    // 250..350. The LTR subgrid's first column is the parent's last.
+    let style = ".g { display: grid; width: 400px; direction: rtl;
+                      grid-template-columns: 50px 100px 1fr }
+                 .s { display: grid; grid-template-columns: subgrid; grid-column: 1 / -1;
+                      direction: ltr }
+                 #b { grid-column: 3 }";
+    let b = boxes(&page(
+        style,
+        "<div class=g><div class=s><div id=a></div><div id=b></div></div></div>",
+    ));
+    assert_eq!((b["a"].0, b["a"].2), (0.0, 250.0));
+    assert_eq!((b["b"].0, b["b"].2), (350.0, 50.0));
+}

@@ -29,11 +29,15 @@ properties and shorthands and the remaining box alignment values
 (`justify-items`, `justify-self`, `place-*`). Abspos boxes pass their
 min/max heights to flex and grid containers. Evidence: exact-geometry tests
 in `rustic-layout/tests/grid.rs`, unit tests of the sizing and placement
-algorithms, the pinned css-grid `checkLayout` comparison (76 of 168 pages,
+algorithms, the pinned css-grid `checkLayout` comparison (79 of 168 pages,
 the rest reviewed, TD-210) and 1055 new in-scope WPT parsing cases. Baseline
 self-alignment, grid container baselines and grid areas as containing blocks
-for positioned descendants followed on 2026-11-26. Four of the capability's
-five steps are complete; subgrid remains (TD-209). Guide:
+for positioned descendants followed on 2026-11-26, and subgrid on
+2026-11-27: column and row subgrids adopt the parent's tracks, their items
+size the parent's tracks through nested subgrids, and gaps, line names,
+edges and opposite directions follow §9; the 60 pinned subgrid parsing
+cases pass. The capability's five steps are complete; vertical writing
+modes, masonry and subgrid baselines stay with TD-209. Guide:
 [layout](LAYOUT.md#grid-layoutgrid-m9).
 
 The extra computed-style longhands raise script allocation enough that the

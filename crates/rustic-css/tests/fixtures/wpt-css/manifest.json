@@ -17,11 +17,12 @@
     "css/css-sizing/parsing",
     "css/css-text/parsing",
     "css/css-grid/parsing",
-    "css/css-align/parsing"
+    "css/css-align/parsing",
+    "css/css-grid/subgrid"
   ],
-  "case_count": 4013,
+  "case_count": 4073,
   "skipped_calls": 219,
-  "cases_sha256": "673369ca3b9faae55769f181f45b1fef44e59024d549bf8bac9702ca54d8037b",
+  "cases_sha256": "30a2e6105f238fde008862c06c6be893abe8c80daa134f685175bee4ad42d865",
   "files": [
     {
       "path": "css/selectors/parsing/invalid-pseudos.html",
@@ -2145,6 +2146,18 @@
       "path": "css/css-align/parsing/row-gap-valid.html",
       "sha256": "9d0032098d7c0fd896cd739d5ee1307224a991573723a53d1f9582640a0ab21c",
       "cases": 5,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/subgrid/grid-template-invalid.html",
+      "sha256": "618150a5fe355563939ff4cca68eada9c56201cbe7c2b182b5ed489c17775894",
+      "cases": 22,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/subgrid/grid-template-valid.html",
+      "sha256": "65e5fe48c9022722d488cacf5c8413f36a37da94e7ce6467e6b15439d22cbf1e",
+      "cases": 38,
       "skipped_calls": 0
     }
   ]

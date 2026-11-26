@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "81a90b8d2a1a9404c99bc63af2c657b21cd35cbf89963c83695850157e796e5a",
-  "percent": "51.45",
-  "verified_percent": "49.65",
-  "partial_percent": "1.80",
-  "completed": 117,
-  "in_progress": 12,
+  "source_fingerprint": "e175b06b6344d58f7c43703c4b015432319769c7f7cabe5372e065bd245fc9fb",
+  "percent": "51.57",
+  "verified_percent": "50.24",
+  "partial_percent": "1.33",
+  "completed": 118,
+  "in_progress": 11,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -95,11 +95,11 @@
       "id": "M9",
       "label": "Compatibility expansion",
       "share": "22.35",
-      "completed": 4,
+      "completed": 5,
       "total": 54,
-      "percent": "9.35",
-      "verified_percent": "5.36",
-      "partial_percent": "3.99"
+      "percent": "9.88",
+      "verified_percent": "8.00",
+      "partial_percent": "1.88"
     },
     {
       "id": "M10",
@@ -2862,110 +2862,105 @@
           "label": "Grid",
           "size": 5,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Grid template, placement, auto-flow and alignment properties parse, serialize and compute (pinned css-grid and css-align parsing cases)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/grid.rs",
-                  "marker": "pub enum GridValue"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/grid.rs",
-                  "marker": "fn grid_values_parse_and_serialize"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/wpt_conformance.rs",
-                  "marker": "const IN_SCOPE: usize = 2664;"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/grid.rs",
+              "marker": "pub enum GridValue"
             },
             {
-              "label": "Placement: explicit and implicit grids, named lines and areas, auto-placement with dense packing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/grid.rs",
-                  "marker": "fn place("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/grid.rs",
-                  "marker": "fn auto_placement_spans_wraps_and_packs_densely"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/grid.rs",
-                  "marker": "fn areas_and_named_lines_place_items"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-css/tests/grid.rs",
+              "marker": "fn grid_values_parse_and_serialize"
             },
             {
-              "label": "Track sizing and alignment: intrinsic, flexible and stretched tracks, gaps, content and self alignment, RTL, auto-fit, inline grids; pinned css-grid checkLayout pages",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/grid.rs",
-                  "marker": "fn size_tracks("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/grid.rs",
-                  "marker": "fn intrinsic_columns_follow_item_contributions"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/grid.rs",
-                  "marker": "fn content_and_self_alignment_position_tracks_and_items"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/wpt_grid.rs",
-                  "marker": "fn grid_layout_matches_the_reviewed_wpt_expectations"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-css/tests/wpt_conformance.rs",
+              "marker": "const IN_SCOPE: usize = 2724;"
             },
             {
-              "label": "Baseline self-alignment and grid-placed absolutely positioned items",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/grid.rs",
-                  "marker": "fn baseline_shims("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/grid.rs",
-                  "marker": "fn baseline_aligned_items_share_a_row_baseline"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/grid.rs",
-                  "marker": "fn grid_area_rect("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/grid.rs",
-                  "marker": "fn grid_areas_are_containing_blocks_for_positioned_children"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/grid.rs",
+              "marker": "fn place("
             },
             {
-              "label": "Subgrid (TD-209)",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn auto_placement_spans_wraps_and_packs_densely"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn areas_and_named_lines_place_items"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/grid.rs",
+              "marker": "fn size_tracks("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn intrinsic_columns_follow_item_contributions"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn content_and_self_alignment_position_tracks_and_items"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/wpt_grid.rs",
+              "marker": "fn grid_layout_matches_the_reviewed_wpt_expectations"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/grid.rs",
+              "marker": "fn baseline_shims("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn baseline_aligned_items_share_a_row_baseline"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/grid.rs",
+              "marker": "fn grid_area_rect("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn grid_areas_are_containing_blocks_for_positioned_children"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/grid.rs",
+              "marker": "fn column_contributions("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/grid.rs",
+              "marker": "fn subgrid_sizes("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn column_subgrid_items_size_and_use_the_parent_tracks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn row_subgrid_items_size_the_parent_rows"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/grid.rs",
+              "marker": "fn nested_subgrids_and_auto_spans_reach_the_root_grid"
             }
           ],
-          "credit": "80.00",
+          "credit": "100.00",
           "engine_share": "0.58"
         },
         {
@@ -3010,13 +3005,13 @@
         }
       ],
       "points": 51,
-      "completed": 6,
-      "in_progress": 1,
+      "completed": 7,
+      "in_progress": 0,
       "total": 11,
-      "contribution": "3.52",
-      "percent": "58.82",
-      "verified_percent": "50.98",
-      "partial_percent": "7.84"
+      "contribution": "3.64",
+      "percent": "60.78",
+      "verified_percent": "60.78",
+      "partial_percent": "0.00"
     },
     {
       "id": "paint",

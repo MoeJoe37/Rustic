@@ -61,6 +61,8 @@ DIRECTORIES = (
     # M9 `layout.grid`: grid definition/placement and box alignment values.
     "css/css-grid/parsing",
     "css/css-align/parsing",
+    # M9 `layout.grid` step 5: `subgrid` line name lists.
+    "css/css-grid/subgrid",
 )
 
 FUNCTIONS = {

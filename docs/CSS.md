@@ -625,6 +625,24 @@ host. Slots are not assigned, so the host's light children inherit from the
 host rather than from a slot (TD-23); `::slotted()`, `::part()` and
 `:host-context()` are rejected. Each tree has its own layer order.
 
+### Presentational hints
+
+HTML presentational hints (HTML §15.3) are author-origin declarations with
+zero specificity that lose to every author rule, in or out of a layer, as
+if at the start of the author sheets; `revert-layer` in the lowest layer
+falls back to them. `rustic-style/src/hints.rs` maps an element's
+attributes to CSS text that is parsed like a `style` attribute; every value
+is validated and re-serialized first (numbers by Rustic, colors only as
+checked names or hex digits), so attribute text never reaches the parser.
+Mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object`,
+tables and cells (zero ignored on tables and cells), `height` on rows,
+`width` on columns, `bgcolor` on tables, row groups, rows and cells,
+`align`/`valign` on row groups, rows and cells, `nowrap` on cells, table
+`align` (floats or auto margins), `cellspacing`, and `cellpadding` and
+`border`, which also reach the table's cells. Changing any of these
+attributes restyles the element's subtree. Other legacy attributes are
+TD-179.
+
 ### Cascade evidence
 
 * `rustic-style/tests/cascade.rs`: specificity and order, all six origin and

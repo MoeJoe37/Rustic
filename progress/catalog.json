@@ -2770,7 +2770,28 @@
               "evidence": []
             },
             {
-              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, bgcolor, rules/frame) and pinned css-tables layout pages",
+              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, valign, bgcolor, nowrap)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/hints.rs",
+                  "marker": "pub(crate) fn presentational_hints"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn table_presentational_hints_map_to_css_below_author_rules"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn legacy_table_attributes_size_and_space_the_table"
+                }
+              ]
+            },
+            {
+              "label": "Pinned css-tables layout pages compared like css-grid (importer, reviewed expected failures)",
               "status": "planned",
               "evidence": []
             }

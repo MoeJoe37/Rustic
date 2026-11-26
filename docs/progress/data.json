@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "eadf1f262ad90eef3a3b1d35061efa71b5bd3e0ac5ddc430f34ea316b828b5d1",
-  "percent": "51.92",
+  "source_fingerprint": "0d701317ee54edcaf0db6cb9ebc02878b2752bed84368a53ec7ddc3c1a8191c7",
+  "percent": "51.96",
   "verified_percent": "50.24",
-  "partial_percent": "1.68",
+  "partial_percent": "1.72",
   "completed": 118,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 5,
       "total": 54,
-      "percent": "11.46",
+      "percent": "11.63",
       "verified_percent": "8.00",
-      "partial_percent": "3.46"
+      "partial_percent": "3.63"
     },
     {
       "id": "M10",
@@ -3040,12 +3040,33 @@
               "evidence": []
             },
             {
-              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, bgcolor, rules/frame) and pinned css-tables layout pages",
+              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, valign, bgcolor, nowrap)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/hints.rs",
+                  "marker": "pub(crate) fn presentational_hints"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn table_presentational_hints_map_to_css_below_author_rules"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn legacy_table_attributes_size_and_space_the_table"
+                }
+              ]
+            },
+            {
+              "label": "Pinned css-tables layout pages compared like css-grid (importer, reviewed expected failures)",
               "status": "planned",
               "evidence": []
             }
           ],
-          "credit": "60.00",
+          "credit": "66.66",
           "engine_share": "0.58"
         },
         {
@@ -3083,10 +3104,10 @@
       "completed": 7,
       "in_progress": 1,
       "total": 11,
-      "contribution": "4.00",
-      "percent": "66.66",
+      "contribution": "4.03",
+      "percent": "67.32",
       "verified_percent": "60.78",
-      "partial_percent": "5.88"
+      "partial_percent": "6.54"
     },
     {
       "id": "paint",

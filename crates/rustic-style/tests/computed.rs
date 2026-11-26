@@ -452,3 +452,38 @@ fn catalog_properties_compute() {
     let sheet = "#p { text-indent: 2em; font-size: 10px } #c { font-size: 20px }";
     assert_eq!(computed(html, sheet, "c", "text-indent"), "20px");
 }
+
+#[test]
+fn table_presentational_hints_map_to_css_below_author_rules() {
+    let html = "<table id=t cellspacing=5 cellpadding=3 border=2 width=50% bgcolor=fc0 \
+                align=center><tr id=r valign=top bgcolor='red; display: none'>\
+                <td id=c width=0 height=20 nowrap align=right>x</td></tr></table>\
+                <img id=i width=40 height=30.5>";
+    let none = "#none { color: red }";
+    let value = |id, property| computed(html, none, id, property);
+    assert_eq!(value("t", "border-spacing"), "5px");
+    assert_eq!(value("t", "width"), "50%");
+    assert_eq!(value("t", "background-color"), "rgb(255, 204, 0)");
+    assert_eq!(value("t", "margin-left"), "auto");
+    assert_eq!(value("t", "border-top-width"), "2px");
+    assert_eq!(value("t", "border-top-style"), "outset");
+    // Table attributes reach the cells; zero cell widths are ignored.
+    assert_eq!(value("c", "padding-top"), "3px");
+    assert_eq!(value("c", "border-left-style"), "inset");
+    assert_eq!(value("c", "width"), "auto");
+    assert_eq!(value("c", "height"), "20px");
+    assert_eq!(value("c", "white-space"), "nowrap");
+    assert_eq!(value("c", "text-align"), "right");
+    assert_eq!(value("r", "vertical-align"), "top");
+    // Attribute text is validated, never passed to the CSS parser.
+    assert_eq!(value("r", "background-color"), "rgba(0, 0, 0, 0)");
+    // (No user-agent sheet here, so `display` keeps its initial value.)
+    assert_eq!(value("r", "display"), "inline");
+    assert_eq!(value("i", "width"), "40px");
+    assert_eq!(value("i", "height"), "30.5px");
+    // Any author rule beats a hint, even with zero specificity.
+    assert_eq!(
+        computed(html, "* { padding: 9px }", "c", "padding-top"),
+        "9px"
+    );
+}

@@ -45,6 +45,7 @@ mod containers;
 mod cssom;
 mod dom;
 mod fonts;
+mod hints;
 mod html;
 mod html_state;
 mod interpolate;

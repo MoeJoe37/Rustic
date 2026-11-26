@@ -776,6 +776,10 @@ every one reported its height. No recursion: nested tables are more frames.
   children they wrap; like anonymous blocks they have no fragment of
   their own. `inline-table` boxes are atomic inlines sized like a table,
   with the first line's baseline.
+- HTML attributes (`border`, `cellpadding`, `cellspacing`, `width`,
+  `bgcolor`, `align`, `valign`, ...) become presentational hints
+  ([CSS guide](CSS.md#presentational-hints)); the sheet centres `th` and
+  `caption` text.
 - Without fonts (the block-only reference), anonymous table boxes are not
   generated and misparented parts are refused (TD-211).
 

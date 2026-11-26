@@ -54,7 +54,7 @@ dd { margin-left: 40px }
 dir, menu, ol, ul { padding-left: 40px }
 
 table { display: table; box-sizing: border-box; border-spacing: 2px; border-collapse: separate; text-indent: initial }
-caption { display: table-caption }
+caption { display: table-caption; text-align: center }
 colgroup { display: table-column-group }
 col { display: table-column }
 thead { display: table-header-group }
@@ -64,7 +64,7 @@ tr { display: table-row }
 td, th { display: table-cell; padding: 1px }
 thead, tbody, tfoot, table > tr { vertical-align: middle }
 tr, td, th { vertical-align: inherit }
-th { font-weight: bold }
+th { font-weight: bold; text-align: center }
 
 b, strong { font-weight: bolder }
 i, cite, dfn, em, var { font-style: italic }

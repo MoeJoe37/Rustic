@@ -682,6 +682,10 @@ impl StyledDocument {
         if local == "style" {
             self.dirty.elements.insert(element);
         }
+        // Table hints reach the cells, so restyle the subtree.
+        if crate::hints::is_hint_attribute(&local) {
+            self.dirty.subtrees.insert(element);
+        }
         self.state_attribute_changed(document, element, &local);
         if let Some(&deep) = self.map.has.attributes.get(&local) {
             self.has_anchors(document, element, deep);

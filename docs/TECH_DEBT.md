@@ -243,7 +243,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) was not OS-confined | Paid 2026-11-22 (Linux 2026-11-21, macOS and Windows 2026-11-22; Windows loopback fixture runs stay unconfined, ADR 0066) |
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M9 |
 | TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M9 |
-| TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints are not mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object` (and other attribute hints) do not size elements | Open, M9 CSS/layout |
+| TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints cover dimensions and table attributes only (2026-11-27): `body`/`font` colors, `bordercolor`, `rules`/`frame`, `hspace`/`vspace`, list and `hr` attributes are not mapped | Partly paid, M9 CSS/layout |
 | TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
 | TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M12 |
 | TD-182 | Deliberate | Desktop host | Paid 2026-11-23: `rustic view` renders through one long-lived renderer per page with clicks and keys routed to it, the UI-01 browser strip, and window tests on native Windows, macOS and Linux (ADR 0069, ADR 0074); IME composition into pages moved to TD-197 | Paid |
@@ -3250,16 +3250,19 @@ across renderers and show popups in the shell, and load frames in
 single-process runs for `reftest`.
 **Rescheduled 2026-11-23 (M8 completion):** moved to the M9 language and web APIs row: frame scripting across renderers (`contentWindow`, `postMessage`, `window.open`) is HTML browsing-context work in M9, together with TD-130.
 
-### TD-179 — HTML presentational hints are not mapped
+### TD-179 — HTML presentational hints are partly mapped
 
 HTML §15 maps attributes such as `width` and `height` on `img`, `iframe`,
 `video`, `embed` and `object` (and `align`, `bgcolor`, `border`, …) to CSS
-presentational hints. The cascade has no presentational-hint origin yet, so
-those attributes do nothing; pages size such elements with CSS only. Found
-while adding frames (ADR 0062), whose tests size frames with CSS.
-**Pay:** add a presentational-hint declaration block per element below
-author rules (CSS Cascade 4, "non-CSS presentational hints"), starting with HTML's dimension
-attributes, with the WPT `html/rendering` tests.
+presentational hints. Found while adding frames (ADR 0062). Partly paid
+2026-11-27 with `layout.tables`: the cascade has a presentational-hint
+level below author rules ([CSS guide](CSS.md#presentational-hints)), and
+dimensions and the table attributes are mapped. Not mapped yet: `body`
+`text`/`link`/`bgcolor`/`background`, `font` `color`/`size`/`face`,
+table `bordercolor`, `rules` and `frame`, `hspace`/`vspace`, `hr` and list
+attributes, `dir`-independent `align` on other elements, and the legacy
+color parser's lenient forms (only names and 3- or 6-digit hex are taken).
+**Pay:** map the rest with the WPT `html/rendering` tests.
 
 ### TD-180 — Script scrolling is the position subset
 

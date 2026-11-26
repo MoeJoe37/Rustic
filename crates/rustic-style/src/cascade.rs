@@ -148,6 +148,9 @@ impl<E> TreeScope<E> {
 pub struct StyleInputs<'a, E> {
     /// The element's `style` attribute declarations (author origin).
     pub style_attribute: &'a [PropertyDeclaration],
+    /// The element's HTML presentational hints (author origin, losing to
+    /// every author rule).
+    pub presentational_hints: &'a [PropertyDeclaration],
     /// Values from running CSS animations (the animation origin), later
     /// ones winning. Rustic has no animation engine yet, so the engine
     /// passes none; the cascade already places them correctly.
@@ -169,6 +172,7 @@ impl<E> StyleInputs<'_, E> {
     pub fn document() -> Self {
         Self {
             style_attribute: &[],
+            presentational_hints: &[],
             animations: &[],
             transitions: &[],
             scope: TreeScope::document(),
@@ -188,6 +192,9 @@ struct Priority {
     /// Encapsulation context: outer wins for normal declarations, inner for
     /// important ones.
     context: u32,
+    /// Not a presentational hint: hints lose to every author rule (HTML
+    /// §15.3.1, as if at the start of the author sheets).
+    rule: bool,
     /// Declarations from the `style` attribute beat rule declarations.
     inline: bool,
     /// Cascade layer: later wins for normal declarations, earlier for
@@ -251,6 +258,7 @@ impl Candidate<'_> {
         let min = |tier| Priority {
             tier,
             context: 0,
+            rule: false,
             inline: false,
             layer: 0,
             specificity: Specificity::default(),
@@ -273,6 +281,7 @@ impl Candidate<'_> {
         // existed, including the normal level itself.
         Some(Priority {
             context: context_key(self.depth, false),
+            rule: p.rule,
             inline: p.inline,
             layer: layer_key(self.rank, false),
             ..min(tier(origin, false))
@@ -620,6 +629,7 @@ impl Cascade {
                         priority: Priority {
                             tier: tier(sheet.origin, important),
                             context: context_key(tree.1, important),
+                            rule: true,
                             inline: false,
                             layer: layer_key(rank, important),
                             specificity,
@@ -635,12 +645,31 @@ impl Cascade {
             }
         }
         let depth = inputs.scope.depth;
+        for (declaration_index, declaration) in inputs.presentational_hints.iter().enumerate() {
+            candidates.push(Candidate {
+                priority: Priority {
+                    tier: tier(Origin::Author, false),
+                    context: context_key(depth, false),
+                    rule: false,
+                    inline: false,
+                    layer: layer_key(UNLAYERED, false),
+                    specificity: Specificity::default(),
+                    proximity: UNSCOPED,
+                    order: (0, 0, declaration_index),
+                },
+                level: RevertLevel::Author,
+                depth,
+                rank: UNLAYERED,
+                declaration,
+            });
+        }
         for (declaration_index, declaration) in inputs.style_attribute.iter().enumerate() {
             let important = declaration.important;
             candidates.push(Candidate {
                 priority: Priority {
                     tier: tier(Origin::Author, important),
                     context: context_key(depth, important),
+                    rule: true,
                     inline: true,
                     layer: layer_key(UNLAYERED, important),
                     specificity: Specificity::default(),
@@ -662,6 +691,7 @@ impl Cascade {
                     priority: Priority {
                         tier,
                         context: 0,
+                        rule: true,
                         inline: false,
                         layer: 0,
                         specificity: Specificity::default(),

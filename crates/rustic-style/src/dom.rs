@@ -692,6 +692,14 @@ pub(crate) fn style_walk<'a>(
                 if let Some(base) = cascade.document_base_url() {
                     resolve_declaration_urls(&mut inline, base);
                 }
+                let hint_source = crate::hints::presentational_hints(&element);
+                let hints = if hint_source.is_empty() {
+                    Vec::new()
+                } else {
+                    parse_style_attribute(parser, &hint_source)
+                        .map(|(declarations, _)| declarations)
+                        .unwrap_or_default()
+                };
                 let containers: Vec<ContainerInfo<'_, DomElement<'a>>> = if container_queries {
                     path.iter()
                         .filter_map(|e| {
@@ -708,6 +716,7 @@ pub(crate) fn style_walk<'a>(
                 };
                 let inputs = StyleInputs {
                     style_attribute: &inline,
+                    presentational_hints: &hints,
                     scope,
                     shadow_root: shadow_root.map(shadow_tree_context),
                     containers: &containers,

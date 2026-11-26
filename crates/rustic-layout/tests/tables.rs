@@ -303,3 +303,23 @@ fn inline_tables_sit_on_the_line() {
     assert_eq!(m["it"].3, 20.0);
     assert_eq!(m["inner"].0, 0.0);
 }
+
+#[test]
+fn legacy_table_attributes_size_and_space_the_table() {
+    let html = page(
+        "",
+        &format!(
+            "<table id=t border=1 cellpadding=4 cellspacing=0 width=200><tr>\
+             <td id=a>{}</td><td id=b>{}</td></tr></table>",
+            b("ia", 10, 10),
+            b("ib", 10, 10)
+        ),
+    );
+    let m = boxes(&html);
+    // `width` is the border box (the sheet's `box-sizing: border-box`);
+    // cells get 1px borders and 4px padding and share the 198px equally.
+    assert_eq!(m["t"], (0.0, 0.0, 200.0, 22.0));
+    assert_eq!(m["a"], (1.0, 1.0, 99.0, 20.0));
+    assert_eq!(m["b"], (100.0, 1.0, 99.0, 20.0));
+    assert_eq!(m["ia"], (6.0, 6.0, 10.0, 10.0));
+}

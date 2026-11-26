@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 50.98%** = 49.65% verified complete + 1.33% partial credit. 117/228 capabilities complete, 11 in progress.
+**Overall completion: 51.34%** = 49.65% verified complete + 1.69% partial credit. 117/228 capabilities complete, 12 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `44520c139707bc82e76ef6f09aa3a13f4f695b8c5b09d8e97531c945b1e0b107`.
+Catalog: `engine-v4`. Source fingerprint: `d8fd1cb2a6461c58a8c201e6027620e14346a402baa0d7fd227442e1c2cbc329`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `44520c139707bc82e76ef6f09aa3a13f4f695
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 4/54 | 7.25% | 5.36% | 22.35% |
+| M9 Compatibility expansion | 4/54 | 8.83% | 5.36% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -35,7 +35,7 @@ Catalog: `engine-v4`. Source fingerprint: `44520c139707bc82e76ef6f09aa3a13f4f695
 | HTML | 10/11 | 0 | 78.37% | 78.37% | 5% | 3.91 |
 | CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
 | Text & fonts | 4/7 | 0 | 56.00% | 56.00% | 3% | 1.68 |
-| Layout | 6/11 | 0 | 50.98% | 50.98% | 6% | 3.05 |
+| Layout | 6/11 | 1 | 56.86% | 50.98% | 6% | 3.41 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 6 | 0.00% | 0.00% | 3% | 0.00 |
@@ -147,7 +147,12 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `layout.sizing` — Intrinsic and replaced-element sizing · size 3 · M3 · 0.35% of engine ([source](../../crates/rustic-layout/src/intrinsic.rs), [test](../../crates/rustic-layout/tests/sizing.rs), [test](../../crates/rustic-layout/tests/sizing.rs), [source](../../crates/rustic-layout/src/replaced.rs), [test](../../crates/rustic-layout/tests/sizing.rs), [test](../../crates/rustic-layout/tests/sizing.rs), [source](../../crates/rustic-layout/src/lines.rs), [test](../../crates/rustic-layout/tests/atomic.rs), [test](../../crates/rustic-layout/tests/atomic.rs))
 - **complete** `layout.position` — Floats, positioning and overflow · size 5 · M3 · 0.58% of engine ([source](../../crates/rustic-layout/src/position.rs), [test](../../crates/rustic-layout/tests/position.rs), [test](../../crates/rustic-layout/tests/position.rs), [source](../../crates/rustic-layout/src/exclusions.rs), [test](../../crates/rustic-layout/tests/position.rs), [test](../../crates/rustic-layout/tests/position.rs), [source](../../crates/rustic-layout/src/overflow.rs), [test](../../crates/rustic-layout/tests/position.rs), [source](../../crates/rustic-layout/src/sticky.rs), [test](../../crates/rustic-layout/src/sticky.rs), [test](../../crates/rustic-layout/tests/position.rs))
 - **complete** `layout.flex` — Flexbox · size 5 · M3 · 0.58% of engine ([source](../../crates/rustic-css/src/flex.rs), [test](../../crates/rustic-css/tests/flex.rs), [source](../../crates/rustic-layout/src/flow/flex.rs), [test](../../crates/rustic-layout/tests/flex.rs), [test](../../crates/rustic-layout/tests/flex.rs), [test](../../crates/rustic-layout/tests/flex.rs), [source](../../crates/rustic-layout/src/flow.rs), [test](../../crates/rustic-layout/tests/atomic.rs), [test](../../crates/rustic-layout/tests/atomic.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../tools/import_wpt_flexbox_tests.py), [test](../../crates/rustic-layout/tests/wpt_flexbox.rs))
-- **planned** `layout.grid` — Grid · size 5 · M9 · 0.58% of engine
+- **in progress 60.00%** `layout.grid` — Grid · size 5 · M9 · 0.58% of engine
+  - [x] Grid template, placement, auto-flow and alignment properties parse, serialize and compute (pinned css-grid and css-align parsing cases) ([source](../../crates/rustic-css/src/grid.rs), [test](../../crates/rustic-css/tests/grid.rs), [test](../../crates/rustic-css/tests/wpt_conformance.rs))
+  - [x] Placement: explicit and implicit grids, named lines and areas, auto-placement with dense packing ([source](../../crates/rustic-layout/src/flow/grid.rs), [test](../../crates/rustic-layout/tests/grid.rs), [test](../../crates/rustic-layout/tests/grid.rs))
+  - [x] Track sizing and alignment: intrinsic, flexible and stretched tracks, gaps, content and self alignment, RTL, auto-fit, inline grids; pinned css-grid checkLayout pages ([source](../../crates/rustic-layout/src/flow/grid.rs), [test](../../crates/rustic-layout/tests/grid.rs), [test](../../crates/rustic-layout/tests/grid.rs), [test](../../crates/rustic-layout/tests/wpt_grid.rs))
+  - [ ] Baseline self-alignment and grid-placed absolutely positioned items (TD-209)
+  - [ ] Subgrid (TD-209)
 - **planned** `layout.tables` — Tables · size 5 · M9 · 0.58% of engine
 - **planned** `layout.fragmentation` — Fragmentation, printing and advanced formatting · size 5 · M9 · 0.58% of engine
 - **planned** `layout.incremental` — Incremental/full-layout parity and conformance · size 5 · M9 · 0.58% of engine

@@ -81,6 +81,10 @@ CSS transitions and animations with their events, the Web Animations API,
 scroll-driven animations, anchor positioning, view transitions, implicit
 and nested `@scope` and a read-only CSSOM
 ([CSS.md](docs/CSS.md#transitions-and-animations)).
+CSS Grid layout is in progress: grid containers place, size and align their
+items with the full track sizing algorithm; baseline alignment, grid-area
+containing blocks for positioned children and subgrid remain
+([LAYOUT.md](docs/LAYOUT.md#grid-layoutgrid-m9)).
 **Android and iOS are deferred to the last milestone (M14)**, not dropped:
 they stay release platforms, every Android and iOS target is still
 compile-checked in CI and the Android isolated renderer service runs on an
@@ -95,7 +99,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 50.98%** (49.65% verified complete + 1.33% partial credit) — 117/228 capabilities complete and 11 in progress across 25 subsystems. Current milestone: **M9 Compatibility expansion**, 7.25% done.
+**Overall engine completion: 51.34%** (49.65% verified complete + 1.69% partial credit) — 117/228 capabilities complete and 12 in progress across 25 subsystems. Current milestone: **M9 Compatibility expansion**, 8.83% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

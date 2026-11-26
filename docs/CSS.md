@@ -304,6 +304,20 @@ factor unless two factors precede it),
 Children of flex and grid containers are blockified at computed-value time.
 `tests/flex.rs` covers valid, round-trip and invalid values.
 
+`layout.grid` (M9) adds the grid longhands `grid-template-rows`,
+`grid-template-columns`, `grid-template-areas`, `grid-auto-rows`,
+`grid-auto-columns`, `grid-auto-flow` and the four `grid-row-*`/`grid-column-*`
+placement lines, the `grid-row`, `grid-column`, `grid-area`, `grid-template`
+and `grid` shorthands, `justify-items` (initial `legacy`) and `justify-self`,
+the `place-content`, `place-items` and `place-self` shorthands, the
+`flow-start`/`flow-end` keywords, `safe`/`unsafe normal` for the self and
+items properties, and the `grid-gap`, `grid-row-gap` and `grid-column-gap`
+aliases. Track lists keep their line names and `repeat()` structure for
+serialization (`[]` drops); lengths compute to pixels. `tests/grid.rs`
+covers them, and the pinned WPT `css-grid/parsing` and `css-align/parsing`
+cases are part of the conformance gate. Details:
+[layout guide](LAYOUT.md#grid-layoutgrid-m9).
+
 Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
 `rex`, `ch`, `rch`, `cap`, `rcap`, `ic`, `ric`, `lh`, `rlh`) and the viewport
 units including the small/large/dynamic variants, plus unitless zero. Every

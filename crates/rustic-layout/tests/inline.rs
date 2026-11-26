@@ -386,7 +386,7 @@ fn unsupported_inline_content_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
     for (html, reason) in [
         (
-            "<p>x<span style='display:inline-grid'>x</span>",
+            "<p>x<span style='display:inline-table'>x</span>",
             UnsupportedFlow::FormattingContext,
         ),
         ("<p>x<input>", UnsupportedFlow::SpecialElement),

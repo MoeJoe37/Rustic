@@ -347,6 +347,11 @@ impl AbsoluteHeight {
         self.maximum.map_or(n, |m| n.min(m)).max(self.minimum)
     }
 
+    /// Used minimum and maximum content heights.
+    pub(crate) fn bounds(&self) -> (f64, Option<f64>) {
+        (self.minimum, self.maximum)
+    }
+
     /// The content height children may resolve percentages against, if it
     /// does not depend on the content (specified, or both offsets non-auto).
     pub(crate) fn definite(&self) -> Option<f64> {

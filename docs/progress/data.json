@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "44520c139707bc82e76ef6f09aa3a13f4f695b8c5b09d8e97531c945b1e0b107",
-  "percent": "50.98",
+  "source_fingerprint": "d8fd1cb2a6461c58a8c201e6027620e14346a402baa0d7fd227442e1c2cbc329",
+  "percent": "51.34",
   "verified_percent": "49.65",
-  "partial_percent": "1.33",
+  "partial_percent": "1.69",
   "completed": 117,
-  "in_progress": 11,
+  "in_progress": 12,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 4,
       "total": 54,
-      "percent": "7.25",
+      "percent": "8.83",
       "verified_percent": "5.36",
-      "partial_percent": "1.89"
+      "partial_percent": "3.47"
     },
     {
       "id": "M10",
@@ -2862,9 +2862,89 @@
           "label": "Grid",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Grid template, placement, auto-flow and alignment properties parse, serialize and compute (pinned css-grid and css-align parsing cases)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/grid.rs",
+                  "marker": "pub enum GridValue"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/grid.rs",
+                  "marker": "fn grid_values_parse_and_serialize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/wpt_conformance.rs",
+                  "marker": "const IN_SCOPE: usize = 2664;"
+                }
+              ]
+            },
+            {
+              "label": "Placement: explicit and implicit grids, named lines and areas, auto-placement with dense packing",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/grid.rs",
+                  "marker": "fn place("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn auto_placement_spans_wraps_and_packs_densely"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn areas_and_named_lines_place_items"
+                }
+              ]
+            },
+            {
+              "label": "Track sizing and alignment: intrinsic, flexible and stretched tracks, gaps, content and self alignment, RTL, auto-fit, inline grids; pinned css-grid checkLayout pages",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/grid.rs",
+                  "marker": "fn size_tracks("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn intrinsic_columns_follow_item_contributions"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn content_and_self_alignment_position_tracks_and_items"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/wpt_grid.rs",
+                  "marker": "fn grid_layout_matches_the_reviewed_wpt_expectations"
+                }
+              ]
+            },
+            {
+              "label": "Baseline self-alignment and grid-placed absolutely positioned items (TD-209)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Subgrid (TD-209)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "60.00",
           "engine_share": "0.58"
         },
         {
@@ -2910,12 +2990,12 @@
       ],
       "points": 51,
       "completed": 6,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 11,
-      "contribution": "3.05",
-      "percent": "50.98",
+      "contribution": "3.41",
+      "percent": "56.86",
       "verified_percent": "50.98",
-      "partial_percent": "0.00"
+      "partial_percent": "5.88"
     },
     {
       "id": "paint",

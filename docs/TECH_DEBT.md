@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-209, TD-210, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
@@ -266,6 +266,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M10 |
 | TD-200 | Deliberate | WebAssembly | The progressive decoder pulls response chunks and compiles in an agent promise reaction | Partly paid by ADR 0094, M9 |
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
+| TD-209 | Deliberate | Layout | Grid subset: no subgrid or masonry, baseline self-alignment falls back to `start`, absolutely positioned children use the content-box start corner instead of grid areas, `horizontal-tb` only, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
+| TD-210 | Deliberate | Layout | css-grid WPT comparison: 112 of 168 static pages fail, every one reviewed (baseline, writing modes, masonry, grid-placed abspos, subgrid, Ahem text) | Open, `layout.grid` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3420,3 +3422,40 @@ through shared state and suspended invocations.
 Cross-instance indirect calls verify the callee's signature.
 [ADR 0093](adr/0093-wasm-reference-interop.md) extends the boundary to nullable
 reference-valued calls and globals.
+
+### TD-209 — Grid layout subset
+
+`layout.grid` implements placement, the track sizing algorithm and box
+alignment for `horizontal-tb` grids. Not implemented: `subgrid` and masonry
+(`grid-lanes`, which are not parsed), baseline self-alignment (`baseline`
+and `last baseline` behave as `start`, and grid containers take the first
+in-flow line box as their baseline), and grid areas as containing blocks
+for absolutely positioned children (they use the grid container's
+content-box start corner as the static position, the TD-49 approximation
+flex uses). Auto repetitions count against definite sizes, fixed
+`max-*`/`min-*` sizes and the used height constraint, but not against
+percentage `max-width` while the container's own intrinsic size is
+computed. Implicit lines named on both sides of the explicit grid are
+counted from the explicit grid only. Grid properties are not animatable
+(they interpolate discretely). `inline-size`/`block-size`, `width: stretch`
+and `overflow: clip` next to `hidden` affect a few WPT pages through other
+subsystems.
+**Pay:** baseline sharing groups and grid-area abspos containing blocks
+first (26 and 17 WPT pages), then subgrid, with writing modes (`text.writing`)
+for the vertical pages.
+
+### TD-210 — css-grid WPT comparison failures
+
+`tests/wpt_grid.rs` lays out the 168 static `checkLayout` pages that
+`tools/import_wpt_grid_tests.py` extracts from the pinned css-grid directory
+and compares every element's expectations. 56 pass. Each of the other 112 is
+listed in `fixtures/wpt-grid/expected_failures.txt` with its reason: 26
+baseline alignment, 24 vertical writing modes, 20 masonry, 17 grid-placed
+absolutely positioned items, 14 subgrid, and 11 single causes (Ahem
+`::first-letter`/`::first-line` text, logical sizing properties, table and
+form-control items, unread expectation attributes). Rustic's bundled test
+fonts have no Ahem, so pages measuring Ahem text can only pass once the
+harness bundles it. The list is a ratchet: a listed page that passes fails
+the test.
+**Pay:** shrink the list with TD-209; bundle Ahem in the test fonts.
+

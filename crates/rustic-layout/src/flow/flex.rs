@@ -226,8 +226,8 @@ fn distribute(
     match a.keyword {
         K::FlexEnd => (free, 0.0),
         K::Center => (free / 2.0, 0.0),
-        K::Start | K::SelfStart => (to_end(start_is_flex_start), 0.0),
-        K::End | K::SelfEnd => (to_end(!start_is_flex_start), 0.0),
+        K::Start | K::SelfStart | K::FlowStart => (to_end(start_is_flex_start), 0.0),
+        K::End | K::SelfEnd | K::FlowEnd => (to_end(!start_is_flex_start), 0.0),
         K::Left => (
             to_end(left_is_flex_start.unwrap_or(start_is_flex_start)),
             0.0,

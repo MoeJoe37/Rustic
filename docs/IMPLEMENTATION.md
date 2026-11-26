@@ -16,6 +16,25 @@ which describes the current state in one place. What is next is in the
 [roadmap queue](ROADMAP.md#18-current-implementation-queue), and the measured
 status is the [progress summary](progress/summary.md).
 
+## M9 CSS/layout — Grid layout (`layout.grid`)
+
+Grid containers (`display: grid` and `inline-grid`) lay out in the block
+walk as flex containers do: `flow/grid.rs` places items (explicit and
+implicit grids, line names and areas, sparse and dense auto-placement in
+row or column flow), sizes columns and then rows with the CSS Grid 2 track
+sizing algorithm, applies content and self alignment with gaps, RTL and
+`auto-fit` collapse, and lays items out again when their height depends on
+the row. `rustic-css` parses the grid template, placement and auto-flow
+properties and shorthands and the remaining box alignment values
+(`justify-items`, `justify-self`, `place-*`). Abspos boxes pass their
+min/max heights to flex and grid containers. Evidence: exact-geometry tests
+in `rustic-layout/tests/grid.rs`, unit tests of the sizing and placement
+algorithms, the pinned css-grid `checkLayout` comparison (56 of 168 pages,
+the rest reviewed, TD-210) and 1055 new in-scope WPT parsing cases. Three of
+the capability's five steps are complete; baseline alignment, grid-area
+containing blocks and subgrid remain (TD-209). Guide:
+[layout](LAYOUT.md#grid-layoutgrid-m9).
+
 ## CSS-09 — Animations and modern CSS
 
 `rustic_style::AnimationController` holds a document's animations and

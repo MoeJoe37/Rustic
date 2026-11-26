@@ -596,7 +596,84 @@ Specification basis, reviewed 2026-11-09: CSS Flexible Box Layout 1
 Alignment 3 [§4–§8](https://www.w3.org/TR/css-align-3/), CSS Sizing 3
 [§3–§5](https://www.w3.org/TR/css-sizing-3/#sizing-values) and CSS 2.2
 [§10.3.2/§10.4/§10.6.2](https://www.w3.org/TR/CSS22/visudet.html#inline-replaced-width).
-The WPT subset above is the only layout-WPT comparison so far.
+The css-grid comparison below is the second layout-WPT comparison.
+
+## Grid (`layout.grid`, M9)
+
+### Properties
+
+`rustic-css` parses, serializes and computes `grid-template-rows`,
+`grid-template-columns` (line names, `repeat()` with counts, `auto-fill`
+and `auto-fit`, `minmax()`, `fit-content()`, `fr`), `grid-template-areas`
+(validated rectangles), `grid-auto-rows`/`-columns`, `grid-auto-flow`, the
+four placement longhands and the `grid-row`, `grid-column`, `grid-area`,
+`grid-template` and `grid` shorthands, plus `justify-items`, `justify-self`
+(with `legacy`), `place-content`/`-items`/`-self`, `flow-start`/`flow-end`,
+overflow positions on `normal` and the `grid-gap` aliases. Track lists keep
+their written structure; `repeat()` counts clamp at 10,000. `subgrid` and
+masonry are not parsed (TD-209).
+
+### Algorithm
+
+`flow/grid.rs` runs as a formatting context inside the block walk, as flex
+does: a grid container's frame owns a run that asks the walk to lay its
+items out and receives their content heights, so nesting adds frames, not
+recursion. A run:
+
+1. expands the explicit grid (auto repetitions count against the definite
+   size, else a `max-*` size, else fill a `min-*` size; areas add tracks
+   sized by `grid-auto-*` and `-start`/`-end` line names), resolves each
+   item's lines (numbers, names, spans, negative lines, swapped and equal
+   lines) and runs the auto-placement algorithm (row or column flow, sparse
+   or dense) over `order`-modified document order; implicit tracks before
+   the explicit grid run the `grid-auto-*` pattern backwards; empty
+   `auto-fit` tracks collapse with their gutters;
+2. sizes columns with the track sizing algorithm (CSS Grid 2 §11.3–§11.8):
+   initialization, intrinsic sizes for single spans then span groups through
+   "distribute extra space" (minimum, min-content and max-content steps for
+   base sizes and growth limits), items crossing flexible tracks, maximization,
+   "find the size of an fr" and stretching `auto` tracks; contributions come
+   from the bottom-up intrinsic sizes, with the automatic minimum size
+   clamped by fixed max sizing functions and zero for scroll containers in
+   that axis;
+3. aligns the columns (`justify-content`, distributed gutters widen spanning
+   areas) and lays every item out at its area width (stretched, specified
+   or fit-content);
+4. sizes rows from those heights the same way; an indefinite height whose
+   flexible rows break `min-height`/`max-height` is sized again against the
+   bound; then aligns rows and lays out again items whose height depends on
+   the row (stretched, or percentages against the grid area);
+5. places items with `justify-self`/`align-self` and auto margins; RTL grids
+   mirror columns, and `left`/`right` stay physical. Relative offsets
+   resolve against the grid area.
+
+The grid container's intrinsic widths run the column algorithm under min-
+and max-content constraints with limited contributions. `inline-grid`
+containers are atomic inlines whose baseline is their first item line.
+Lines past 10,000 tracks clamp into the last track and placement is
+metered by the flow work budget. Absolutely positioned boxes whose
+containing block is an abspos grid now carry their `min-height`/`max-height`
+into the grid's row sizing.
+
+### Evidence
+
+`crates/rustic-css/tests/grid.rs` covers valid and invalid values and
+shorthand expansion; the pinned WPT `css-grid/parsing` and
+`css-align/parsing` cases joined the `css.conformance` gate (2293 of 2664
+in-scope cases pass, three grid cases reviewed as failures).
+`crates/rustic-layout/tests/grid.rs` has fourteen scenarios with exact
+geometry (fixed and flexible tracks with gaps, areas and named lines, auto
+placement with spans, dense and column flow, negative lines, intrinsic and
+inline grids, row sizing and stretch, content and self alignment, RTL,
+`auto-fit` collapse, `order`, abspos `min-height`, clamped lines, anonymous
+items); `flow/grid.rs` unit-tests the sizing and placement algorithms
+directly. `tests/wpt_grid.rs` compares the 168 static `checkLayout` pages
+of the pinned css-grid directory (`tools/import_wpt_grid_tests.py`): 56
+pass and the other 112 are reviewed failures (TD-210).
+
+Specification basis, reviewed 2026-11-26: CSS Grid Layout 2
+[§6–§11](https://drafts.csswg.org/css-grid-2/) and CSS Box Alignment 3
+[§5–§8](https://drafts.csswg.org/css-align-3/).
 
 ## Inline formatting and text fragments (REN-03b)
 

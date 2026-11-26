@@ -74,6 +74,17 @@ impl HeightConstraint {
         }
     }
 
+    /// A content-based constraint with solved bounds (absolutely positioned
+    /// boxes whose height depends on their content): flex and grid layout
+    /// size their tracks and lines against the bounds.
+    pub(crate) fn bounded(minimum: CssPx, maximum: Option<CssPx>) -> Self {
+        Self {
+            specified: None,
+            minimum,
+            maximum,
+        }
+    }
+
     pub(crate) fn used(&self, automatic: CssPx) -> CssPx {
         let tentative = self.specified.unwrap_or(automatic);
         let limited = self.maximum.map_or(

@@ -20,6 +20,7 @@ use rustic_style::ComputedStyle;
 use std::{collections::HashMap, error::Error, fmt};
 
 mod flex;
+mod grid;
 
 use crate::anchor;
 use crate::exclusions::{Exclusions, Side};
@@ -278,6 +279,10 @@ struct Node<'a> {
     flex_container: bool,
     /// An in-flow child of a flex container.
     flex_item: bool,
+    /// `display:grid` or `inline-grid`.
+    grid_container: bool,
+    /// An in-flow child of a grid container.
+    grid_item: bool,
     /// Already in [`Engine::absolute`] (flex items can be laid out twice).
     queued: bool,
     // Results of the current layout attempt.
@@ -374,6 +379,8 @@ struct Frame {
     /// For a flex container, its run in [`Engine::flexes`]; its children are
     /// laid out by the flex algorithm rather than this walk.
     flex: Option<usize>,
+    /// For a grid container, its run in [`Engine::grids`].
+    grid: Option<usize>,
 }
 
 fn direction(style: &ComputedStyle) -> Result<Direction, FlowError> {
@@ -445,15 +452,16 @@ fn supported_box(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
     }
     if !matches!(
         b.kind(),
-        BoxKind::Element(Display::Block | Display::FlowRoot | Display::Flex)
+        BoxKind::Element(Display::Block | Display::FlowRoot | Display::Flex | Display::Grid)
     ) {
         return Err(fail(UnsupportedFlow::FormattingContext));
     }
     b.style().ok_or(FlowError::InvalidSnapshot)
 }
 
-/// An atomic inline: `inline-block`, `inline-flex` or an inline replaced
-/// element. Inline grids/tables, controls and foreign content stay refused.
+/// An atomic inline: `inline-block`, `inline-flex`, `inline-grid` or an
+/// inline replaced element. Inline tables, controls and foreign content stay
+/// refused.
 fn supported_atomic(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
     let fail = |reason| FlowError::Unsupported {
         node: b.node(),
@@ -464,7 +472,7 @@ fn supported_atomic(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
         return Err(fail(UnsupportedFlow::SpecialElement));
     }
     match b.kind() {
-        BoxKind::Element(Display::InlineBlock | Display::InlineFlex) => {}
+        BoxKind::Element(Display::InlineBlock | Display::InlineFlex | Display::InlineGrid) => {}
         BoxKind::Element(Display::Inline) if replaced => {}
         _ => return Err(fail(UnsupportedFlow::FormattingContext)),
     }
@@ -504,6 +512,8 @@ struct Engine<'a, 'c> {
     work: Work<'c>,
     /// Flex containers being laid out, innermost last.
     flexes: Vec<flex::FlexRun>,
+    /// Grid containers being laid out, innermost last.
+    grids: Vec<grid::GridRun>,
     ifcs: Vec<Ifc<'a>>,
     /// Lines per inline formatting context, relative to its content origin.
     line_sets: Vec<Option<LineSet>>,
@@ -581,6 +591,7 @@ fn new_node<'a>(
     depth: usize,
 ) -> Result<Node<'a>, FlowError> {
     let parent_flex = parent.is_some_and(|p| nodes[p].flex_container);
+    let parent_grid = parent.is_some_and(|p| nodes[p].grid_container);
     let containing_direction = match parent {
         Some(p) => nodes[p].direction,
         None => direction(style)?,
@@ -589,9 +600,10 @@ fn new_node<'a>(
         V::Position(Position::Absolute) => (Scheme::Absolute, false),
         V::Position(Position::Fixed) => (Scheme::Fixed, false),
         V::Position(p) => {
-            // `float` does not apply to flex items (CSS Flexbox 1 §3).
+            // `float` does not apply to flex or grid items (CSS Flexbox 1
+            // §3, CSS Grid 2 §6.1).
             let scheme = match float_side(style, containing_direction)? {
-                Some(side) if !parent_flex => Scheme::Float(side),
+                Some(side) if !parent_flex && !parent_grid => Scheme::Float(side),
                 _ => Scheme::Flow,
             };
             (scheme, *p == Position::Relative)
@@ -600,6 +612,7 @@ fn new_node<'a>(
     };
     let sticky = matches!(style.get(P::Position), V::Position(Position::Sticky));
     let flex_item = parent_flex && scheme == Scheme::Flow;
+    let grid_item = parent_grid && scheme == Scheme::Flow;
     // The nearest positioned ancestor; `None` is the initial containing block.
     let containing = match scheme {
         Scheme::Fixed => None,
@@ -639,6 +652,11 @@ fn new_node<'a>(
             BoxKind::Element(Display::Flex | Display::InlineFlex)
         ),
         flex_item,
+        grid_container: matches!(
+            b.kind(),
+            BoxKind::Element(Display::Grid | Display::InlineGrid)
+        ),
+        grid_item,
         queued: false,
         measure: BlockMeasure {
             content_width: CssPx::ZERO,
@@ -823,8 +841,10 @@ fn anonymous_styles(
     for (i, b) in boxes.iter().enumerate() {
         let flex = match b.kind() {
             BoxKind::Element(Display::Block | Display::FlowRoot | Display::InlineBlock) => false,
-            // Text directly in a flex container gets anonymous flex items.
-            BoxKind::Element(Display::Flex | Display::InlineFlex) => true,
+            // Text directly in a flex or grid container gets anonymous items.
+            BoxKind::Element(
+                Display::Flex | Display::InlineFlex | Display::Grid | Display::InlineGrid,
+            ) => true,
             _ => continue,
         };
         let (mut inline, mut block) = (false, flex);
@@ -954,7 +974,7 @@ fn build_text_nodes<'a>(
                 let items = flatten(ends, kinds, source, work)?;
                 let has_block = items.iter().any(|i| matches!(i, Item::Block(_)));
                 let has_inline = items.iter().any(|i| matches!(i, Item::Inline(_)));
-                if !has_block && !nodes[index].flex_container {
+                if !has_block && !nodes[index].flex_container && !nodes[index].grid_container {
                     if has_inline {
                         let entries: Vec<Entry> = items
                             .iter()
@@ -1062,8 +1082,10 @@ fn build_text_nodes<'a>(
                 node.anonymous = true;
                 node.natural = None;
                 node.flex_container = false;
-                // In a flex container this is an anonymous flex item.
+                node.grid_container = false;
+                // In a flex or grid container this is an anonymous item.
                 node.flex_item = nodes[parent].flex_container;
+                node.grid_item = nodes[parent].grid_container;
                 let ifc = inline::build(tree, ends, style, &entries, fonts, work)?;
                 ifcs.push(ifc);
                 let k = ifcs.len() - 1;
@@ -1127,6 +1149,8 @@ impl<'a, 'c> Engine<'a, 'c> {
                 || node.natural.is_some()
                 || node.flex_container
                 || node.flex_item
+                || node.grid_container
+                || node.grid_item
                 || node.atomic.is_some();
         }
         // Block-only intrinsic sizes, bottom up (CSS Sizing 3 §5).
@@ -1139,6 +1163,10 @@ impl<'a, 'c> Engine<'a, 'c> {
             }
             if self.nodes[i].flex_container {
                 self.nodes[i].intrinsic = self.flex_intrinsic(i)?;
+                continue;
+            }
+            if self.nodes[i].grid_container {
+                self.nodes[i].intrinsic = self.grid_intrinsic(i)?;
                 continue;
             }
             let (mut min, mut max) = (0.0_f64, 0.0_f64);
@@ -1224,11 +1252,15 @@ impl<'a, 'c> Engine<'a, 'c> {
         Ok(())
     }
 
-    /// The frame for a formatting-context root; a flex container starts its run.
+    /// The frame for a formatting-context root; a flex or grid container
+    /// starts its run.
     fn root_frame(&mut self, i: usize) -> Result<Frame, FlowError> {
         let mut frame = self.frame_for(i, 0.0)?;
         if self.nodes[i].flex_container {
             frame.flex = Some(self.start_flex(i)?);
+            frame.next = frame.end;
+        } else if self.nodes[i].grid_container {
+            frame.grid = Some(self.start_grid(i)?);
             frame.next = frame.end;
         }
         Ok(frame)
@@ -1261,6 +1293,7 @@ impl<'a, 'c> Engine<'a, 'c> {
             checkpoint: self.absolute.len(),
             query: 0.0,
             flex: None,
+            grid: None,
         })
     }
 
@@ -1376,8 +1409,13 @@ impl<'a, 'c> Engine<'a, 'c> {
                 continue;
             }
             let frame = *frames.last().ok_or(FlowError::InvalidSnapshot)?;
-            if let Some(k) = frame.flex {
-                let Some(natural) = self.flex_step(&mut frames, &mut bfcs, k)? else {
+            let step = match (frame.flex, frame.grid) {
+                (Some(k), _) => Some(self.flex_step(&mut frames, &mut bfcs, k)?),
+                (None, Some(k)) => Some(self.grid_step(&mut frames, &mut bfcs, k)?),
+                (None, None) => None,
+            };
+            if let Some(step) = step {
+                let Some(natural) = step else {
                     continue;
                 };
                 frames.pop();
@@ -1441,6 +1479,10 @@ impl<'a, 'c> Engine<'a, 'c> {
         }
         if let Some(k) = frames.last().and_then(|f| f.flex) {
             self.flex_item_done(k, i, natural)?;
+            return Ok(None);
+        }
+        if let Some(k) = frames.last().and_then(|f| f.grid) {
+            self.grid_item_done(k, i, natural)?;
             return Ok(None);
         }
         self.set_height(i, natural)?;
@@ -1640,7 +1682,7 @@ impl<'a, 'c> Engine<'a, 'c> {
         let height = m.margin.top.get() + n.border_height.get() + m.margin.bottom.get();
         let content_top = m.margin.top.get() + m.border.top.get() + m.padding.top.get();
         let own = n.natural.is_none() && !scroll_container(n.overflow);
-        let last = !n.flex_container;
+        let last = !n.flex_container && !n.grid_container;
         let baseline = match own {
             true => self.content_baseline(i, last)?,
             false => None,
@@ -1694,7 +1736,10 @@ impl<'a, 'c> Engine<'a, 'c> {
                 let Some(parent) = n.parent else {
                     break false;
                 };
-                if n.scheme != Scheme::Flow || n.atomic.is_some() || (n.bfc_root && !n.flex_item) {
+                if n.scheme != Scheme::Flow
+                    || n.atomic.is_some()
+                    || (n.bfc_root && !n.flex_item && !n.grid_item)
+                {
                     break false;
                 }
                 y += n.pos.1 + n.edge().1 - self.nodes[parent].child_origin().1;
@@ -2143,7 +2188,16 @@ impl<'a, 'c> Engine<'a, 'c> {
             n.vertical_extras()?
         };
         // Children see the solved height as definite only if it is not content-based.
-        self.nodes[i].height = Some(HeightConstraint::solved(definite));
+        self.nodes[i].height = Some(match definite {
+            Some(_) => HeightConstraint::solved(definite),
+            None => {
+                let (min, max) = vertical.bounds();
+                HeightConstraint::bounded(
+                    CssPx::new(min.max(0.0))?,
+                    max.map(|m| CssPx::new(m.max(0.0))).transpose()?,
+                )
+            }
+        });
         let frame = self.root_frame(i)?;
         let natural = self.walk(frame)?;
         let solved = vertical.solve(natural)?;
@@ -2184,6 +2238,7 @@ impl<'a, 'c> Engine<'a, 'c> {
             checkpoint: 0,
             query: 0.0,
             flex: None,
+            grid: None,
         };
         self.walk(root)?;
         let mut q = 0;
@@ -2274,6 +2329,7 @@ impl BlockLayout {
             root_direction,
             absolute: Vec::new(),
             flexes: Vec::new(),
+            grids: Vec::new(),
             work,
             ifcs,
             line_sets,

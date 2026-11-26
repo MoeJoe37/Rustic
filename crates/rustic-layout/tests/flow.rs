@@ -211,7 +211,7 @@ fn unsupported_contexts_and_controls_return_typed_errors() {
     for css in [
         "display:inline",
         "display:inline-flex",
-        "display:grid",
+        "display:inline-grid",
         "display:table",
         "display:list-item",
     ] {

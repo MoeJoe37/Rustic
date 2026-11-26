@@ -3434,8 +3434,7 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Shared memories, reference-valued host and cross-instance calls, and the
-progressive response pipeline remain open.
+Shared memories and the progressive response pipeline remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3614,8 +3613,9 @@ widths. They use the same import matching, growth pool, alias tracking and
 re-export identity as `externref`. Entries retain the function's defining
 instance and index, so a table write or bulk copy preserves function identity
 across instances. Indirect and indirect tail calls check the callee's signature
-before entering it. When they cross instances, the dispatcher exchanges scalar
-numeric values under the existing call-depth and work limits.
+before entering it. When they cross instances, the dispatcher carries numeric and nullable
+reference values under the existing call-depth and work limits.
+[ADR 0093](adr/0093-wasm-reference-interop.md) describes the reference boundary.
 
 The host attaches runtime and import records before applying active segments.
 Functions published by an earlier segment remain live if a later segment
@@ -3627,3 +3627,22 @@ The pinned Window `Instance` and `instantiate` WPT files gained nine passes for
 function-table imports, including empty module or field names and both promise
 overloads. The full pinned Window selection has 1,289 passes and 79 expected
 failures. [ADR 0092](adr/0092-wasm-function-table-imports.md)
+
+
+### WASM-05/06 — Reference-valued calls and globals
+
+Window function imports, exports, and cross-instance indirect calls exchange
+`externref` and nullable function references alongside the scalar types.
+A JavaScript object, symbol or primitive round-trips with its identity.
+A function reference resolves to the original branded Wasm wrapper.
+Imported callbacks can return references, including in multi-value iterables.
+Multi-value exports preserve occupied slots whose values are undefined.
+The Rust numeric execution entry points still use scalar-only signatures.
+
+Window global constructors support `externref` and `anyfunc`. Imported and
+exported wrappers share the live mutable cell. An immutable reference import
+can also snapshot an ordinary host value. The collector traces the current
+cell, reference arguments and results, and suspended frames. Regressions cover
+callback result coercion, GC during reentry, direct and indirect calls across
+instances, global re-exports, and collection after overwriting a global.
+[ADR 0093](adr/0093-wasm-reference-interop.md)

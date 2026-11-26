@@ -2,15 +2,49 @@ use super::state::Transfer;
 use super::*;
 use crate::Immediate;
 
-pub(super) fn invoke<'bytes>(
+pub(super) trait BoundaryValue: Copy {
+    fn supports(ty: ValueType) -> bool;
+    fn into_slot(self) -> Slot;
+    fn from_slot(slot: Slot) -> Self;
+}
+
+impl BoundaryValue for Value {
+    fn supports(ty: ValueType) -> bool {
+        is_numeric(ty)
+    }
+
+    fn into_slot(self) -> Slot {
+        Slot::Number(self)
+    }
+
+    fn from_slot(slot: Slot) -> Self {
+        slot.number()
+    }
+}
+
+impl BoundaryValue for HostValue {
+    fn supports(ty: ValueType) -> bool {
+        Self::supports(ty)
+    }
+
+    fn into_slot(self) -> Slot {
+        self
+    }
+
+    fn from_slot(slot: Slot) -> Self {
+        slot
+    }
+}
+
+pub(super) fn invoke<'bytes, T: BoundaryValue>(
     instance: &Executable<'_, 'bytes>,
     state: &RefCell<State<'bytes>>,
     function: usize,
-    arguments: &[Value],
+    arguments: &[T],
     entry_work: usize,
     cancellation: &CancellationToken,
     dispatch: Option<Dispatch<'_, '_>>,
-) -> Result<Vec<Value>, ExecutionError> {
+) -> Result<Vec<T>, ExecutionError> {
     let mut machine = Machine {
         instance,
         state,
@@ -36,11 +70,11 @@ pub(super) fn invoke<'bytes>(
     if arguments
         .iter()
         .zip(&signature.params)
-        .any(|(&value, &ty)| value.value_type() != ty)
+        .any(|(&value, &ty)| value.into_slot().value_type() != ty)
     {
         return Err(error(0, Fault::ArgumentType));
     }
-    if !signature.results.iter().copied().all(is_numeric) {
+    if !signature.results.iter().copied().all(T::supports) {
         return Err(error(0, Fault::ResultType));
     }
     machine.check_values(signature.results.len())?;
@@ -54,7 +88,14 @@ pub(super) fn invoke<'bytes>(
         .map_err(|_| error(0, Fault::LimitExceeded))?;
     machine
         .operands
-        .extend(arguments.iter().copied().map(Slot::Number));
+        .extend(arguments.iter().copied().map(T::into_slot));
+    if machine
+        .operands
+        .iter()
+        .any(|value| value.host_root().is_some())
+    {
+        state.borrow().has_host_references.set(true);
+    }
     machine.call(function)?;
     while let Some(current) = machine.calls.last_mut() {
         let pc = current.pc;
@@ -65,8 +106,50 @@ pub(super) fn invoke<'bytes>(
         machine.budget.spend(instruction.offset, 1)?;
         machine.step(instruction, function.jumps[pc])?;
     }
-    results.extend(machine.operands.into_iter().map(Slot::number));
+    results.extend(machine.operands.into_iter().map(T::from_slot));
     Ok(results)
+}
+
+fn exchange<T: BoundaryValue>(
+    arguments: &[Slot],
+    signature: &FunctionType,
+    offset: usize,
+    call: impl FnOnce(&[T], &mut [T]) -> Result<(), HostTrap>,
+) -> Result<Vec<T>, ExecutionError> {
+    if !signature
+        .params
+        .iter()
+        .chain(&signature.results)
+        .copied()
+        .all(T::supports)
+    {
+        return Err(error(offset, Fault::UnsupportedInstruction));
+    }
+    let mut input = Vec::new();
+    input
+        .try_reserve_exact(arguments.len())
+        .map_err(|_| error(offset, Fault::LimitExceeded))?;
+    input.extend(arguments.iter().copied().map(T::from_slot));
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(signature.results.len())
+        .map_err(|_| error(offset, Fault::LimitExceeded))?;
+    output.extend(
+        signature
+            .results
+            .iter()
+            .copied()
+            .map(|ty| T::from_slot(Slot::zero(ty))),
+    );
+    call(&input, &mut output).map_err(|_| error(offset, Fault::HostTrap))?;
+    if output
+        .iter()
+        .zip(&signature.results)
+        .any(|(&value, &ty)| value.into_slot().value_type() != ty)
+    {
+        return Err(error(offset, Fault::HostResultType));
+    }
+    Ok(output)
 }
 
 struct Call {
@@ -464,44 +547,37 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
         let start = self.operands.len() - params;
         self.check_values(additional)?;
         self.budget.spend(offset, params + result_count)?;
-        if matches!(target, HostCall::Indirect { .. })
-            && !signature
-                .params
-                .iter()
-                .chain(&signature.results)
-                .copied()
-                .all(is_numeric)
-        {
-            return Err(error(offset, Fault::UnsupportedInstruction));
-        }
         self.operands
             .try_reserve(additional)
             .map_err(|_| error(offset, Fault::LimitExceeded))?;
-        let mut arguments = Vec::new();
-        arguments
-            .try_reserve_exact(params)
-            .map_err(|_| error(offset, Fault::LimitExceeded))?;
-        arguments.extend(self.operands[start..].iter().copied().map(Slot::number));
-        let mut results = Vec::new();
-        results
-            .try_reserve_exact(result_count)
-            .map_err(|_| error(offset, Fault::LimitExceeded))?;
-        results.extend(
-            signature
-                .results
-                .iter()
-                .copied()
-                .map(|ty| Slot::zero(ty).number()),
-        );
-
-        let called = if let Some(callback) = import.and_then(|import| import.callback) {
-            callback(&arguments, &mut results, self.budget.cancellation)
+        let outcome = if let Some(callback) = import.and_then(|import| import.callback) {
+            exchange::<Value>(
+                &self.operands[start..],
+                signature,
+                offset,
+                |args, results| callback(args, results, self.budget.cancellation),
+            )
+            .map(|results| {
+                self.operands.truncate(start);
+                self.operands.extend(results.into_iter().map(Slot::Number));
+            })
         } else {
             match self.dispatch.as_mut() {
-                Some(Dispatch::Plain(dispatch)) => match target {
-                    HostCall::Import(index) => dispatch(index, &arguments, &mut results),
-                    HostCall::Indirect { .. } => Err(HostTrap),
-                },
+                Some(Dispatch::Plain(dispatch)) => {
+                    let HostCall::Import(index) = target else {
+                        return Err(error(offset, Fault::HostTrap));
+                    };
+                    exchange::<Value>(
+                        &self.operands[start..],
+                        signature,
+                        offset,
+                        |args, results| dispatch(index, args, results),
+                    )
+                    .map(|results| {
+                        self.operands.truncate(start);
+                        self.operands.extend(results.into_iter().map(Slot::Number));
+                    })
+                }
                 Some(Dispatch::Tracing(dispatch)) => {
                     let trace = self.state.borrow().has_host_references.get();
                     let mut roots = if trace {
@@ -512,23 +588,25 @@ impl Machine<'_, '_, '_, '_, '_, '_, '_> {
                         [].iter().chain(&[])
                     }
                     .filter_map(Slot::host_root);
-                    dispatch(target, &arguments, &mut results, &mut roots)
+                    let results = exchange::<HostValue>(
+                        &self.operands[start..],
+                        signature,
+                        offset,
+                        |args, results| dispatch(target, args, results, &mut roots),
+                    );
+                    results.map(|results| {
+                        if results.iter().any(|value| value.host_root().is_some()) {
+                            self.state.borrow().has_host_references.set(true);
+                        }
+                        self.operands.truncate(start);
+                        self.operands.extend(results);
+                    })
                 }
-                None => Err(HostTrap),
+                None => Err(error(offset, Fault::HostTrap)),
             }
         };
         self.budget.spend(offset, 0)?;
-        called.map_err(|_| error(offset, Fault::HostTrap))?;
-        if results
-            .iter()
-            .zip(&signature.results)
-            .any(|(&value, &ty)| value.value_type() != ty)
-        {
-            return Err(error(offset, Fault::HostResultType));
-        }
-        self.operands.truncate(start);
-        self.operands.extend(results.into_iter().map(Slot::Number));
-        Ok(())
+        outcome
     }
 
     fn pop_call(&mut self) {

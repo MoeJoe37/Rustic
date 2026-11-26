@@ -16,31 +16,32 @@ pub(super) struct State<'bytes> {
     data: Vec<Cow<'bytes, [u8]>>,
 }
 
-/// A thread-confined numeric global shared with a host or other instances.
+/// A thread-confined global cell shared with a host or other instances.
+/// The embedder traces any host identities in a reachable cell.
 #[derive(Clone, Debug)]
-pub struct NumericGlobal(Rc<GlobalCell>);
+pub struct SharedGlobal(Rc<GlobalCell>);
 
 #[derive(Debug)]
 struct GlobalCell {
-    value: Cell<Value>,
+    value: Cell<HostValue>,
     mutable: bool,
 }
 
-impl NumericGlobal {
+impl SharedGlobal {
     /// Allocate an independent global with the type of its initial value.
-    pub fn new(value: Value, mutable: bool) -> Self {
+    pub fn new(value: HostValue, mutable: bool) -> Self {
         Self(Rc::new(GlobalCell {
             value: Cell::new(value),
             mutable,
         }))
     }
 
-    /// Heap bytes retained by one shared allocation, including its counts.
+    /// Heap bytes retained by one cell, including its reference counts.
     pub const fn storage_bytes() -> usize {
         size_of::<GlobalCell>() + 2 * size_of::<usize>()
     }
 
-    /// Read the numeric type and mutability.
+    /// Read the type and mutability of the cell.
     pub fn ty(&self) -> GlobalType {
         GlobalType {
             value_type: self.get().value_type(),
@@ -49,12 +50,12 @@ impl NumericGlobal {
     }
 
     /// Read the current value.
-    pub fn get(&self) -> Value {
+    pub fn get(&self) -> HostValue {
         self.0.value.get()
     }
 
-    /// Replace the value if the cell is mutable and the numeric type matches.
-    pub fn set(&self, value: Value) -> bool {
+    /// Replace the value if the cell is mutable and the type matches.
+    pub fn set(&self, value: HostValue) -> bool {
         let ty = self.ty();
         if !ty.mutable || ty.value_type != value.value_type() {
             return false;
@@ -64,9 +65,40 @@ impl NumericGlobal {
     }
 }
 
+/// A shared WebAssembly global restricted to numeric values.
+#[derive(Clone, Debug)]
+pub struct NumericGlobal(SharedGlobal);
+
+impl NumericGlobal {
+    /// Allocate a numeric global with the type of its initial value.
+    pub fn new(value: Value, mutable: bool) -> Self {
+        Self(SharedGlobal::new(HostValue::Number(value), mutable))
+    }
+
+    /// Heap bytes retained by one cell, including its reference counts.
+    pub const fn storage_bytes() -> usize {
+        SharedGlobal::storage_bytes()
+    }
+
+    /// Read the numeric type and mutability.
+    pub fn ty(&self) -> GlobalType {
+        self.0.ty()
+    }
+
+    /// Read the current number.
+    pub fn get(&self) -> Value {
+        self.0.get().number()
+    }
+
+    /// Replace the number if the global is mutable and the number type matches.
+    pub fn set(&self, value: Value) -> bool {
+        self.0.set(HostValue::Number(value))
+    }
+}
+
 pub(super) enum GlobalSlot {
     Local { ty: GlobalType, value: Slot },
-    Shared(NumericGlobal),
+    Shared(SharedGlobal),
 }
 
 impl GlobalSlot {
@@ -80,7 +112,7 @@ impl GlobalSlot {
     pub(super) fn value(&self) -> Slot {
         match self {
             Self::Local { value, .. } => *value,
-            Self::Shared(global) => Slot::Number(global.get()),
+            Self::Shared(global) => global.get(),
         }
     }
 
@@ -88,28 +120,25 @@ impl GlobalSlot {
         match self {
             Self::Local { value: slot, .. } => *slot = value,
             Self::Shared(global) => {
-                let updated = global.set(value.number());
-                debug_assert!(updated, "validated numeric global write");
+                let updated = global.set(value);
+                debug_assert!(updated, "validated global write");
             }
         }
     }
 
-    pub(super) fn share(&mut self) -> Option<NumericGlobal> {
+    pub(super) fn share(&mut self) -> SharedGlobal {
         match self {
-            Self::Shared(global) => Some(global.clone()),
-            Self::Local {
-                ty,
-                value: Slot::Number(value),
-            } => {
-                let global = NumericGlobal::new(*value, ty.mutable);
+            Self::Shared(global) => global.clone(),
+            Self::Local { ty, value } => {
+                let global = SharedGlobal::new(*value, ty.mutable);
                 *self = Self::Shared(global.clone());
-                Some(global)
+                global
             }
-            Self::Local {
-                value: Slot::Ref(_),
-                ..
-            } => None,
         }
+    }
+
+    pub(super) fn share_numeric(&mut self) -> Option<NumericGlobal> {
+        is_numeric(self.ty().value_type).then(|| NumericGlobal(self.share()))
     }
 }
 
@@ -158,10 +187,14 @@ impl<'bytes> State<'bytes> {
     ) -> Result<(Self, Initializers<'input>), ExecutionError> {
         let InstanceImports {
             mut globals,
+            mut shared_globals,
             memories: mut imported_memories,
             tables,
             function_owner,
         } = imports;
+        if !globals.is_empty() && !shared_globals.is_empty() {
+            return Err(error(0, Fault::ImportTypeMismatch));
+        }
         let mut state = Self {
             function_owner,
             ..Default::default()
@@ -171,20 +204,21 @@ impl<'bytes> State<'bytes> {
                 continue;
             };
             budget.spend(entry.offset, 1)?;
-            let Some((global, remaining)) = globals.split_first() else {
+            let global = if let Some((global, remaining)) = shared_globals.split_first() {
+                shared_globals = remaining;
+                global.clone()
+            } else if let Some((global, remaining)) = globals.split_first() {
+                globals = remaining;
+                global.0.clone()
+            } else {
                 return Err(error(entry.offset, Fault::MissingImport));
             };
             if ty != global.ty() {
                 return Err(error(entry.offset, Fault::ImportTypeMismatch));
             }
-            append(
-                &mut state.globals,
-                GlobalSlot::Shared(global.clone()),
-                entry.offset,
-            )?;
-            globals = remaining;
+            append(&mut state.globals, GlobalSlot::Shared(global), entry.offset)?;
         }
-        if !globals.is_empty() {
+        if !globals.is_empty() || !shared_globals.is_empty() {
             return Err(error(0, Fault::ImportTypeMismatch));
         }
         for entry in &declarations.globals {
@@ -236,7 +270,13 @@ impl<'bytes> State<'bytes> {
             budget,
         )?;
         state.tables = allocated_tables;
-        state.has_host_references.set(!tables.is_empty());
+        state.has_host_references.set(
+            !tables.is_empty()
+                || state
+                    .globals
+                    .iter()
+                    .any(|global| !is_numeric(global.ty().value_type)),
+        );
         let mut active_segments = Vec::new();
         let mut segment_trap = None;
         // A trapping element segment stops instantiation before data writes.

@@ -3416,5 +3416,6 @@ external-reference tables shareable. [ADR 0092](adr/0092-wasm-function-table-imp
 adds function-table imports and traces each function's defining instance
 through shared state and suspended invocations.
 
-Cross-instance numeric indirect calls verify the callee's signature.
-Reference-valued calls that cross instance boundaries remain in WASM-05.
+Cross-instance indirect calls verify the callee's signature.
+[ADR 0093](adr/0093-wasm-reference-interop.md) extends the boundary to nullable
+reference-valued calls and globals.

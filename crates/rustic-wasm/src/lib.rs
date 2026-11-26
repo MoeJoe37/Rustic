@@ -20,9 +20,10 @@ pub use binary::{
 };
 pub use execute::{
     ExecutionError, ExecutionErrorKind, ExecutionLimits, ExternalReference, FunctionAddress,
-    FunctionImport, HostCall, HostDispatch, HostTrap, Instance, InstanceImports, InstanceLimits,
-    LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES, NumericGlobal, NumericInstance,
-    PreparedInstance, ReferenceRoot, ReferenceTable, TableEntry, TracingHostDispatch, Value,
+    FunctionImport, HostCall, HostDispatch, HostTrap, HostValue, Instance, InstanceImports,
+    InstanceLimits, LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES, NumericGlobal,
+    NumericInstance, PreparedInstance, Reference, ReferenceRoot, ReferenceTable, SharedGlobal,
+    TableEntry, TracingHostDispatch, Value,
 };
 pub use instructions::{
     BlockType, Immediate, Instruction, InstructionLimits, Opcode, decode_instructions,

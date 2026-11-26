@@ -305,7 +305,7 @@ validation, execution/traps and explicit imports. Its JS identity/tracing and We
 compilation adapters follow the existing Fetch and document CSP policies.
 Window module objects own byte snapshots and reflection metadata. Numeric
 function, global and memory exports trace the interpreter state through the
-JS heap. Global wrappers and importing instances read the same numeric cells.
+JS heap. Global wrappers and importing instances share cells for scalar and nullable reference values.
 An attached Wasm buffer views the current generation of linear memory and
 traces its allocation owner. Resizable generations retain their wrapper on
 growth. Mode changes move the bytes into a new generation and detach the old
@@ -325,7 +325,8 @@ attaches code and import records to the rooted instance before applying active
 segments. A completed write into a shared table can keep the defining instance
 alive after an initialization trap. For dispatched imports and cross-instance
 indirect calls, guest store borrows are released and suspended frames' references
-are rooted for the call. The interpreter checks full-width table indices before
+are rooted for the call. The tracing interface carries typed numeric and
+nullable reference arguments and results. The interpreter checks full-width table indices before
 converting them to host indices. The realm propagates JavaScript exceptions,
 and the interpreter remains available without executable-memory permission.
 [ADR 0080](adr/0080-window-wasm-module-compilation.md),
@@ -333,7 +334,7 @@ and the interpreter remains available without executable-memory permission.
 [ADR 0083](adr/0083-wasm-js-function-imports.md), [ADR 0084](adr/0084-shared-numeric-wasm-globals.md),
 [ADR 0085](adr/0085-wasm-fixed-memory-buffers.md), [ADR 0086](adr/0086-wasm-memory64.md),
 [ADR 0087](adr/0087-wasm-resizable-buffers.md), [ADR 0088](adr/0088-window-wasm-tables.md),
-[ADR 0089](adr/0089-live-wasm-function-tables.md), [ADR 0090](adr/0090-live-wasm-external-tables.md), [ADR 0091](adr/0091-wasm-external-table-imports.md), [ADR 0092](adr/0092-wasm-function-table-imports.md)
+[ADR 0089](adr/0089-live-wasm-function-tables.md), [ADR 0090](adr/0090-live-wasm-external-tables.md), [ADR 0091](adr/0091-wasm-external-table-imports.md), [ADR 0092](adr/0092-wasm-function-table-imports.md), [ADR 0093](adr/0093-wasm-reference-interop.md)
 
 The extension design assigns execution under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native

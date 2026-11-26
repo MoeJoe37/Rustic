@@ -25,8 +25,8 @@ mod table;
 use imports::{BoundFunction, Dispatch};
 pub use imports::{FunctionImport, HostCall, HostDispatch, HostTrap, TracingHostDispatch};
 pub use memory::{LinearMemory, MEMORY_PAGE_BYTES, MEMORY32_MAX_PAGES};
-pub use state::NumericGlobal;
 use state::{Initializers, State};
+pub use state::{NumericGlobal, SharedGlobal};
 pub use table::{ReferenceTable, TableEntry};
 
 /// A WebAssembly number crossing the interpreter boundary.
@@ -63,13 +63,45 @@ impl AddressType {
     }
 }
 
-#[derive(Clone, Copy)]
-enum Slot {
+/// A scalar or reference exchanged with a tracing embedder.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostValue {
+    /// A WebAssembly number with its original bits.
     Number(Value),
+    /// A nullable function or external reference.
     Ref(Reference),
 }
 
-impl Slot {
+type Slot = HostValue;
+
+impl HostValue {
+    /// The scalar or abstract reference type of this value.
+    pub fn value_type(self) -> ValueType {
+        match self {
+            Self::Number(value) => value.value_type(),
+            Self::Ref(Reference::Function(_) | Reference::NullFunction) => ValueType::Ref {
+                nullable: true,
+                heap_type: -16,
+            },
+            Self::Ref(Reference::Extern(_) | Reference::NullExtern) => ValueType::Ref {
+                nullable: true,
+                heap_type: -17,
+            },
+        }
+    }
+
+    /// Whether this type can cross the tracing host interface.
+    pub fn supports(ty: ValueType) -> bool {
+        is_numeric(ty)
+            || matches!(
+                ty,
+                ValueType::Ref {
+                    nullable: true,
+                    heap_type: -16 | -17
+                }
+            )
+    }
+
     fn zero(ty: ValueType) -> Self {
         match ty {
             ValueType::I32 => Self::Number(Value::I32(0)),
@@ -95,7 +127,8 @@ impl Slot {
         }
     }
 
-    fn host_root(&self) -> Option<ReferenceRoot> {
+    /// The embedder identity that must remain live while this value is held.
+    pub fn host_root(&self) -> Option<ReferenceRoot> {
         match *self {
             Self::Ref(reference) => reference.host_root(),
             Self::Number(_) => None,
@@ -176,11 +209,16 @@ pub enum ReferenceRoot {
     FunctionOwner(NonZeroU32),
 }
 
-#[derive(Clone, Copy)]
-enum Reference {
+/// A reference exchanged without losing its WebAssembly kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Reference {
+    /// A function address within the current store.
     Function(FunctionAddress),
+    /// A null function reference.
     NullFunction,
+    /// A JavaScript value or another host-defined identity.
     Extern(ExternalReference),
+    /// A null external reference.
     NullExtern,
 }
 
@@ -377,6 +415,9 @@ impl Default for InstanceLimits {
 pub struct InstanceImports<'a> {
     /// Numeric global bindings.
     pub globals: &'a [NumericGlobal],
+    /// Global bindings in declaration order for tracing hosts. Supply either
+    /// these cells or numeric-only bindings in `globals`.
+    pub shared_globals: &'a [SharedGlobal],
     /// Unshared linear memory bindings.
     pub memories: &'a [LinearMemory],
     /// Nullable reference table bindings.
@@ -389,7 +430,7 @@ pub struct InstanceImports<'a> {
 ///
 /// State changes remain visible across invocations, including changes made
 /// before a trap. The host traces references reachable from an instance and
-/// its suspended invocations. Cross-instance calls exchange scalar numbers.
+/// its suspended invocations. Cross-instance calls use the tracing host interface.
 pub struct Instance<'module, 'bytes> {
     executable: Executable<'module, 'bytes>,
     state: RefCell<State<'bytes>>,
@@ -501,7 +542,18 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
             .borrow_mut()
             .globals
             .get_mut(index as usize)?
-            .share()
+            .share_numeric()
+    }
+
+    /// Share a global with the tracing host and other instances.
+    pub fn share_global(&self, index: u32) -> Option<SharedGlobal> {
+        Some(
+            self.state
+                .borrow_mut()
+                .globals
+                .get_mut(index as usize)?
+                .share(),
+        )
     }
 
     /// Retain a handle to a memory in this instance's memory index space.
@@ -533,15 +585,15 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         self.invoke_dispatched(function, arguments, cancellation, Dispatch::Plain(dispatch))
     }
 
-    /// Invoke a numeric function and expose roots in suspended guest frames to
+    /// Invoke a scalar or reference-valued function and expose suspended roots to
     /// each host call. See also [`Self::visit_reference_roots`] for state roots.
     pub fn invoke_function_with_reference_roots(
         &self,
         function: u32,
-        arguments: &[Value],
+        arguments: &[HostValue],
         cancellation: &CancellationToken,
         dispatch: &mut TracingHostDispatch<'_>,
-    ) -> Result<Vec<Value>, ExecutionError> {
+    ) -> Result<Vec<HostValue>, ExecutionError> {
         self.invoke_dispatched(
             function,
             arguments,
@@ -550,13 +602,13 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         )
     }
 
-    fn invoke_dispatched(
+    fn invoke_dispatched<T: machine::BoundaryValue>(
         &self,
         function: u32,
-        arguments: &[Value],
+        arguments: &[T],
         cancellation: &CancellationToken,
         dispatch: Dispatch<'_, '_>,
-    ) -> Result<Vec<Value>, ExecutionError> {
+    ) -> Result<Vec<T>, ExecutionError> {
         if self.function_type_at(function).is_none() {
             return Err(error(0, Fault::UnknownExport));
         }
@@ -588,7 +640,7 @@ impl Instance<'static, 'static> {
             module,
             limits,
             cancellation,
-            false,
+            None,
             InstanceImports::default(),
         )?;
         initializers.apply(&instance.state.borrow(), cancellation)?;
@@ -616,7 +668,7 @@ impl Instance<'static, 'static> {
             ..Default::default()
         };
         let (instance, initializers) =
-            Self::prepare_owned(module, limits, cancellation, true, imports)?;
+            Self::prepare_owned(module, limits, cancellation, Some(false), imports)?;
         initializers.apply(&instance.state.borrow(), cancellation)?;
         instance.executable.run_start(
             &instance.state,
@@ -636,7 +688,7 @@ impl Instance<'static, 'static> {
         imports: InstanceImports<'_>,
     ) -> Result<PreparedInstance<'input>, ExecutionError> {
         let (instance, initializers) =
-            Self::prepare_owned(module, limits, cancellation, true, imports)?;
+            Self::prepare_owned(module, limits, cancellation, Some(true), imports)?;
         Ok(PreparedInstance {
             instance: Rc::new(instance),
             initializers,
@@ -658,7 +710,7 @@ impl Instance<'static, 'static> {
         module: ValidatedModule<'input>,
         limits: InstanceLimits,
         cancellation: &CancellationToken,
-        allow_imports: bool,
+        reference_dispatch: Option<bool>,
         state_imports: InstanceImports<'_>,
     ) -> Result<(Self, Initializers<'input>), ExecutionError> {
         let module = module.into_module();
@@ -670,10 +722,14 @@ impl Instance<'static, 'static> {
         check_profile(
             &declarations,
             Profile::LocalState,
-            allow_imports,
+            reference_dispatch.is_some(),
             &mut budget,
         )?;
-        let imports = imports::for_dispatch(&declarations, &mut budget)?;
+        let imports = imports::for_dispatch(
+            &declarations,
+            reference_dispatch.unwrap_or(false),
+            &mut budget,
+        )?;
         let exports = prepare_exports(&declarations.exports, &mut budget, |name, offset| {
             let mut owned = String::new();
             owned
@@ -796,7 +852,15 @@ impl<'module, 'bytes> Executable<'module, 'bytes> {
         dispatch: Option<Dispatch<'_, '_>>,
     ) -> Result<(), ExecutionError> {
         if let Some(start) = self.start.take() {
-            machine::invoke(self, state, start as usize, &[], 0, cancellation, dispatch)?;
+            machine::invoke::<HostValue>(
+                self,
+                state,
+                start as usize,
+                &[],
+                0,
+                cancellation,
+                dispatch,
+            )?;
         }
         Ok(())
     }

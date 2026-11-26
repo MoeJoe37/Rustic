@@ -2,12 +2,11 @@
 
 use rustic_js::runtime::ErrorKind;
 use rustic_wasm::{
-    ExternalReference, FunctionAddress, Limits, ReferenceRoot, ReferenceTable, TableEntry,
-    TableType,
+    ExternalReference, Limits, ReferenceRoot, ReferenceTable, TableEntry, TableType,
 };
 
 use super::super::events::PrivateArray;
-use super::instance::{self, function_owner, owner_value, root_value};
+use super::instance::{self, owner_value, root_value};
 use super::*;
 
 const TABLE: &str = "WebAssembly.Table";
@@ -301,18 +300,10 @@ fn shared_entry(agent: &mut Agent, functions: bool, value: Option<Value>) -> JsR
             value.host_identity(),
         )));
     }
-    let Some(record) = host::function_record(agent, value)? else {
-        return agent
-            .type_error("WebAssembly function table entries must be Wasm functions or null");
-    };
-    let (instance, function) = host::function_parts(agent, record)?;
-    let owner = function_owner(instance).ok_or(OutOfMemory)?;
-    Ok(TableEntry::Function(FunctionAddress::owned(
-        owner, function,
-    )))
+    Ok(TableEntry::Function(host::function_address(agent, value)?))
 }
 
-fn read_shared(agent: &mut Agent, entry: TableEntry) -> JsResult<Value> {
+pub(super) fn read_shared(agent: &mut Agent, entry: TableEntry) -> JsResult<Value> {
     match entry {
         TableEntry::Null => Ok(Value::NULL),
         TableEntry::External(reference) => Ok(Value::from_host_identity(reference.identity())),

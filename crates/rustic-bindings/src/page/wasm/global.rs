@@ -1,4 +1,4 @@
-use rustic_wasm::{GlobalType, NumericGlobal};
+use rustic_wasm::{GlobalType, HostValue, Reference, SharedGlobal};
 
 use super::*;
 
@@ -41,36 +41,42 @@ fn construct(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
             "f64" => Some(ValueType::F64),
             _ => None,
         },
+        7 if name.to_text() == "anyfunc" => Some(ValueType::Ref {
+            nullable: true,
+            heap_type: -16,
+        }),
+        9 if name.to_text() == "externref" => Some(ValueType::Ref {
+            nullable: true,
+            heap_type: -17,
+        }),
         _ => None,
     };
     let Some(value_type) = value_type else {
         return agent.type_error("unsupported WebAssembly.Global type");
     };
-    let initial = arg(args, 1);
-    let initial = if initial == Value::UNDEFINED {
-        match value_type {
-            ValueType::I32 => WasmValue::I32(0),
-            ValueType::I64 => WasmValue::I64(0),
-            ValueType::F32 => WasmValue::F32(0),
-            ValueType::F64 => WasmValue::F64(0),
-            _ => unreachable!("numeric descriptor type"),
-        }
-    } else {
-        to_wasm(agent, initial, value_type)?
+    let initial = match (value_type, args.get(1).copied()) {
+        (ValueType::Ref { heap_type: -16, .. }, None) => HostValue::Ref(Reference::NullFunction),
+        (ValueType::I32, None | Some(Value::UNDEFINED)) => HostValue::Number(WasmValue::I32(0)),
+        (ValueType::I64, None | Some(Value::UNDEFINED)) => HostValue::Number(WasmValue::I64(0)),
+        (ValueType::F32, None | Some(Value::UNDEFINED)) => HostValue::Number(WasmValue::F32(0)),
+        (ValueType::F64, None | Some(Value::UNDEFINED)) => HostValue::Number(WasmValue::F64(0)),
+        (ty, value) => host::to_host_value(agent, value.unwrap_or(Value::UNDEFINED), ty)?,
     };
     let proto = agent.host_prototype_from_new_target(GLOBAL, target)?;
-    let state = NumericGlobal::new(initial, mutable);
-    Ok(Value::object(agent.new_host_state(
+    let state = SharedGlobal::new(initial, mutable);
+    Ok(Value::object(agent.new_traced_host_state(
         GLOBAL,
         proto,
         state,
-        NumericGlobal::storage_bytes(),
+        SharedGlobal::storage_bytes(),
+        Some(trace_global),
     )?))
 }
 
-pub(super) fn export(agent: &mut Agent, instance: Value, state: NumericGlobal) -> JsResult<Value> {
+pub(super) fn export(agent: &mut Agent, instance: Value, state: SharedGlobal) -> JsResult<Value> {
     let proto = prototype(agent, GLOBAL)?;
-    let global = Value::object(agent.new_host_state(GLOBAL, proto, state, 0)?);
+    let global =
+        Value::object(agent.new_traced_host_state(GLOBAL, proto, state, 0, Some(trace_global))?);
     with_root(agent, global, |agent| {
         with_page(agent, |agent, page| {
             agent.weak_map_set(page.wasm_links, global, instance)
@@ -79,20 +85,38 @@ pub(super) fn export(agent: &mut Agent, instance: Value, state: NumericGlobal) -
     Ok(global)
 }
 
-pub(super) fn find(agent: &Agent, value: Value) -> Option<Rc<NumericGlobal>> {
+fn trace_global(state: &dyn std::any::Any, mark: &mut dyn FnMut(Value)) {
+    let global = state.downcast_ref::<SharedGlobal>().expect("global state");
+    if let Some(root) = global.get().host_root() {
+        mark(instance::root_value(root));
+    }
+}
+
+pub(super) fn find(agent: &Agent, value: Value) -> Option<Rc<SharedGlobal>> {
     agent.host_state(value.as_object()?, GLOBAL)
 }
 
-pub(super) fn accepts_import(agent: &Agent, value: Value, ty: GlobalType) -> bool {
-    is_numeric(ty.value_type)
-        && (find(agent, value).is_some()
-            || match ty.value_type {
-                ValueType::I64 => agent.type_of(value) == "bigint",
-                _ => value.as_number().is_some(),
-            })
+pub(super) fn accepts_import(agent: &mut Agent, value: Value, ty: GlobalType) -> JsResult<bool> {
+    if !HostValue::supports(ty.value_type) {
+        return Ok(false);
+    }
+    if find(agent, value).is_some() {
+        return Ok(true);
+    }
+    if ty.mutable {
+        return Ok(false);
+    }
+    Ok(match ty.value_type {
+        ValueType::I64 => agent.type_of(value) == "bigint",
+        ValueType::Ref { heap_type: -16, .. } => {
+            value == Value::NULL || host::function_record(agent, value)?.is_some()
+        }
+        ValueType::Ref { heap_type: -17, .. } => true,
+        _ => value.as_number().is_some(),
+    })
 }
 
-fn state(agent: &mut Agent, this: Value) -> JsResult<Rc<NumericGlobal>> {
+fn state(agent: &mut Agent, this: Value) -> JsResult<Rc<SharedGlobal>> {
     match find(agent, this) {
         Some(global) => Ok(global),
         None => agent.type_error("invalid WebAssembly.Global receiver"),
@@ -101,7 +125,7 @@ fn state(agent: &mut Agent, this: Value) -> JsResult<Rc<NumericGlobal>> {
 
 fn get_value(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let value = state(agent, this)?.get();
-    to_js(agent, value)
+    host::to_js_value(agent, value)
 }
 
 fn set_value(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
@@ -110,8 +134,8 @@ fn set_value(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> 
     if !ty.mutable {
         return agent.type_error("cannot set an immutable WebAssembly.Global");
     }
-    let value = to_wasm(agent, arg(args, 0), ty.value_type)?;
+    let value = host::to_host_value(agent, arg(args, 0), ty.value_type)?;
     let updated = global.set(value);
-    debug_assert!(updated, "checked numeric global conversion");
+    debug_assert!(updated, "checked global conversion");
     Ok(Value::UNDEFINED)
 }

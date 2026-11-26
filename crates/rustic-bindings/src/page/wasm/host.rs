@@ -1,6 +1,7 @@
 use rustic_wasm::{
-    ExecutionError, ExecutionErrorKind, HostCall, HostTrap, LinearMemory, NumericGlobal,
-    ReferenceRoot, ReferenceTable, TracingHostDispatch,
+    ExecutionError, ExecutionErrorKind, ExternalReference, FunctionAddress, HostCall, HostTrap,
+    HostValue, LinearMemory, Reference, ReferenceRoot, ReferenceTable, SharedGlobal, TableEntry,
+    TracingHostDispatch,
 };
 
 use super::super::events::PrivateArray;
@@ -24,7 +25,7 @@ pub(super) struct Bindings {
 
 #[derive(Default)]
 pub(super) struct LinkedState {
-    pub globals: Vec<NumericGlobal>,
+    pub globals: Vec<SharedGlobal>,
     pub memories: Vec<LinearMemory>,
     pub tables: Vec<ReferenceTable>,
 }
@@ -51,7 +52,7 @@ pub(super) fn read_imports(
             let value = agent.get(namespace, key)?;
             let accepted = match import.ty {
                 ImportType::Function(_) => agent.is_callable(value),
-                ImportType::Global(ty) => global::accepts_import(agent, value, ty),
+                ImportType::Global(ty) => global::accepts_import(agent, value, ty)?,
                 ImportType::Memory(_) => memory::find(agent, value).is_some(),
                 ImportType::Table(ty) => table::accepts_import(agent, value, ty),
                 _ => false,
@@ -88,12 +89,12 @@ pub(super) fn link(
                     .iter()
                     .chain(&expected.results)
                     .copied()
-                    .all(is_numeric)
+                    .all(HostValue::supports)
                 {
                     return Err(wasm_error(
                         agent,
                         LINK_ERROR,
-                        "only numeric function imports are supported",
+                        "unsupported WebAssembly function import signature",
                     ));
                 }
                 if let Some(record) = function_record(agent, value)? {
@@ -122,8 +123,8 @@ pub(super) fn link(
                 } else {
                     // A primitive import is an independent immutable cell. The
                     // interpreter checks the declared mutability before start.
-                    globals.push(NumericGlobal::new(
-                        to_wasm(agent, value, ty.value_type)?,
+                    globals.push(SharedGlobal::new(
+                        to_host_value(agent, value, ty.value_type)?,
                         false,
                     ));
                 }
@@ -207,8 +208,8 @@ pub(super) fn invoke(
     instance: Value,
     runtime: &Runtime,
     function: u32,
-    arguments: &[WasmValue],
-) -> JsResult<Vec<WasmValue>> {
+    arguments: &[HostValue],
+) -> JsResult<Vec<HostValue>> {
     let record = instance_record(agent, instance)?;
     let bindings = PrivateArray::from_value(record.get(agent, 0)?).expect("function bindings");
     let token = agent.cancellation().unwrap_or_default();
@@ -217,7 +218,7 @@ pub(super) fn invoke(
     })
 }
 
-fn with_reference_roots<T>(
+pub(super) fn with_reference_roots<T>(
     agent: &mut Agent,
     roots: &mut dyn Iterator<Item = ReferenceRoot>,
     operation: impl FnOnce(&mut Agent) -> JsResult<T>,
@@ -242,8 +243,8 @@ fn dispatch(
     agent: &mut Agent,
     bindings: PrivateArray,
     target: HostCall<'_>,
-    arguments: &[WasmValue],
-    results: &mut [WasmValue],
+    arguments: &[HostValue],
+    results: &mut [HostValue],
 ) -> JsResult<()> {
     with_page(agent, |agent, page| {
         agent.check_native_work()?;
@@ -289,8 +290,8 @@ fn invoke_binding(
     agent: &mut Agent,
     bindings: PrivateArray,
     index: usize,
-    arguments: &[WasmValue],
-    results: &mut [WasmValue],
+    arguments: &[HostValue],
+    results: &mut [HostValue],
 ) -> JsResult<()> {
     let function = bindings.get(agent, u32::try_from(index).map_err(|_| OutOfMemory)?)?;
     if let Some(record) = function_record(agent, function)? {
@@ -307,13 +308,13 @@ fn invoke_binding(
             .map_err(|_| OutOfMemory)?;
         for &value in arguments {
             agent.check_native_work()?;
-            args.push(to_js(agent, value)?);
+            args.push(to_js_value(agent, value)?);
         }
         let value = agent.call(function, Value::UNDEFINED, &args)?;
         match results {
             [] => Ok(()),
             [result] => {
-                *result = to_wasm(agent, value, result.value_type())?;
+                *result = to_host_value(agent, value, result.value_type())?;
                 Ok(())
             }
             results => with_root(agent, value, |agent| convert_results(agent, value, results)),
@@ -321,7 +322,7 @@ fn invoke_binding(
     })
 }
 
-fn convert_results(agent: &mut Agent, value: Value, results: &mut [WasmValue]) -> JsResult<()> {
+fn convert_results(agent: &mut Agent, value: Value, results: &mut [HostValue]) -> JsResult<()> {
     let items = PrivateArray::new(agent, &[])?;
     with_root(agent, items.value(), |agent| {
         let key = PropertyKey::Symbol(agent.symbols.iterator);
@@ -352,8 +353,60 @@ fn convert_results(agent: &mut Agent, value: Value, results: &mut [WasmValue]) -
         }
         for (index, result) in results.iter_mut().enumerate() {
             let value = items.get(agent, u32::try_from(index).map_err(|_| OutOfMemory)?)?;
-            *result = to_wasm(agent, value, result.value_type())?;
+            *result = to_host_value(agent, value, result.value_type())?;
         }
         Ok(())
     })
+}
+
+pub(super) fn function_address(agent: &mut Agent, value: Value) -> JsResult<FunctionAddress> {
+    let Some(record) = function_record(agent, value)? else {
+        return agent.type_error("WebAssembly function references must be Wasm functions or null");
+    };
+    let (instance, function) = function_parts(agent, record)?;
+    let owner = instance::function_owner(instance).ok_or(OutOfMemory)?;
+    Ok(FunctionAddress::owned(owner, function))
+}
+
+/// Convert a JavaScript value to a validated boundary type.
+pub(super) fn to_host_value(agent: &mut Agent, value: Value, ty: ValueType) -> JsResult<HostValue> {
+    Ok(match ty {
+        ValueType::Ref {
+            heap_type: -16,
+            nullable: true,
+        } => {
+            let reference = if value == Value::NULL {
+                Reference::NullFunction
+            } else {
+                Reference::Function(function_address(agent, value)?)
+            };
+            HostValue::Ref(reference)
+        }
+        ValueType::Ref {
+            heap_type: -17,
+            nullable: true,
+        } => {
+            let reference = if value == Value::NULL {
+                Reference::NullExtern
+            } else {
+                Reference::Extern(ExternalReference::new(value.host_identity()))
+            };
+            HostValue::Ref(reference)
+        }
+        ty => HostValue::Number(to_wasm(agent, value, ty)?),
+    })
+}
+
+pub(super) fn to_js_value(agent: &mut Agent, value: HostValue) -> JsResult<Value> {
+    match value {
+        HostValue::Number(value) => to_js(agent, value),
+        HostValue::Ref(reference) => {
+            let entry = match reference {
+                Reference::NullFunction | Reference::NullExtern => TableEntry::Null,
+                Reference::Function(address) => TableEntry::Function(address),
+                Reference::Extern(reference) => TableEntry::External(reference),
+            };
+            table::read_shared(agent, entry)
+        }
+    }
 }

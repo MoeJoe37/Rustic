@@ -102,6 +102,7 @@ and verification, follow the [ledger](../IMPLEMENTATION.md) and
 | [0090](0090-live-wasm-external-tables.md) | Live module-defined Wasm external-reference table exports and tracing | Accepted for M9 |
 | [0091](0091-wasm-external-table-imports.md) | Shared Wasm external-reference table imports and start-time tracing | Accepted for M9 |
 | [0092](0092-wasm-function-table-imports.md) | Shared Wasm function tables, function addresses and indirect calls | Accepted for M9 |
+| [0093](0093-wasm-reference-interop.md) | Traced Wasm reference-valued calls and shared globals | Accepted for M9 |
 
 ## Records by area
 

@@ -221,13 +221,6 @@ fn address_index(
     agent.type_error(invalid)
 }
 
-fn is_numeric(ty: ValueType) -> bool {
-    matches!(
-        ty,
-        ValueType::I32 | ValueType::I64 | ValueType::F32 | ValueType::F64
-    )
-}
-
 fn to_wasm(agent: &mut Agent, value: Value, ty: ValueType) -> JsResult<WasmValue> {
     Ok(match ty {
         ValueType::I32 => WasmValue::I32(to_int32(agent.to_number(value)?)),

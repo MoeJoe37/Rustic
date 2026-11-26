@@ -2159,7 +2159,7 @@ fn wasm_exported_function_tables_share_guest_state_and_preserve_identity() {
             assert(table.length === at(3) && table.get(at(0)) === answer, 'initial elements and exported identity');
             const hidden = table.get(at(1));
             assert(hidden === table.get(at(1)) && hidden() === 43, 'lazy function wrapper');
-            assert(rejects(TypeError, () => table.get(at(2))(null)), 'unsupported host signature has a typed error');
+            assert(table.get(at(2))(null) === undefined, 'call a reference signature through the table wrapper');
             clear(at(0));
             assert(table.get(at(0)) === null, 'guest clear visible to JS');
             assert(rejects(WebAssembly.RuntimeError, () => call(at(0))), 'guest observes null');
@@ -2589,6 +2589,175 @@ fn wasm_function_table_imports_share_addresses_and_keep_trapping_owners_alive() 
             })), 'check type, current minimum, maximum and width');
             assert(table.get(1) === null, 'link mismatch applies no active writes');
         }
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}
+
+#[test]
+fn wasm_reference_calls_preserve_values_and_roots_across_instances() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    install_wasm_collector(&mut agent);
+    let outcome = agent.evaluate(r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        function section(kind, bytes) { return [kind, bytes.length, ...bytes]; }
+        function module(...sections) {
+            return new WebAssembly.Module(Uint8Array.of(0,97,115,109,1,0,0,0,...sections.flat()));
+        }
+        function body(locals, opcodes) {
+            return [locals.length + opcodes.length + 1, ...locals, ...opcodes, 11];
+        }
+        function named(name, kind, index) {
+            return [name.length, ...Array.from(name, c => c.charCodeAt(0)), kind, index];
+        }
+        // (externref, funcref, i32) -> (externref, i32, funcref).
+        const signature = [96,3,111,112,127,3,111,127,112];
+        const provider = module(
+            section(1,[3,...signature,96,0,0,96,0,1,127]),
+            section(2,[2,1,109,1,102,0,0,1,109,1,103,0,1]),
+            section(3,[2,0,2]),
+            section(7,[2,...named('run',0,2),...named('seven',0,3)]),
+            section(10,[2,
+                ...body([0], [32,0,32,1,32,2,16,0,16,1]),
+                ...body([0], [65,7])
+            ])
+        );
+        const id = Symbol('identity');
+        let pending;
+        const imports = {m:{f(input, fun, count) {
+            if (count === 0) return [input, 0, fun];
+            const item = {input, id};
+            pending = new WeakRef(item);
+            return [item, {valueOf() { collect(); return count + 1; }}, fun];
+        }, g() {
+            collect();
+            if (pending) assert(pending.deref() !== undefined, 'callback result is live in Wasm');
+        }}};
+        const first = new WebAssembly.Instance(provider, imports).exports;
+        const original = {key:42};
+        const direct = first.run(original, first.seven, 1);
+        assert(direct[0].input === original && direct[0].id === id &&
+            direct[1] === 2 && direct[2] === first.seven, 'mixed export and callback results');
+        const omitted = first.run(undefined, null, 0);
+        assert(omitted.length === 3 && 0 in omitted && omitted[0] === undefined && omitted[2] === null,
+            'undefined remains an occupied result slot');
+        pending = undefined;
+        assert(first.run(null, null, 0)[0] === null, 'external null round trip');
+        assert(rejects(TypeError, () => first.run(null, () => 7, 0)), 'plain JS function is not a funcref');
+        assert(rejects(TypeError, () => first.run(null, undefined, 0)), 'explicit undefined is not a funcref');
+
+        const imported = module(
+            section(1,[1,...signature]), section(2,[1,1,109,1,102,0,0]),
+            section(3,[1,0]), section(7,[2,...named('call',0,1),...named('alias',0,0)]),
+            section(10,[1,...body([0], [32,0,32,1,32,2,16,0])])
+        );
+        const linked = new WebAssembly.Instance(imported, {m:{f:first.run}}).exports;
+        assert(linked.alias === first.run, 'import re-export preserves wrapper identity');
+        const fromImport = linked.call(id, first.seven, 2);
+        assert(fromImport[0].input === id && fromImport[1] === 3 && fromImport[2]() === 7,
+            'direct cross-instance reference arguments and results');
+
+        const indirect = module(
+            section(1,[1,...signature]),
+            section(2,[1,1,109,1,116,1,112,1,1,2]),
+            section(3,[2,0,0]),
+            section(7,[2,...named('call',0,0),...named('tail',0,1)]),
+            section(10,[2,
+                ...body([0],[32,0,32,1,32,2,65,0,17,0,0]),
+                ...body([0],[32,0,32,1,32,2,65,0,19,0,0])
+            ])
+        );
+        const table = new WebAssembly.Table({element:'anyfunc',initial:1,maximum:2}, first.run);
+        const calls = new WebAssembly.Instance(indirect, {m:{t:table}}).exports;
+        for (const call of [calls.call,calls.tail]) {
+            const result = call(original, first.seven, {valueOf() { collect(); return 4; }});
+            assert(result[0].input === original && result[1] === 5 && result[2] === first.seven,
+                'indirect reference arguments and results across instances');
+        }
+        table.set(0, first.seven);
+        assert(rejects(WebAssembly.RuntimeError, () => calls.call(null,null,0)), 'type mismatch before invocation');
+        true
+    "#);
+    if let Err(rustic_js::EvalError::Throw(value)) = outcome {
+        panic!("{}", agent.describe_value(value));
+    }
+    assert_eq!(outcome.unwrap(), Value::TRUE);
+}
+
+#[test]
+fn wasm_reference_globals_share_cells_and_keep_current_values_alive() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    install_wasm_collector(&mut agent);
+    let outcome = agent.evaluate(r#"
+        function assert(ok, message) { if (!ok) throw message; }
+        function rejects(type, call) {
+            try { call(); } catch (error) { return error instanceof type; }
+            return false;
+        }
+        function section(kind, bytes) { return [kind, bytes.length, ...bytes]; }
+        function named(name, kind, index) {
+            return [name.length, ...Array.from(name, c => c.charCodeAt(0)), kind, index];
+        }
+        function module(...sections) {
+            return new WebAssembly.Module(Uint8Array.of(0,97,115,109,1,0,0,0,...sections.flat()));
+        }
+        const extern = new WebAssembly.Global({value:'externref',mutable:true});
+        const fun = new WebAssembly.Global({value:'anyfunc',mutable:true});
+        assert(extern.value === undefined && fun.valueOf() === null, 'reference defaults');
+        assert(rejects(TypeError, () => new WebAssembly.Global({value:'anyfunc'}, undefined)), 'explicit undefined funcref');
+        assert(rejects(TypeError, () => { fun.value = () => 1; }), 'plain JS function rejected');
+        const read = module(
+            section(1,[3,96,1,111,0,96,0,1,111,96,0,1,127]),
+            section(2,[4,1,109,1,101,3,111,1,1,109,1,110,3,127,0,
+                1,109,1,102,3,112,1,1,109,1,115,3,111,0]),
+            section(3,[3,0,1,2]),
+            section(6,[2,111,1,208,111,11,111,0,35,3,11]),
+            section(7,[9,...named('ext',3,0),...named('number',3,1),...named('fn',3,2),
+                ...named('local',3,4),...named('alias',3,4),...named('snapshot',3,5),
+                ...named('write',0,0),...named('get',0,1),...named('seven',0,2)]),
+            section(10,[3,6,0,32,0,36,0,11,4,0,35,0,11,4,0,65,7,11])
+        );
+        const marker = Symbol('immutable externref');
+        const imports = {m:{e:extern,n:42,f:fun,s:marker}};
+        const a = new WebAssembly.Instance(read, imports).exports;
+        const b = new WebAssembly.Instance(read, imports).exports;
+        assert(a.ext === b.ext && a.ext === extern && b.fn === fun, 'import identities');
+        assert(a.number.value === 42 && a.snapshot.value === marker, 'mixed global indices and const initializer');
+        assert(a.local === a.alias && a.local.value === null, 'local alias and Wasm null initialization');
+        assert(rejects(TypeError, () => { a.snapshot.value = {}; }), 'immutable global');
+        function writeGuest() {
+            const value = {tag:'live'};
+            a.write(value);
+            return new WeakRef(value);
+        }
+        const weak = writeGuest();
+        collect();
+        assert(b.get() === weak.deref() && b.get().tag === 'live', 'shared guest write keeps value alive');
+        extern.value = undefined;
+        collect();
+        assert(a.get() === undefined && weak.deref() === undefined, 'external overwrite releases old value');
+        fun.value = a.seven;
+        collect();
+        assert(b.fn.value === a.seven && fun.valueOf()() === 7, 'function identity and owner retention');
+        assert(rejects(WebAssembly.LinkError, () => new WebAssembly.Instance(read, {m:{
+            e:{}, n:42, f:fun, s:marker
+        }})), 'mutable reference import needs a Global');
+        assert(rejects(WebAssembly.LinkError, () => new WebAssembly.Instance(read, {m:{
+            e:fun, n:42, f:fun, s:marker
+        }})), 'mutable global type mismatch');
         true
     "#);
     if let Err(rustic_js::EvalError::Throw(value)) = outcome {

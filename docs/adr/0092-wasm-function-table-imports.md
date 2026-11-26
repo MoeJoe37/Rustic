@@ -45,9 +45,9 @@ and let collection follow existing heap roots.
 
 ## Consequences and revisit trigger
 
-TD-208's shared table ownership is implemented. Reference-valued
-cross-instance signatures still need a call boundary that transports and
-roots reference arguments and results. Revisit this boundary under WASM-05.
+TD-208's shared table ownership is implemented.
+[ADR 0093](0093-wasm-reference-interop.md) adds a boundary for nullable
+reference arguments and results.
 
 ## Validation
 

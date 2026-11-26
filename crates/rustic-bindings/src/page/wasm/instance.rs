@@ -1,7 +1,8 @@
 use std::{any::Any, cell::OnceCell, collections::HashMap, num::NonZeroU32};
 
 use rustic_wasm::{
-    ExecutionError, ExecutionErrorKind, Instance, InstanceImports, InstanceLimits, ReferenceRoot,
+    ExecutionError, ExecutionErrorKind, HostValue, Instance, InstanceImports, InstanceLimits,
+    ReferenceRoot,
 };
 
 use super::super::events::PrivateArray;
@@ -192,14 +193,16 @@ fn instantiate_module(
                                 .iter()
                                 .chain(&signature.results)
                                 .copied()
-                                .all(is_numeric)
+                                .all(HostValue::supports)
                         }
                         None => true,
                     }
                 }
                 ExportIndex::Global(index) => {
                     match (index as usize).checked_sub(state.globals.len()) {
-                        Some(local) => is_numeric(declarations.globals[local].value.ty.value_type),
+                        Some(local) => {
+                            HostValue::supports(declarations.globals[local].value.ty.value_type)
+                        }
                         None => true,
                     }
                 }
@@ -258,10 +261,11 @@ fn instantiate_module(
                 limits,
                 &token,
                 InstanceImports {
-                    globals: &state.globals,
+                    shared_globals: &state.globals,
                     memories: &state.memories,
                     tables: &state.tables,
                     function_owner: Some(function_owner(object).ok_or(OutOfMemory)?),
+                    ..InstanceImports::default()
                 },
             )
             .map_err(|error| execution_error(agent, error, true))?;
@@ -334,9 +338,7 @@ fn populate_exports(
                         if imported != Value::UNDEFINED {
                             imported
                         } else {
-                            let state = runtime
-                                .share_numeric_global(index)
-                                .expect("numeric exported global");
+                            let state = runtime.share_global(index).expect("exported global");
                             global::export(agent, instance, state)?
                         }
                     }
@@ -443,11 +445,9 @@ fn call(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         .iter()
         .chain(&signature.results)
         .copied()
-        .all(is_numeric)
+        .all(HostValue::supports)
     {
-        return agent.type_error(
-            "only numeric WebAssembly function signatures can be called from JavaScript",
-        );
+        return agent.type_error("unsupported WebAssembly function signature");
     }
     let types = &signature.params;
     let mut input = Vec::new();
@@ -456,14 +456,31 @@ fn call(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         .map_err(|_| OutOfMemory)?;
     for (index, &ty) in types.iter().enumerate() {
         agent.check_native_work()?;
-        input.push(to_wasm(agent, arg(args, index), ty)?);
+        input.push(host::to_host_value(agent, arg(args, index), ty)?);
     }
     let results = host::invoke(agent, instance, &runtime, function, &input)?;
-    match results.as_slice() {
+    let mut roots = results.iter().filter_map(HostValue::host_root);
+    host::with_reference_roots(agent, &mut roots, |agent| match results.as_slice() {
         [] => Ok(Value::UNDEFINED),
-        &[one] => to_js(agent, one),
-        _ => sequence(agent, results.into_iter(), to_js),
-    }
+        &[one] => host::to_js_value(agent, one),
+        _ => {
+            let array = Value::object(agent.create_array_from_list(&[])?);
+            with_root(agent, array, |agent| {
+                let id = array.as_object().expect("result array");
+                for (index, &value) in results.iter().enumerate() {
+                    agent.check_native_work()?;
+                    let value = host::to_js_value(agent, value)?;
+                    let key = PropertyKey::Index(u32::try_from(index).map_err(|_| OutOfMemory)?);
+                    agent.define_property_or_throw(
+                        id,
+                        key,
+                        PropertyDescriptor::data_with(value, true, true, true),
+                    )?;
+                }
+                Ok(array)
+            })
+        }
+    })
 }
 
 pub(super) fn execution_error(agent: &mut Agent, error: ExecutionError, linking: bool) -> Abrupt {

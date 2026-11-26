@@ -12,7 +12,7 @@ type Callback<'host> = dyn Fn(&[Value], &mut [Value], &CancellationToken) -> Res
 pub type HostDispatch<'host> =
     dyn FnMut(usize, &[Value], &mut [Value]) -> Result<(), HostTrap> + 'host;
 
-/// A numeric call that leaves the current instance.
+/// A call that leaves the current instance.
 #[derive(Clone, Copy)]
 pub enum HostCall<'a> {
     /// An explicitly bound import by function index.
@@ -26,12 +26,12 @@ pub enum HostCall<'a> {
     },
 }
 
-/// A numeric host dispatcher with the host identities in suspended frames.
+/// A host dispatcher with the live identities in suspended frames.
 /// These identities and any indirect target must stay live during the call.
 pub type TracingHostDispatch<'host> = dyn FnMut(
         HostCall<'_>,
-        &[Value],
-        &mut [Value],
+        &[HostValue],
+        &mut [HostValue],
         &mut dyn Iterator<Item = ReferenceRoot>,
     ) -> Result<(), HostTrap>
     + 'host;
@@ -133,6 +133,7 @@ pub(super) fn link<'module>(
 
 pub(super) fn for_dispatch(
     declarations: &Declarations<'_>,
+    references: bool,
     budget: &mut Budget<'_>,
 ) -> Result<Vec<BoundFunction<'static>>, ExecutionError> {
     let mut functions = Vec::new();
@@ -151,7 +152,7 @@ pub(super) fn for_dispatch(
             .iter()
             .chain(&signature.results)
             .copied()
-            .all(is_numeric)
+            .all(|ty| is_numeric(ty) || (references && HostValue::supports(ty)))
         {
             return Err(error(offset, Fault::ImportTypeMismatch));
         }

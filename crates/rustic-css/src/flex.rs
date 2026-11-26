@@ -171,8 +171,9 @@ pub(crate) fn gap(value: &Value) -> Option<Gap> {
 
 keywords! {
     /// Alignment keywords used by `justify-content`, `align-content`,
-    /// `align-items` and `align-self`. Which keywords a property accepts is
-    /// checked when parsing.
+    /// `align-items`, `align-self`, `justify-items` and `justify-self`.
+    /// Which keywords a property accepts is checked when parsing; the
+    /// `legacy` forms are `justify-items` only.
     AlignKeyword {
         Auto => "auto",
         Normal => "normal",
@@ -186,11 +187,17 @@ keywords! {
         SelfEnd => "self-end",
         FlexStart => "flex-start",
         FlexEnd => "flex-end",
+        FlowStart => "flow-start",
+        FlowEnd => "flow-end",
         Left => "left",
         Right => "right",
         SpaceBetween => "space-between",
         SpaceAround => "space-around",
         SpaceEvenly => "space-evenly",
+        Legacy => "legacy",
+        LegacyLeft => "legacy left",
+        LegacyRight => "legacy right",
+        LegacyCenter => "legacy center",
     }
 }
 
@@ -240,6 +247,8 @@ pub(crate) enum AlignProperty {
     AlignContent,
     AlignItems,
     AlignSelf,
+    JustifyItems,
+    JustifySelf,
 }
 
 /// Parse an alignment value for `property` (CSS Box Alignment 3 §5–§6).
@@ -254,6 +263,21 @@ pub(crate) fn alignment(parts: &[&Value], property: AlignProperty) -> Option<Ali
         property,
         AlignProperty::JustifyContent | AlignProperty::AlignContent
     );
+    let justify = matches!(
+        property,
+        AlignProperty::JustifyContent | AlignProperty::JustifyItems | AlignProperty::JustifySelf
+    );
+    // `legacy && [left | right | center]?` (CSS Box Alignment 3 §6.3).
+    if property == AlignProperty::JustifyItems && words.contains(&"legacy") {
+        let other: Vec<&str> = words.iter().copied().filter(|w| *w != "legacy").collect();
+        return match (words.len(), other.as_slice()) {
+            (1, []) => Some(Alignment::new(K::Legacy)),
+            (2, ["left"]) => Some(Alignment::new(K::LegacyLeft)),
+            (2, ["right"]) => Some(Alignment::new(K::LegacyRight)),
+            (2, ["center"]) => Some(Alignment::new(K::LegacyCenter)),
+            _ => None,
+        };
+    }
     // `<baseline-position>`: `[first | last]? baseline`.
     let baseline = match words.as_slice() {
         ["baseline"] | ["first", "baseline"] => Some(K::Baseline),
@@ -272,24 +296,76 @@ pub(crate) fn alignment(parts: &[&Value], property: AlignProperty) -> Option<Ali
         return None;
     };
     let keyword = match *word {
-        "first" | "last" | "baseline" => return None,
+        "first" | "last" | "baseline" | "legacy" => return None,
         other => AlignKeyword::from_name(other)?,
     };
     let positional = match keyword {
-        K::Center | K::Start | K::End | K::FlexStart | K::FlexEnd => true,
-        K::Left | K::Right => property == AlignProperty::JustifyContent,
+        K::Center | K::Start | K::End | K::FlexStart | K::FlexEnd | K::FlowStart | K::FlowEnd => {
+            true
+        }
+        K::Left | K::Right => justify,
         K::SelfStart | K::SelfEnd => !content,
         _ => false,
     };
+    // `<overflow-position>? normal` for the self and items properties
+    // (CSS Box Alignment 3, 2025 Editor's Draft).
+    let normal_overflow = keyword == K::Normal && !content;
     if overflow.is_some() {
-        return positional.then_some(Alignment { keyword, overflow });
+        return (positional || normal_overflow).then_some(Alignment { keyword, overflow });
     }
     let accepted = positional
         || match keyword {
             K::Normal | K::Stretch => true,
-            K::Auto => property == AlignProperty::AlignSelf,
+            K::Auto => matches!(
+                property,
+                AlignProperty::AlignSelf | AlignProperty::JustifySelf
+            ),
             K::SpaceBetween | K::SpaceAround | K::SpaceEvenly => content,
             _ => false,
         };
     accepted.then_some(Alignment::new(keyword))
+}
+
+/// `place-content`, `place-items`, `place-self`: the `align-*` value then an
+/// optional `justify-*` value; one value sets both (CSS Box Alignment 3
+/// §5.5, §6.4, §6.5). `property` is the `align-*` longhand. A lone baseline
+/// value sets `justify-content` to `start`, which takes no baseline.
+pub(crate) fn place(
+    parts: &[&Value],
+    property: AlignProperty,
+) -> Option<Vec<crate::PropertyValue>> {
+    let justify = match property {
+        AlignProperty::AlignContent => AlignProperty::JustifyContent,
+        AlignProperty::AlignItems => AlignProperty::JustifyItems,
+        _ => AlignProperty::JustifySelf,
+    };
+    for split in 1..=parts.len() {
+        let Some(align) = alignment(&parts[..split], property) else {
+            continue;
+        };
+        let rest = &parts[split..];
+        let other = if rest.is_empty() {
+            match alignment(&parts[..split], justify) {
+                Some(v) => v,
+                None if matches!(
+                    align.keyword,
+                    AlignKeyword::Baseline | AlignKeyword::LastBaseline
+                ) && justify == AlignProperty::JustifyContent =>
+                {
+                    Alignment::new(AlignKeyword::Start)
+                }
+                None => continue,
+            }
+        } else {
+            match alignment(rest, justify) {
+                Some(v) => v,
+                None => continue,
+            }
+        };
+        return Some(vec![
+            crate::PropertyValue::Alignment(align),
+            crate::PropertyValue::Alignment(other),
+        ]);
+    }
+    None
 }

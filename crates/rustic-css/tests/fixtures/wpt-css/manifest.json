@@ -15,11 +15,13 @@
     "css/css-overflow/parsing",
     "css/css-position/parsing",
     "css/css-sizing/parsing",
-    "css/css-text/parsing"
+    "css/css-text/parsing",
+    "css/css-grid/parsing",
+    "css/css-align/parsing"
   ],
-  "case_count": 2916,
+  "case_count": 4013,
   "skipped_calls": 219,
-  "cases_sha256": "1530da3fa2deb8b0b43f729fa1aa52acb72e0e9469276bfd8cce399ed6e1faca",
+  "cases_sha256": "673369ca3b9faae55769f181f45b1fef44e59024d549bf8bac9702ca54d8037b",
   "files": [
     {
       "path": "css/selectors/parsing/invalid-pseudos.html",
@@ -1831,6 +1833,318 @@
       "path": "css/css-text/parsing/word-wrap-valid.html",
       "sha256": "2fea0abcb11b53969b64c5c695189714e704a05a85e90eb28a50499a4d8d702a",
       "cases": 3,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-area-invalid.html",
+      "sha256": "5d37253ded11456bd8aa1994ba7c80f041c8d405a61d1b6d6a446808cde80fec",
+      "cases": 25,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-area-valid.html",
+      "sha256": "e2c618137b729594d0bc64f2f6bbe6690ca9fea88f8bccfb2ab996a324daa0e7",
+      "cases": 60,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-auto-columns-invalid.html",
+      "sha256": "b748f521726141bc72f4188843a3609aab8a9c60fc1810a8b7335faec1ebfec5",
+      "cases": 16,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-auto-columns-valid.html",
+      "sha256": "0c067df2b06345253e56f6abb9d89163b9c48a518a9e8dfded569e30a79153d1",
+      "cases": 30,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-auto-flow-invalid.html",
+      "sha256": "63c7bc5fc0e0f48b21f6c9aead14a340301ae8f736b554dfab74804df523c709",
+      "cases": 3,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-auto-flow-valid.html",
+      "sha256": "d5d971813c316feae988704d7a91c903ff680429101363bc8f4fd81ece88a5e6",
+      "cases": 7,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-auto-rows-invalid.html",
+      "sha256": "8c0b5898112380bf04a872bd126c3f9b82753202764b6b37e78cae786380f7fd",
+      "cases": 15,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-auto-rows-valid.html",
+      "sha256": "90332be518afa379a8c10e8ecf88374a242a92d9edb1d91330f224f64c95e76c",
+      "cases": 30,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-column-invalid.html",
+      "sha256": "aadfc8771397cd9d56e4fcdb86786b65308b8d476f25d92b741b7e6e711cd6b2",
+      "cases": 31,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-row-invalid.html",
+      "sha256": "6bc249de8a8285c4ba9ab5eaea9e8dbd4ba0c622dfd92de25b64fe71839ef9f9",
+      "cases": 31,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-shorthand-invalid.html",
+      "sha256": "6ab215ab7af1b078582b0992fa103894c25d690f1a71e0555bdc378fc10057e1",
+      "cases": 34,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-shorthand-valid.html",
+      "sha256": "5aaeab6d7468437e69b476f758b6e8006aec267764bb45af8a8c57ff1a3062b3",
+      "cases": 49,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-areas-invalid.html",
+      "sha256": "295f95772e7c6b1abf9002c16c09ab2ce949f2a78e3a0ade45e1c97a5b59fe20",
+      "cases": 11,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-areas-valid.html",
+      "sha256": "faf6eadabd8b37c2af79a66a6004a11ca258e542679a598f3a042493caa3ab68",
+      "cases": 9,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-columns-invalid.html",
+      "sha256": "1dbbdb974e6b532d20016779cd84f2f09ffc04f4ad435450b6b1141ba48760d0",
+      "cases": 42,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-columns-repeat-intrinsic-valid.tentative.html",
+      "sha256": "8d51e5830a927fbd220fb3529be324445d3a39e57cd9a81f3b73dbe655b90ad0",
+      "cases": 21,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-columns-valid.html",
+      "sha256": "18329fdc730cc3ae0d9992b5537a78d77af43adb8d053827eba93e16d6326f69",
+      "cases": 34,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-rows-invalid.html",
+      "sha256": "f36f2550239bc5f659c5f35503edb5b32afb85520c78232dd3e6df83689ae1a1",
+      "cases": 42,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-rows-repeat-intrinsic-valid.tentative.html",
+      "sha256": "32fc1e0d98f613ceb13da5afff87482aefc7d7ce6ec4a43edd543e06d1475c1c",
+      "cases": 21,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-rows-valid.html",
+      "sha256": "b215d950d0c44eb87a026c4d73ecbab2b2f5a2e0ad563dfba3566265d8178de7",
+      "cases": 34,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-shorthand-invalid.html",
+      "sha256": "066a6f79c9a0b36b702311ff389d0c1cc84869a303cb77fe6520ae80e71c9906",
+      "cases": 66,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-grid/parsing/grid-template-shorthand-valid.html",
+      "sha256": "2c9203a4c59ed12003d9716575ed3ada962e3839c27e6fa75ff8b4a941d4f833",
+      "cases": 42,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/align-content-invalid.html",
+      "sha256": "291a724f3c452301c94d77766e3f87583ed459bb731edde44ea841d49c1e7c0c",
+      "cases": 23,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/align-content-valid.html",
+      "sha256": "daf780ff6d599ee4db71d1975f3dbc95454e625126f76a75f2122a4dbcd83642",
+      "cases": 19,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/align-items-invalid.html",
+      "sha256": "58fcfdb68c78e72229086483af99e41552d85fb24b248d0e2dd80fe711cfeab4",
+      "cases": 26,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/align-items-valid.html",
+      "sha256": "8109471c050f7d8bec755c5a70528220d81c71276b82ba3e2941921818aeb72e",
+      "cases": 20,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/align-self-invalid.html",
+      "sha256": "ea594ea7b73dc95ae12e1cc80ee3ec70bc755329f6a6fad1d1199b85c1d96caf",
+      "cases": 24,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/align-self-valid.html",
+      "sha256": "9ba308f96c3c00bbaeb0c801682ce0908b985c16c991785e42ce16b3bb22f661",
+      "cases": 21,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/column-gap-invalid.html",
+      "sha256": "992d087eb2fee9819726c19ca813ed5b04b3bc33f04e0972ce08090067adc915",
+      "cases": 5,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/column-gap-valid.html",
+      "sha256": "e004da1ee5e2e47788fa232283e520b2c1583ec88127a53ad1e1614c2528cdc0",
+      "cases": 6,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/gap-invalid.html",
+      "sha256": "1c9ed303cba36e8f6206bc0605b636f2a524b9b11fe850d13529a79e188bc87d",
+      "cases": 4,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/gap-valid.html",
+      "sha256": "b4c65b40c36e0749ec1358e7b0c5869ce352e04ceddecfbfecfa8caee2ed70d7",
+      "cases": 9,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/grid-column-gap-invalid.html",
+      "sha256": "1c59f58a27e05fd6d1e0fda275aab7b80cd10e5e9d47e8135bbde9df3a2fee8f",
+      "cases": 5,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/grid-column-gap-valid.html",
+      "sha256": "79268d9d9d8cbdcd7342d49a99e136cc67eb503b68c1b647662b3410df2ad686",
+      "cases": 6,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/grid-gap-invalid.html",
+      "sha256": "34c68baa7280d34b53737c9205ca4a82596ede9c23dbb1735ae02f19b1f2571b",
+      "cases": 4,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/grid-gap-valid.html",
+      "sha256": "20dd351f1b879ecf25b77e129cfc14af4d87a5c1d6a233c2bbf6ef5fee648d66",
+      "cases": 9,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/grid-row-gap-invalid.html",
+      "sha256": "465fa0c571502045266acd70a08e77057328059aa0ca746d9edf28485a8f735a",
+      "cases": 4,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/grid-row-gap-valid.html",
+      "sha256": "b978ae37c072275342a566d2067e3df5908bffbaba2a04885c44918480a470d8",
+      "cases": 5,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/justify-content-invalid.html",
+      "sha256": "1258515742d8aaee893e1e15238e1deacaea48a3e306baf7a766140fa2d056fd",
+      "cases": 24,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/justify-content-valid.html",
+      "sha256": "d41093cbc6e2688179a26061625d5b503ee4d3c66e29787ca2971e5ffc00e7ac",
+      "cases": 18,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/justify-items-invalid.html",
+      "sha256": "08fc15590c169fa8677236f53704c0b231e84bf8bd8c43911357eda4fc0a5daf",
+      "cases": 21,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/justify-items-valid.html",
+      "sha256": "95539bed5fbcc0421cc3aa1b7411dfe33e98b6f864a0e2070200dc9f02f8ed29",
+      "cases": 26,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/justify-self-invalid.html",
+      "sha256": "1ad4980cea52454a685082624e5cc2afbfb5bc55f38faf52a8e98bddcfab9b04",
+      "cases": 22,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/justify-self-valid.html",
+      "sha256": "fb0ccbd3c553b5da1b5324b90670c4fcb1afd14989cff27f3513ab309d63673a",
+      "cases": 23,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/place-content-invalid.html",
+      "sha256": "2dd5a4e273a3575c22edcc0d636b2c25016dec514cc51e9cc99d5a5cced464dd",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/place-content-valid.html",
+      "sha256": "a1293a6016d130fcbf56d225ad639427b30fd880bb2863d119ca9617db21bf66",
+      "cases": 26,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/place-items-invalid.html",
+      "sha256": "8003e3b2eea508f8fa5bfdb836f62555b234ffc811f1e974632fb56f67a73c0a",
+      "cases": 17,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/place-items-valid.html",
+      "sha256": "55c4a79d6395c1b44308fe8724736b86b8e010e2c0813595351737e912107f15",
+      "cases": 24,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/place-self-invalid.html",
+      "sha256": "603c4a26132a463b3f2bd312750dfb1a305838f9f278ad7ebdd9a68df722896d",
+      "cases": 11,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/place-self-valid.html",
+      "sha256": "d977982afe112f96bd7818075a2117eb1f1c1890bafd5c24fe9c65bdb215330e",
+      "cases": 23,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/row-gap-invalid.html",
+      "sha256": "c27924c349089ab94d57887369ea847b4cbc8b76218b251564521dbb58f63b0e",
+      "cases": 4,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-align/parsing/row-gap-valid.html",
+      "sha256": "9d0032098d7c0fd896cd739d5ee1307224a991573723a53d1f9582640a0ab21c",
+      "cases": 5,
       "skipped_calls": 0
     }
   ]

@@ -798,6 +798,9 @@ fn compute_values(
                         PropertyValue::Gap(Gap::LengthPercentage(lp)) => {
                             PropertyValue::Gap(Gap::LengthPercentage(basis.lp(lp, nonnegative)))
                         }
+                        PropertyValue::Grid(grid) => {
+                            PropertyValue::Grid(grid.map_lengths(&|lp| basis.lp(lp, true)))
+                        }
                         PropertyValue::Transform(list) => {
                             PropertyValue::Transform(rustic_css::TransformList(
                                 list.0

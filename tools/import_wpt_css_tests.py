@@ -42,7 +42,8 @@ MANIFEST = DESTINATION / "manifest.json"
 REPOSITORY = "web-platform-tests/wpt"
 REVISION = "cb97c571c3b1947e08b8615eeb4028a2794b23a4"
 
-# Directories whose parsing tests cover M2's declared CSS scope.
+# Directories whose parsing tests cover M2's declared CSS scope, plus the
+# M9 additions below.
 DIRECTORIES = (
     "css/selectors/parsing",
     "css/css-pseudo/parsing",
@@ -57,6 +58,9 @@ DIRECTORIES = (
     "css/css-position/parsing",
     "css/css-sizing/parsing",
     "css/css-text/parsing",
+    # M9 `layout.grid`: grid definition/placement and box alignment values.
+    "css/css-grid/parsing",
+    "css/css-align/parsing",
 )
 
 FUNCTIONS = {

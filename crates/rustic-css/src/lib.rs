@@ -35,6 +35,7 @@ mod easing;
 mod effects;
 mod error;
 mod flex;
+mod grid;
 mod length;
 mod media;
 mod parser;
@@ -78,6 +79,10 @@ pub use effects::{BlendMode, FilterFunction, Isolation, Shadow};
 pub use error::{CssError, Diagnostic, DiagnosticKind};
 pub use flex::{
     AlignKeyword, Alignment, FlexBasis, FlexDirection, FlexWrap, Gap, OverflowPosition, Size,
+};
+pub use grid::{
+    AutoFlow, GridAreas, GridLine, GridTemplate, GridValue, MAX_REPEAT, NamedArea, RepeatCount,
+    TrackBreadth, TrackComponent, TrackSize,
 };
 pub use length::{Length, LengthPercentage, LengthUnit};
 pub use media::{

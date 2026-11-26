@@ -774,6 +774,8 @@ pub enum PropertyValue {
     Alignment(Alignment),
     /// `row-gap`, `column-gap`.
     Gap(Gap),
+    /// The grid template, placement and auto-flow longhands.
+    Grid(crate::GridValue),
 }
 
 macro_rules! property_ids {
@@ -791,6 +793,9 @@ macro_rules! property_ids {
             /// The longhand named `name`, ASCII case-insensitively.
             pub fn from_name(name: &str) -> Option<Self> {
                 if name.eq_ignore_ascii_case("word-wrap") {return Some(Self::OverflowWrap);}
+                // Legacy aliases (CSS Box Alignment 3 §8.4).
+                if name.eq_ignore_ascii_case("grid-row-gap") {return Some(Self::RowGap);}
+                if name.eq_ignore_ascii_case("grid-column-gap") {return Some(Self::ColumnGap);}
                 match name.to_ascii_lowercase().as_str() {
                     $($name => Some(Self::$variant),)*
                     _ => None,
@@ -901,6 +906,18 @@ property_ids! {
     AlignSelf => "align-self", false;
     RowGap => "row-gap", false;
     ColumnGap => "column-gap", false;
+    JustifyItems => "justify-items", false;
+    JustifySelf => "justify-self", false;
+    GridTemplateRows => "grid-template-rows", false;
+    GridTemplateColumns => "grid-template-columns", false;
+    GridTemplateAreas => "grid-template-areas", false;
+    GridAutoRows => "grid-auto-rows", false;
+    GridAutoColumns => "grid-auto-columns", false;
+    GridAutoFlow => "grid-auto-flow", false;
+    GridRowStart => "grid-row-start", false;
+    GridColumnStart => "grid-column-start", false;
+    GridRowEnd => "grid-row-end", false;
+    GridColumnEnd => "grid-column-end", false;
     OutlineWidth => "outline-width", false;
     OutlineStyle => "outline-style", false;
     OutlineColor => "outline-color", false;
@@ -1109,8 +1126,23 @@ impl PropertyId {
             P::JustifyContent | P::AlignContent | P::AlignItems => {
                 PropertyValue::Alignment(Alignment::new(flex::AlignKeyword::Normal))
             }
-            P::AlignSelf => PropertyValue::Alignment(Alignment::new(flex::AlignKeyword::Auto)),
+            P::AlignSelf | P::JustifySelf => {
+                PropertyValue::Alignment(Alignment::new(flex::AlignKeyword::Auto))
+            }
+            P::JustifyItems => PropertyValue::Alignment(Alignment::new(flex::AlignKeyword::Legacy)),
             P::RowGap | P::ColumnGap => PropertyValue::Gap(Gap::Normal),
+            P::GridTemplateRows
+            | P::GridTemplateColumns
+            | P::GridTemplateAreas
+            | P::GridAutoRows
+            | P::GridAutoColumns
+            | P::GridAutoFlow
+            | P::GridRowStart
+            | P::GridColumnStart
+            | P::GridRowEnd
+            | P::GridColumnEnd => {
+                PropertyValue::Grid(crate::grid::initial(self).expect("a grid longhand"))
+            }
         }
     }
 }
@@ -1398,6 +1430,25 @@ pub fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
     const FLEX: &[P] = &[P::FlexGrow, P::FlexShrink, P::FlexBasis];
     const FLEX_FLOW: &[P] = &[P::FlexDirection, P::FlexWrap];
     const GAP: &[P] = &[P::RowGap, P::ColumnGap];
+    const GRID_TEMPLATE: &[P] = &[
+        P::GridTemplateRows,
+        P::GridTemplateColumns,
+        P::GridTemplateAreas,
+    ];
+    const GRID: &[P] = &[
+        P::GridTemplateRows,
+        P::GridTemplateColumns,
+        P::GridTemplateAreas,
+        P::GridAutoRows,
+        P::GridAutoColumns,
+        P::GridAutoFlow,
+    ];
+    const GRID_AREA: &[P] = &[
+        P::GridRowStart,
+        P::GridColumnStart,
+        P::GridRowEnd,
+        P::GridColumnEnd,
+    ];
     const OUTLINE: &[P] = &[P::OutlineWidth, P::OutlineStyle, P::OutlineColor];
     const BORDER_RADIUS: &[P] = &[
         P::BorderTopLeftRadius,
@@ -1445,7 +1496,15 @@ pub fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "container" => CONTAINER,
         "flex" => FLEX,
         "flex-flow" => FLEX_FLOW,
-        "gap" => GAP,
+        "gap" | "grid-gap" => GAP,
+        "grid-template" => GRID_TEMPLATE,
+        "grid" => GRID,
+        "grid-area" => GRID_AREA,
+        "grid-row" => &[P::GridRowStart, P::GridRowEnd],
+        "grid-column" => &[P::GridColumnStart, P::GridColumnEnd],
+        "place-content" => &[P::AlignContent, P::JustifyContent],
+        "place-items" => &[P::AlignItems, P::JustifyItems],
+        "place-self" => &[P::AlignSelf, P::JustifySelf],
         "text-decoration" => TEXT_DECORATION,
         "outline" => OUTLINE,
         "border-radius" => BORDER_RADIUS,
@@ -2038,6 +2097,16 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::AnchorName | P::PositionAnchor | P::PositionArea | P::ViewTransitionName => {
             return crate::anchor::longhand(property, parts);
         }
+        P::GridTemplateRows
+        | P::GridTemplateColumns
+        | P::GridTemplateAreas
+        | P::GridAutoRows
+        | P::GridAutoColumns
+        | P::GridAutoFlow
+        | P::GridRowStart
+        | P::GridColumnStart
+        | P::GridRowEnd
+        | P::GridColumnEnd => return crate::grid::longhand(property, parts),
         P::FontFamily => return font_family(parts).map(PropertyValue::FontFamily),
         P::TextTransform => return text_transform(parts).map(PropertyValue::TextTransform),
         P::TextDecorationLine => {
@@ -2100,11 +2169,18 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::BorderBottomLeftRadius => {
             return corner_radius(parts).map(PropertyValue::BorderRadius);
         }
-        P::JustifyContent | P::AlignContent | P::AlignItems | P::AlignSelf => {
+        P::JustifyContent
+        | P::AlignContent
+        | P::AlignItems
+        | P::AlignSelf
+        | P::JustifyItems
+        | P::JustifySelf => {
             let which = match property {
                 P::JustifyContent => AlignProperty::JustifyContent,
                 P::AlignContent => AlignProperty::AlignContent,
                 P::AlignItems => AlignProperty::AlignItems,
+                P::JustifyItems => AlignProperty::JustifyItems,
+                P::JustifySelf => AlignProperty::JustifySelf,
                 _ => AlignProperty::AlignSelf,
             };
             return flex::alignment(parts, which).map(PropertyValue::Alignment);
@@ -2158,6 +2234,18 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::AlignContent
         | P::AlignItems
         | P::AlignSelf
+        | P::JustifyItems
+        | P::JustifySelf
+        | P::GridTemplateRows
+        | P::GridTemplateColumns
+        | P::GridTemplateAreas
+        | P::GridAutoRows
+        | P::GridAutoColumns
+        | P::GridAutoFlow
+        | P::GridRowStart
+        | P::GridColumnStart
+        | P::GridRowEnd
+        | P::GridColumnEnd
         | P::BorderTopLeftRadius
         | P::BorderTopRightRadius
         | P::BorderBottomRightRadius
@@ -2430,7 +2518,7 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
         "font" => font(parts),
         "flex" => flex(parts),
         "flex-flow" => flex_flow(parts),
-        "gap" => {
+        "gap" | "grid-gap" => {
             let (row, column) = match parts {
                 [both] => (flex::gap(both)?, flex::gap(both)?),
                 [row, column] => (flex::gap(row)?, flex::gap(column)?),
@@ -2439,6 +2527,13 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
             Some(vec![PropertyValue::Gap(row), PropertyValue::Gap(column)])
         }
         "background" => background::shorthand(parts),
+        "grid-row" | "grid-column" => crate::grid::line_shorthand(parts),
+        "grid-area" => crate::grid::area_shorthand(parts),
+        "grid-template" => crate::grid::template_shorthand(parts),
+        "grid" => crate::grid::grid_shorthand(parts),
+        "place-content" => flex::place(parts, AlignProperty::AlignContent),
+        "place-items" => flex::place(parts, AlignProperty::AlignItems),
+        "place-self" => flex::place(parts, AlignProperty::AlignSelf),
         "transition" => crate::animation::transition_shorthand(parts),
         "animation" => crate::animation::animation_shorthand(parts),
         "animation-range" => crate::animation::range_shorthand(parts),
@@ -2511,6 +2606,7 @@ impl fmt::Display for PropertyValue {
             Self::Integer(n) => write!(f, "{n}"),
             Self::Alignment(v) => write!(f, "{v}"),
             Self::Gap(v) => write!(f, "{v}"),
+            Self::Grid(v) => write!(f, "{v}"),
             Self::BorderWidth(BorderWidth::Thin) => f.write_str("thin"),
             Self::BorderWidth(BorderWidth::Medium) => f.write_str("medium"),
             Self::BorderWidth(BorderWidth::Thick) => f.write_str("thick"),

@@ -94,7 +94,8 @@ pub struct BoxSnapshot {
     natural: Option<NaturalSize>,
     language: Option<Arc<str>>,
     /// HTML `colspan` and `rowspan` of a `td`/`th` (`rowspan` 0 spans the
-    /// rest of the row group); (1, 1) for every other box.
+    /// rest of the row group), or `span` of a `col`/`colgroup` as the first
+    /// value; (1, 1) for every other box.
     span: (u32, u32),
 }
 
@@ -352,6 +353,21 @@ impl BoxTree {
                             .map(|a| a.value().as_units())
                     };
                     cell_spans(attribute("colspan"), attribute("rowspan"))
+                }
+                NodeKind::Element(element)
+                    if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
+                        && (element.name().local().eq_ignore_ascii_case("col")
+                            || element.name().local().eq_ignore_ascii_case("colgroup")) =>
+                {
+                    let span = element
+                        .attributes()
+                        .iter()
+                        .find(|a| {
+                            a.name().namespace().is_none()
+                                && a.name().local().eq_ignore_ascii_case("span")
+                        })
+                        .map(|a| a.value().as_units());
+                    (cell_spans(span, None).0, 1)
                 }
                 _ => (1, 1),
             };

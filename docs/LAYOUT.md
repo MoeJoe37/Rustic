@@ -750,10 +750,15 @@ every one reported its height. No recursion: nested tables are more frames.
 - Columns (CSS 2.2 §17.5.2.2, automatic layout): each column takes its
   cells' largest border-box min-content and max-content contributions;
   spanning cells (by increasing span) widen the columns they cross in
-  proportion to their maximums. The table's width is its specified width
-  or shrink-to-fit, never below its minimum; space between the minimum and
-  maximum interpolates every column, and space beyond grows columns by
-  their maximums. `table-layout: fixed` with a definite width takes the
+  proportion to their maximums. `<col>`/`<colgroup>` boxes (with `span`)
+  give fixed widths as column maximums and percentages; percentage cells
+  and columns (capped at a 100% total) take their share of the width
+  first and widen a shrink-to-fit table so they get it (a 100% column
+  beside others makes it as wide as possible). The table's width is its
+  specified width or shrink-to-fit, never below its minimum; space between
+  the minimum and maximum interpolates the other columns, and space beyond
+  grows auto columns by their maximums (evenly if all are zero), fixed ones
+  only when every column is fixed. `table-layout: fixed` with a definite width takes the
   first row's fixed (or percentage) widths and shares the rest among the
   other columns, or with no other columns among the fixed-length ones. A
   cell's minimum is its min-content width or `min-width`, not its `width`;
@@ -798,9 +803,9 @@ centred tables, fixed layout, captions, header and footer groups,
 specified heights with baseline and bottom alignment, RTL, anonymous
 tables, rows and cells, and inline tables; `flow/table.rs` unit-tests the column algorithms. `tests/wpt_tables.rs` compares the 35 static
 `checkLayout` pages of the pinned css-tables directory
-(`tools/import_wpt_tables_tests.py`, sharing the css-grid importer): 17
-pass and the other 18 are reviewed failures (list items, percentage and
-column widths, collapsing borders, vertical writing modes, Ahem text,
+(`tools/import_wpt_tables_tests.py`, sharing the css-grid importer): 18
+pass and the other 17 are reviewed failures (list items, tentative
+width-merging rules, collapsing borders, vertical writing modes, Ahem text,
 `height: stretch`; TD-211). Its `offsetParent` also stops at `td`, `th`
 and `table` for static elements, as CSSOM View specifies.
 

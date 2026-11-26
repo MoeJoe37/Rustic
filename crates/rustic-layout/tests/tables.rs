@@ -323,3 +323,18 @@ fn legacy_table_attributes_size_and_space_the_table() {
     assert_eq!(m["b"], (100.0, 1.0, 99.0, 20.0));
     assert_eq!(m["ia"], (6.0, 6.0, 10.0, 10.0));
 }
+
+#[test]
+fn column_and_percentage_widths_share_the_table_width() {
+    let html = page(
+        "table { width: 200px; border-spacing: 0 } td { padding: 0; height: 5px }",
+        "<table><colgroup><col style='width:30px'><col span=2></colgroup>\
+         <tr><td id=a></td><td id=b width=50%></td><td id=c></td></tr></table>",
+    );
+    let m = boxes(&html);
+    // 50% of 200 for the percentage column, 30px for the fixed one and
+    // the rest for the auto column, which grows before the fixed one.
+    assert_eq!(m["a"], (0.0, 0.0, 30.0, 5.0));
+    assert_eq!(m["b"], (30.0, 0.0, 100.0, 5.0));
+    assert_eq!(m["c"], (130.0, 0.0, 70.0, 5.0));
+}

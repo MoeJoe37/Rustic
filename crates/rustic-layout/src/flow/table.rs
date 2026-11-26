@@ -240,6 +240,10 @@ struct Cell {
     /// Outer (border-box) min/max-content contributions.
     min: f64,
     max: f64,
+    /// A percentage `width`, if any.
+    percent: Option<f64>,
+    /// A fixed `width`.
+    fixed: bool,
     measure: BlockMeasure,
     /// Content height from the latest layout.
     natural: f64,
@@ -287,6 +291,8 @@ enum Target {
 
 /// The table's rows, groups, cells in slots and captions.
 struct Structure {
+    /// Widths of the columns `<col>`/`<colgroup>` boxes define, in order.
+    column_widths: Vec<Option<ColumnWidth>>,
     groups: Vec<Group>,
     rows: Vec<Row>,
     cells: Vec<Cell>,
@@ -356,18 +362,73 @@ fn share(targets: &mut [f64], weights: &[f64], extra: f64) {
     }
 }
 
+/// A column's or cell's specified width.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum ColumnWidth {
+    Pixels(f64),
+    Percent(f64),
+}
+
+/// A box's `width` as a column width: a fixed length (border box, adding
+/// `extras`) or a percentage; `None` for `auto`, keywords and mixed `calc()`.
+fn column_width(style: &ComputedStyle, extras: f64) -> Result<Option<ColumnWidth>, FlowError> {
+    Ok(match Sizing::read(style, P::Width)? {
+        Sizing::Length(LengthPercentage::Percentage(p)) => Some(ColumnWidth::Percent(p.max(0.0))),
+        Sizing::Length(v) if !intrinsic::has_percentage(v) => {
+            let r = Resolver::new(style, None, extras, Intrinsic::default());
+            r.resolve(Sizing::Length(v), 0.0)?
+                .map(|w| ColumnWidth::Pixels(w + extras))
+        }
+        _ => None,
+    })
+}
+
+/// Per-column bounds for the automatic algorithm.
+#[derive(Clone, Debug, PartialEq)]
+struct Bounds {
+    min: Vec<f64>,
+    max: Vec<f64>,
+    /// Percentage widths (0 for none), capped so they total at most 100.
+    percent: Vec<f64>,
+    /// Columns with a fixed width from a column box or a single-column cell.
+    fixed: Vec<bool>,
+}
+
 /// Column minimum and maximum widths from the cells (CSS 2.2 §17.5.2.2):
 /// single-column cells first, then spanning cells by increasing span.
-fn column_bounds(cells: &[Cell], columns: usize, space: f64) -> (Vec<f64>, Vec<f64>) {
+fn column_bounds(
+    cells: &[Cell],
+    columns: usize,
+    space: f64,
+    specified: &[Option<ColumnWidth>],
+) -> Bounds {
     let mut min = vec![0.0_f64; columns];
     let mut max = vec![0.0_f64; columns];
+    let mut percent = vec![0.0_f64; columns];
+    let mut fixed = vec![false; columns];
     let mut spanning: Vec<&Cell> = Vec::new();
     for c in cells {
         if c.columns == 1 {
             min[c.column] = min[c.column].max(c.min);
             max[c.column] = max[c.column].max(c.max);
+            if let Some(p) = c.percent {
+                percent[c.column] = percent[c.column].max(p);
+            }
+            fixed[c.column] |= c.fixed;
         } else {
             spanning.push(c);
+        }
+    }
+    // Column boxes' widths: a fixed width is the column's preferred width
+    // (never below its minimum), a percentage like a cell's.
+    for (i, w) in specified.iter().enumerate().take(columns) {
+        match w {
+            Some(ColumnWidth::Pixels(w)) => {
+                max[i] = min[i].max(*w);
+                fixed[i] = true;
+            }
+            Some(ColumnWidth::Percent(p)) => percent[i] = percent[i].max(*p),
+            None => {}
         }
     }
     spanning.sort_by_key(|c| c.columns);
@@ -384,11 +445,97 @@ fn column_bounds(cells: &[Cell], columns: usize, space: f64) -> (Vec<f64>, Vec<f
             max[i] = max[i].max(min[i]);
         }
     }
-    (min, max)
+    // Percentages beyond a total of 100% are dropped, in column order.
+    let mut left = 100.0_f64;
+    for p in &mut percent {
+        *p = p.min(left);
+        left -= *p;
+    }
+    Bounds {
+        min,
+        max,
+        percent,
+        fixed,
+    }
 }
 
-/// Automatic column widths for `available` space between the spacing.
-fn auto_widths(min: &[f64], max: &[f64], available: f64) -> Vec<f64> {
+/// The table's max-content width from its column bounds: percentage
+/// columns widen it so each gets its share (CSS 2.2 §17.5.2.2's common
+/// practice), without going below the sum of maximums.
+fn max_content(b: &Bounds) -> f64 {
+    let sum: f64 = b.max.iter().sum();
+    let total: f64 = b.percent.iter().sum();
+    let mut widest = sum;
+    for (m, p) in b.max.iter().zip(&b.percent) {
+        if *p > 0.0 {
+            widest = widest.max(m * 100.0 / p);
+        }
+    }
+    let others: f64 = b
+        .max
+        .iter()
+        .zip(&b.percent)
+        .filter(|(_, p)| **p == 0.0)
+        .map(|(m, _)| m)
+        .sum();
+    if total > 0.0 && total < 100.0 {
+        widest = widest.max(others * 100.0 / (100.0 - total));
+    } else if total >= 100.0 && others > 0.0 {
+        // No share is left for the other columns: as wide as possible.
+        widest = f64::INFINITY;
+    }
+    widest.min(1e7)
+}
+
+/// Automatic column widths for `available` space between the spacing:
+/// percentage columns take their share (at least their minimum), the
+/// others share the rest by [`free_widths`]; without other columns, extra
+/// space grows the percentage columns.
+fn auto_widths(b: &Bounds, available: f64) -> Vec<f64> {
+    let n = b.min.len();
+    let fixed: Vec<usize> = (0..n).filter(|&i| b.percent[i] > 0.0).collect();
+    if fixed.is_empty() {
+        return free_widths(&b.min, &b.max, &b.fixed, available);
+    }
+    let mut out = vec![0.0; n];
+    for &i in &fixed {
+        out[i] = b.min[i].max(available * b.percent[i] / 100.0);
+    }
+    let others: Vec<usize> = (0..n).filter(|&i| b.percent[i] == 0.0).collect();
+    let taken: f64 = fixed.iter().map(|&i| out[i]).sum();
+    let others_min: f64 = others.iter().map(|&i| b.min[i]).sum();
+    // Percentage columns shrink toward their minimums first.
+    let deficit = taken + others_min - available;
+    if deficit > 0.0 {
+        let room: f64 = fixed.iter().map(|&i| out[i] - b.min[i]).sum();
+        if room > 0.0 {
+            let cut = deficit.min(room) / room;
+            for &i in &fixed {
+                out[i] -= (out[i] - b.min[i]) * cut;
+            }
+        }
+    }
+    let rest = available - fixed.iter().map(|&i| out[i]).sum::<f64>();
+    if others.is_empty() {
+        let weights: Vec<f64> = out.clone();
+        share(&mut out, &weights, rest);
+        return out;
+    }
+    let min: Vec<f64> = others.iter().map(|&i| b.min[i]).collect();
+    let max: Vec<f64> = others.iter().map(|&i| b.max[i]).collect();
+    let flags: Vec<bool> = others.iter().map(|&i| b.fixed[i]).collect();
+    for (k, w) in free_widths(&min, &max, &flags, rest.max(0.0))
+        .into_iter()
+        .enumerate()
+    {
+        out[others[k]] = w;
+    }
+    out
+}
+
+/// Widths for columns without percentages: interpolate between minimums
+/// and maximums, then grow by maximums.
+fn free_widths(min: &[f64], max: &[f64], fixed: &[bool], available: f64) -> Vec<f64> {
     let (sum_min, sum_max): (f64, f64) = (min.iter().sum(), max.iter().sum());
     if available <= sum_min {
         return min.to_vec();
@@ -401,8 +548,25 @@ fn auto_widths(min: &[f64], max: &[f64], available: f64) -> Vec<f64> {
         };
         return min.iter().zip(max).map(|(a, b)| a + (b - a) * t).collect();
     }
+    // Beyond the maximums, auto columns grow first (by their maximums, or
+    // evenly when those are all zero); fixed-width columns only when every
+    // column is fixed (CSS Tables 3 §3.10.5).
     let mut widths = max.to_vec();
-    share(&mut widths, max, available - sum_max);
+    let any_auto = fixed.iter().any(|f| !f);
+    let weights: Vec<f64> = max
+        .iter()
+        .zip(fixed)
+        .map(|(&m, &f)| if f == any_auto { 0.0 } else { m })
+        .collect();
+    let weights = if weights.iter().sum::<f64>() > 0.0 {
+        weights
+    } else {
+        fixed
+            .iter()
+            .map(|&f| if f == any_auto { 0.0 } else { 1.0 })
+            .collect()
+    };
+    share(&mut widths, &weights, available - sum_max);
     widths
 }
 
@@ -411,6 +575,7 @@ impl Engine<'_, '_> {
     fn table_structure(&mut self, t: usize) -> Result<Structure, FlowError> {
         let end = self.nodes[t].end;
         let mut captions = Vec::new();
+        let mut column_widths: Vec<Option<ColumnWidth>> = Vec::new();
         // Groups in source order; direct rows join one implicit group per run.
         let mut source: Vec<(TablePart, Option<usize>, Vec<usize>)> = Vec::new();
         let mut c = t + 1;
@@ -418,6 +583,29 @@ impl Engine<'_, '_> {
             self.work.charge(1)?;
             let next = self.nodes[c].end;
             match self.nodes[c].table {
+                Some(TablePart::Column) => {
+                    // A column group's columns are its `col` children, or
+                    // `span` columns of its own width (HTML §4.9.3).
+                    let own = column_width(self.nodes[c].style, 0.0)?;
+                    let mut cols = Vec::new();
+                    let mut k = c + 1;
+                    while k < next {
+                        self.work.charge(1)?;
+                        if self.nodes[k].table == Some(TablePart::Column) {
+                            cols.push(k);
+                        }
+                        k = self.nodes[k].end;
+                    }
+                    let list = if cols.is_empty() { vec![c] } else { cols };
+                    for k in list {
+                        let w = column_width(self.nodes[k].style, 0.0)?.or(own);
+                        let span = (self.nodes[k].span.0 as usize).clamp(1, 1000);
+                        self.work.charge(span)?;
+                        if column_widths.len() + span <= MAX_COLUMNS {
+                            column_widths.extend(std::iter::repeat_n(w, span));
+                        }
+                    }
+                }
                 Some(TablePart::Caption) => {
                     let bottom = matches!(
                         self.nodes[c].style.get(P::CaptionSide),
@@ -509,6 +697,12 @@ impl Engine<'_, '_> {
                     let (_, min_width, _) =
                         Resolver::new(n.style, None, extras, n.intrinsic).widths(0.0)?;
                     let min = n.intrinsic.min.max(min_width) + extras;
+                    let specified = column_width(n.style, extras)?;
+                    let percent = match specified {
+                        Some(ColumnWidth::Percent(p)) => Some(p),
+                        _ => None,
+                    };
+                    let fixed = matches!(specified, Some(ColumnWidth::Pixels(_)));
                     cells.push(Cell {
                         node: k,
                         row: index,
@@ -518,6 +712,8 @@ impl Engine<'_, '_> {
                         align: cell_align(n.style),
                         min,
                         max: outer.max.max(min),
+                        percent,
+                        fixed,
                         measure: EMPTY,
                         natural: 0.0,
                         baseline: None,
@@ -535,12 +731,14 @@ impl Engine<'_, '_> {
                 rows: (first, last),
             });
         }
+        let columns = busy.len().max(column_widths.len());
         Ok(Structure {
+            column_widths,
             groups,
             rows,
             cells,
             captions,
-            columns: busy.len(),
+            columns,
         })
     }
 
@@ -554,10 +752,10 @@ impl Engine<'_, '_> {
             let w = widths.iter().sum::<f64>() + gaps(s.columns, space);
             Intrinsic { min: w, max: w }
         } else {
-            let (min, max) = column_bounds(&s.cells, s.columns, space);
+            let b = column_bounds(&s.cells, s.columns, space, &s.column_widths);
             Intrinsic {
-                min: min.iter().sum::<f64>() + gaps(s.columns, space),
-                max: max.iter().sum::<f64>() + gaps(s.columns, space),
+                min: b.min.iter().sum::<f64>() + gaps(s.columns, space),
+                max: max_content(&b) + gaps(s.columns, space),
             }
         };
         for caption in &s.captions {
@@ -602,14 +800,31 @@ impl Engine<'_, '_> {
     ) -> Result<Vec<f64>, FlowError> {
         let available = (width - gaps(s.columns, space)).max(0.0);
         if !fixed_layout(self.nodes[t].style)? {
-            let (min, max) = column_bounds(&s.cells, s.columns, space);
-            return Ok(auto_widths(&min, &max, available));
+            let b = column_bounds(&s.cells, s.columns, space, &s.column_widths);
+            return Ok(auto_widths(&b, available));
         }
         // Fixed layout: the first row's cells with a fixed width set their
         // columns; the other columns share what is left (§17.5.2.1).
         let mut widths: Vec<Option<f64>> = vec![None; s.columns];
         let mut percent = vec![false; s.columns];
+        // Column boxes first, then the first row's cells (§17.5.2.1).
+        for (i, w) in s.column_widths.iter().enumerate().take(s.columns) {
+            widths[i] = match w {
+                Some(ColumnWidth::Pixels(w)) => Some(*w),
+                Some(ColumnWidth::Percent(p)) => {
+                    percent[i] = true;
+                    Some(available * p / 100.0)
+                }
+                None => None,
+            };
+        }
         for c in s.cells.iter().filter(|c| c.row == 0) {
+            if widths[c.column..c.column + c.columns]
+                .iter()
+                .any(Option::is_some)
+            {
+                continue;
+            }
             self.work.charge(1)?;
             let n = &self.nodes[c.node];
             let w = match Sizing::read(n.style, P::Width)? {
@@ -789,6 +1004,7 @@ impl Engine<'_, '_> {
         let mut s = std::mem::replace(
             &mut self.tables[k].structure,
             Structure {
+                column_widths: Vec::new(),
                 groups: Vec::new(),
                 rows: Vec::new(),
                 cells: Vec::new(),
@@ -1006,6 +1222,8 @@ mod tests {
             align: Align::Baseline,
             min,
             max,
+            percent: None,
+            fixed: false,
             measure: EMPTY,
             natural: 0.0,
             baseline: None,
@@ -1019,17 +1237,39 @@ mod tests {
             cell(1, 1, 10.0, 10.0),
             cell(0, 2, 60.0, 100.0),
         ];
-        let (min, max) = column_bounds(&cells, 2, 0.0);
+        let b = column_bounds(&cells, 2, 0.0, &[]);
         // 40 extra minimum shared 30:10; 60 extra maximum the same way.
-        assert_eq!(min, vec![40.0, 20.0]);
-        assert_eq!(max, vec![75.0, 25.0]);
+        assert_eq!(b.min, vec![40.0, 20.0]);
+        assert_eq!(b.max, vec![75.0, 25.0]);
     }
 
     #[test]
     fn automatic_widths_interpolate_then_grow_by_maximums() {
         let (min, max) = ([10.0, 10.0], [30.0, 10.0]);
-        assert_eq!(auto_widths(&min, &max, 15.0), vec![10.0, 10.0]);
-        assert_eq!(auto_widths(&min, &max, 30.0), vec![20.0, 10.0]);
-        assert_eq!(auto_widths(&min, &max, 80.0), vec![60.0, 20.0]);
+        let auto = [false, false];
+        assert_eq!(free_widths(&min, &max, &auto, 15.0), vec![10.0, 10.0]);
+        assert_eq!(free_widths(&min, &max, &auto, 30.0), vec![20.0, 10.0]);
+        assert_eq!(free_widths(&min, &max, &auto, 80.0), vec![60.0, 20.0]);
+        // Auto columns take the excess before fixed ones.
+        assert_eq!(
+            free_widths(&min, &max, &[true, false], 80.0),
+            vec![30.0, 50.0]
+        );
+    }
+
+    #[test]
+    fn percentage_columns_take_their_share_first() {
+        let b = Bounds {
+            min: vec![10.0, 10.0, 10.0],
+            max: vec![20.0, 40.0, 10.0],
+            percent: vec![50.0, 0.0, 0.0],
+            fixed: vec![false; 3],
+        };
+        // 50% of 200 is 100; the other two share 100 by their maximums.
+        assert_eq!(auto_widths(&b, 200.0), vec![100.0, 80.0, 20.0]);
+        // The table's max-content width gives the 20px column its 50%.
+        assert_eq!(max_content(&b), 100.0);
+        // Too little space: the percentage column shrinks first.
+        assert_eq!(auto_widths(&b, 40.0), vec![20.0, 10.0, 10.0]);
     }
 }

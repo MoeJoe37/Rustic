@@ -459,12 +459,7 @@ impl<'module, 'bytes> Instance<'module, 'bytes> {
         cancellation: &CancellationToken,
         dispatch: &mut HostDispatch<'_>,
     ) -> Result<Vec<Value>, ExecutionError> {
-        self.invoke_dispatched(
-            function,
-            arguments,
-            cancellation,
-            Dispatch::Plain(dispatch),
-        )
+        self.invoke_dispatched(function, arguments, cancellation, Dispatch::Plain(dispatch))
     }
 
     /// Invoke a numeric function and expose roots in suspended guest frames to

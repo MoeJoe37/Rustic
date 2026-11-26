@@ -85,7 +85,14 @@ impl Instance<'_, '_> {
 
     /// Read the declared limits of a nullable, module-defined function table.
     pub fn function_table_limits(&self, table: u32) -> Option<Limits> {
-        Some(self.state.borrow().tables.reference_table(table, -16)?.ty.limits)
+        Some(
+            self.state
+                .borrow()
+                .tables
+                .reference_table(table, -16)?
+                .ty
+                .limits,
+        )
     }
 
     /// Read the current length of a nullable function table.
@@ -344,9 +351,7 @@ impl Tables {
         let tables = self
             .tables
             .iter()
-            .filter(|table| {
-                matches!(table.ty.element_type, ValueType::Ref { heap_type: -17, .. })
-            })
+            .filter(|table| matches!(table.ty.element_type, ValueType::Ref { heap_type: -17, .. }))
             .map(|table| &table.entries);
         for entry in tables.chain(&self.elements).flatten() {
             if let Reference::Extern(reference) = *entry {

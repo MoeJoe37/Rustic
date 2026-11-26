@@ -12,7 +12,9 @@ pub(super) const RUNTIME_ERROR: &str = "WebAssembly.RuntimeError";
 pub(super) type Runtime = Instance<'static, 'static>;
 
 fn trace_runtime(state: &dyn Any, mark: &mut dyn FnMut(Value)) {
-    let runtime = state.downcast_ref::<Runtime>().expect("Wasm instance state");
+    let runtime = state
+        .downcast_ref::<Runtime>()
+        .expect("Wasm instance state");
     runtime.visit_external_references(&mut |reference| {
         mark(Value::from_host_identity(reference.identity()));
     });

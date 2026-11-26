@@ -264,7 +264,10 @@ fn get(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
                     Value::from_host_identity(reference.identity())
                 }));
             }
-            Err(agent.throw(ErrorKind::RangeError, "WebAssembly table index out of bounds"))
+            Err(agent.throw(
+                ErrorKind::RangeError,
+                "WebAssembly table index out of bounds",
+            ))
         }
     }
 }

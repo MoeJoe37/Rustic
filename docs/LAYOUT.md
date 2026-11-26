@@ -645,15 +645,25 @@ recursion. A run:
    the row (stretched, or percentages against the grid area);
 5. places items with `justify-self`/`align-self` and auto margins; RTL grids
    mirror columns, and `left`/`right` stay physical. Relative offsets
-   resolve against the grid area.
+   resolve against the grid area. Items with `align-self: baseline` or
+   `last baseline` share a baseline with the others in their start (end)
+   row: each moves by its shim, and the shims count in the rows' sizes
+   (synthesized from the border box without a line box). The run then
+   keeps its line positions and names.
 
 The grid container's intrinsic widths run the column algorithm under min-
-and max-content constraints with limited contributions. `inline-grid`
-containers are atomic inlines whose baseline is their first item line.
+and max-content constraints with limited contributions. A grid container's
+first (last) baseline comes from its first (last) row: the item taking part
+in baseline alignment there, else the first (last) in grid order, so an
+`inline-grid` sits on the line by it. Absolutely positioned descendants
+whose containing block is a grid container use their grid area (CSS Grid 2
+§9.1): their lines resolve against the laid-out grid, and `auto` lines or
+lines outside it are the padding edges; a positioned child without insets
+starts at its area's start corner (§9.2).
 Lines past 10,000 tracks clamp into the last track and placement is
-metered by the flow work budget. Absolutely positioned boxes whose
-containing block is an abspos grid now carry their `min-height`/`max-height`
-into the grid's row sizing.
+metered by the flow work budget. Absolutely positioned grids carry their
+`min-height`/`max-height` into their row sizing, and a `max-*` size below
+the `min-*` size yields to it when auto repetitions are counted.
 
 ### Evidence
 
@@ -661,15 +671,16 @@ into the grid's row sizing.
 shorthand expansion; the pinned WPT `css-grid/parsing` and
 `css-align/parsing` cases joined the `css.conformance` gate (2293 of 2664
 in-scope cases pass, three grid cases reviewed as failures).
-`crates/rustic-layout/tests/grid.rs` has fourteen scenarios with exact
+`crates/rustic-layout/tests/grid.rs` has nineteen scenarios with exact
 geometry (fixed and flexible tracks with gaps, areas and named lines, auto
 placement with spans, dense and column flow, negative lines, intrinsic and
 inline grids, row sizing and stretch, content and self alignment, RTL,
 `auto-fit` collapse, `order`, abspos `min-height`, clamped lines, anonymous
-items); `flow/grid.rs` unit-tests the sizing and placement algorithms
+items, grid-area containing blocks, baseline alignment, inline-grid
+baselines, repetitions against min/max sizes); `flow/grid.rs` unit-tests the sizing and placement algorithms
 directly. `tests/wpt_grid.rs` compares the 168 static `checkLayout` pages
-of the pinned css-grid directory (`tools/import_wpt_grid_tests.py`): 56
-pass and the other 112 are reviewed failures (TD-210).
+of the pinned css-grid directory (`tools/import_wpt_grid_tests.py`): 76
+pass and the other 92 are reviewed failures (TD-210).
 
 Specification basis, reviewed 2026-11-26: CSS Grid Layout 2
 [§6–§11](https://drafts.csswg.org/css-grid-2/) and CSS Box Alignment 3

@@ -12,9 +12,11 @@
 //! Track sizing follows §11.3–§11.8: initialization, intrinsic sizes (single
 //! spans, then growing span groups through "distribute extra space", then
 //! items crossing flexible tracks), maximization, flexible lengths and
-//! stretched `auto` tracks. Limits (subgrid, masonry, baseline alignment,
-//! grid-placed absolutely positioned children, vertical writing modes) are
-//! TD-209; the WPT comparison's reviewed failures are TD-210.
+//! stretched `auto` tracks. Baseline-aligned items share row baselines,
+//! and a finished run keeps its lines so positioned descendants can use
+//! grid areas as containing blocks (§9). Limits (subgrid, masonry, vertical
+//! writing modes) are TD-209; the WPT comparison's reviewed failures are
+//! TD-210.
 
 use rustic_css::{
     AlignKeyword as K, Alignment, Direction, Gap, GridLine, GridTemplate, GridValue,
@@ -139,6 +141,10 @@ struct Item {
     y: f64,
     /// The grid area's size, the item's containing block.
     area: (f64, f64),
+    /// First and last line-box baselines below the content-box top, from
+    /// the latest layout (`None`: synthesized from the border box).
+    first_baseline: Option<f64>,
+    last_baseline: Option<f64>,
 }
 
 impl Item {
@@ -173,9 +179,109 @@ pub(super) struct GridRun {
     /// of the last track, after content alignment.
     column_pos: Vec<f64>,
     row_pos: Vec<f64>,
+    /// Explicit line names per axis and the explicit grid's first line in
+    /// the shifted (implicit) line numbering, for positioned children.
+    column_names: Vec<Vec<String>>,
+    row_names: Vec<Vec<String>>,
+    origin: (i64, i64),
     phase: Phase,
     queue: Vec<Request>,
     current: Option<usize>,
+}
+
+/// One axis of a laid-out grid, for absolutely positioned descendants
+/// whose containing block is the grid container (CSS Grid 2 §9.1).
+#[derive(Clone, Debug, Default)]
+struct AxisLines {
+    /// Where an area starting at each implicit line begins, and where one
+    /// ending at it ends (content-box offsets from the axis start).
+    starts: Vec<f64>,
+    ends: Vec<f64>,
+    names: Vec<Vec<String>>,
+    /// The explicit grid's first line in implicit numbering.
+    origin: i64,
+}
+
+impl AxisLines {
+    fn new(tracks: &[Track], pos: &[f64], names: Vec<Vec<String>>, origin: i64) -> Self {
+        let n = tracks.len();
+        let end_of = |t: usize| pos[t] + tracks[t].base;
+        let last = if n == 0 { 0.0 } else { end_of(n - 1) };
+        Self {
+            starts: (0..=n).map(|l| if l < n { pos[l] } else { last }).collect(),
+            ends: (0..=n)
+                .map(|l| {
+                    if l > 0 {
+                        end_of(l - 1)
+                    } else {
+                        pos.first().copied().unwrap_or(0.0)
+                    }
+                })
+                .collect(),
+            names,
+            origin,
+        }
+    }
+
+    /// The start and end offsets for `start`/`end` lines; `None` is the
+    /// padding edge (`auto`, a span against `auto`, or a line outside the
+    /// grid).
+    fn area(
+        &self,
+        start: &GridLine,
+        end: &GridLine,
+        work: &mut Work<'_>,
+    ) -> Result<(Option<f64>, Option<f64>), FlowError> {
+        let lines = Lines {
+            names: &self.names,
+            count: self.names.len().saturating_sub(1) as i64,
+        };
+        let span = |l: &GridLine| match l {
+            GridLine::Line {
+                span: true,
+                integer,
+                name,
+            } => Some((i64::from(integer.unwrap_or(1)), name.clone())),
+            _ => None,
+        };
+        let mut s = lines.definite(start, false, work)?;
+        let mut e = lines.definite(end, true, work)?;
+        if let (None, Some(e)) = (s, e) {
+            s = match span(start) {
+                Some((n, None)) => Some(e - n),
+                Some((n, Some(name))) => Some(lines.search(e, -1, &name, n, work)?),
+                None => None,
+            };
+        }
+        if let (Some(s), None) = (s, e) {
+            e = match span(end) {
+                Some((n, None)) => Some(s + n),
+                Some((n, Some(name))) => Some(lines.search(s, 1, &name, n, work)?),
+                None => None,
+            };
+        }
+        if let (Some(a), Some(b)) = (s, e) {
+            if a > b {
+                (s, e) = (Some(b), Some(a));
+            } else if a == b {
+                e = Some(a + 1);
+            }
+        }
+        // Explicit numbering to implicit indexes; outside the grid is auto.
+        let at = |line: Option<i64>, list: &[f64]| {
+            line.and_then(|l| usize::try_from(l - self.origin).ok())
+                .and_then(|i| list.get(i).copied())
+        };
+        Ok((at(s, &self.starts), at(e, &self.ends)))
+    }
+}
+
+/// A laid-out grid's lines, kept for its positioned descendants.
+#[derive(Clone, Debug, Default)]
+pub(super) struct GridGeometry {
+    columns: AxisLines,
+    rows: AxisLines,
+    rtl: bool,
 }
 
 fn grid_value(style: &ComputedStyle, p: P) -> Result<&GridValue, FlowError> {
@@ -1150,18 +1256,90 @@ fn area_size(tracks: &[Track], range: (usize, usize), gap: f64) -> f64 {
 }
 
 /// Resolve `normal`/`auto`/`legacy` self alignment: replaced boxes start,
-/// everything else stretches.
-fn self_alignment(a: Alignment, replaced: bool) -> Alignment {
+/// everything else stretches. Baseline alignment applies in the block axis
+/// (`block`); in the inline axis of a `horizontal-tb` grid it falls back to
+/// `start`.
+fn self_alignment(a: Alignment, replaced: bool, block: bool) -> Alignment {
     match a.keyword {
         K::Normal | K::Auto | K::Legacy if replaced => Alignment::new(K::Start),
         K::Normal | K::Auto | K::Legacy => Alignment::new(K::Stretch),
         K::LegacyLeft => Alignment::new(K::Left),
         K::LegacyRight => Alignment::new(K::Right),
         K::LegacyCenter => Alignment::new(K::Center),
-        // Baseline self-alignment falls back to start (TD-209).
+        K::Baseline | K::LastBaseline if block => a,
         K::Baseline | K::LastBaseline => Alignment::new(K::Start),
         _ => a,
     }
+}
+
+/// The distance from an item's margin-box top to its first (or last)
+/// baseline, given its content height; without a line box the baseline is
+/// synthesized from the border box's bottom edge.
+fn ascent(item: &Item, height: f64, last: bool) -> f64 {
+    let top = item.margin.top.get() + item.border.top.get() + item.padding.top.get();
+    match if last {
+        item.last_baseline
+    } else {
+        item.first_baseline
+    } {
+        Some(b) => top + b,
+        None => item.margin.top.get() + item.vertical_extras() + height,
+    }
+}
+
+/// Baseline shims (CSS Box Alignment 3 §9.3, CSS Grid 2 §11.5 step 1):
+/// items sharing a first-baseline group (their start row) move down to
+/// the group's largest ascent; last-baseline items (by end row) keep the
+/// group's largest descent below their baseline. Returns each item's shim.
+fn baseline_shims(items: &[Item], heights: &[f64]) -> Vec<f64> {
+    let outer = |i: usize| {
+        let item = &items[i];
+        heights[i] + item.vertical_extras() + item.margin.top.get() + item.margin.bottom.get()
+    };
+    let mut shims = vec![0.0; items.len()];
+    for (keyword, last) in [(K::Baseline, false), (K::LastBaseline, true)] {
+        let group = |item: &Item| if last { item.rows.1 } else { item.rows.0 };
+        let measure = |i: usize| {
+            let a = ascent(&items[i], heights[i], last);
+            if last { outer(i) - a } else { a }
+        };
+        let members: Vec<usize> = (0..items.len())
+            .filter(|&i| items[i].align.keyword == keyword)
+            .collect();
+        for &i in &members {
+            let most = members
+                .iter()
+                .filter(|&&j| group(&items[j]) == group(&items[i]))
+                .map(|&j| measure(j))
+                .fold(f64::NEG_INFINITY, f64::max);
+            shims[i] = (most - measure(i)).max(0.0);
+        }
+    }
+    shims
+}
+
+/// A grid container's first (or last) baseline below its content-box top
+/// (CSS Grid 2 §10.8): from the first (last) row with items, the item
+/// taking part in baseline alignment there, else the first (last) in grid
+/// order; `None` without items.
+fn container_baseline(items: &[Item], last: bool) -> Option<f64> {
+    let row = |i: &Item| if last { i.rows.1 } else { i.rows.0 };
+    let edge = if last {
+        items.iter().map(row).max()?
+    } else {
+        items.iter().map(row).min()?
+    };
+    let keyword = if last { K::LastBaseline } else { K::Baseline };
+    let mut in_row: Vec<&Item> = items.iter().filter(|i| row(i) == edge).collect();
+    in_row.sort_by_key(|i| i.columns.0);
+    if last {
+        in_row.reverse();
+    }
+    let chosen = in_row
+        .iter()
+        .find(|i| i.align.keyword == keyword)
+        .or_else(|| in_row.first())?;
+    Some(chosen.y + ascent(chosen, chosen.height, last))
 }
 
 /// Offset of a box in its area for a self-alignment value.
@@ -1274,13 +1452,14 @@ impl Engine<'_, '_> {
             let next = child.end;
             if matches!(child.scheme, Scheme::Absolute | Scheme::Fixed) {
                 if queue_absolute {
-                    // Static position: the content box's start corner
-                    // (grid-area containing blocks are TD-209).
+                    // Static position: the start corner of an area whose
+                    // edges are the padding edges (CSS Grid 2 §9.2).
+                    let m = self.nodes[c].measure;
                     let x = match direction {
-                        Direction::Ltr => 0.0,
-                        Direction::Rtl => width.unwrap_or(0.0),
+                        Direction::Ltr => -m.padding.left.get(),
+                        Direction::Rtl => width.unwrap_or(0.0) + m.padding.right.get(),
                     };
-                    self.nodes[i].static_pos = (x, 0.0);
+                    self.nodes[i].static_pos = (x, -m.padding.top.get());
                     self.push_absolute(i);
                 }
                 i = next;
@@ -1342,8 +1521,8 @@ impl Engine<'_, '_> {
                     node: i,
                     columns: (0, 0),
                     rows: (0, 0),
-                    justify: self_alignment(justify, replaced),
-                    align: self_alignment(align, replaced),
+                    justify: self_alignment(justify, replaced, false),
+                    align: self_alignment(align, replaced, true),
                     padding: Edges::default(),
                     border: Edges::default(),
                     margin: Edges::default(),
@@ -1355,6 +1534,8 @@ impl Engine<'_, '_> {
                     x: 0.0,
                     y: 0.0,
                     area: (0.0, 0.0),
+                    first_baseline: None,
+                    last_baseline: None,
                 },
             ));
             i = next;
@@ -1463,10 +1644,70 @@ impl Engine<'_, '_> {
             align_content: alignment(style, P::AlignContent)?,
             column_pos: Vec::new(),
             row_pos: Vec::new(),
+            column_names: columns.names.clone(),
+            row_names: rows.names.clone(),
+            origin: (c0, r0),
             phase: Phase::Measure,
             queue: Vec::new(),
             current: None,
         })
+    }
+
+    /// The containing block an absolutely positioned box gets from grid
+    /// container `c` (CSS Grid 2 §9.1), as (x, y, width, height) in `c`'s
+    /// padding box; `None` if `c` is not a laid-out grid.
+    pub(super) fn grid_area_rect(
+        &mut self,
+        c: usize,
+        style: &ComputedStyle,
+    ) -> Result<Option<(f64, f64, f64, f64)>, FlowError> {
+        let Some(geometry) = self.grid_geometry.get(&c).cloned() else {
+            return Ok(None);
+        };
+        let line = |p| -> Result<GridLine, FlowError> {
+            match grid_value(style, p)? {
+                GridValue::Line(l) => Ok(l.clone()),
+                _ => Err(FlowError::InvalidSnapshot),
+            }
+        };
+        let (x0, x1) = geometry.columns.area(
+            &line(P::GridColumnStart)?,
+            &line(P::GridColumnEnd)?,
+            &mut self.work,
+        )?;
+        let (y0, y1) = geometry.rows.area(
+            &line(P::GridRowStart)?,
+            &line(P::GridRowEnd)?,
+            &mut self.work,
+        )?;
+        let n = &self.nodes[c];
+        let m = n.measure;
+        let (pl, pr, pt, pb) = (
+            m.padding.left.get(),
+            m.padding.right.get(),
+            m.padding.top.get(),
+            m.padding.bottom.get(),
+        );
+        let content_w = m.content_width.get();
+        let full_w = pl + content_w + pr;
+        let full_h = pt + n.content_height.get() + pb;
+        let (left, right) = if geometry.rtl {
+            // Logical offsets run leftwards from the content box's right edge.
+            (
+                x1.map_or(0.0, |e| pl + content_w - e),
+                x0.map_or(full_w, |s| pl + content_w - s),
+            )
+        } else {
+            (x0.map_or(0.0, |s| pl + s), x1.map_or(full_w, |e| pl + e))
+        };
+        let top = y0.map_or(0.0, |s| pt + s);
+        let bottom = y1.map_or(full_h, |e| pt + e);
+        Ok(Some((
+            left,
+            top,
+            (right - left).max(0.0),
+            (bottom - top).max(0.0),
+        )))
     }
 
     /// An item's inline-axis contributions from its intrinsic sizes.
@@ -1532,7 +1773,7 @@ impl Engine<'_, '_> {
         let r = Resolver::new(style, None, extras, Intrinsic::default());
         let (_, minimum, maximum) = r.widths(0.0)?;
         let columns = RepeatSpace {
-            fit: maximum,
+            fit: maximum.map(|m| m.max(minimum)),
             fill: (minimum > 0.0).then_some(minimum),
         };
         let mut run = self.grid_setup(i, None, None, columns, RepeatSpace::default(), false)?;
@@ -1574,8 +1815,11 @@ impl Engine<'_, '_> {
                 fit: Some(h),
                 fill: None,
             },
+            // A maximum below the minimum yields to it (CSS 2.2 §10.7).
             None => RepeatSpace {
-                fit: constraint.maximum().map(CssPx::get),
+                fit: constraint
+                    .maximum()
+                    .map(|m| m.get().max(constraint.minimum().get())),
                 fill: Some(constraint.minimum().get()).filter(|&m| m > 0.0),
             },
         };
@@ -1744,6 +1988,11 @@ impl Engine<'_, '_> {
             return Err(FlowError::InvalidSnapshot);
         }
         run.items[item].natural = natural;
+        let first = self.content_baseline(node, false)?;
+        let last = self.content_baseline(node, true)?;
+        let entry = &mut self.grids[k].items[item];
+        entry.first_baseline = first;
+        entry.last_baseline = last;
         Ok(())
     }
 
@@ -1751,19 +2000,27 @@ impl Engine<'_, '_> {
     /// height differs from the measured one.
     fn grid_rows(&mut self, k: usize) -> Result<(), FlowError> {
         let count = self.grids[k].items.len();
-        let mut contributions = Vec::with_capacity(count);
+        let mut heights = Vec::with_capacity(count);
         for idx in 0..count {
             self.work.charge(1)?;
             let item = self.grids[k].items[idx];
             let n = &self.nodes[item.node];
             let extras = item.vertical_extras();
             let constraint = HeightConstraint::new(n.style, None, CssPx::new(extras)?)?;
-            let used = match item.laid {
+            heights.push(match item.laid {
                 Some(h) => h,
                 None => constraint.used(CssPx::new(item.natural.max(0.0))?).get(),
-            };
+            });
+        }
+        let shims = baseline_shims(&self.grids[k].items, &heights);
+        let mut contributions = Vec::with_capacity(count);
+        for idx in 0..count {
+            let item = self.grids[k].items[idx];
+            let n = &self.nodes[item.node];
+            let extras = item.vertical_extras();
             let margins = item.margin.top.get() + item.margin.bottom.get();
-            let outer = used + extras + margins;
+            // Baseline-aligned items contribute their shim too.
+            let outer = heights[idx] + extras + margins + shims[idx];
             let minimum = match Sizing::read(n.style, P::MinHeight)? {
                 Sizing::Initial if scrolls(n.overflow.1) => extras + margins,
                 _ => outer,
@@ -1884,7 +2141,9 @@ impl Engine<'_, '_> {
         let columns = run.columns.clone();
         let rows = run.rows.clone();
         let mut items = run.items.clone();
-        for item in &mut items {
+        let heights: Vec<f64> = items.iter().map(|i| i.height).collect();
+        let shims = baseline_shims(&items, &heights);
+        for (item, &shim) in items.iter_mut().zip(&shims) {
             self.work.charge(1)?;
             let area_w = area_from(&xs, &columns, item.columns);
             let area_h = area_from(&ys, &rows, item.rows);
@@ -1933,7 +2192,11 @@ impl Engine<'_, '_> {
                 }
                 0.0
             } else {
-                self_offset(item.align, free_h)
+                match item.align.keyword {
+                    K::Baseline => shim,
+                    K::LastBaseline => free_h - shim,
+                    _ => self_offset(item.align, free_h),
+                }
             };
             // Columns are laid out from the inline start; mirror in RTL.
             let x = if rtl {
@@ -1972,6 +2235,29 @@ impl Engine<'_, '_> {
             }
         }
         self.grids[k].items = items;
+        let run = &mut self.grids[k];
+        let geometry = GridGeometry {
+            columns: AxisLines::new(
+                &run.columns,
+                &run.column_pos,
+                std::mem::take(&mut run.column_names),
+                run.origin.0,
+            ),
+            rows: AxisLines::new(
+                &run.rows,
+                &run.row_pos,
+                std::mem::take(&mut run.row_names),
+                run.origin.1,
+            ),
+            rtl,
+        };
+        let container = run.container;
+        self.grid_geometry.insert(container, geometry);
+        let baselines = (
+            container_baseline(&self.grids[k].items, false),
+            container_baseline(&self.grids[k].items, true),
+        );
+        self.nodes[container].grid_baselines = Some(baselines);
         Ok(natural)
     }
 }

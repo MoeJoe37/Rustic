@@ -266,8 +266,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M10 |
 | TD-200 | Deliberate | WebAssembly | The progressive decoder pulls response chunks and compiles in an agent promise reaction | Partly paid by ADR 0094, M9 |
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
-| TD-209 | Deliberate | Layout | Grid subset: no subgrid or masonry, baseline self-alignment falls back to `start`, absolutely positioned children use the content-box start corner instead of grid areas, `horizontal-tb` only, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
-| TD-210 | Deliberate | Layout | css-grid WPT comparison: 112 of 168 static pages fail, every one reviewed (baseline, writing modes, masonry, grid-placed abspos, subgrid, Ahem text) | Open, `layout.grid` (M9) |
+| TD-209 | Deliberate | Layout | Grid subset: no subgrid or masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
+| TD-210 | Deliberate | Layout | css-grid WPT comparison: 92 of 168 static pages fail, every one reviewed (writing modes, masonry, subgrid, logical properties, Ahem text) | Open, `layout.grid` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3425,37 +3425,31 @@ reference-valued calls and globals.
 
 ### TD-209 — Grid layout subset
 
-`layout.grid` implements placement, the track sizing algorithm and box
-alignment for `horizontal-tb` grids. Not implemented: `subgrid` and masonry
-(`grid-lanes`, which are not parsed), baseline self-alignment (`baseline`
-and `last baseline` behave as `start`, and grid containers take the first
-in-flow line box as their baseline), and grid areas as containing blocks
-for absolutely positioned children (they use the grid container's
-content-box start corner as the static position, the TD-49 approximation
-flex uses). Auto repetitions count against definite sizes, fixed
-`max-*`/`min-*` sizes and the used height constraint, but not against
-percentage `max-width` while the container's own intrinsic size is
-computed. Implicit lines named on both sides of the explicit grid are
-counted from the explicit grid only. Grid properties are not animatable
-(they interpolate discretely). `inline-size`/`block-size`, `width: stretch`
-and `overflow: clip` next to `hidden` affect a few WPT pages through other
-subsystems.
-**Pay:** baseline sharing groups and grid-area abspos containing blocks
-first (26 and 17 WPT pages), then subgrid, with writing modes (`text.writing`)
-for the vertical pages.
+`layout.grid` implements placement, the track sizing algorithm, box
+alignment including baseline self-alignment in the block axis, grid areas
+as containing blocks for positioned descendants, and grid container
+baselines, for `horizontal-tb` grids. Not implemented: `subgrid` and
+masonry (`grid-lanes`, which are not parsed), vertical writing modes (so
+`justify-self: baseline` falls back to `start`), and baseline groups across
+items spanning several rows beyond their start or end row. Auto repetitions
+do not count against percentage `max-width` while the container's own
+intrinsic size is computed, and implicit lines named on both sides of the
+explicit grid are counted from the explicit grid only. Grid properties
+interpolate discretely. Logical properties (`inline-size`, `margin-block`,
+...), `aspect-ratio`, `width: stretch`, generated content and `overflow:
+clip` next to `hidden` affect a few WPT pages through other subsystems.
+**Pay:** subgrid next, then the vertical pages with writing modes
+(`text.writing`).
 
 ### TD-210 — css-grid WPT comparison failures
 
 `tests/wpt_grid.rs` lays out the 168 static `checkLayout` pages that
 `tools/import_wpt_grid_tests.py` extracts from the pinned css-grid directory
-and compares every element's expectations. 56 pass. Each of the other 112 is
-listed in `fixtures/wpt-grid/expected_failures.txt` with its reason: 26
-baseline alignment, 24 vertical writing modes, 20 masonry, 17 grid-placed
-absolutely positioned items, 14 subgrid, and 11 single causes (Ahem
-`::first-letter`/`::first-line` text, logical sizing properties, table and
-form-control items, unread expectation attributes). Rustic's bundled test
-fonts have no Ahem, so pages measuring Ahem text can only pass once the
-harness bundles it. The list is a ratchet: a listed page that passes fails
-the test.
+and compares every element's expectations. 76 pass. Each of the other 92 is
+listed in `fixtures/wpt-grid/expected_failures.txt` with its reason: 41
+vertical writing modes, 20 masonry, 13 subgrid, 7 logical properties, and
+11 single causes (Ahem `::first-letter`/`::first-line` text, form-control
+items, generated content, `aspect-ratio`, unread expectation attributes and
+the TD-209 edge cases). Rustic's bundled test fonts have no Ahem. The list
+is a ratchet: a listed page that passes fails the test.
 **Pay:** shrink the list with TD-209; bundle Ahem in the test fonts.
-

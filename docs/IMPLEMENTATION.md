@@ -29,10 +29,11 @@ properties and shorthands and the remaining box alignment values
 (`justify-items`, `justify-self`, `place-*`). Abspos boxes pass their
 min/max heights to flex and grid containers. Evidence: exact-geometry tests
 in `rustic-layout/tests/grid.rs`, unit tests of the sizing and placement
-algorithms, the pinned css-grid `checkLayout` comparison (56 of 168 pages,
-the rest reviewed, TD-210) and 1055 new in-scope WPT parsing cases. Three of
-the capability's five steps are complete; baseline alignment, grid-area
-containing blocks and subgrid remain (TD-209). Guide:
+algorithms, the pinned css-grid `checkLayout` comparison (76 of 168 pages,
+the rest reviewed, TD-210) and 1055 new in-scope WPT parsing cases. Baseline
+self-alignment, grid container baselines and grid areas as containing blocks
+for positioned descendants followed on 2026-11-26. Four of the capability's
+five steps are complete; subgrid remains (TD-209). Guide:
 [layout](LAYOUT.md#grid-layoutgrid-m9).
 
 ## CSS-09 — Animations and modern CSS

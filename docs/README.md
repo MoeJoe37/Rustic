@@ -102,7 +102,7 @@ an earlier one's "remaining" notes.
 | Scripted Window | Pinned upstream `testharness.js` selection covering DOM, CSSOM, encoding, URL, Blob/Fetch and Wasm. [Exact Window baseline](SCRIPTING.md#pinned-window-web-platform-tests) |
 | DOM | 25,230 pre-insert combinations against a specification oracle; seeded model tests |
 | CSS | 8,041 color cases; 1,115 of 1,455 in-scope pinned WPT parsing cases with a reasoned ratchet |
-| Layout and paint | Exact-geometry tests, checked reftests, 38 of 91 static css-flexbox and 56 of 168 static css-grid WPT pages |
+| Layout and paint | Exact-geometry tests, checked reftests, 38 of 91 static css-flexbox and 76 of 168 static css-grid WPT pages |
 | Text | Shaping compared against 30 committed HarfBuzz reference cases |
 | JavaScript | Pinned Test262: all 23,123 `test/language` files parse as required. Pass counts are 21,939 of 22,427 language files (97.8%), 17,739 of 18,861 gated built-ins files (94.1%), 1,240 of 1,326 gated `intl402` files (93.5%) and all 696 executed module files. Eight benchmark workloads have pinned checksums and a committed heap-size report |
 | Scripted documents | Deterministic turn-order, timer, input and frame tests on a manual clock. Binding tests cover identity, reentrancy, failure atomicity and collection of detached DOM/JS cycles |

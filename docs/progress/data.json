@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d8fd1cb2a6461c58a8c201e6027620e14346a402baa0d7fd227442e1c2cbc329",
-  "percent": "51.34",
+  "source_fingerprint": "95f528e446fa7b490cfe1b5891519ee20660b6e4aa9ce3d2e4eb638119d6d4df",
+  "percent": "51.45",
   "verified_percent": "49.65",
-  "partial_percent": "1.69",
+  "partial_percent": "1.80",
   "completed": 117,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 4,
       "total": 54,
-      "percent": "8.83",
+      "percent": "9.35",
       "verified_percent": "5.36",
-      "partial_percent": "3.47"
+      "partial_percent": "3.99"
     },
     {
       "id": "M10",
@@ -2934,9 +2934,30 @@
               ]
             },
             {
-              "label": "Baseline self-alignment and grid-placed absolutely positioned items (TD-209)",
-              "status": "planned",
-              "evidence": []
+              "label": "Baseline self-alignment and grid-placed absolutely positioned items",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/grid.rs",
+                  "marker": "fn baseline_shims("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn baseline_aligned_items_share_a_row_baseline"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/grid.rs",
+                  "marker": "fn grid_area_rect("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn grid_areas_are_containing_blocks_for_positioned_children"
+                }
+              ]
             },
             {
               "label": "Subgrid (TD-209)",
@@ -2944,7 +2965,7 @@
               "evidence": []
             }
           ],
-          "credit": "60.00",
+          "credit": "80.00",
           "engine_share": "0.58"
         },
         {
@@ -2992,10 +3013,10 @@
       "completed": 6,
       "in_progress": 1,
       "total": 11,
-      "contribution": "3.41",
-      "percent": "56.86",
+      "contribution": "3.52",
+      "percent": "58.82",
       "verified_percent": "50.98",
-      "partial_percent": "5.88"
+      "partial_percent": "7.84"
     },
     {
       "id": "paint",

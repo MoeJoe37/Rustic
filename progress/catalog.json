@@ -2666,9 +2666,30 @@
               ]
             },
             {
-              "label": "Baseline self-alignment and grid-placed absolutely positioned items (TD-209)",
-              "status": "planned",
-              "evidence": []
+              "label": "Baseline self-alignment and grid-placed absolutely positioned items",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/grid.rs",
+                  "marker": "fn baseline_shims("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn baseline_aligned_items_share_a_row_baseline"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/grid.rs",
+                  "marker": "fn grid_area_rect("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/grid.rs",
+                  "marker": "fn grid_areas_are_containing_blocks_for_positioned_children"
+                }
+              ]
             },
             {
               "label": "Subgrid (TD-209)",

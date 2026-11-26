@@ -280,3 +280,117 @@ fn text_in_a_grid_is_an_anonymous_item() {
     assert_eq!(b["b"].0, 30.0);
     assert_eq!(b["g"].3, 10.0);
 }
+
+#[test]
+fn grid_areas_are_containing_blocks_for_positioned_children() {
+    let style = ".g { position: relative; display: grid; width: 300px; height: 100px;
+                      padding: 10px; grid-template-columns: 100px 50px; grid-template-rows: 40px;
+                      column-gap: 20px }
+                 .g > div { position: absolute; width: 100%; height: 100%; top: 0; left: 0 }";
+    let b = boxes(&page(
+        style,
+        "<div class=g id=g>\
+           <div id=a style='grid-column: 2 / 3; grid-row: 1 / 2'></div>\
+           <div id=b style='grid-column: auto; grid-row: auto'></div>\
+           <div id=c style='grid-column: 2 / auto; grid-row: 1 / auto'></div>\
+           <div id=d style='grid-column: 9 / 12'></div>\
+         </div>",
+    ));
+    // Area of column 2, row 1: x = padding 10 + 100 + gap 20.
+    assert_eq!(b["a"], (130.0, 10.0, 50.0, 40.0));
+    // `auto` lines are the padding edges.
+    assert_eq!(b["b"], (0.0, 0.0, 320.0, 120.0));
+    assert_eq!(b["c"], (130.0, 10.0, 190.0, 110.0));
+    // An omitted end line and lines outside the grid are `auto`.
+    assert_eq!(b["d"], (0.0, 0.0, 320.0, 120.0));
+}
+
+#[test]
+fn positioned_grid_children_without_insets_start_at_their_area() {
+    let b = boxes(&page(
+        ".g { position: relative; display: grid; width: 200px; grid-template-columns: 60px 60px;
+              grid-template-rows: 30px 30px }
+         #a { position: absolute; width: 5px; height: 5px; grid-area: 2 / 2 }",
+        "<div class=g><div id=a></div></div>",
+    ));
+    assert_eq!(b["a"], (60.0, 30.0, 5.0, 5.0));
+    // RTL: column 1 is at the right.
+    let b = boxes(&page(
+        ".g { position: relative; display: grid; direction: rtl; width: 200px;
+              grid-template-columns: 60px 60px; grid-template-rows: 30px }
+         #a { position: absolute; left: 0; right: 0; height: 5px; grid-column: 1 / 2 }",
+        "<div class=g><div id=a></div></div>",
+    ));
+    assert_eq!(b["a"], (140.0, 0.0, 60.0, 5.0));
+}
+
+#[test]
+fn baseline_aligned_items_share_a_row_baseline() {
+    // Same font, so the text baselines line up when the item without top
+    // padding moves down by 20px; the row grows by the shim.
+    let b = boxes(&page(
+        ".g { display: grid; grid-template-columns: 50px 50px; align-items: baseline;
+              font: 10px/10px sans-serif }
+         #a { padding-top: 20px }",
+        "<div class=g id=g><div id=a>x</div><div id=b>y</div></div>",
+    ));
+    assert_eq!(b["a"], (0.0, 0.0, 50.0, 30.0));
+    assert_eq!(b["b"], (50.0, 20.0, 50.0, 10.0));
+    assert_eq!(b["g"].3, 30.0);
+    // Without line boxes the baseline is the border box's bottom edge.
+    let b = boxes(&page(
+        ".g { display: grid; grid-template-columns: 50px 50px }
+         #a { height: 40px; align-self: baseline } #b { height: 10px; align-self: baseline }",
+        "<div class=g><div id=a></div><div id=b></div></div>",
+    ));
+    assert_eq!(b["b"].1, 30.0);
+    // `last baseline` keeps the largest descent below the shared baseline.
+    let b = boxes(&page(
+        ".g { display: grid; grid-template-columns: 50px 50px; grid-template-rows: 60px;
+              align-items: last baseline; font: 10px/10px sans-serif }
+         #a { padding-bottom: 15px }",
+        "<div class=g><div id=a>x</div><div id=b>y</div></div>",
+    ));
+    assert_eq!(b["a"], (0.0, 35.0, 50.0, 25.0));
+    assert_eq!(b["b"], (50.0, 35.0, 50.0, 10.0));
+}
+
+#[test]
+fn an_inline_grid_takes_its_baseline_from_its_first_row() {
+    // The first row's baseline-aligned item is 50px tall with no text, so
+    // the grid's baseline is 50px below its top: the 10px box beside it on
+    // the line ends there.
+    let b = boxes(&page(
+        "div { line-height: 0 } .g { display: inline-grid; grid-auto-flow: column }
+         #i1 { width: 30px; height: 100px } #i2 { width: 30px; height: 50px; align-self: baseline }
+         #x { display: inline-block; width: 10px; height: 10px }",
+        "<div><span id=x></span><span class=g id=g><div id=i1></div><div id=i2></div></span></div>",
+    ));
+    assert_eq!(b["x"].1, 40.0);
+    assert_eq!(b["g"].1, 0.0);
+}
+
+#[test]
+fn auto_repetitions_count_against_min_and_max_sizes() {
+    // No definite height: repetitions fit the max height, but a smaller
+    // max yields to the min height (130px fits two 50px rows and a gap).
+    let style = ".g { display: grid; grid-template-rows: repeat(auto-fill, 50px); row-gap: 20px;
+                      grid-auto-columns: 10px }
+                 #a { grid-row: -2 }";
+    let b = boxes(&page(
+        &format!("{style} .g {{ max-height: 130px }}"),
+        "<div class=g><div id=a></div></div>",
+    ));
+    assert_eq!(b["a"].1, 70.0);
+    let b = boxes(&page(
+        &format!("{style} .g {{ max-height: 60px; min-height: 130px }}"),
+        "<div class=g><div id=a></div></div>",
+    ));
+    assert_eq!(b["a"].1, 70.0);
+    // Only a min height: the fewest repetitions that fill it (three).
+    let b = boxes(&page(
+        &format!("{style} .g {{ min-height: 130px }}"),
+        "<div class=g><div id=a></div></div>",
+    ));
+    assert_eq!(b["a"].1, 140.0);
+}

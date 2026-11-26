@@ -283,6 +283,9 @@ struct Node<'a> {
     grid_container: bool,
     /// An in-flow child of a grid container.
     grid_item: bool,
+    /// A laid-out grid container's first and last baselines below its
+    /// content-box top (CSS Grid 2 §10.8).
+    grid_baselines: Option<(Option<f64>, Option<f64>)>,
     /// Already in [`Engine::absolute`] (flex items can be laid out twice).
     queued: bool,
     // Results of the current layout attempt.
@@ -514,6 +517,8 @@ struct Engine<'a, 'c> {
     flexes: Vec<flex::FlexRun>,
     /// Grid containers being laid out, innermost last.
     grids: Vec<grid::GridRun>,
+    /// Final lines of laid-out grid containers, for positioned descendants.
+    grid_geometry: HashMap<usize, grid::GridGeometry>,
     ifcs: Vec<Ifc<'a>>,
     /// Lines per inline formatting context, relative to its content origin.
     line_sets: Vec<Option<LineSet>>,
@@ -657,6 +662,7 @@ fn new_node<'a>(
             BoxKind::Element(Display::Grid | Display::InlineGrid)
         ),
         grid_item,
+        grid_baselines: None,
         queued: false,
         measure: BlockMeasure {
             content_width: CssPx::ZERO,
@@ -1706,6 +1712,10 @@ impl<'a, 'c> Engine<'a, 'c> {
         i: usize,
         last: bool,
     ) -> Result<Option<f64>, FlowError> {
+        // A grid container's baselines come from its rows, not preorder.
+        if let Some((first, last_baseline)) = self.nodes[i].grid_baselines {
+            return Ok(if last { last_baseline } else { first });
+        }
         let end = self.nodes[i].end;
         let len = end - i;
         for step in 0..len {
@@ -2162,9 +2172,25 @@ impl<'a, 'c> Engine<'a, 'c> {
         }
         let region = anchored.as_ref().and_then(|(_, region)| *region);
         let style: &ComputedStyle = anchored.as_ref().map_or(base, |(style, _)| style);
-        let (width, height, offset) = match region {
-            Some(r) => (r.rect.width, r.rect.height, (r.rect.x, r.rect.y)),
-            None => (width, height, (0.0, 0.0)),
+        // A grid container's positioned descendants take their grid area
+        // as the containing block (CSS Grid 2 §9.1).
+        let grid_area = match (region, containing) {
+            (None, Some(c)) if self.nodes[c].grid_container => self.grid_area_rect(c, style)?,
+            _ => None,
+        };
+        let (width, height, offset) = match (region, grid_area) {
+            (Some(r), _) => (r.rect.width, r.rect.height, (r.rect.x, r.rect.y)),
+            (None, Some((x, y, w, h))) => (w, h, (x, y)),
+            (None, None) => (width, height, (0.0, 0.0)),
+        };
+        // A grid child's static position is its area's start corner, as if
+        // it were the area's sole item (CSS Grid 2 §9.2).
+        let (static_x, static_y) = match grid_area {
+            Some((x, y, w, _)) if parent == containing => {
+                let rtl = containing_direction == Direction::Rtl;
+                (if rtl { x + w } else { x }, y)
+            }
+            _ => (static_x, static_y),
         };
         let cx = AbsoluteContext {
             width,
@@ -2330,6 +2356,7 @@ impl BlockLayout {
             absolute: Vec::new(),
             flexes: Vec::new(),
             grids: Vec::new(),
+            grid_geometry: HashMap::new(),
             work,
             ifcs,
             line_sets,

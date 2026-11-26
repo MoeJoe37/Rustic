@@ -36,6 +36,11 @@ for positioned descendants followed on 2026-11-26. Four of the capability's
 five steps are complete; subgrid remains (TD-209). Guide:
 [layout](LAYOUT.md#grid-layoutgrid-m9).
 
+The extra computed-style longhands raise script allocation enough that the
+pinned Window WPT run collects detached documents earlier, so one more
+`Node-replaceChild` subtest stays under the 16-document cap and passes. The
+full Window selection now has 1,290 passes and 78 expected failures.
+
 ## CSS-09 — Animations and modern CSS
 
 `rustic_style::AnimationController` holds a document's animations and

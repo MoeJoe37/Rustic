@@ -21,6 +21,7 @@ use std::{collections::HashMap, error::Error, fmt};
 
 mod flex;
 mod grid;
+mod table;
 
 use crate::anchor;
 use crate::exclusions::{Exclusions, Side};
@@ -286,6 +287,10 @@ struct Node<'a> {
     /// A laid-out grid container's first and last baselines below its
     /// content-box top (CSS Grid 2 §10.8).
     grid_baselines: Option<(Option<f64>, Option<f64>)>,
+    /// The box's table role, if any.
+    table: Option<table::TablePart>,
+    /// HTML `colspan`/`rowspan` of a table cell.
+    span: (u32, u32),
     /// Already in [`Engine::absolute`] (flex items can be laid out twice).
     queued: bool,
     // Results of the current layout attempt.
@@ -384,6 +389,8 @@ struct Frame {
     flex: Option<usize>,
     /// For a grid container, its run in [`Engine::grids`].
     grid: Option<usize>,
+    /// For a table, its run in [`Engine::tables`].
+    table: Option<usize>,
 }
 
 fn direction(style: &ComputedStyle) -> Result<Direction, FlowError> {
@@ -455,7 +462,21 @@ fn supported_box(b: &BoxSnapshot) -> Result<&ComputedStyle, FlowError> {
     }
     if !matches!(
         b.kind(),
-        BoxKind::Element(Display::Block | Display::FlowRoot | Display::Flex | Display::Grid)
+        BoxKind::Element(
+            Display::Block
+                | Display::FlowRoot
+                | Display::Flex
+                | Display::Grid
+                | Display::Table
+                | Display::TableCaption
+                | Display::TableRowGroup
+                | Display::TableHeaderGroup
+                | Display::TableFooterGroup
+                | Display::TableRow
+                | Display::TableCell
+                | Display::TableColumn
+                | Display::TableColumnGroup
+        )
     ) {
         return Err(fail(UnsupportedFlow::FormattingContext));
     }
@@ -521,6 +542,8 @@ struct Engine<'a, 'c> {
     grid_geometry: HashMap<usize, grid::GridGeometry>,
     /// Subgrids' links to their parent grids, by subgrid node.
     subgrids: HashMap<usize, grid::Subgrid>,
+    /// Tables being laid out, innermost last.
+    tables: Vec<table::TableRun>,
     ifcs: Vec<Ifc<'a>>,
     /// Lines per inline formatting context, relative to its content origin.
     line_sets: Vec<Option<LineSet>>,
@@ -583,9 +606,30 @@ fn build_nodes<'a>(
         let style = supported_box(b)?;
         let node = new_node(&nodes, source, b, style, parent, depth)?;
         nodes.push(node);
+        check_table_parent(&nodes, nodes.len() - 1)?;
         index.push(Some(nodes.len() - 1));
     }
     Ok(nodes)
+}
+
+/// Refuse table structure that would need anonymous table boxes (CSS
+/// Tables 3 §3.9, TD-211): a table part outside its proper parent, or other
+/// content directly inside a table, row group, row or column group.
+fn check_table_parent(nodes: &[Node<'_>], index: usize) -> Result<(), FlowError> {
+    let n = &nodes[index];
+    let parent = n.parent.and_then(|p| nodes[p].table);
+    let fits = match n.table {
+        Some(part) => part.fits_in(parent),
+        None => !parent.is_some_and(table::TablePart::needs_proper_children),
+    };
+    if fits {
+        Ok(())
+    } else {
+        Err(FlowError::Unsupported {
+            node: n.node,
+            reason: UnsupportedFlow::FormattingContext,
+        })
+    }
 }
 
 /// A flow node for a supported block box (or an anonymous block).
@@ -665,6 +709,11 @@ fn new_node<'a>(
         ),
         grid_item,
         grid_baselines: None,
+        table: match b.kind() {
+            BoxKind::Element(d) => table::TablePart::of(d),
+            BoxKind::Text => None,
+        },
+        span: b.table_span(),
         queued: false,
         measure: BlockMeasure {
             content_width: CssPx::ZERO,
@@ -848,7 +897,13 @@ fn anonymous_styles(
     let mut of = vec![None; boxes.len()];
     for (i, b) in boxes.iter().enumerate() {
         let flex = match b.kind() {
-            BoxKind::Element(Display::Block | Display::FlowRoot | Display::InlineBlock) => false,
+            BoxKind::Element(
+                Display::Block
+                | Display::FlowRoot
+                | Display::InlineBlock
+                | Display::TableCell
+                | Display::TableCaption,
+            ) => false,
             // Text directly in a flex or grid container gets anonymous items.
             BoxKind::Element(
                 Display::Flex | Display::InlineFlex | Display::Grid | Display::InlineGrid,
@@ -968,6 +1023,7 @@ fn build_text_nodes<'a>(
                 node.atomic = atomic;
                 nodes.push(node);
                 let index = nodes.len() - 1;
+                check_table_parent(&nodes, index)?;
                 if let Some((k, a)) = atomic {
                     let item = ifcs
                         .get_mut(k)
@@ -982,6 +1038,16 @@ fn build_text_nodes<'a>(
                 let items = flatten(ends, kinds, source, work)?;
                 let has_block = items.iter().any(|i| matches!(i, Item::Block(_)));
                 let has_inline = items.iter().any(|i| matches!(i, Item::Inline(_)));
+                if has_inline
+                    && nodes[index]
+                        .table
+                        .is_some_and(table::TablePart::needs_proper_children)
+                {
+                    return Err(FlowError::Unsupported {
+                        node: nodes[index].node,
+                        reason: UnsupportedFlow::FormattingContext,
+                    });
+                }
                 if !has_block && !nodes[index].flex_container && !nodes[index].grid_container {
                     if has_inline {
                         let entries: Vec<Entry> = items
@@ -1091,6 +1157,7 @@ fn build_text_nodes<'a>(
                 node.natural = None;
                 node.flex_container = false;
                 node.grid_container = false;
+                node.table = None;
                 // In a flex or grid container this is an anonymous item.
                 node.flex_item = nodes[parent].flex_container;
                 node.grid_item = nodes[parent].grid_container;
@@ -1159,6 +1226,7 @@ impl<'a, 'c> Engine<'a, 'c> {
                 || node.flex_item
                 || node.grid_container
                 || node.grid_item
+                || node.table.is_some()
                 || node.atomic.is_some();
         }
         // Block-only intrinsic sizes, bottom up (CSS Sizing 3 §5).
@@ -1175,6 +1243,10 @@ impl<'a, 'c> Engine<'a, 'c> {
             }
             if self.nodes[i].grid_container {
                 self.nodes[i].intrinsic = self.grid_intrinsic(i)?;
+                continue;
+            }
+            if self.nodes[i].table == Some(table::TablePart::Table) {
+                self.nodes[i].intrinsic = self.table_intrinsic(i)?;
                 continue;
             }
             let (mut min, mut max) = (0.0_f64, 0.0_f64);
@@ -1270,6 +1342,9 @@ impl<'a, 'c> Engine<'a, 'c> {
         } else if self.nodes[i].grid_container {
             frame.grid = Some(self.start_grid(i)?);
             frame.next = frame.end;
+        } else if self.nodes[i].table == Some(table::TablePart::Table) {
+            frame.table = Some(self.start_table(i)?);
+            frame.next = frame.end;
         }
         Ok(frame)
     }
@@ -1302,6 +1377,7 @@ impl<'a, 'c> Engine<'a, 'c> {
             query: 0.0,
             flex: None,
             grid: None,
+            table: None,
         })
     }
 
@@ -1417,10 +1493,11 @@ impl<'a, 'c> Engine<'a, 'c> {
                 continue;
             }
             let frame = *frames.last().ok_or(FlowError::InvalidSnapshot)?;
-            let step = match (frame.flex, frame.grid) {
-                (Some(k), _) => Some(self.flex_step(&mut frames, &mut bfcs, k)?),
-                (None, Some(k)) => Some(self.grid_step(&mut frames, &mut bfcs, k)?),
-                (None, None) => None,
+            let step = match (frame.flex, frame.grid, frame.table) {
+                (Some(k), _, _) => Some(self.flex_step(&mut frames, &mut bfcs, k)?),
+                (None, Some(k), _) => Some(self.grid_step(&mut frames, &mut bfcs, k)?),
+                (None, None, Some(k)) => Some(self.table_step(&mut frames, &mut bfcs, k)?),
+                (None, None, None) => None,
             };
             if let Some(step) = step {
                 let Some(natural) = step else {
@@ -1491,6 +1568,10 @@ impl<'a, 'c> Engine<'a, 'c> {
         }
         if let Some(k) = frames.last().and_then(|f| f.grid) {
             self.grid_item_done(k, i, natural)?;
+            return Ok(None);
+        }
+        if let Some(k) = frames.last().and_then(|f| f.table) {
+            self.table_item_done(k, i, natural)?;
             return Ok(None);
         }
         self.set_height(i, natural)?;
@@ -1891,7 +1972,10 @@ impl<'a, 'c> Engine<'a, 'c> {
         let style = self.nodes[i].style;
         let inner = Some(self.nodes[i].intrinsic);
         let replaced = self.replaced_size(i, pf.width.get(), pf.definite)?;
-        let forced = replaced.map(|(w, _)| w);
+        let forced = match self.nodes[i].table {
+            Some(table::TablePart::Table) => Some(self.table_width(i, pf.width.get())?),
+            _ => replaced.map(|(w, _)| w),
+        };
         let plain = measure_in_band(style, pf.width, pf.direction, (0.0, 0.0), inner, forced)?;
         self.begin(i, plain, &pf)?;
         self.force_height(i, replaced)?;
@@ -2267,6 +2351,7 @@ impl<'a, 'c> Engine<'a, 'c> {
             query: 0.0,
             flex: None,
             grid: None,
+            table: None,
         };
         self.walk(root)?;
         let mut q = 0;
@@ -2360,6 +2445,7 @@ impl BlockLayout {
             grids: Vec::new(),
             grid_geometry: HashMap::new(),
             subgrids: HashMap::new(),
+            tables: Vec::new(),
             work,
             ifcs,
             line_sets,

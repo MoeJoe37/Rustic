@@ -53,5 +53,3 @@ css/css-flexbox/position-relative-percentage-top-001.html	inline-level elements 
 css/css-flexbox/quirks-auto-block-size-with-percentage-item.html	quirks-mode percentage heights are not implemented
 css/css-flexbox/svg-root-as-flex-item-006.html	svg layout is not implemented
 css/css-flexbox/svg-root-as-flex-item-007.html	svg layout is not implemented
-css/css-flexbox/table-as-item-cross-size.html	tables are not implemented
-css/css-flexbox/table-with-percent-intrinsic-width.html	tables are not implemented

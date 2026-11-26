@@ -199,9 +199,10 @@ M3 completion (2026-11-10) every declared layout unit is implemented: block
 flow and margin collapse, anonymous flow normalization, floats, clearance,
 relative/absolute/fixed/sticky positioning, overflow clipping, intrinsic and
 replaced sizing (REN-02c), inline formatting with OpenType shaping and atomic
-inlines (REN-03), and flexbox with text items and `inline-flex` (REN-08; 38 of
-91 static css-flexbox WPT pages pass, TD-72). Grid, tables, multicolumn,
-vertical writing modes and fragmentation are M9 work. Open layout debt is in
+inlines (REN-03), and flexbox with text items and `inline-flex` (REN-08; 40 of
+91 static css-flexbox WPT pages pass, TD-72). M9 added grid and
+well-formed tables (TD-209, TD-211); multicolumn, vertical writing modes
+and fragmentation are still M9 work. Open layout debt is in
 [TECH_DEBT.md](TECH_DEBT.md) (TD-48/49/70–73).
 
 ## Anonymous flow normalization (REN-01c)
@@ -587,8 +588,8 @@ corpus has a flex page (`paint-flex.html`) and flex dictionary tokens.
 revision whose only script is `checkLayout(...)`, copied (scripts removed,
 `support/` stylesheets inlined) by `tools/import_wpt_flexbox_tests.py`, and
 compares every `data-expected-*`/`data-offset-*` attribute as
-`check-layout-th.js` would. 38 pages pass. `expected_failures.txt` lists the
-other 53 with a reviewed reason; the test fails when a listed page passes or
+`check-layout-th.js` would. 40 pages pass. `expected_failures.txt` lists the
+other 51 with a reviewed reason; the test fails when a listed page passes or
 an unlisted one fails (TD-72).
 
 Specification basis, reviewed 2026-11-09: CSS Flexible Box Layout 1
@@ -724,6 +725,62 @@ the subgrid step (all 60 pass).
 Specification basis, reviewed 2026-11-26: CSS Grid Layout 2
 [§6–§11](https://drafts.csswg.org/css-grid-2/) and CSS Box Alignment 3
 [§5–§8](https://drafts.csswg.org/css-align-3/).
+
+## Tables (`layout.tables`, M9)
+
+### Properties
+
+`rustic-css` parses and computes `border-collapse`, `border-spacing`,
+`table-layout`, `caption-side` and `empty-cells` ([CSS guide](CSS.md)). The
+HTML user-agent sheet gives `table` 2px spacing, cells 1px padding and row
+groups `vertical-align: middle`.
+
+### Layout
+
+`flow/table.rs` runs a table as a formatting context inside the block walk,
+like grid layout: the table's frame queues its captions and cells, each is
+laid out as a formatting root at its width, and the table finishes once
+every one reported its height. No recursion: nested tables are more frames.
+
+- Structure: header groups display first and footer groups last; rows
+  directly in the table form implicit groups. Cells take slots by the HTML
+  table processing model: `colspan` 1–1000, `rowspan` 0–65,534 where `0`
+  and spans past the group stop at the group's last row. `BoxSnapshot`
+  carries the spans of `td`/`th`.
+- Columns (CSS 2.2 §17.5.2.2, automatic layout): each column takes its
+  cells' largest border-box min-content and max-content contributions;
+  spanning cells (by increasing span) widen the columns they cross in
+  proportion to their maximums. The table's width is its specified width
+  or shrink-to-fit, never below its minimum; space between the minimum and
+  maximum interpolates every column, and space beyond grows columns by
+  their maximums. `table-layout: fixed` with a definite width takes the
+  first row's fixed (or percentage) widths and shares the rest among the
+  other columns.
+- Rows: the tallest single-row cell, a specified row height (a minimum)
+  and baseline-aligned cells' ascent plus descent. Spanning cells, and a
+  taller specified table height, grow rows in proportion to their heights.
+- Placement: captions above or below the rows at the table's content
+  width, `border-spacing` around columns and rows, row groups and rows as
+  boxes across the columns, cells relative to their first row, mirrored in
+  RTL. `vertical-align` `top`, `middle`, `bottom` and `baseline` (others act
+  as `baseline`) moves a cell's content by growing its top padding in the
+  used geometry, so the cell's border box fills its slot.
+- Refused: table parts that would need anonymous table boxes (TD-211).
+
+### Evidence
+
+`crates/rustic-css/tests/tables.rs` covers the properties, and the pinned
+WPT `css-tables/parsing` cases joined the `css.conformance` gate (all 26
+pass). `crates/rustic-layout/tests/tables.rs` checks exact geometry for
+column and row sizing, slots with `colspan`/`rowspan`, specified and
+centred tables, fixed layout, captions, header and footer groups,
+specified heights with baseline and bottom alignment, RTL and the refusal
+of misparented parts; `flow/table.rs` unit-tests the column algorithms.
+
+Specification basis, reviewed 2026-11-27: CSS 2.2
+[§17](https://www.w3.org/TR/CSS22/tables.html), CSS Tables 3
+[Editor's Draft](https://drafts.csswg.org/css-tables-3/) and the HTML
+[table processing model](https://html.spec.whatwg.org/multipage/tables.html#forming-a-table).
 
 ## Inline formatting and text fragments (REN-03b)
 

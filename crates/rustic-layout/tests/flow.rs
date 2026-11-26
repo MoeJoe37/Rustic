@@ -212,7 +212,8 @@ fn unsupported_contexts_and_controls_return_typed_errors() {
         "display:inline",
         "display:inline-flex",
         "display:inline-grid",
-        "display:table",
+        "display:table-cell",
+        "display:inline-table",
         "display:list-item",
     ] {
         unsupported(

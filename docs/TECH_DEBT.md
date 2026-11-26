@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-209, TD-210, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
@@ -142,7 +142,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-59 | Deliberate | Paint | CPU tile culling skips irrelevant commands. Filter-margin changes still repaint everything, damage uses a common-prefix/suffix diff and resize relayouts from scratch. The CI frame-time gate covers GPU compositing on lavapipe | Open, REN-04j, M9 |
 | TD-70 | Deliberate | Layout | Atomic inlines and block-in-inline splitting: baseline, relative-offset and paint-order approximations | Open, M3 layout |
 | TD-71 | Deliberate | Layout | Sticky positioning: no overflow adjustment, no nested sticky composition, inline sticky boxes stay static | Open, M3 layout |
-| TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 53 of 91 static pages fail (writing modes, images, tables, 6 undiagnosed) | Open, REN-08 |
+| TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 51 of 91 static pages fail (writing modes, images, 6 undiagnosed) | Open, REN-08 |
 | TD-73 | Watch | Base | Layout keeps its own `CssPx`/`CssRect` beside the unit-typed `rustic-base` geometry | Guarded |
 | TD-80 | Deliberate | Codecs | JPEG: no arithmetic coding, lossless, hierarchical, 12-bit or `DNL`; color management ignored | Open, paint.images |
 | TD-81 | Deliberate | Codecs | WebP and PNG ignore ICC/EXIF metadata; only JPEG applies EXIF orientation | Open, paint.images, M9 |
@@ -268,6 +268,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
 | TD-210 | Deliberate | Layout | css-grid WPT comparison: 89 of 168 static pages fail, every one reviewed (writing modes, masonry, subgrid baselines, logical properties, Ahem text) | Open, `layout.grid` (M9) |
+| TD-211 | Deliberate | Layout | Table subset: well-formed tables only (no anonymous table boxes, so misparented table parts, text in rows and `inline-table` are refused), separated borders only, `<col>` widths, percentage cell widths, `visibility: collapse`, `empty-cells` and relative positioning of table parts ignored | Open, `layout.tables` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1314,9 +1315,9 @@ scrolling work. **Trigger:** scrolling in an embedder, or css-position WPT.
 ### TD-72 — css-flexbox WPT comparison gaps
 
 `tests/wpt_flexbox.rs` checks the 91 static `checkLayout` pages of the pinned
-WPT revision; 38 pass. `expected_failures.txt` gives each failure's reason:
+WPT revision; 40 pass (two table pages since `layout.tables`). `expected_failures.txt` gives each failure's reason:
 23 need vertical writing modes, 12 need decoded images (the harness loads
-none), and tables, SVG, form controls, `fieldset`, `list-item`, quirks-mode
+none), and SVG, form controls, `fieldset`, `list-item`, quirks-mode
 percentages and `aspect-ratio` on non-replaced boxes cover most others; six
 are mismatches not yet diagnosed, and one percentage-height case. The harness
 approximates `offsetParent` (nearest positioned ancestor, else body with
@@ -3457,3 +3458,22 @@ items, generated content, `aspect-ratio`, unread expectation attributes and
 the TD-209 edge cases). Rustic's bundled test fonts have no Ahem. The list
 is a ratchet: a listed page that passes fails the test.
 **Pay:** shrink the list with TD-209; bundle Ahem in the test fonts.
+
+### TD-211 — Table layout subset
+`layout.tables` lays out tables whose structure the HTML parser builds:
+a table holding captions, column groups, row groups and rows, rows holding
+cells. Whitespace between parts is dropped; anything else (a
+`display: table-cell` box outside a row, text or blocks directly in a row or
+table, `inline-table`) is refused as an unsupported formatting context,
+because the anonymous table, row and cell boxes of CSS Tables 3 §3.9 are
+not generated yet. Only the separated borders model exists:
+`border-collapse: collapse` drops the spacing and keeps every cell border.
+Column and column group boxes get no geometry (`<col width>` and column
+backgrounds are ignored), percentage cell widths act as `auto` in the
+automatic algorithm, `visibility: collapse` and `empty-cells: hide` change
+nothing, and table parts are not relatively positioned. Extra height of
+spanning cells and of a taller table is shared by rows in proportion to
+their heights.
+**Pay:** the remaining `layout.tables` steps (anonymous boxes and inline
+tables; collapsing borders and columns; HTML presentational hints and the
+pinned css-tables layout pages).

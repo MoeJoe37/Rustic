@@ -198,7 +198,7 @@ CSS compatibility is M9 work.
 | REN-05 | **Done** ([PAINT.md](PAINT.md)): CPU raster reference backend, tiling and damage; bounded inflate, PNG, JPEG, GIF and WebP decoding with an image store | REN-04 |
 | REN-06 | **Done**: `render` headless command, PNG output, layout/display-list dumps, resize/zoom and `hit-test` | REN-05 |
 | REN-07 | **Done for the declared gate**: `reftest` harness with fuzzy tolerances, checked fixtures, deterministic fonts; the `frame_budget` example measures repaint time | REN-06 |
-| REN-08 | **Done for the declared scope** ([LAYOUT.md](LAYOUT.md#flexbox-ren-08)): block, text and `inline-flex` items; 38 of 91 pinned static css-flexbox WPT pages pass (TD-72). Grid and tables are M9 work | REN-07 |
+| REN-08 | **Done for the declared scope** ([LAYOUT.md](LAYOUT.md#flexbox-ren-08)): block, text and `inline-flex` items; 38 of 91 pinned static css-flexbox WPT pages passed (TD-72; 40 since M9 tables). Grid and tables are M9 work | REN-07 |
 | MOB-03/04 | **Not done; carried forward.** Android/iOS local-fixture CPU surfaces through narrow native bridges. They need NDK/Xcode link and emulator/simulator runs that only hosted CI runners (or a local machine with those SDKs) can provide. Scheduled as the parallel platform track of M5; see [§8](#8-m5--scripted-document-integration) for its completion test and what happens if CI is still blocked | REN-05; mobile core checks |
 
 **Status:** the M3 catalog gate (17 capabilities) is complete: block, inline and

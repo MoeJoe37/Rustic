@@ -93,6 +93,9 @@ pub struct BoxSnapshot {
     html_tag: HtmlTag,
     natural: Option<NaturalSize>,
     language: Option<Arc<str>>,
+    /// HTML `colspan` and `rowspan` of a `td`/`th` (`rowspan` 0 spans the
+    /// rest of the row group); (1, 1) for every other box.
+    span: (u32, u32),
 }
 
 /// HTML elements whose `overflow` can propagate to the viewport.
@@ -151,6 +154,45 @@ impl BoxSnapshot {
     pub(crate) fn html_tag(&self) -> HtmlTag {
         self.html_tag
     }
+
+    /// HTML table cell spans: (`colspan` 1..=1000, `rowspan` 0..=65534).
+    pub(crate) const fn table_span(&self) -> (u32, u32) {
+        self.span
+    }
+}
+
+/// HTML "rules for parsing non-negative integers", saturating.
+fn non_negative_integer(units: &[u16]) -> Option<u32> {
+    let is_space = |u: u16| matches!(u, 0x09 | 0x0A | 0x0C | 0x0D | 0x20);
+    let mut rest = units
+        .iter()
+        .copied()
+        .skip_while(|&u| is_space(u))
+        .peekable();
+    if rest.peek() == Some(&u16::from(b'+')) {
+        rest.next();
+    }
+    let mut value: Option<u32> = None;
+    for u in rest {
+        let Some(digit) = char::from_u32(u32::from(u)).and_then(|c| c.to_digit(10)) else {
+            break;
+        };
+        value = Some(value.unwrap_or(0).saturating_mul(10).saturating_add(digit));
+    }
+    value
+}
+
+/// HTML table processing model: `colspan` is 1..=1000 (0 and errors are
+/// 1) and `rowspan` 0..=65534 (errors are 1).
+fn cell_spans(colspan: Option<&[u16]>, rowspan: Option<&[u16]>) -> (u32, u32) {
+    let columns = colspan
+        .and_then(non_negative_integer)
+        .filter(|&n| n > 0)
+        .map_or(1, |n| n.min(1000));
+    let rows = rowspan
+        .and_then(non_negative_integer)
+        .map_or(1, |n| n.min(65_534));
+    (columns, rows)
 }
 
 /// A flat, preorder box snapshot, distinct from the owning DOM.
@@ -293,6 +335,26 @@ impl BoxTree {
                 }
                 _ => None,
             };
+            let span = match node.kind() {
+                NodeKind::Element(element)
+                    if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
+                        && (element.name().local().eq_ignore_ascii_case("td")
+                            || element.name().local().eq_ignore_ascii_case("th")) =>
+                {
+                    let attribute = |name: &str| {
+                        element
+                            .attributes()
+                            .iter()
+                            .find(|a| {
+                                a.name().namespace().is_none()
+                                    && a.name().local().eq_ignore_ascii_case(name)
+                            })
+                            .map(|a| a.value().as_units())
+                    };
+                    cell_spans(attribute("colspan"), attribute("rowspan"))
+                }
+                _ => (1, 1),
+            };
             let html_tag = match node.kind() {
                 NodeKind::Element(element)
                     if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
@@ -378,6 +440,7 @@ impl BoxTree {
                 special_layout,
                 html_tag,
                 natural: natural.filter(|_| matches!(kind, BoxKind::Element(_))),
+                span,
             });
             parents.push((depth, Some(current), shared));
         }

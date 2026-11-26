@@ -2723,22 +2723,38 @@
               ]
             },
             {
-              "label": "Table box tree: anonymous table, row-group, row and cell fixup, captions and the table wrapper box (CSS Tables 3 §3)",
+              "label": "Table layout for well-formed tables: slots with colspan/rowspan, automatic and fixed column widths, row heights, vertical-align, captions, header and footer groups, RTL",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/table.rs",
+                  "marker": "fn column_bounds("
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn colspan_and_rowspan_take_slots_and_grow_columns_and_rows"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/tables.rs",
+                  "marker": "fn fixed_layout_uses_the_first_row_widths"
+                }
+              ]
+            },
+            {
+              "label": "Anonymous table boxes (CSS Tables 3 §3.9) for misparented parts and text, and inline tables",
               "status": "planned",
               "evidence": []
             },
             {
-              "label": "Table layout: slot grid with colspan/rowspan, auto and fixed column widths, row heights, cell vertical-align and border-spacing; pinned css-tables layout pages",
+              "label": "Collapsing borders, column boxes and widths, percentage widths, empty-cells and visibility: collapse",
               "status": "planned",
               "evidence": []
             },
             {
-              "label": "Collapsing borders, empty-cells, visibility: collapse and table background layers",
-              "status": "planned",
-              "evidence": []
-            },
-            {
-              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, bgcolor, rules/frame)",
+              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, bgcolor, rules/frame) and pinned css-tables layout pages",
               "status": "planned",
               "evidence": []
             }

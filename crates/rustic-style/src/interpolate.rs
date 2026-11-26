@@ -120,7 +120,8 @@ pub fn animation_type(property: PropertyId) -> AnimationType {
         | P::FlexBasis
         | P::Order
         | P::RowGap
-        | P::ColumnGap => AnimationType::ByComputedValue,
+        | P::ColumnGap
+        | P::BorderSpacing => AnimationType::ByComputedValue,
         _ => AnimationType::Discrete,
     }
 }
@@ -326,6 +327,9 @@ fn try_interpolate(
         ))))),
         (V::Gap(Gap::LengthPercentage(a)), V::Gap(Gap::LengthPercentage(b))) => {
             V::Gap(Gap::LengthPercentage(nonnegative(lp(a, b, t))))
+        }
+        (V::BorderSpacing(ah, av), V::BorderSpacing(bh, bv)) => {
+            V::BorderSpacing(nonnegative(lp(ah, bh, t)), nonnegative(lp(av, bv, t)))
         }
         (V::BorderWidth(BorderWidth::Length(a)), V::BorderWidth(BorderWidth::Length(b))) => {
             V::BorderWidth(BorderWidth::Length(Length::px(
@@ -679,6 +683,7 @@ fn scale(value: &PropertyValue, factor: f64) -> Option<PropertyValue> {
             V::FlexBasis(FlexBasis::Size(Size::LengthPercentage(s(l))))
         }
         V::Gap(Gap::LengthPercentage(l)) => V::Gap(Gap::LengthPercentage(s(l))),
+        V::BorderSpacing(h, v) => V::BorderSpacing(s(h), s(v)),
         V::BorderWidth(BorderWidth::Length(l)) => {
             V::BorderWidth(BorderWidth::Length(Length::px(l.to_px()? * factor)))
         }

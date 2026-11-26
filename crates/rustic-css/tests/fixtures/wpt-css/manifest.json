@@ -18,11 +18,12 @@
     "css/css-text/parsing",
     "css/css-grid/parsing",
     "css/css-align/parsing",
-    "css/css-grid/subgrid"
+    "css/css-grid/subgrid",
+    "css/css-tables/parsing"
   ],
-  "case_count": 4073,
+  "case_count": 4099,
   "skipped_calls": 219,
-  "cases_sha256": "30a2e6105f238fde008862c06c6be893abe8c80daa134f685175bee4ad42d865",
+  "cases_sha256": "258814d0468d5ce59ce9232a8663423ef5393b2f60f3a090b8b9d4397c5f384d",
   "files": [
     {
       "path": "css/selectors/parsing/invalid-pseudos.html",
@@ -2158,6 +2159,66 @@
       "path": "css/css-grid/subgrid/grid-template-valid.html",
       "sha256": "65e5fe48c9022722d488cacf5c8413f36a37da94e7ce6467e6b15439d22cbf1e",
       "cases": 38,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/border-collapse-invalid.html",
+      "sha256": "c5e50efd71476c64ea70ee12e6457846ea7619c7e2be5c19648009ddbe5aaf0f",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/border-collapse-valid.html",
+      "sha256": "57da418f42eb449ebbc45b54ed8b1b7e3398e869f93e5160086ae6732fbf6bdf",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/border-spacing-invalid.html",
+      "sha256": "ba9d83f20f300576158597bc51d05bee0df82ec72567b0805a2ddacd40fb26a4",
+      "cases": 4,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/border-spacing-valid.html",
+      "sha256": "8b89d9e1b0b3c2ca9f0413ac2ff993f4779a9b15969944a3860c9be1ffb51aae",
+      "cases": 4,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/caption-side-invalid.html",
+      "sha256": "d3f66e33dafb9c0746d9e081438f6999108df09ac11bb332c007bd836f167b1a",
+      "cases": 4,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/caption-side-valid.html",
+      "sha256": "8886b2a8f902cae64524b9b008421083609825e7fe3f6e9b428a12dd7f9b8ef3",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/empty-cells-invalid.html",
+      "sha256": "127aff47ac7fc6bde3655d91692878467c79ef2d06ccd8bfc337cabda54818b7",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/empty-cells-valid.html",
+      "sha256": "e56999a121b34075ad185c00d950b1431d2567ce62ad8bf9d8c77361908fa46e",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/table-layout-invalid.html",
+      "sha256": "7c08e85013a3eee8bb5b68063c5e4950f4c3a995f10fbe72c436784199f2a083",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-tables/parsing/table-layout-valid.html",
+      "sha256": "2bed69eb7182d9a07bc5a7f08c2a346c2ba18adcf2b582a8ae73d48882bf5d3b",
+      "cases": 2,
       "skipped_calls": 0
     }
   ]

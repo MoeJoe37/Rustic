@@ -318,6 +318,16 @@ covers them, and the pinned WPT `css-grid/parsing` and `css-align/parsing`
 cases are part of the conformance gate. Details:
 [layout guide](LAYOUT.md#grid-layoutgrid-m9).
 
+`layout.tables` (M9) adds the table longhands `border-collapse`
+(`separate`/`collapse`), `border-spacing` (one or two nonnegative lengths, no
+percentages; one value serializes when both are equal), `table-layout`
+(`auto`/`fixed`), `caption-side` (`top`/`bottom`) and `empty-cells`
+(`show`/`hide`). All but `table-layout` inherit; `border-spacing` computes to
+pixels clamped at zero and animates by computed value. The user-agent sheet
+gives `table` `border-spacing: 2px`. `tests/tables.rs` covers them, and the
+pinned WPT `css-tables/parsing` cases are part of the conformance gate. The
+table box tree and table layout are the later `layout.tables` steps.
+
 Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
 `rex`, `ch`, `rch`, `cap`, `rcap`, `ic`, `ric`, `lh`, `rlh`) and the viewport
 units including the small/large/dynamic variants, plus unitless zero. Every
@@ -1079,8 +1089,9 @@ skipped (219), never guessed. `tools/check_repository.py` verifies the digests.
   implemented.
 * `.tentative` files test proposals and are never in scope.
 
-Of 2,916 cases, 1,609 are in scope and **1,241 pass** (invalid-selector
-102/104, invalid-value 521/522, valid-selector 108/199, valid-value 468/742).
+Of 4,099 cases, 2,750 are in scope and **2,379 pass** (invalid-selector
+102/104, invalid-value 1,099/1,100, valid-selector 108/199, valid-value
+1,070/1,347; M9 added the css-grid, css-align and css-tables directories).
 The other 1,349 are out of scope: properties `rustic-css` does not support yet,
 and tentative files. Both counts are pinned in the gate, so supporting or
 dropping a property changes them deliberately. Every other in-scope case is

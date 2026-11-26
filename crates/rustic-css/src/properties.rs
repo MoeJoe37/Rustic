@@ -303,6 +303,38 @@ keywords! {
 }
 
 keywords! {
+    /// `border-collapse` values (CSS 2.2 §17.6).
+    BorderCollapse {
+        Separate => "separate",
+        Collapse => "collapse",
+    }
+}
+
+keywords! {
+    /// `table-layout` values (CSS 2.2 §17.5.2).
+    TableLayout {
+        Auto => "auto",
+        Fixed => "fixed",
+    }
+}
+
+keywords! {
+    /// `caption-side` values (CSS 2.2 §17.4.1).
+    CaptionSide {
+        Top => "top",
+        Bottom => "bottom",
+    }
+}
+
+keywords! {
+    /// `empty-cells` values (CSS 2.2 §17.6.1.1).
+    EmptyCells {
+        Show => "show",
+        Hide => "hide",
+    }
+}
+
+keywords! {
     /// `visibility` values.
     Visibility {
         Visible => "visible",
@@ -701,6 +733,16 @@ pub enum PropertyValue {
     Overflow(Overflow),
     /// `visibility`.
     Visibility(Visibility),
+    /// `border-collapse`.
+    BorderCollapse(BorderCollapse),
+    /// `border-spacing`: horizontal then vertical nonnegative lengths.
+    BorderSpacing(LengthPercentage, LengthPercentage),
+    /// `table-layout`.
+    TableLayout(TableLayout),
+    /// `caption-side`.
+    CaptionSide(CaptionSide),
+    /// `empty-cells`.
+    EmptyCells(EmptyCells),
     /// `opacity`, as a number (a percentage is divided by 100). Out-of-range
     /// values are clamped to `0..=1` when computed.
     Opacity(f64),
@@ -868,6 +910,11 @@ property_ids! {
     OverflowX => "overflow-x", false;
     OverflowY => "overflow-y", false;
     Visibility => "visibility", true;
+    BorderCollapse => "border-collapse", true;
+    BorderSpacing => "border-spacing", true;
+    TableLayout => "table-layout", false;
+    CaptionSide => "caption-side", true;
+    EmptyCells => "empty-cells", true;
     Opacity => "opacity", false;
     VerticalAlign => "vertical-align", false;
     Direction => "direction", true;
@@ -1021,6 +1068,11 @@ impl PropertyId {
             P::Clear => PropertyValue::Clear(Clear::None),
             P::OverflowX | P::OverflowY => PropertyValue::Overflow(Overflow::Visible),
             P::Visibility => PropertyValue::Visibility(Visibility::Visible),
+            P::BorderCollapse => PropertyValue::BorderCollapse(BorderCollapse::Separate),
+            P::BorderSpacing => PropertyValue::BorderSpacing(zero.clone(), zero.clone()),
+            P::TableLayout => PropertyValue::TableLayout(TableLayout::Auto),
+            P::CaptionSide => PropertyValue::CaptionSide(CaptionSide::Top),
+            P::EmptyCells => PropertyValue::EmptyCells(EmptyCells::Show),
             P::Opacity => PropertyValue::Opacity(1.0),
             P::AnimationTimingFunction | P::TransitionTimingFunction => {
                 PropertyValue::Easing(EasingList::default())
@@ -2163,6 +2215,21 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::PerspectiveOrigin => {
             return background::position(parts).map(PropertyValue::PerspectiveOrigin);
         }
+        P::BorderSpacing => {
+            // <length [0,∞]>{1,2}; percentages are invalid (CSS 2.2 §17.6.1).
+            let one = |v: &Value| {
+                length_percentage(v)
+                    .filter(|d| !d.is_negative() && !matches!(d, LengthPercentage::Percentage(_)))
+            };
+            return match parts {
+                [h] => {
+                    let h = one(h)?;
+                    Some(PropertyValue::BorderSpacing(h.clone(), h))
+                }
+                [h, v] => Some(PropertyValue::BorderSpacing(one(h)?, one(v)?)),
+                _ => None,
+            };
+        }
         P::BorderTopLeftRadius
         | P::BorderTopRightRadius
         | P::BorderBottomRightRadius
@@ -2258,7 +2325,8 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         | P::Rotate
         | P::Scale
         | P::TransformOrigin
-        | P::PerspectiveOrigin => unreachable!("handled above"),
+        | P::PerspectiveOrigin
+        | P::BorderSpacing => unreachable!("handled above"),
         P::Perspective => {
             PropertyValue::Perspective(if keyword(value, "none") {
                 None
@@ -2300,6 +2368,10 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::Clear => PropertyValue::Clear(Clear::from_name(name()?)?),
         P::OverflowX | P::OverflowY => PropertyValue::Overflow(Overflow::from_name(name()?)?),
         P::Visibility => PropertyValue::Visibility(Visibility::from_name(name()?)?),
+        P::BorderCollapse => PropertyValue::BorderCollapse(BorderCollapse::from_name(name()?)?),
+        P::TableLayout => PropertyValue::TableLayout(TableLayout::from_name(name()?)?),
+        P::CaptionSide => PropertyValue::CaptionSide(CaptionSide::from_name(name()?)?),
+        P::EmptyCells => PropertyValue::EmptyCells(EmptyCells::from_name(name()?)?),
         P::Opacity => PropertyValue::Opacity(opacity(value)?),
         P::VerticalAlign => PropertyValue::VerticalAlign(match name() {
             Some(n) => VerticalAlign::Keyword(VerticalAlignKeyword::from_name(n)?),
@@ -2657,6 +2729,12 @@ impl fmt::Display for PropertyValue {
             Self::Clear(v) => write!(f, "{v}"),
             Self::Overflow(v) => write!(f, "{v}"),
             Self::Visibility(v) => write!(f, "{v}"),
+            Self::BorderCollapse(v) => write!(f, "{v}"),
+            Self::BorderSpacing(h, v) if h == v => write!(f, "{h}"),
+            Self::BorderSpacing(h, v) => write!(f, "{h} {v}"),
+            Self::TableLayout(v) => write!(f, "{v}"),
+            Self::CaptionSide(v) => write!(f, "{v}"),
+            Self::EmptyCells(v) => write!(f, "{v}"),
             Self::Opacity(n) => write_number(f, *n),
             Self::Easing(functions) => functions.fmt(f),
             Self::Animation(value) => value.fmt(f),

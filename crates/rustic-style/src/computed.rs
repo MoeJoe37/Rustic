@@ -830,6 +830,9 @@ fn compute_values(
                         PropertyValue::Perspective(Some(d)) => {
                             PropertyValue::Perspective(Some(basis.lp(d, true)))
                         }
+                        PropertyValue::BorderSpacing(h, v) => {
+                            PropertyValue::BorderSpacing(basis.lp(h, true), basis.lp(v, true))
+                        }
                         PropertyValue::ClipPath(rustic_css::ClipPath::Shape(shape, b)) => {
                             PropertyValue::ClipPath(rustic_css::ClipPath::Shape(
                                 shape.map_lengths(&|lp| basis.lp(lp, false)),

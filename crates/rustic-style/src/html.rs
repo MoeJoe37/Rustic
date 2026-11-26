@@ -53,7 +53,7 @@ dir, dl, menu, ol, ul { margin-top: 1em; margin-bottom: 1em }
 dd { margin-left: 40px }
 dir, menu, ol, ul { padding-left: 40px }
 
-table { display: table; box-sizing: border-box; text-indent: initial }
+table { display: table; box-sizing: border-box; border-spacing: 2px; border-collapse: separate; text-indent: initial }
 caption { display: table-caption }
 colgroup { display: table-column-group }
 col { display: table-column }

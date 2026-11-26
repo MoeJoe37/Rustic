@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "e175b06b6344d58f7c43703c4b015432319769c7f7cabe5372e065bd245fc9fb",
-  "percent": "51.57",
+  "source_fingerprint": "f19916f66507e395c332ab46b2ca808f25cff9f74f7ca3932de3dbb8d1b5f3da",
+  "percent": "51.69",
   "verified_percent": "50.24",
-  "partial_percent": "1.33",
+  "partial_percent": "1.45",
   "completed": 118,
-  "in_progress": 11,
+  "in_progress": 12,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 5,
       "total": 54,
-      "percent": "9.88",
+      "percent": "10.41",
       "verified_percent": "8.00",
-      "partial_percent": "1.88"
+      "partial_percent": "2.41"
     },
     {
       "id": "M10",
@@ -2877,7 +2877,7 @@
             {
               "kind": "test",
               "path": "crates/rustic-css/tests/wpt_conformance.rs",
-              "marker": "const IN_SCOPE: usize = 2724;"
+              "marker": "const IN_SCOPE: usize ="
             },
             {
               "kind": "source",
@@ -2968,9 +2968,52 @@
           "label": "Tables",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "Table properties (border-collapse, border-spacing, table-layout, caption-side, empty-cells) parse, serialize and compute (pinned css-tables parsing cases)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/properties.rs",
+                  "marker": "BorderSpacing(LengthPercentage, LengthPercentage)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/tables.rs",
+                  "marker": "fn table_values_parse_and_serialize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "Border spacing computes to absolute lengths"
+                }
+              ]
+            },
+            {
+              "label": "Table box tree: anonymous table, row-group, row and cell fixup, captions and the table wrapper box (CSS Tables 3 \u00a73)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Table layout: slot grid with colspan/rowspan, auto and fixed column widths, row heights, cell vertical-align and border-spacing; pinned css-tables layout pages",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Collapsing borders, empty-cells, visibility: collapse and table background layers",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, bgcolor, rules/frame)",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "20.00",
           "engine_share": "0.58"
         },
         {
@@ -3006,12 +3049,12 @@
       ],
       "points": 51,
       "completed": 7,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 11,
-      "contribution": "3.64",
-      "percent": "60.78",
+      "contribution": "3.76",
+      "percent": "62.74",
       "verified_percent": "60.78",
-      "partial_percent": "0.00"
+      "partial_percent": "1.96"
     },
     {
       "id": "paint",

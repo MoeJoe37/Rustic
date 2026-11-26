@@ -251,6 +251,11 @@ fn currentcolor_and_border_widths() {
         computed(html, transform, "a", "perspective-origin"),
         "0% 50%"
     );
+    // Border spacing computes to absolute lengths, clamped at zero.
+    let spacing = "#a { border-spacing: calc(10px + 0.5em) calc(10px - 0.5em) }";
+    assert_eq!(computed(html, spacing, "a", "border-spacing"), "18px 2px");
+    let negative = "#a { border-spacing: calc(10px - 1em) 1em }";
+    assert_eq!(computed(html, negative, "a", "border-spacing"), "0px 16px");
 }
 
 #[test]

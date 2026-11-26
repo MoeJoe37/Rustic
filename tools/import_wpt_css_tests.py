@@ -63,6 +63,8 @@ DIRECTORIES = (
     "css/css-align/parsing",
     # M9 `layout.grid` step 5: `subgrid` line name lists.
     "css/css-grid/subgrid",
+    # M9 `layout.tables`: table box properties.
+    "css/css-tables/parsing",
 )
 
 FUNCTIONS = {

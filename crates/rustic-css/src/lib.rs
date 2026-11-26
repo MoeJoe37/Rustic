@@ -93,14 +93,15 @@ pub use media::{
 };
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{
-    BorderStyle, BorderWidth, BoxSizing, Clear, ContainerType, CornerRadius, CssWideKeyword,
-    DeclaredValue, Direction, Display, FamilyName, Float, FontSize, FontSizeKeyword, FontStretch,
-    FontStretchKeyword, FontStyle, FontVariantCaps, FontWeight, GenericFamily, Hyphens,
-    LengthPercentageOrAuto, LineBreak, LineHeight, MaxSize, OutlineStyle, Overflow, OverflowWrap,
-    Position, PropertyDeclaration, PropertyError, PropertyId, PropertyName, PropertyValue, Spacing,
-    TextAlign, TextCase, TextDecorationLine, TextDecorationStyle, TextTransform, UnicodeBidi,
-    VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, WordBreak, ZIndex, longhands_of,
-    parse_declaration, serialize_four_sided_shorthand,
+    BorderCollapse, BorderStyle, BorderWidth, BoxSizing, CaptionSide, Clear, ContainerType,
+    CornerRadius, CssWideKeyword, DeclaredValue, Direction, Display, EmptyCells, FamilyName, Float,
+    FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle, FontVariantCaps,
+    FontWeight, GenericFamily, Hyphens, LengthPercentageOrAuto, LineBreak, LineHeight, MaxSize,
+    OutlineStyle, Overflow, OverflowWrap, Position, PropertyDeclaration, PropertyError, PropertyId,
+    PropertyName, PropertyValue, Spacing, TableLayout, TextAlign, TextCase, TextDecorationLine,
+    TextDecorationStyle, TextTransform, UnicodeBidi, VerticalAlign, VerticalAlignKeyword,
+    Visibility, WhiteSpace, WordBreak, ZIndex, longhands_of, parse_declaration,
+    serialize_four_sided_shorthand,
 };
 pub use registered::{
     PropertySyntax, RegisteredItem, RegisteredValue, SyntaxComponent, SyntaxMultiplier, SyntaxType,

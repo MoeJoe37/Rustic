@@ -188,6 +188,11 @@ const LONGHAND_GETTERS: [NativeFn; PropertyId::ALL.len()] = [
     get_longhand::<143> as NativeFn,
     get_longhand::<144> as NativeFn,
     get_longhand::<145> as NativeFn,
+    get_longhand::<146> as NativeFn,
+    get_longhand::<147> as NativeFn,
+    get_longhand::<148> as NativeFn,
+    get_longhand::<149> as NativeFn,
+    get_longhand::<150> as NativeFn,
 ];
 
 fn get_longhand<const INDEX: usize>(

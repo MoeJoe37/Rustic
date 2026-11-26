@@ -2609,7 +2609,7 @@
             {
               "kind": "test",
               "path": "crates/rustic-css/tests/wpt_conformance.rs",
-              "marker": "const IN_SCOPE: usize = 2724;"
+              "marker": "const IN_SCOPE: usize ="
             },
             {
               "kind": "source",
@@ -2698,8 +2698,51 @@
           "label": "Tables",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "Table properties (border-collapse, border-spacing, table-layout, caption-side, empty-cells) parse, serialize and compute (pinned css-tables parsing cases)",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/properties.rs",
+                  "marker": "BorderSpacing(LengthPercentage, LengthPercentage)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-css/tests/tables.rs",
+                  "marker": "fn table_values_parse_and_serialize"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "Border spacing computes to absolute lengths"
+                }
+              ]
+            },
+            {
+              "label": "Table box tree: anonymous table, row-group, row and cell fixup, captions and the table wrapper box (CSS Tables 3 §3)",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Table layout: slot grid with colspan/rowspan, auto and fixed column widths, row heights, cell vertical-align and border-spacing; pinned css-tables layout pages",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Collapsing borders, empty-cells, visibility: collapse and table background layers",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, bgcolor, rules/frame)",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "layout.fragmentation",

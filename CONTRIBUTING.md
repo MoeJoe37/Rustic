@@ -6,6 +6,9 @@ Compatibility work continues across the engine and web platform. Check the
 [implementation ledger](docs/IMPLEMENTATION.md) for what works today and the
 [roadmap](docs/ROADMAP.md) for dependencies and upcoming work.
 
+Everyone who takes part in the project follows the
+[code of conduct](CODE_OF_CONDUCT.md).
+
 ## Set up a checkout
 
 Install Git, [rustup](https://rustup.rs/), and Python 3.11 or later. Rustup reads

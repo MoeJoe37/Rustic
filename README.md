@@ -237,6 +237,7 @@ graphics APIs, and operating system integration are allowed. See
 
 ## Contributing and license
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before making a change. Security reports
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before making a change. Everyone taking
+part follows the [code of conduct](CODE_OF_CONDUCT.md). Security reports
 follow [SECURITY.md](SECURITY.md). The existing [GNU Affero General Public License
 version 3](LICENSE) is preserved; workspace metadata uses `AGPL-3.0-only`.

@@ -38,11 +38,7 @@ pub fn decode_module<'a>(
     cancellation: &CancellationToken,
 ) -> Result<DecodedModule<'a>, BinaryError> {
     let mut binary = scan_module(bytes, limits.binary, cancellation)?;
-    let mut decoder = Decoder {
-        cancellation,
-        remaining_entries: limits.declaration_entries,
-        code: limits.code,
-    };
+    let mut decoder = Decoder::new(limits, cancellation);
     let mut declarations = Declarations {
         data_count: binary.data_count,
         ..Declarations::default()
@@ -51,59 +47,13 @@ pub fn decode_module<'a>(
     for section in &binary.sections {
         let mut reader = Reader::new(section.bytes, section.offset);
         poll(&reader, cancellation)?;
-        match section.kind {
-            SectionKind::Type => {
-                declarations.types = decoder.declarations(&mut reader, function_type)?
-            }
-            SectionKind::Import => {
-                declarations.imports = decoder.declarations(&mut reader, import)?
-            }
-            SectionKind::Table => declarations.tables = decoder.declarations(&mut reader, table)?,
-            SectionKind::Memory => {
-                declarations.memories =
-                    decoder.declarations(&mut reader, |_, r| allocation_limits(r))?
-            }
-            SectionKind::Global => {
-                declarations.globals = decoder.declarations(&mut reader, global)?
-            }
-            SectionKind::Tag => {
-                declarations.tags = decoder.declarations(&mut reader, |_, r| tag_type(r))?
-            }
-            SectionKind::Export => {
-                declarations.exports = decoder.declarations(&mut reader, export)?
-            }
-            SectionKind::Start => {
-                declarations.start = Some(Declaration {
-                    offset: reader.position(),
-                    value: reader.u32()?,
-                })
-            }
-            SectionKind::Element => {
-                declarations.elements = decoder.declarations(&mut reader, element)?
-            }
-            SectionKind::Data => declarations.data = decoder.declarations(&mut reader, data)?,
-            SectionKind::Code => {
-                functions
-                    .try_reserve_exact(binary.functions.len())
-                    .map_err(|_| reader.error(Fault::LimitExceeded))?;
-                for body in binary.functions.drain(..) {
-                    let mut source = Reader::new(body.instructions, body.offset);
-                    let instructions = expression(&mut source, &mut decoder.code, cancellation)?;
-                    source.finish()?;
-                    functions.push(Declaration {
-                        offset: body.offset,
-                        value: Function {
-                            type_index: body.type_index,
-                            locals: body.locals,
-                            instructions,
-                        },
-                    });
-                }
-                continue;
-            }
-            SectionKind::Custom | SectionKind::Function | SectionKind::DataCount => continue,
+        if section.kind == SectionKind::Code {
+            functions = decoder.functions(binary.functions.drain(..), &reader)?;
+        } else if deferred(section.kind) {
+            decoder.borrowing_section(section.kind, &mut reader, &mut declarations)?;
+        } else {
+            decoder.owned_section(section.kind, &mut reader, &mut declarations)?;
         }
-        reader.finish()?;
     }
     binary
         .sections
@@ -115,13 +65,100 @@ pub fn decode_module<'a>(
     })
 }
 
+mod streaming;
+pub use streaming::StreamingDecoder;
+
+fn deferred(kind: SectionKind) -> bool {
+    matches!(
+        kind,
+        SectionKind::Import | SectionKind::Export | SectionKind::Data
+    )
+}
+
 struct Decoder<'a> {
     cancellation: &'a CancellationToken,
     remaining_entries: usize,
     code: InstructionLimits,
 }
 
-impl Decoder<'_> {
+impl<'token> Decoder<'token> {
+    fn new(limits: DecodeLimits, cancellation: &'token CancellationToken) -> Self {
+        Self {
+            cancellation,
+            remaining_entries: limits.declaration_entries,
+            code: limits.code,
+        }
+    }
+
+    fn functions<'bytes>(
+        &mut self,
+        bodies: impl ExactSizeIterator<Item = crate::FunctionBody<'bytes>>,
+        reader: &Reader<'_>,
+    ) -> Result<Vec<Declaration<Function>>, BinaryError> {
+        let mut functions = Vec::new();
+        functions
+            .try_reserve_exact(bodies.len())
+            .map_err(|_| reader.error(Fault::LimitExceeded))?;
+        for body in bodies {
+            let mut source = Reader::new(body.instructions, body.offset);
+            let instructions = expression(&mut source, &mut self.code, self.cancellation)?;
+            source.finish()?;
+            functions.push(Declaration {
+                offset: body.offset,
+                value: Function {
+                    type_index: body.type_index,
+                    locals: body.locals,
+                    instructions,
+                },
+            });
+        }
+        Ok(functions)
+    }
+
+    fn owned_section(
+        &mut self,
+        kind: SectionKind,
+        reader: &mut Reader<'_>,
+        declarations: &mut Declarations<'_>,
+    ) -> Result<(), BinaryError> {
+        match kind {
+            SectionKind::Type => declarations.types = self.declarations(reader, function_type)?,
+            SectionKind::Table => declarations.tables = self.declarations(reader, table)?,
+            SectionKind::Memory => {
+                declarations.memories = self.declarations(reader, |_, r| allocation_limits(r))?;
+            }
+            SectionKind::Global => declarations.globals = self.declarations(reader, global)?,
+            SectionKind::Tag => {
+                declarations.tags = self.declarations(reader, |_, r| tag_type(r))?
+            }
+            SectionKind::Start => {
+                declarations.start = Some(Declaration {
+                    offset: reader.position(),
+                    value: reader.u32()?,
+                });
+            }
+            SectionKind::Element => declarations.elements = self.declarations(reader, element)?,
+            SectionKind::Custom | SectionKind::Function | SectionKind::DataCount => return Ok(()),
+            _ => unreachable!("section decoded separately"),
+        }
+        reader.finish()
+    }
+
+    fn borrowing_section<'bytes>(
+        &mut self,
+        kind: SectionKind,
+        reader: &mut Reader<'bytes>,
+        declarations: &mut Declarations<'bytes>,
+    ) -> Result<(), BinaryError> {
+        match kind {
+            SectionKind::Import => declarations.imports = self.declarations(reader, import)?,
+            SectionKind::Export => declarations.exports = self.declarations(reader, export)?,
+            SectionKind::Data => declarations.data = self.declarations(reader, data)?,
+            _ => unreachable!("section without borrowed declarations"),
+        }
+        reader.finish()
+    }
+
     fn vector<'a, T>(
         &mut self,
         reader: &mut Reader<'a>,

@@ -1,8 +1,9 @@
 use rustic_base::CancellationToken;
 use rustic_wasm::{
     BinaryLimits, DecodeLimits, ExecutionLimits, ExportIndex, FunctionImport, FunctionType,
-    ImportType, Instance, InstanceLimits, InstructionLimits, Opcode, ValidatedModule,
-    ValidationLimits, Value, decode_instructions, decode_module, scan_module, validate_module,
+    ImportType, Instance, InstanceLimits, InstructionLimits, Opcode, StreamingDecoder,
+    ValidatedModule, ValidationLimits, Value, decode_instructions, decode_module, scan_module,
+    validate_module,
 };
 
 use crate::Target;
@@ -60,6 +61,25 @@ impl Target for WasmBinaryTarget {
 
     fn check(&self, input: &[u8]) -> Result<(), String> {
         let token = CancellationToken::default();
+        let limits = DecodeLimits::default();
+        let decoded = decode_module(input, limits, &token);
+        let mut streaming = StreamingDecoder::new(limits, &token);
+        let stream = input
+            .chunks(1 + input.len() % 17)
+            .try_for_each(|chunk| streaming.push(chunk))
+            .and_then(|()| {
+                streaming.finish(|bytes, module| {
+                    bytes == input && decoded.as_ref().is_ok_and(|whole| whole == &module)
+                })
+            });
+        match (decoded.is_ok(), stream) {
+            (true, Ok((_, true))) => {}
+            (false, Err(error)) if error.offset <= input.len() => {}
+            (_, Err(error)) if error.offset > input.len() => {
+                return Err(format!("stream decoder error outside input: {error}"));
+            }
+            _ => return Err("stream and complete decoders disagree".to_owned()),
+        }
         let module = match scan_module(input, BinaryLimits::default(), &token) {
             Ok(module) => module,
             Err(error) if error.offset <= input.len() => return Ok(()),
@@ -100,7 +120,7 @@ impl Target for WasmBinaryTarget {
                 return Err("decoded instruction offsets do not cover the body in order".to_owned());
             }
         }
-        let decoded = match decode_module(input, DecodeLimits::default(), &token) {
+        let decoded = match decoded {
             Ok(module) => module,
             Err(error) if error.offset <= input.len() => return Ok(()),
             Err(error) => return Err(format!("module decoder error outside input: {error}")),

@@ -32,8 +32,9 @@ consumes the body through the same used flag as the Fetch body mixin.
 ## Consequences and revisit trigger
 
 The initial asynchronous path runs bounded compilation as an agent job, using
-the Fetch binding's buffered body. TD-200 tracks moving it to an appropriate
-task source with an incrementally decoded body. A retained module's code can
+the Fetch binding's buffered body. [ADR 0094](0094-wasm-progressive-response-decoding.md)
+adds incremental input. TD-200 tracks moving compilation and fulfillment to
+the networking task source. A retained module's code can
 share the byte snapshot when the ownership model for executable instances is
 introduced. Instantiation and JavaScript import/export adapters will extend
 the module boundary.

@@ -312,6 +312,20 @@ impl FetchResponse {
         self.kind != ResponseType::Opaque && self.internal.url_list.len() > 1
     }
 
+    /// Pull one piece of the filtered body. Opaque responses expose no bytes.
+    pub fn next_body_chunk(&self, timeout: Duration) -> Result<Option<Vec<u8>>, NetworkError> {
+        if !matches!(self.kind, ResponseType::Basic | ResponseType::Cors) {
+            return Ok(None);
+        }
+        match self.internal.exchange.next_event(Some(timeout)) {
+            Some(NetEvent::Body(bytes)) => Ok(Some(bytes)),
+            Some(NetEvent::Finished) => Ok(None),
+            Some(NetEvent::Failed(error)) => Err(NetworkError::Transport(error)),
+            Some(NetEvent::Response(_)) => unreachable!("one head per exchange"),
+            None => Err(NetworkError::BodyTimeout),
+        }
+    }
+
     /// Read the whole visible body, waiting at most `timeout` per piece.
     /// Opaque responses have no visible body and yield an empty one
     /// without reading the network.

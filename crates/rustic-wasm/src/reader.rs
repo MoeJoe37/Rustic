@@ -168,7 +168,7 @@ impl<'a> Reader<'a> {
         })
     }
 
-    pub(crate) fn finish(self) -> Result<(), BinaryError> {
+    pub(crate) fn finish(&self) -> Result<(), BinaryError> {
         if self.rest.is_empty() {
             Ok(())
         } else {

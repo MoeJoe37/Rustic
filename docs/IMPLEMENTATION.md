@@ -2790,7 +2790,7 @@ for one frame; downloads get no quarantine metadata.
 
 Added 2026-11-21 (`rustic-cli/src/loader.rs` `render_layers`,
 `rustic-cli/src/broker.rs` `open_frame`, `rustic_net::navigation::FrameContainer`,
-`rustic_raster::Surface::add_frame`, IPC protocol version 2,
+`rustic_raster::Surface::add_frame`, the protocol 2 frame messages,
 [ADR 0062](adr/0062-out-of-process-frames.md)). In a split `render`, each
 `<iframe>` document is loaded by the broker and rendered in a renderer of
 its own with its own grant; the embedding renderer receives a handle, never
@@ -3391,7 +3391,7 @@ Reference-valued host calls, table bindings and threaded memories remain open.
 ### WASM-06 — Window module compilation and MIME/CSP
 
 Window exposes `WebAssembly.validate`, `new WebAssembly.Module`, `compile`
-and buffered `compileStreaming`, plus the WebAssembly error constructors.
+and `compileStreaming`, plus the WebAssembly error constructors.
 Module reflection reports ordered imports and exports and returns independent
 copies of matching custom sections. Compilation uses the original decoder,
 with per-operation resource and cancellation limits. Promise jobs retain
@@ -3403,7 +3403,7 @@ construction and both compilation entry points independently of string
 evaluation. Validation can run under a compilation restriction. The eight
 pinned Window WPT files cover compilation, validation and module reflection.
 All 120 subtests pass.
-Imported string builtins and a progressive response pipeline remain open.
+Imported string builtins and asynchronous compilation scheduling remain open.
 [ADR 0080](adr/0080-window-wasm-module-compilation.md)
 
 ### ECMAScript Annex B — Legacy percent functions
@@ -3434,7 +3434,7 @@ The standard-library heap baseline grew by 328 bytes for the Annex B
 `escape` and `unescape` function objects and their properties. The standalone
 ECMAScript agent still has no Window Wasm objects.
 
-Shared memories and the progressive response pipeline remain open.
+Shared memories remain open.
 [ADR 0081](adr/0081-owned-wasm-instances.md)
 
 Window implements numeric `WebAssembly.Global` construction, `value` and
@@ -3646,3 +3646,21 @@ cell, reference arguments and results, and suspended frames. Regressions cover
 callback result coercion, GC during reentry, direct and indirect calls across
 instances, global re-exports, and collection after overwriting a global.
 [ADR 0093](adr/0093-wasm-reference-interop.md)
+
+
+### WASM-06 — Progressive Fetch compilation
+
+For readable `application/wasm` network responses, Fetch supplies filtered
+headers and a private body reader. The single-process and brokered renderer
+paths pull chunks under bounded transport buffers. The incremental decoder
+checks complete sections as they arrive and retains the decoded declarations
+and code. It validates the complete module and builds reflection metadata at
+EOF. A decoding error can reject and close the body before the rest arrives.
+Both stream entry points enforce the MIME, status, CSP, byte and work limits.
+
+IPC protocol 3 adds renderer-scoped Fetch body handles and bounded pull and
+close messages. The broker remains responsible for network policy and limits.
+Fetch body methods can consume the same reader, and cloning buffers the body
+for the two consumers. Constructed responses and other MIME types continue
+through the buffered body path. TD-200 tracks task scheduling off the agent's
+promise reaction. [ADR 0094](adr/0094-wasm-progressive-response-decoding.md)

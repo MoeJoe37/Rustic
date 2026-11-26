@@ -853,3 +853,75 @@ fn document_csp_gates_wasm_compilation_with_its_own_source_keyword() {
         );
     }
 }
+
+#[test]
+fn wasm_streaming_decodes_partial_network_bodies_in_both_renderer_modes() {
+    let bytes = b"\0asm\x01\0\0\0\x01\x05\x01\x60\0\x01\x7f\x03\x02\x01\0\x07\x07\x01\x03run\0\0\x0a\x06\x01\x04\0\x41\x2a\x0b";
+    let html = br#"<!doctype html><p id=result>pending</p><script>
+        Promise.all([
+            fetch("/wasm").then(response =>
+                WebAssembly.instantiateStreaming(response).then(({instance}) =>
+                    instance.exports.run() + ":" + response.bodyUsed)),
+            fetch("/wasm").then(response => {
+                const clone = response.clone();
+                return Promise.all([response.arrayBuffer(), clone.bytes()]).then(([a,b]) =>
+                    String(new Uint8Array(a).join() === b.join()));
+            }),
+            fetch("/bad").then(response =>
+                WebAssembly.compileStreaming(response).then(() => "unexpected",
+                    error => error.name + ":" + response.bodyUsed)),
+            fetch("/short").then(response => {
+                const clone = response.clone();
+                return Promise.all([response.arrayBuffer(), clone.bytes()].map(promise =>
+                    promise.then(() => "unexpected", error => error.name))).then(x => x.join(":"));
+            })
+        ]).then(values => document.getElementById("result").textContent = values.join("/"),
+                error => document.getElementById("result").textContent = error.name);
+    </script>"#;
+    let head = b"HTTP/1.1 200 OK\r\nContent-Type: application/wasm\r\nCache-Control: no-store\r\n";
+    let server = FixtureServer::start([
+        (
+            "/",
+            Reply::response(200, &[("Content-Type", "text/html")], html),
+        ),
+        (
+            "/wasm",
+            Reply::new()
+                .send(head.to_vec())
+                .send(format!("Content-Length: {}\r\n\r\n", bytes.len()).into_bytes())
+                .drip(bytes, 3, std::time::Duration::from_millis(6)),
+        ),
+        // The declared trailing bytes never arrive. Compilation must reject
+        // from the delivered code section without waiting for body EOF.
+        (
+            "/bad",
+            Reply::new()
+                .send(head.to_vec())
+                .send(b"Content-Length: 512\r\n\r\n\0asm\x01\0\0\0\x01\x04\x01\x60\0\0\x03\x02\x01\0\x0a\x05\x01\x03\0\xff\x0b".to_vec())
+                .hold(),
+        ),
+        ("/short", Reply::new().send(head.to_vec())
+            .send(b"Content-Length: 512\r\n\r\n\0asm\x01\0\0\0".to_vec())),
+    ])
+    .unwrap();
+    let grant = format!("http://a.test={}", server.address());
+    for single in [false, true] {
+        let mut args = vec![
+            "dump-dom",
+            "--run-scripts",
+            "--allow-origin",
+            &grant,
+            "http://a.test/",
+        ];
+        if single {
+            args.push("--single-process");
+        }
+        let output = rustic(&args);
+        assert!(output.status.success(), "{}", stderr(&output));
+        assert!(
+            stdout(&output).contains("42:true/true/CompileError:true/TypeError:TypeError"),
+            "{}",
+            stdout(&output)
+        );
+    }
+}

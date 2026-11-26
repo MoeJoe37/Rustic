@@ -170,18 +170,7 @@ pub fn scan_module<'a>(
     if bytes.len() > limits.module_bytes {
         return Err(source.error(Fault::LimitExceeded));
     }
-    if source.take(4)? != b"\0asm" {
-        return Err(BinaryError {
-            offset: 0,
-            kind: Fault::BadMagic,
-        });
-    }
-    if source.take(4)? != [1, 0, 0, 0] {
-        return Err(BinaryError {
-            offset: 4,
-            kind: Fault::UnsupportedVersion,
-        });
-    }
+    header(&mut source)?;
 
     let mut module = BinaryModule {
         sections: Vec::new(),
@@ -196,18 +185,10 @@ pub fn scan_module<'a>(
         if module.sections.len() >= limits.sections {
             return Err(source.error(Fault::LimitExceeded));
         }
-        let at = source.position();
-        let id = source.byte()?;
-        let kind = SectionKind::from_id(id)
-            .filter(|kind| *kind == SectionKind::Custom || *kind > previous)
-            .ok_or(BinaryError {
-                offset: at,
-                kind: Fault::InvalidSection,
-            })?;
+        let (kind, mut payload) = section_payload(&mut source, previous)?;
         if kind != SectionKind::Custom {
             previous = kind;
         }
-        let mut payload = source.sized_span()?;
         let name = if kind == SectionKind::Custom {
             Some(payload.name()?)
         } else {
@@ -252,7 +233,37 @@ pub fn scan_module<'a>(
     Ok(module)
 }
 
-fn function_types(
+pub(crate) fn header(source: &mut Reader<'_>) -> Result<(), BinaryError> {
+    if source.take(4)? != b"\0asm" {
+        return Err(BinaryError {
+            offset: 0,
+            kind: Fault::BadMagic,
+        });
+    }
+    if source.take(4)? != [1, 0, 0, 0] {
+        return Err(BinaryError {
+            offset: 4,
+            kind: Fault::UnsupportedVersion,
+        });
+    }
+    Ok(())
+}
+
+pub(crate) fn section_payload<'a>(
+    source: &mut Reader<'a>,
+    previous: SectionKind,
+) -> Result<(SectionKind, Reader<'a>), BinaryError> {
+    let at = source.position();
+    let kind = SectionKind::from_id(source.byte()?)
+        .filter(|kind| *kind == SectionKind::Custom || *kind > previous)
+        .ok_or(BinaryError {
+            offset: at,
+            kind: Fault::InvalidSection,
+        })?;
+    Ok((kind, source.sized_span()?))
+}
+
+pub(crate) fn function_types(
     mut payload: Reader<'_>,
     limit: usize,
     cancellation: &CancellationToken,
@@ -267,7 +278,7 @@ fn function_types(
     Ok(types)
 }
 
-fn function_bodies<'a>(
+pub(crate) fn function_bodies<'a>(
     mut payload: Reader<'a>,
     types: &[u32],
     limits: BinaryLimits,

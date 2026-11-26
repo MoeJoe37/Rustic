@@ -228,8 +228,8 @@ Unimplemented Web APIs are absent from the exposed interface.
 | Text encoding | `TextEncoder.encode()` and `encodeInto()`, and `TextDecoder.decode()` with streaming state, BOM handling and fatal mode | [Encoding guide](ENCODING.md), [ADR 0075](adr/0075-web-text-encoding.md) |
 | URL | `URL`, `URL.canParse()`, `URL.parse()` and live `URLSearchParams`, including component setters on `URL` | Structured URL record and pinned Window tests. [URL guide](URL.md), [ADR 0076](adr/0076-window-url-and-search-params.md) |
 | Fetch and Blob | Buffered string, unshared fixed-length buffer, `URLSearchParams` and Blob bodies. Body readers include `text()`, `json()`, `arrayBuffer()`, `bytes()` and `blob()`. The `Blob` constructor, slicing, repeatable buffered reads and `Response.json()` are exposed | Headers and bodies follow the supported Fetch policy and consumption rules. Stream bodies, `File` and `FormData` remain open. [NET-03 ledger](IMPLEMENTATION.md#net-03--fetch-headers-request-and-response) |
-| Wasm compilation | `validate`, `compile`, `Module` reflection, `instantiate` and the Fetch-response entry points | Buffered `compileStreaming` and `instantiateStreaming` check Fetch status and Wasm MIME. Compilation follows document CSP. [Compilation evidence](IMPLEMENTATION.md#wasm-06--window-module-compilation-and-mimecsp) |
-| Wasm state and linking | Numeric and nullable reference-valued function and global imports/exports, shared identity for linked globals, and unshared 32-bit and 64-bit memories with fixed or resizable buffers. Standalone `WebAssembly.Table` supports `anyfunc` and `externref`. Module-defined nullable function and external-reference tables have live JS exports. Standalone and exported `funcref` and `externref` tables can be imported and re-exported in both address widths. Indirect calls carry scalar and nullable reference values across instances | Shared Wasm memories and progressive streaming remain open. [Runtime evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), [live table exports](IMPLEMENTATION.md#wasm-06--live-function-table-exports) |
+| Wasm compilation | `validate`, `compile`, `Module` reflection, `instantiate` and the Fetch-response entry points | `compileStreaming` and `instantiateStreaming` decode completed sections as response bytes arrive after MIME, status and CSP checks. [Compilation evidence](IMPLEMENTATION.md#wasm-06--window-module-compilation-and-mimecsp) |
+| Wasm state and linking | Numeric and nullable reference-valued function and global imports/exports, shared identity for linked globals, and unshared 32-bit and 64-bit memories with fixed or resizable buffers. Standalone `WebAssembly.Table` supports `anyfunc` and `externref`. Module-defined nullable function and external-reference tables have live JS exports. Standalone and exported `funcref` and `externref` tables can be imported and re-exported in both address widths. Indirect calls carry scalar and nullable reference values across instances | Shared Wasm memories and reference/GC types beyond the nullable table and global profile remain open. [Runtime evidence](IMPLEMENTATION.md#wasm-0102--module-decoding-and-core-validation), [live table exports](IMPLEMENTATION.md#wasm-06--live-function-table-exports) |
 
 ## Crates
 
@@ -472,8 +472,7 @@ The [technical debt ledger](TECH_DEBT.md#payoff-schedule) is the source of
 current targets for remaining DOM, HTML, CSSOM and Window work. Key items
 include realm lifetime (TD-118), cross-context scripting (TD-130 and TD-178),
 dynamic markup and modules (TD-133 and TD-135), error locations and handler
-attributes (TD-152 and TD-153), and Streams (TD-169). Progressive Wasm
-compilation is tracked in TD-200.
+attributes (TD-152 and TD-153), and Streams (TD-169). Off-thread scheduling and completion for Wasm compilation are tracked in TD-200.
 
 ## Adding an interface
 

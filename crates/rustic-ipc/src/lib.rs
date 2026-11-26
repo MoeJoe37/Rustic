@@ -30,7 +30,7 @@ pub use wire::{DecodeError, Reader, Writer};
 pub const MAGIC: &[u8; 8] = b"RUSTICIP";
 /// The protocol version this build speaks. Peers must match exactly: the
 /// broker and renderer are always the same executable.
-pub const PROTOCOL_VERSION: u16 = 2;
+pub const PROTOCOL_VERSION: u16 = 3;
 
 /// Which end of the channel a process is.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

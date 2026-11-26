@@ -83,11 +83,32 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
                 status_text: b"Created".to_vec(),
                 headers: vec![("x".into(), b"1".to_vec())],
                 body: b"{}".to_vec(),
+                stream: None,
             }),
         },
         BrokerMessage::Fetch {
             id: 10,
             result: None,
+        },
+        BrokerMessage::Fetch {
+            id: 21,
+            result: Some(FetchResponse {
+                status: 200,
+                stream: Some(u64::MAX),
+                ..Default::default()
+            }),
+        },
+        BrokerMessage::FetchBody {
+            id: 22,
+            result: Ok(Some(vec![0, 97, 115, 109])),
+        },
+        BrokerMessage::FetchBody {
+            id: 23,
+            result: Ok(None),
+        },
+        BrokerMessage::FetchBody {
+            id: 24,
+            result: Err(ResourceFailure::Blocked),
         },
         BrokerMessage::Storage {
             id: 11,
@@ -203,6 +224,16 @@ fn samples() -> (Vec<BrokerMessage>, Vec<RendererMessage>) {
                 redirect: "follow".into(),
                 referrer_policy: String::new(),
             },
+        },
+        RendererMessage::FetchBody {
+            id: 18,
+            stream: u64::MAX,
+            close: false,
+        },
+        RendererMessage::FetchBody {
+            id: 19,
+            stream: 4,
+            close: true,
         },
         RendererMessage::Storage {
             id: 4,

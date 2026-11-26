@@ -670,6 +670,7 @@ impl rustic_engine::FetchHost for EchoNetwork {
                 ("x-a".to_owned(), b"1".to_vec()),
             ],
             body: body.into_bytes(),
+            reader: None,
         })
     }
 }

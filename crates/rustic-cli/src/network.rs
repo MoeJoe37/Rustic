@@ -18,7 +18,7 @@
 //! responses are checked for status and, for scripts and stylesheets,
 //! for their MIME type (`X-Content-Type-Options: nosniff`).
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
@@ -54,6 +54,7 @@ const MAX_ORIGIN_GRANTS: usize = 64;
 const MAX_CA_FILE_BYTES: u64 = 1024 * 1024;
 /// How long to wait for a response head, and for each piece of a body.
 pub(crate) const NETWORK_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const MAX_STREAMED_FETCH_BODIES: usize = 16;
 /// Most distinct stylesheet charsets remembered per document.
 const MAX_REMEMBERED_CHARSETS: usize = 4096;
 
@@ -326,6 +327,7 @@ pub(crate) enum ResourceKind {
 pub(crate) struct NetworkSession {
     /// Shared with the session's frames (one cookie jar and cache).
     fetcher: Rc<RefCell<Fetcher>>,
+    live_fetch_bodies: Rc<Cell<usize>>,
     document_url: Url,
     origin: Origin,
     csp: CspList,
@@ -664,6 +666,7 @@ impl NetworkSession {
         let secure = mixed_content::is_secure_context(&origin, None);
         Self {
             fetcher: Rc::new(RefCell::new(fetcher)),
+            live_fetch_bodies: Rc::new(Cell::new(0)),
             document_url,
             origin,
             csp: CspList::from_container(policy),
@@ -755,6 +758,7 @@ impl NetworkSession {
         let secure = mixed_content::is_secure_context(&origin, None);
         let session = Self {
             fetcher: Rc::clone(&self.fetcher),
+            live_fetch_bodies: Rc::clone(&self.live_fetch_bodies),
             document_url,
             csp: CspList::from_container(&policy),
             secure,
@@ -907,6 +911,7 @@ impl NetworkSession {
         let secure = mixed_content::is_secure_context(&origin, None);
         let session = Self {
             fetcher: Rc::clone(&self.fetcher),
+            live_fetch_bodies: Rc::clone(&self.live_fetch_bodies),
             document_url,
             csp: CspList::from_container(&policy),
             secure,
@@ -1467,14 +1472,36 @@ impl NetworkSession {
         let redirected = response.redirected();
         let status = response.status();
         let status_text = response.status_message().to_vec();
-        let headers = response
+        let headers: Vec<_> = response
             .headers()
             .iter()
             .map(|(name, value)| (name.to_owned(), value.to_vec()))
             .collect();
-        let body = response
-            .read_body(NETWORK_TIMEOUT)
-            .map_err(|_| rustic_engine::NetworkFailure)?;
+        let mut content_type = headers
+            .iter()
+            .filter(|(name, _)| name.eq_ignore_ascii_case("content-type"));
+        let wasm = content_type
+            .next()
+            .is_some_and(|(_, value)| value.trim_ascii().eq_ignore_ascii_case(b"application/wasm"))
+            && content_type.next().is_none();
+        let in_flight = session.live_fetch_bodies.get();
+        let (body, reader) =
+            if wasm && matches!(kind, "basic" | "cors") && in_flight < MAX_STREAMED_FETCH_BODIES {
+                session.live_fetch_bodies.set(in_flight + 1);
+                let reader = WasmResponseReader {
+                    response,
+                    live_bodies: Rc::clone(&session.live_fetch_bodies),
+                };
+                (
+                    Vec::new(),
+                    Some(Rc::new(reader) as Rc<dyn rustic_engine::ScriptBodyReader>),
+                )
+            } else {
+                let body = response
+                    .read_body(NETWORK_TIMEOUT)
+                    .map_err(|_| rustic_engine::NetworkFailure)?;
+                (body, None)
+            };
         Ok(rustic_engine::ScriptResponse {
             kind,
             url,
@@ -1483,7 +1510,28 @@ impl NetworkSession {
             status_text,
             headers,
             body,
+            reader,
         })
+    }
+}
+
+#[derive(Debug)]
+struct WasmResponseReader {
+    response: FetchResponse,
+    live_bodies: Rc<Cell<usize>>,
+}
+
+impl Drop for WasmResponseReader {
+    fn drop(&mut self) {
+        self.live_bodies.set(self.live_bodies.get() - 1);
+    }
+}
+
+impl rustic_engine::ScriptBodyReader for WasmResponseReader {
+    fn next_chunk(&self) -> Result<Option<Vec<u8>>, rustic_engine::NetworkFailure> {
+        self.response
+            .next_body_chunk(NETWORK_TIMEOUT)
+            .map_err(|_| rustic_engine::NetworkFailure)
     }
 }
 

@@ -336,6 +336,13 @@ and the interpreter remains available without executable-memory permission.
 [ADR 0087](adr/0087-wasm-resizable-buffers.md), [ADR 0088](adr/0088-window-wasm-tables.md),
 [ADR 0089](adr/0089-live-wasm-function-tables.md), [ADR 0090](adr/0090-live-wasm-external-tables.md), [ADR 0091](adr/0091-wasm-external-table-imports.md), [ADR 0092](adr/0092-wasm-function-table-imports.md), [ADR 0093](adr/0093-wasm-reference-interop.md)
 
+Filtered Wasm responses can pass a private body reader to the Window binding.
+The renderer pulls chunks by a broker-scoped handle or directly in
+single-process mode. A bounded section decoder runs in the renderer and
+keeps reflection bytes until the module is validated. The broker retains
+request authority and normal transport backpressure.
+[ADR 0094](adr/0094-wasm-progressive-response-decoding.md)
+
 The extension design assigns execution under distinct principals/realms through broker-checked
 capabilities, with isolated content-script worlds and attributed messages. Native
 MV2 blocking callbacks and trusted compiled filters share a deterministic request

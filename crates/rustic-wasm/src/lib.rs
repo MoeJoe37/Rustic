@@ -34,7 +34,7 @@ pub use module::{
     GlobalType, Import, ImportType, Limits, Table, TableType,
 };
 pub use reader::{BinaryError, BinaryErrorKind};
-pub use sections::{DecodeLimits, decode_module};
+pub use sections::{DecodeLimits, StreamingDecoder, decode_module};
 pub use validate::{
     IndexSpace, ValidatedModule, ValidationError, ValidationErrorKind, ValidationLimits,
     validate_module,

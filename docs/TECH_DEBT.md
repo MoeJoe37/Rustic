@@ -264,7 +264,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-197 | Deliberate | Desktop host | **Partly paid 2026-11-23 (ADR 0074):** composition reaches the focused page field as well as the browser's own. Remaining: CI exercises it with synthetic events through the host's handler, not with the platforms' input methods (IBus, TSF, macOS text input) | Partly paid, M10 (beta input-method runs) |
 | TD-198 | Deliberate | Network / CLI | Frame and popup documents are read whole in the broker before their renderer parses them; only top-level documents stream | Open, M12 |
 | TD-199 | Deliberate | Dependencies / accessibility | The AT-SPI graph of AccessKit 0.25 carries quick-xml 0.38 (RUSTSEC-2026-0194/0195, reached only by atspi-common's own tests) and the unmaintained zvariant, zvariant_derive and zbus_names (RUSTSEC-2026-0370..0372); `deny.toml` ignores them with reasons | Open, M10 |
-| TD-200 | Deliberate | WebAssembly | Module compilation runs as bounded promise jobs over buffered input | Open, M9 |
+| TD-200 | Deliberate | WebAssembly | The progressive decoder pulls response chunks and compiles in an agent promise reaction | Partly paid by ADR 0094, M9 |
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -3318,15 +3318,16 @@ Scripted window tests (`crates/rustic-cli/tests/view.rs`) run on native
 Windows and macOS (x64, ARM64) and on Linux under Xvfb and headless Weston.
 IME composition into pages is TD-197.
 
-### TD-200 — WebAssembly compilation jobs use buffered input
+### TD-200 — WebAssembly compilation runs on the agent
 
-The Window `compile` and `compileStreaming` paths run bounded decoding as
-promise jobs. Fetch exposes a buffered response, so compilation starts after
-the full body has been admitted. This gives module byte snapshots and CSP/MIME
-gates before the engine has background compilation or a stream reader.
-**Pay:** use cancellable incremental input and a dedicated completion task
-when the M9 Wasm/Streams integration exposes those boundaries.
-[ADR 0080](adr/0080-window-wasm-module-compilation.md)
+[ADR 0080](adr/0080-window-wasm-module-compilation.md) first compiled
+admitted response bodies in a promise job. [ADR 0094](adr/0094-wasm-progressive-response-decoding.md)
+adds cancellable, incremental response decoding in both renderer modes.
+The promise reaction still performs pulls and compilation on the agent.
+
+**Pay the rest:** move response reading and compilation off the agent and
+settle the promise from the networking task source. Keep cancellation,
+MIME/CSP policy and result ownership checked at that boundary.
 
 ### TD-201 — Transform interpolation edge cases
 

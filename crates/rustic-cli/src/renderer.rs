@@ -638,6 +638,7 @@ impl BrokerLink {
             | BrokerMessage::Prefetched { id }
             | BrokerMessage::DocumentChunk { id, .. }
             | BrokerMessage::Fetch { id, .. }
+            | BrokerMessage::FetchBody { id, .. }
             | BrokerMessage::Storage { id, .. }
             | BrokerMessage::Frame { id, .. }
             | BrokerMessage::Popup { id, .. }
@@ -655,6 +656,56 @@ impl BrokerLink {
 fn lost(error: &IpcError) -> ! {
     eprintln!("rustic renderer: lost the broker: {error}");
     std::process::exit(1);
+}
+
+struct BrokerBodyReader {
+    link: Rc<BrokerLink>,
+    stream: u64,
+    done: std::cell::Cell<bool>,
+}
+
+impl std::fmt::Debug for BrokerBodyReader {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BrokerBodyReader")
+            .field("stream", &self.stream)
+            .finish_non_exhaustive()
+    }
+}
+
+impl rustic_engine::ScriptBodyReader for BrokerBodyReader {
+    fn next_chunk(&self) -> Result<Option<Vec<u8>>, rustic_engine::NetworkFailure> {
+        if self.done.get() {
+            return Ok(None);
+        }
+        let reply = self
+            .link
+            .request(|id| RendererMessage::FetchBody {
+                id,
+                stream: self.stream,
+                close: false,
+            })
+            .unwrap_or_else(|error| lost(&error));
+        let BrokerMessage::FetchBody { result, .. } = reply else {
+            return Err(rustic_engine::NetworkFailure);
+        };
+        if !matches!(result, Ok(Some(_))) {
+            self.done.set(true);
+        }
+        result.map_err(|_| rustic_engine::NetworkFailure)
+    }
+}
+
+impl Drop for BrokerBodyReader {
+    fn drop(&mut self) {
+        if !self.done.get() {
+            let _ = self.link.request(|id| RendererMessage::FetchBody {
+                id,
+                stream: self.stream,
+                close: true,
+            });
+        }
+    }
 }
 
 /// Loads through the broker. Decisions about inline content use the
@@ -820,6 +871,13 @@ impl Session for BrokeredSession {
             status_text: response.status_text,
             headers: response.headers,
             body: response.body,
+            reader: response.stream.map(|stream| {
+                Rc::new(BrokerBodyReader {
+                    link: Rc::clone(&self.link),
+                    stream,
+                    done: std::cell::Cell::new(false),
+                }) as Rc<dyn rustic_engine::ScriptBodyReader>
+            }),
         })
     }
 

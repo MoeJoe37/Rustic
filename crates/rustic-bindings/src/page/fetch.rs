@@ -8,16 +8,16 @@
 //!
 //! State lives in prototype-less private arrays in a weak map, keyed by
 //! the script object. Header lists are byte strings stored as Latin-1 JS
-//! strings. Bodies are complete byte strings: `text()`, `json()` and
-//! `bodyUsed`, `arrayBuffer()`, `blob()` and `bytes()` work. Streams and
-//! FormData remain part of TD-169.
+//! strings. Bodies can hold buffered bytes or a private native reader.
+//! Body methods consume both representations through the same used flag.
+//! The public ReadableStream interface and FormData remain part of TD-169.
 
-use std::borrow::Cow;
 use std::fmt::Debug;
 use std::rc::Rc;
+use std::{borrow::Cow, cell::RefCell};
 
 use rustic_js::runtime::{
-    Abrupt, Agent, ErrorKind, JsResult, NativeFn, ObjectId, PropertyKey, Value, to_uint16,
+    Abrupt, Agent, ErrorKind, JsResult, NativeFn, ObjectId, PropertyKey, StringId, Value, to_uint16,
 };
 use rustic_net::cors::{
     is_cors_safelisted_method, is_forbidden_method, is_forbidden_request_header,
@@ -51,7 +51,7 @@ pub struct ScriptRequest {
 }
 
 /// A filtered response from the host.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct ScriptResponse {
     /// `basic`, `cors`, `opaque` or `opaqueredirect`.
     pub kind: &'static str,
@@ -65,8 +65,51 @@ pub struct ScriptResponse {
     pub status_text: Vec<u8>,
     /// The visible header list.
     pub headers: Vec<(String, Vec<u8>)>,
-    /// The visible body.
+    /// The visible body if delivered in one buffer.
     pub body: Vec<u8>,
+    /// A deferred visible body. When present, `body` is empty.
+    pub reader: Option<Rc<dyn ScriptBodyReader>>,
+}
+
+/// A pull reader for a filtered response body. It must not call into script.
+pub trait ScriptBodyReader: Debug {
+    /// Read the next chunk, returning `None` only at a clean end of body.
+    fn next_chunk(&self) -> Result<Option<Vec<u8>>, NetworkFailure>;
+}
+
+const RESPONSE_STREAM: &str = "Fetch response body reader";
+pub(super) const MAX_STREAM_CHUNKS: usize = 262_144;
+
+struct Source(RefCell<Option<Rc<dyn ScriptBodyReader>>>);
+
+fn streamed_body(agent: &Agent, value: Value) -> Option<Rc<Source>> {
+    agent.host_state(value.as_object()?, RESPONSE_STREAM)
+}
+
+impl Source {
+    fn take(&self) -> Result<Rc<dyn ScriptBodyReader>, NetworkFailure> {
+        self.0.borrow_mut().take().ok_or(NetworkFailure)
+    }
+}
+
+/// Buffer a deferred body for callers which need all its bytes.
+pub fn read_script_body(reader: &dyn ScriptBodyReader) -> Result<Vec<u8>, NetworkFailure> {
+    let mut buffer = Vec::new();
+    let limit = usize::try_from(rustic_net::TransportLimits::default().max_body_bytes)
+        .unwrap_or(usize::MAX);
+    for _ in 0..MAX_STREAM_CHUNKS {
+        let Some(chunk) = reader.next_chunk()? else {
+            return Ok(buffer);
+        };
+        if chunk.len() > limit - buffer.len() {
+            return Err(NetworkFailure);
+        }
+        buffer
+            .try_reserve(chunk.len())
+            .map_err(|_| NetworkFailure)?;
+        buffer.extend_from_slice(&chunk);
+    }
+    Err(NetworkFailure)
 }
 
 /// A network error: script sees only a `TypeError`.
@@ -1073,13 +1116,21 @@ struct ResponseParts<'a> {
 }
 
 fn new_response(agent: &mut Agent, parts: ResponseParts<'_>) -> JsResult<Value> {
+    let body = match parts.body {
+        Some(bytes) => bytes_value(agent, bytes)?,
+        None => Value::NULL,
+    };
+    new_response_with_body(agent, parts, body)
+}
+
+fn new_response_with_body(
+    agent: &mut Agent,
+    parts: ResponseParts<'_>,
+    body: Value,
+) -> JsResult<Value> {
     let headers = new_headers(agent, parts.guard, parts.headers)?;
     let proto = prototype(agent, RESPONSE)?;
     let object = Value::object(agent.new_object_with(Some(proto))?);
-    let body = match parts.body {
-        Some(body) => bytes_value(agent, body)?,
-        None => Value::NULL,
-    };
     let url = parts
         .url
         .map(Url::serialize_without_fragment)
@@ -1263,10 +1314,20 @@ fn response_clone(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value
     let headers = record.get(agent, R_HEADERS_RESPONSE)?;
     let headers = self::record(agent, headers, HEADERS)?;
     let (guard, list) = read_list(agent, headers)?;
-    let body = record.get(agent, R_BODY_RESPONSE)?;
-    let body = (!(body == Value::NULL)).then(|| value_bytes(agent, body));
+    let mut body = record.get(agent, R_BODY_RESPONSE)?;
+    if let Some(source) = streamed_body(agent, body) {
+        // An exhausted source makes either subsequent read reject if
+        // draining fails. Each wrapper keeps its own disturbance flag.
+        if let Ok(bytes) = source
+            .take()
+            .and_then(|reader| read_script_body(reader.as_ref()))
+        {
+            body = bytes_value(agent, &bytes)?;
+            record.set(agent, R_BODY_RESPONSE, body)?;
+        }
+    }
     let redirected = record.get(agent, 8)? == Value::TRUE;
-    new_response(
+    new_response_with_body(
         agent,
         ResponseParts {
             kind: &kind,
@@ -1275,9 +1336,10 @@ fn response_clone(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value
             status_text: &status_text,
             headers: &list,
             guard,
-            body: body.as_deref(),
+            body: None,
             redirected,
         },
+        body,
     )
 }
 
@@ -1346,7 +1408,11 @@ fn consume_body<const RESPONSE_BODY: bool, const FORMAT: u8>(
             Vec::new()
         } else {
             record.set(agent, used_slot, Value::TRUE)?;
-            value_bytes(agent, body)
+            if let Some(source) = streamed_body(agent, body) {
+                collect_stream(agent, &source)?
+            } else {
+                value_bytes(agent, body)
+            }
         };
         let owner = this.as_object().expect("branded Body receiver");
         match FORMAT {
@@ -1390,7 +1456,20 @@ fn body_mime_type(agent: &mut Agent, headers: Value) -> JsResult<String> {
         .map_or_else(String::new, |mime| mime.to_string()))
 }
 
-pub(super) fn wasm_response_bytes(agent: &mut Agent, response: Value) -> JsResult<Vec<u8>> {
+pub(super) enum WasmResponseBody {
+    Empty,
+    Bytes(StringId),
+    Reader(Rc<dyn ScriptBodyReader>),
+}
+
+fn collect_stream(agent: &mut Agent, source: &Source) -> JsResult<Vec<u8>> {
+    let reader = source
+        .take()
+        .map_err(|_| type_error(agent, "Failed to read response body"))?;
+    read_script_body(reader.as_ref()).map_err(|_| type_error(agent, "Failed to read response body"))
+}
+
+pub(super) fn wasm_response_body(agent: &mut Agent, response: Value) -> JsResult<WasmResponseBody> {
     let response = record(agent, response, RESPONSE)?;
     let headers = response.get(agent, R_HEADERS_RESPONSE)?;
     let headers = record(agent, headers, HEADERS)?;
@@ -1422,24 +1501,18 @@ pub(super) fn wasm_response_bytes(agent: &mut Agent, response: Value) -> JsResul
     }
     let body = response.get(agent, R_BODY_RESPONSE)?;
     if body == Value::NULL {
-        return Ok(Vec::new());
+        return Ok(WasmResponseBody::Empty);
     }
     response.set(agent, R_USED_RESPONSE, Value::TRUE)?;
-    let text = agent
-        .heap
-        .string(body.as_string().expect("response byte string"));
-    if text.len() > super::wasm::MAX_BYTES {
-        return Err(super::wasm::compile_error(
-            agent,
-            "WebAssembly binary exceeds the input limit",
-        ));
+    if let Some(source) = streamed_body(agent, body) {
+        return source
+            .take()
+            .map(WasmResponseBody::Reader)
+            .map_err(|_| type_error(agent, "Failed to read response body"));
     }
-    let mut bytes = Vec::new();
-    bytes
-        .try_reserve_exact(text.len())
-        .map_err(|_| rustic_js::runtime::OutOfMemory)?;
-    bytes.extend(text.units().map(|unit| unit as u8));
-    Ok(bytes)
+    Ok(WasmResponseBody::Bytes(
+        body.as_string().expect("response byte string"),
+    ))
 }
 
 pub(super) fn settle(
@@ -1482,19 +1555,27 @@ fn fetch(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
         let Ok(response) = host.fetch(request) else {
             return Err(type_error(agent, "Failed to fetch"));
         };
-        new_response(
-            agent,
-            ResponseParts {
-                kind: response.kind,
-                url: response.url.as_ref(),
-                status: response.status,
-                status_text: &response.status_text,
-                headers: &response.headers,
-                guard: GUARD_IMMUTABLE,
-                body: Some(&response.body),
-                redirected: response.redirected,
-            },
-        )
+        let parts = ResponseParts {
+            kind: response.kind,
+            url: response.url.as_ref(),
+            status: response.status,
+            status_text: &response.status_text,
+            headers: &response.headers,
+            guard: GUARD_IMMUTABLE,
+            body: Some(&response.body),
+            redirected: response.redirected,
+        };
+        if let Some(reader) = response.reader {
+            let object = agent.new_host_state(
+                RESPONSE_STREAM,
+                agent.intrinsics.object_prototype,
+                Source(RefCell::new(Some(reader))),
+                0,
+            )?;
+            new_response_with_body(agent, parts, Value::object(object))
+        } else {
+            new_response(agent, parts)
+        }
     })();
     settle(agent, promise, outcome)?;
     Ok(Value::object(promise))

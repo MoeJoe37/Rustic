@@ -341,8 +341,10 @@ pub struct FetchResponse {
     pub status_text: Vec<u8>,
     /// Visible header fields.
     pub headers: Vec<(String, Vec<u8>)>,
-    /// The visible body.
+    /// The visible body when buffered.
     pub body: Vec<u8>,
+    /// Broker-local stream handle when the body is deferred.
+    pub stream: Option<u64>,
 }
 
 /// Which Web Storage area.
@@ -433,6 +435,13 @@ pub enum BrokerMessage {
         /// The response.
         result: Option<FetchResponse>,
     },
+    /// A chunk, end of stream, or failure for a deferred Fetch body.
+    FetchBody {
+        /// The request number.
+        id: u32,
+        /// The chunk, clean EOF, or failure.
+        result: Result<Option<Vec<u8>>, ResourceFailure>,
+    },
     /// The reply to [`RendererMessage::Storage`] number `id`.
     Storage {
         /// The request number.
@@ -503,6 +512,15 @@ pub enum RendererMessage {
         id: u32,
         /// The request.
         request: FetchRequest,
+    },
+    /// Pull the next chunk of a Fetch body or release its handle.
+    FetchBody {
+        /// The request number.
+        id: u32,
+        /// A stream opened by this renderer's broker.
+        stream: u64,
+        /// Release without reading a chunk.
+        close: bool,
     },
     /// A Web Storage operation.
     Storage {
@@ -912,6 +930,28 @@ impl Message for BrokerMessage {
                         writer.bytes(&response.status_text);
                         put_headers(writer, &response.headers);
                         writer.bytes(&response.body);
+                        match response.stream {
+                            Some(stream) => {
+                                writer.u8(1);
+                                writer.u64(stream);
+                            }
+                            None => writer.u8(0),
+                        }
+                    }
+                }
+            }
+            Self::FetchBody { id, result } => {
+                writer.u16(10);
+                writer.u32(*id);
+                match result {
+                    Ok(None) => writer.u8(0),
+                    Ok(Some(chunk)) => {
+                        writer.u8(1);
+                        writer.bytes(chunk);
+                    }
+                    Err(failure) => {
+                        writer.u8(2);
+                        writer.u8(failure_tag(*failure));
                     }
                 }
             }
@@ -1028,6 +1068,11 @@ impl Message for BrokerMessage {
                         status_text: reader.bytes()?,
                         headers: get_headers(reader)?,
                         body: reader.bytes()?,
+                        stream: match reader.u8()? {
+                            0 => None,
+                            1 => Some(reader.u64()?),
+                            _ => return Err(DecodeError::InvalidFlag),
+                        },
                     }),
                     _ => return Err(DecodeError::InvalidFlag),
                 };
@@ -1089,6 +1134,16 @@ impl Message for BrokerMessage {
                 id: reader.u32()?,
                 line: reader.opt_string()?,
             }),
+            10 => {
+                let id = reader.u32()?;
+                let result = match reader.u8()? {
+                    0 => Ok(None),
+                    1 => Ok(Some(reader.bytes()?)),
+                    2 => Err(failure_of(reader.u8()?)?),
+                    _ => return Err(DecodeError::InvalidFlag),
+                };
+                Ok(Self::FetchBody { id, result })
+            }
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }
@@ -1192,6 +1247,12 @@ impl Message for RendererMessage {
                 writer.str(&request.credentials);
                 writer.str(&request.redirect);
                 writer.str(&request.referrer_policy);
+            }
+            Self::FetchBody { id, stream, close } => {
+                writer.u16(14);
+                writer.u32(*id);
+                writer.u64(*stream);
+                writer.bool(*close);
             }
             Self::Storage { id, area, op } => {
                 writer.u16(3);
@@ -1438,6 +1499,11 @@ impl Message for RendererMessage {
             13 => Ok(Self::DocumentChunk { id: reader.u32()? }),
             32 => Ok(Self::AutomationOutput(reader.string()?)),
             33 => Ok(Self::AutomationRead { id: reader.u32()? }),
+            14 => Ok(Self::FetchBody {
+                id: reader.u32()?,
+                stream: reader.u64()?,
+                close: reader.bool()?,
+            }),
             tag => Err(DecodeError::UnknownTag(tag)),
         }
     }

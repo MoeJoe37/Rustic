@@ -56,7 +56,9 @@ pub use events::{AssistiveAction, Composition, InputEvent, KeyInput, Modifiers};
 pub use events::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
-pub use fetch::{FetchHost, NetworkFailure, ScriptRequest, ScriptResponse};
+pub use fetch::{
+    FetchHost, NetworkFailure, ScriptBodyReader, ScriptRequest, ScriptResponse, read_script_body,
+};
 pub use popups::{POPUP_CAPACITY, PopupRequest};
 pub use web_storage::{QuotaExceeded, StorageHost, StorageKind};
 pub use window::{TimerHandler, WindowScheduler};

@@ -47,6 +47,8 @@ generality; Rustic's message set is small.
    answered with a handle) and the `Surface` a `render` sends before
    `Done`: premultiplied pixels and frame layers, which the broker
    validates, composites and encodes.
+   **Protocol 3** (2026-11-26, [ADR 0094](0094-wasm-progressive-response-decoding.md))
+   adds per-renderer Fetch body handles and chunk pulls for Wasm responses.
 6. **No shared memory yet.** Bulk data is copied through the pipe
    (TD-170). Shared memory needs platform calls behind unsafe code or a
    reviewed crate, and validation of every mapped read.

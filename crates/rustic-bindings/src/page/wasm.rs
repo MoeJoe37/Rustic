@@ -14,13 +14,14 @@ use rustic_js::runtime::{
     PropertyKey, Value, to_int32,
 };
 use rustic_wasm::{
-    AddressType, BinaryErrorKind, DecodeLimits, ExportIndex, ImportType, ValidatedModule,
-    ValidationErrorKind, Value as WasmValue, ValueType, decode_module, validate_module,
+    AddressType, BinaryErrorKind, DecodeLimits, DecodedModule, ExportIndex, ImportType,
+    StreamingDecoder, ValidatedModule, ValidationErrorKind, Value as WasmValue, ValueType,
+    decode_module, validate_module,
 };
 
 use super::{
     events::{define_method, with_root},
-    fetch::{settle, wasm_response_bytes},
+    fetch::{MAX_STREAM_CHUNKS, ScriptBodyReader, WasmResponseBody, settle, wasm_response_body},
     prototype, with_page,
 };
 
@@ -371,6 +372,11 @@ fn checked<'a>(
     options: &Options,
     token: &CancellationToken,
 ) -> Result<ValidatedModule<'a>, CompileFailure> {
+    let decoded = decode_module(bytes, decode_limits(), token).map_err(CompileFailure::Binary)?;
+    checked_decoded(decoded, options, token)
+}
+
+fn decode_limits() -> DecodeLimits {
     let mut limits = DecodeLimits::default();
     limits.binary.module_bytes = MAX_BYTES;
     limits.binary.functions = 32_768;
@@ -378,7 +384,14 @@ fn checked<'a>(
     limits.declaration_entries = 131_072;
     limits.code.instructions = 262_144;
     limits.code.vector_entries = 131_072;
-    let decoded = decode_module(bytes, limits, token).map_err(CompileFailure::Binary)?;
+    limits
+}
+
+fn checked_decoded<'a>(
+    decoded: DecodedModule<'a>,
+    options: &Options,
+    token: &CancellationToken,
+) -> Result<ValidatedModule<'a>, CompileFailure> {
     let validated =
         validate_module(decoded, Default::default(), token).map_err(CompileFailure::Validation)?;
     if !options.admits(&validated) {
@@ -506,9 +519,94 @@ fn stream_job(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let options: Rc<Options> = agent
         .host_state(context, STREAM_OPTIONS)
         .expect("stream options");
-    let bytes = wasm_response_bytes(agent, arg(args, 0))?;
+    let body = wasm_response_body(agent, arg(args, 0))?;
     let proto = prototype(agent, MODULE)?;
-    compile_bytes(agent, bytes, &options, proto)
+    require_compilation(agent)?;
+    let token = agent.cancellation().unwrap_or_default();
+    let mut decoder = StreamingDecoder::new(decode_limits(), &token);
+    let length = match body {
+        WasmResponseBody::Empty => 0,
+        WasmResponseBody::Bytes(id) => {
+            let length = agent.heap.string(id).len();
+            if length > MAX_BYTES {
+                return Err(compile_error(
+                    agent,
+                    "WebAssembly binary exceeds the input limit",
+                ));
+            }
+            let push = compilation_work(agent, length, |agent| {
+                let outcome = (|| {
+                    let text = agent.heap.string(id);
+                    let mut input = text.units();
+                    let mut buffer = [0; 8192];
+                    for offset in (0..length).step_by(buffer.len()) {
+                        let count = (length - offset).min(buffer.len());
+                        for (byte, unit) in buffer.iter_mut().zip(input.by_ref().take(count)) {
+                            *byte = unit as u8;
+                        }
+                        decoder.push(&buffer[..count])?;
+                    }
+                    Ok(())
+                })();
+                outcome
+                    .map_err(CompileFailure::Binary)
+                    .map_err(|error| error.throw(agent))
+            });
+            push?;
+            length
+        }
+        WasmResponseBody::Reader(reader) => feed_response(agent, reader.as_ref(), &mut decoder)?,
+    };
+    let (bytes, details) = compilation_work(agent, length, |agent| {
+        let (bytes, details) = decoder
+            .finish(|bytes, decoded| {
+                let parsed = checked_decoded(decoded, &options, &token)
+                    .map_err(|error| error.throw(agent))?;
+                metadata(bytes, &parsed, &token)
+            })
+            .map_err(CompileFailure::Binary)
+            .map_err(|error| error.throw(agent))?;
+        Ok((bytes, details?))
+    })?;
+    new_module(agent, bytes, details, proto)
+}
+
+fn feed_response(
+    agent: &mut Agent,
+    reader: &dyn ScriptBodyReader,
+    decoder: &mut StreamingDecoder<'_>,
+) -> JsResult<usize> {
+    let mut length = 0;
+    for _ in 0..MAX_STREAM_CHUNKS {
+        agent.check_native_work()?;
+        let Some(chunk) = reader.next_chunk().map_err(|_| {
+            agent.throw(
+                rustic_js::runtime::ErrorKind::TypeError,
+                "Failed to read WebAssembly response",
+            )
+        })?
+        else {
+            return Ok(length);
+        };
+        if chunk.len() > MAX_BYTES - length {
+            return Err(compile_error(
+                agent,
+                "WebAssembly binary exceeds the input limit",
+            ));
+        }
+        length += chunk.len();
+        agent.spend_native_work((chunk.len() as u64).div_ceil(64).max(1))?;
+        agent.with_host_memory(compilation_scratch(length), |agent| {
+            decoder
+                .push(&chunk)
+                .map_err(CompileFailure::Binary)
+                .map_err(|error| error.throw(agent))
+        })?;
+    }
+    Err(compile_error(
+        agent,
+        "WebAssembly response exceeds the chunk limit",
+    ))
 }
 
 fn promised(
@@ -531,6 +629,16 @@ fn compile_bytes(
     options: &Options,
     proto: ObjectId,
 ) -> JsResult<Value> {
+    require_compilation(agent)?;
+    let token = agent.cancellation().unwrap_or_default();
+    let (imports, exports, custom) = compilation_work(agent, bytes.len(), |agent| {
+        let parsed = checked(&bytes, options, &token).map_err(|error| error.throw(agent))?;
+        metadata(&bytes, &parsed, &token)
+    })?;
+    new_module(agent, bytes, (imports, exports, custom), proto)
+}
+
+fn require_compilation(agent: &mut Agent) -> JsResult<()> {
     let allowed = with_page(agent, |_, page| {
         let verdict = page.wasm_compilation.borrow();
         for violation in &verdict.violations {
@@ -544,11 +652,15 @@ fn compile_bytes(
             "WebAssembly compilation is blocked by Content Security Policy",
         ));
     }
-    let token = agent.cancellation().unwrap_or_default();
-    let (imports, exports, custom) = compilation_work(agent, bytes.len(), |agent| {
-        let parsed = checked(&bytes, options, &token).map_err(|error| error.throw(agent))?;
-        metadata(&bytes, &parsed, &token)
-    })?;
+    Ok(())
+}
+
+fn new_module(
+    agent: &mut Agent,
+    bytes: Vec<u8>,
+    (imports, exports, custom): Metadata,
+    proto: ObjectId,
+) -> JsResult<Value> {
     let footprint = bytes.capacity()
         + imports.capacity() * size_of::<Import>()
         + exports.capacity() * size_of::<Export>()

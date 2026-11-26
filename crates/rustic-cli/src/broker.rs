@@ -11,12 +11,12 @@
 //! and MIME checks. A renderer that dies or breaks the protocol ends the
 //! command with an error; nothing it half-produced is written.
 
-use std::ffi::OsString;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::{collections::HashMap, ffi::OsString};
 
 use rustic_base::{CancellationToken, EscapedText};
 use rustic_engine::{StorageHost, StorageKind};
@@ -29,7 +29,7 @@ use rustic_style::FetchError;
 use rustic_url::Url;
 
 use crate::loader::{self, LoadError, LoaderLimits};
-use crate::network::{NetworkSession, ResourceKind, Session};
+use crate::network::{MAX_STREAMED_FETCH_BODIES, NetworkSession, ResourceKind, Session};
 use crate::stylesheets::LocalStylesheetFetcher;
 
 static SINGLE_PROCESS: AtomicBool = AtomicBool::new(false);
@@ -1714,6 +1714,8 @@ pub(crate) struct Broker<'a> {
     limits: LoaderLimits,
     local: Option<LocalStylesheetFetcher>,
     storage: Option<Option<Rc<dyn StorageHost>>>,
+    fetch_bodies: HashMap<u64, Rc<dyn rustic_engine::ScriptBodyReader>>,
+    next_fetch_body: u64,
     context: &'a FrameContext,
     /// The composited pixels of the frames this renderer opened, by handle.
     frames: Vec<rustic_raster::Surface>,
@@ -1734,6 +1736,8 @@ impl<'a> Broker<'a> {
             limits,
             local,
             storage: None,
+            fetch_bodies: HashMap::new(),
+            next_fetch_body: 0,
             context,
             frames: Vec::new(),
         }
@@ -2139,6 +2143,10 @@ impl<'a> Broker<'a> {
                 id,
                 result: self.fetch(request),
             },
+            RendererMessage::FetchBody { id, stream, close } => BrokerMessage::FetchBody {
+                id,
+                result: self.fetch_body(stream, close),
+            },
             RendererMessage::Storage { id, area, op } => BrokerMessage::Storage {
                 id,
                 value: self.storage(area, op),
@@ -2235,7 +2243,7 @@ impl<'a> Broker<'a> {
             })
     }
 
-    fn fetch(&self, request: rustic_ipc::protocol::FetchRequest) -> Option<FetchResponse> {
+    fn fetch(&mut self, request: rustic_ipc::protocol::FetchRequest) -> Option<FetchResponse> {
         // Local documents have no network.
         let Grant::Network(session) = self.grant else {
             return None;
@@ -2253,6 +2261,21 @@ impl<'a> Broker<'a> {
                 referrer_policy: request.referrer_policy,
             })
             .ok()?;
+        let mut body = response.body;
+        let stream = if let Some(reader) = response.reader {
+            if self.fetch_bodies.len() < MAX_STREAMED_FETCH_BODIES {
+                let handle = self.next_fetch_body.checked_add(1)?;
+                self.fetch_bodies.try_reserve(1).ok()?;
+                self.fetch_bodies.insert(handle, reader);
+                self.next_fetch_body = handle;
+                Some(handle)
+            } else {
+                body = rustic_engine::read_script_body(reader.as_ref()).ok()?;
+                None
+            }
+        } else {
+            None
+        };
         Some(FetchResponse {
             kind: response.kind.to_owned(),
             url: response.url.map(|url| url.serialize()),
@@ -2260,8 +2283,25 @@ impl<'a> Broker<'a> {
             status: response.status,
             status_text: response.status_text,
             headers: response.headers,
-            body: response.body,
+            body,
+            stream,
         })
+    }
+
+    fn fetch_body(&mut self, handle: u64, close: bool) -> Result<Option<Vec<u8>>, ResourceFailure> {
+        let reader = self
+            .fetch_bodies
+            .get(&handle)
+            .ok_or(ResourceFailure::Blocked)?;
+        let result = if close {
+            Ok(None)
+        } else {
+            reader.next_chunk().map_err(|_| ResourceFailure::Failed)
+        };
+        if !matches!(result, Ok(Some(_))) {
+            self.fetch_bodies.remove(&handle);
+        }
+        result
     }
 
     fn storage(&mut self, area: StorageArea, op: StorageOp) -> StorageValue {

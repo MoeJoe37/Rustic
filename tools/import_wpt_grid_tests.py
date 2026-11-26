@@ -62,9 +62,9 @@ def inline_styles(text: str, page: Path, wpt: Path) -> str:
     return LINK.sub(replace, text)
 
 
-def generate(wpt: Path) -> tuple[str, str]:
+def generate(wpt: Path, directory: str = DIRECTORY) -> tuple[str, str]:
     parts, files, dynamic = [], [], []
-    for path in sorted((wpt / DIRECTORY).rglob("*.html")):
+    for path in sorted((wpt / directory).rglob("*.html")):
         relative = path.relative_to(wpt).as_posix()
         if "/support/" in relative or ".tentative." in relative:
             continue
@@ -90,7 +90,7 @@ def generate(wpt: Path) -> tuple[str, str]:
         "upstream_repository": REPOSITORY,
         "upstream_revision": REVISION,
         "license": "BSD-3-Clause (web-platform-tests); see LICENSE in this directory",
-        "directory": DIRECTORY,
+        "directory": directory,
         "case_count": len(files),
         "skipped_dynamic": dynamic,
         "cases_sha256": hashlib.sha256(cases.encode()).hexdigest(),
@@ -99,11 +99,11 @@ def generate(wpt: Path) -> tuple[str, str]:
     return cases, json.dumps(manifest, indent=2) + "\n"
 
 
-def check() -> None:
-    manifest = json.loads(MANIFEST.read_text())
+def check(cases_path: Path = CASES, manifest_path: Path = MANIFEST) -> None:
+    manifest = json.loads(manifest_path.read_text())
     if manifest["upstream_revision"] != REVISION:
         raise ValueError("manifest revision differs from the importer's pinned revision")
-    cases = CASES.read_bytes()
+    cases = cases_path.read_bytes()
     if hashlib.sha256(cases).hexdigest() != manifest["cases_sha256"]:
         raise ValueError("cases.txt differs from the manifest; regenerate with --vendor")
     count = sum(1 for line in cases.decode().splitlines() if line.startswith("#test "))
@@ -111,14 +111,20 @@ def check() -> None:
         raise ValueError("case count differs from the manifest")
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+def main(
+    destination: Path = DESTINATION, directory: str = DIRECTORY, doc: str = __doc__
+) -> int:
+    """Run the importer for `directory` into `destination` (shared by the
+    css-tables importer)."""
+    parser = argparse.ArgumentParser(description=doc.splitlines()[0])
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--vendor", type=Path, help=f"checkout of {REPOSITORY} at {REVISION}")
     group.add_argument("--check", action="store_true", help="verify the vendored digests")
     options = parser.parse_args()
+    cases_path = destination / "cases.txt"
+    manifest_path = destination / "manifest.json"
     if options.check:
-        check()
+        check(cases_path, manifest_path)
         return 0
     head = subprocess.run(
         ["git", "-C", str(options.vendor), "rev-parse", "HEAD"],
@@ -127,11 +133,11 @@ def main() -> int:
     if head != REVISION:
         print(f"checkout is at {head}, expected {REVISION}", file=sys.stderr)
         return 1
-    cases, manifest = generate(options.vendor)
-    DESTINATION.mkdir(parents=True, exist_ok=True)
-    CASES.write_text(cases)
-    MANIFEST.write_text(manifest)
-    (DESTINATION / "LICENSE").write_bytes((options.vendor / "LICENSE.md").read_bytes())
+    cases, manifest = generate(options.vendor, directory)
+    destination.mkdir(parents=True, exist_ok=True)
+    cases_path.write_text(cases)
+    manifest_path.write_text(manifest)
+    (destination / "LICENSE").write_bytes((options.vendor / "LICENSE.md").read_bytes())
     print(f"wrote {json.loads(manifest)['case_count']} cases")
     return 0
 

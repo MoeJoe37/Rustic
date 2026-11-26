@@ -1,0 +1,160 @@
+{
+  "upstream_repository": "web-platform-tests/wpt",
+  "upstream_revision": "cb97c571c3b1947e08b8615eeb4028a2794b23a4",
+  "license": "BSD-3-Clause (web-platform-tests); see LICENSE in this directory",
+  "directory": "css/css-tables",
+  "case_count": 35,
+  "skipped_dynamic": [
+    "css/css-tables/dynamic-rowspan-change.html",
+    "css/css-tables/tentative/baseline-table.html",
+    "css/css-tables/tentative/baseline-td.html",
+    "css/css-tables/tentative/colgroup-col.html",
+    "css/css-tables/tentative/table-height-redistribution.html",
+    "css/css-tables/tentative/table-limited-quirks.html",
+    "css/css-tables/tentative/table-quirks.html",
+    "css/css-tables/tentative/table-rows-with-zero-columns.html"
+  ],
+  "cases_sha256": "b230b61068b75347e88c61c7581323ad433488d2dc23bafa58e807f4984d1d40",
+  "files": [
+    {
+      "path": "css/css-tables/absolute-tables-001.html",
+      "sha256": "905e0f7ac22cb4084ae6793511c0fa7a313bde8ba2ec603142a1fdc4f79f30b3"
+    },
+    {
+      "path": "css/css-tables/absolute-tables-002.html",
+      "sha256": "6b559abe5bb5a0daa70c9424b831c36f74c2c0fc5b5445627d7de3cd52aa97a0"
+    },
+    {
+      "path": "css/css-tables/absolute-tables-003.html",
+      "sha256": "09f37b24fc71c5a97b2b47cb5c51be8da483b7d53efa92613ce85b9aeb318ae8"
+    },
+    {
+      "path": "css/css-tables/absolute-tables-004.html",
+      "sha256": "99f7f466b096d52d13008cc15e127d07ab18f50c36e4a56f00e4bdee8d268aa3"
+    },
+    {
+      "path": "css/css-tables/absolute-tables-005.html",
+      "sha256": "436937f50f502efa91656b6f8454ea62121978a2cf66f812365c31084631971b"
+    },
+    {
+      "path": "css/css-tables/absolute-tables-height-001.html",
+      "sha256": "9dec8a9dfac4d67fb92d20225415b36911cb780cd7828c860c781d4ef1a09e8b"
+    },
+    {
+      "path": "css/css-tables/absolute-tables-height-quirks-001.html",
+      "sha256": "3e4689337dfc1b7c53a8c69653f66ef51d67eb1785c503d46c788ff41e0f340c"
+    },
+    {
+      "path": "css/css-tables/auto-layout-calc-width-001.html",
+      "sha256": "b03d40519b504776a3c183be157f095499a705d614fc96c839a3270d62aa4a92"
+    },
+    {
+      "path": "css/css-tables/border-spacing-included-in-sizes-001.html",
+      "sha256": "53b3ccc4af3bca7e8a39a4f850fc0abe7c43aad9a09dac7f832bf8924ffca238"
+    },
+    {
+      "path": "css/css-tables/colspan-001.html",
+      "sha256": "c5b70e161fd64445bc6c6dcf9ddc42f351fa4993c673759a5284540ec5c5da18"
+    },
+    {
+      "path": "css/css-tables/colspan-002.html",
+      "sha256": "95f792722a3d735de5c2de57a49fddaed720315c8d7972a08ba47c0960d81f63"
+    },
+    {
+      "path": "css/css-tables/colspan-003.html",
+      "sha256": "c0d653ae2412ac86da7e5bd907f5974edc5b0effbbe0634bcc6138a1e33a6bcb"
+    },
+    {
+      "path": "css/css-tables/column-track-merging.html",
+      "sha256": "1eb8fbfc66e28c9ee82559c7906557b3f835a349b521d0bc9729e0516bd2d0ad"
+    },
+    {
+      "path": "css/css-tables/fixed-layout-calc-width-001.html",
+      "sha256": "a13784af5251431582ed064e65adfe9de9e98c45d901130bb3aadabc19222597"
+    },
+    {
+      "path": "css/css-tables/fixed-layout-excess-width-distribution-001.html",
+      "sha256": "41d5012a8a6eb77573226e62e9f5b0eb63eb13d230d82ec0d02fe0e01c4f7123"
+    },
+    {
+      "path": "css/css-tables/fractional-percent-width.html",
+      "sha256": "0a2dee05ee417cd9228860f42ad774ea7994b2f788dd90158a291fcdbac240ee"
+    },
+    {
+      "path": "css/css-tables/height-distribution/extra-height-given-to-all-row-groups-003.html",
+      "sha256": "5ffba6e1795eb7f974a465a396667aeadccebf25bf36e6bd374d50a7f46347cc"
+    },
+    {
+      "path": "css/css-tables/height-distribution/extra-height-given-to-all-row-groups-004.html",
+      "sha256": "b4a70df22145a6c4536dcdf594bc622fcc01aad91534ec964a8ee4736d8e8fbe"
+    },
+    {
+      "path": "css/css-tables/percent-height-overflow-auto-in-restricted-block-size-cell.html",
+      "sha256": "0f36705517d0385b6f57a9c128c6d38efe2b8e96c0ce44a1bee5094d41454684"
+    },
+    {
+      "path": "css/css-tables/table-min-max-width-intrinsic-contribution-border-padding.html",
+      "sha256": "915c42acc478d11c4e4c241c08bb71e7f4859a526c38dc7ae6a61b9b2bd55d37"
+    },
+    {
+      "path": "css/css-tables/table-min-max-width-intrinsic-contribution.html",
+      "sha256": "f7cf17fc966da07e3127fa66f88c23ecd27834db3a957d15303d3aec99c20dd8"
+    },
+    {
+      "path": "css/css-tables/tentative/caption.html",
+      "sha256": "5cba7b622e3ee25733fa80f206deb1fca53a3ac22e673465268adc8b27cf248f"
+    },
+    {
+      "path": "css/css-tables/tentative/col-collapse-table-size.html",
+      "sha256": "8d08bf5a58128bc649ac7b5d8f3b90d3f8c2e520a3dccde1ad3395dcbccb4d7a"
+    },
+    {
+      "path": "css/css-tables/tentative/colspan-redistribution.html",
+      "sha256": "ab76dce0c11e58a1df09827f55de0dd01a7609c6aeed801facb0775635b7bc67"
+    },
+    {
+      "path": "css/css-tables/tentative/column-widths.html",
+      "sha256": "57a00ac994a9e7ebf63c02ae6f6a3428ec8792c657939e0ff2ede876e18ee3fc"
+    },
+    {
+      "path": "css/css-tables/tentative/element-sizing.html",
+      "sha256": "2d83bec49ec7a076c282b8e8737e81dd70a261906037d1a26ea9a4cc60926e86"
+    },
+    {
+      "path": "css/css-tables/tentative/rowspan-height-redistribution.html",
+      "sha256": "0dfefe703be53baf0965da13d2d9a7f00cd6b47150105156a84a5ef0027ab881"
+    },
+    {
+      "path": "css/css-tables/tentative/table-minmax.html",
+      "sha256": "7830d007f18b67305075602ba9f367fdeabba99fa44dbb03097825b179ac0794"
+    },
+    {
+      "path": "css/css-tables/tentative/table-width-redistribution-fixed-padding.html",
+      "sha256": "b3f1fee3e96b3fdd4379a9f249bb8e01f35282f833a18947913c1a7b8e583fa6"
+    },
+    {
+      "path": "css/css-tables/tentative/table-width-redistribution-fixed.html",
+      "sha256": "bfcd9f97c5c38cf511c2c93b59927ae439ab7e23ce24a54d4bc6d948147bd617"
+    },
+    {
+      "path": "css/css-tables/tentative/table-width-redistribution.html",
+      "sha256": "1c785a5ca73bbd80443094a66ffc411c7a788b0984bb39c13f0ce8dc1690344b"
+    },
+    {
+      "path": "css/css-tables/tentative/tbody-height-redistribution.html",
+      "sha256": "478370a168e18052566ee688c316b98abe76255967e4238f1b67d4fe655671bd"
+    },
+    {
+      "path": "css/css-tables/tentative/td-box-sizing-001.html",
+      "sha256": "2948a79ab893b2cca39cdf23b228ef3658edbd5cb24bea6e3748ebcd699dd7c2"
+    },
+    {
+      "path": "css/css-tables/tentative/td-box-sizing-002.html",
+      "sha256": "6b6f94267d79dbc47ff4e20425062d53ce781498cd5ba8cfc929f86de9cdfeee"
+    },
+    {
+      "path": "css/css-tables/tentative/td-box-sizing-003.html",
+      "sha256": "e37f9bce121e7acd0a1cb6145a378d66b23f82ced96ee4cc3de3a92e6c7405dc"
+    }
+  ]
+}

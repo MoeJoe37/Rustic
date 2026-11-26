@@ -1397,7 +1397,16 @@ impl<'a, 'c> Engine<'a, 'c> {
                     c = next;
                     continue;
                 }
-                let outer = intrinsic::outer_contribution(child.style, child.intrinsic)?;
+                let mut outer = intrinsic::outer_contribution(child.style, child.intrinsic)?;
+                if child.table == Some(table::TablePart::Table) {
+                    // `max-width` never takes a table below its minimum.
+                    let floor = child.intrinsic.min
+                        + intrinsic::fixed_extras(child.style)?
+                        + intrinsic::fixed_margin(child.style, P::MarginLeft)?
+                        + intrinsic::fixed_margin(child.style, P::MarginRight)?;
+                    outer.min = outer.min.max(floor);
+                    outer.max = outer.max.max(outer.min);
+                }
                 min = min.max(outer.min);
                 match child.scheme {
                     Scheme::Float(side) => {
@@ -1795,13 +1804,12 @@ impl<'a, 'c> Engine<'a, 'c> {
             }
             Scheme::Float(_) => {
                 let replaced = self.replaced_size(i, pf.width.get(), pf.definite)?;
+                let forced = match self.nodes[i].table {
+                    Some(table::TablePart::Table) => Some(self.table_width(i, pf.width.get())?),
+                    _ => replaced.map(|(w, _)| w),
+                };
                 let n = &self.nodes[i];
-                let measure = position::measure_float(
-                    n.style,
-                    pf.width,
-                    n.intrinsic,
-                    replaced.map(|(w, _)| w),
-                )?;
+                let measure = position::measure_float(n.style, pf.width, n.intrinsic, forced)?;
                 self.begin(i, measure, &pf)?;
                 self.force_height(i, replaced)?;
                 frames.push(self.root_frame(i)?);
@@ -2426,8 +2434,14 @@ impl<'a, 'c> Engine<'a, 'c> {
         };
         let replaced = self.replaced_size(i, cx.width, CssPx::new(cx.height).ok())?;
         let n = &self.nodes[i];
-        let horizontal =
+        let mut horizontal =
             position::absolute_width(style, &cx, n.intrinsic, replaced.map(|(w, _)| w))?;
+        // A table is never narrower than its minimum width (CSS 2.2 §17.5.2).
+        if n.table == Some(table::TablePart::Table)
+            && horizontal.measure.content_width.get() < n.intrinsic.min
+        {
+            horizontal = position::absolute_width(style, &cx, n.intrinsic, Some(n.intrinsic.min))?;
+        }
         let m = horizontal.measure;
         let vertical =
             AbsoluteHeight::new(style, &cx, m.padding, m.border, replaced.map(|(_, h)| h))?;
@@ -2454,7 +2468,12 @@ impl<'a, 'c> Engine<'a, 'c> {
         let n = &mut self.nodes[i];
         n.measure.margin.top = CssPx::new(solved.margin_start)?;
         n.measure.margin.bottom = CssPx::new(solved.margin_end)?;
-        n.content_height = CssPx::new(solved.size.max(0.0))?;
+        // A table's height is at least its content (CSS 2.2 §17.5.3).
+        let size = match n.table {
+            Some(table::TablePart::Table) => solved.size.max(natural),
+            _ => solved.size,
+        };
+        n.content_height = CssPx::new(size.max(0.0))?;
         n.border_height = n.content_height.checked_add(extras)?;
         n.pos = (
             horizontal.left + m.margin.left.get() + offset.0,

@@ -2792,8 +2792,19 @@
             },
             {
               "label": "Pinned css-tables layout pages compared like css-grid (importer, reviewed expected failures)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/wpt_tables.rs",
+                  "marker": "fn table_layout_matches_the_reviewed_wpt_expectations"
+                },
+                {
+                  "kind": "source",
+                  "path": "tools/import_wpt_tables_tests.py",
+                  "marker": "DIRECTORY = \"css/css-tables\""
+                }
+              ]
             }
           ]
         },

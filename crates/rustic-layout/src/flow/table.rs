@@ -503,8 +503,12 @@ impl Engine<'_, '_> {
                     }
                     let n = &self.nodes[k];
                     let outer = intrinsic::outer_contribution(n.style, n.intrinsic)?;
-                    let own_min = n.intrinsic.min + intrinsic::fixed_extras(n.style)?;
-                    let min = outer.min.max(own_min);
+                    // A cell's minimum is its min-content width or its
+                    // `min-width`, never its `width` (CSS Tables 3 §3.10.3).
+                    let extras = intrinsic::fixed_extras(n.style)?;
+                    let (_, min_width, _) =
+                        Resolver::new(n.style, None, extras, n.intrinsic).widths(0.0)?;
+                    let min = n.intrinsic.min.max(min_width) + extras;
                     cells.push(Cell {
                         node: k,
                         row: index,
@@ -604,6 +608,7 @@ impl Engine<'_, '_> {
         // Fixed layout: the first row's cells with a fixed width set their
         // columns; the other columns share what is left (§17.5.2.1).
         let mut widths: Vec<Option<f64>> = vec![None; s.columns];
+        let mut percent = vec![false; s.columns];
         for c in s.cells.iter().filter(|c| c.row == 0) {
             self.work.charge(1)?;
             let n = &self.nodes[c.node];
@@ -613,7 +618,10 @@ impl Engine<'_, '_> {
                     let r = Resolver::new(n.style, None, extras, n.intrinsic);
                     r.resolve(Sizing::Length(v), 0.0)?.map(|w| w + extras)
                 }
-                Sizing::Length(LengthPercentage::Percentage(p)) => Some(available * p / 100.0),
+                Sizing::Length(LengthPercentage::Percentage(p)) => {
+                    percent[c.column..c.column + c.columns].fill(true);
+                    Some(available * p / 100.0)
+                }
                 _ => None,
             };
             if let Some(w) = w {
@@ -631,7 +639,14 @@ impl Engine<'_, '_> {
             .map(|w| w.unwrap_or(if auto > 0 { free / auto as f64 } else { 0.0 }))
             .collect();
         if auto == 0 {
-            let weights = out.clone();
+            // Excess goes to the fixed-length columns, else the percentage
+            // ones (CSS Tables 3 §3.10.5).
+            let fixed = percent.iter().any(|p| !p);
+            let weights: Vec<f64> = out
+                .iter()
+                .zip(&percent)
+                .map(|(&w, &p)| if p == fixed { 0.0 } else { w })
+                .collect();
             share(&mut out, &weights, free);
         }
         Ok(out)
@@ -670,7 +685,10 @@ impl Engine<'_, '_> {
         }
         for (i, cell) in s.cells.iter_mut().enumerate() {
             let n = &self.nodes[cell.node];
-            let (padding, border) = box_edges(n.style, width)?;
+            // Percentages resolve against the row's width (CSS Tables 3
+            // §3.7.1): the table's content box inside the spacing.
+            let row_width = (width - 2.0 * space.0).max(0.0);
+            let (padding, border) = box_edges(n.style, row_width)?;
             cell.measure = BlockMeasure {
                 content_width: CssPx::ZERO,
                 margin: Edges::default(),

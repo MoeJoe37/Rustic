@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "0e4e1c1421e2648966f6780039adf042b551c26f57be2eb6f183bfaf2dc7b765",
-  "percent": "51.96",
+  "source_fingerprint": "fc2f7cb599e31061bcd78f580a8a01486e8dd0eb7722e99f562871f2f3516e12",
+  "percent": "52.06",
   "verified_percent": "50.24",
-  "partial_percent": "1.72",
+  "partial_percent": "1.82",
   "completed": 118,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 5,
       "total": 54,
-      "percent": "11.63",
+      "percent": "12.07",
       "verified_percent": "8.00",
-      "partial_percent": "3.63"
+      "partial_percent": "4.07"
     },
     {
       "id": "M10",
@@ -3062,11 +3062,22 @@
             },
             {
               "label": "Pinned css-tables layout pages compared like css-grid (importer, reviewed expected failures)",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/wpt_tables.rs",
+                  "marker": "fn table_layout_matches_the_reviewed_wpt_expectations"
+                },
+                {
+                  "kind": "source",
+                  "path": "tools/import_wpt_tables_tests.py",
+                  "marker": "DIRECTORY = \"css/css-tables\""
+                }
+              ]
             }
           ],
-          "credit": "66.66",
+          "credit": "83.33",
           "engine_share": "0.58"
         },
         {
@@ -3104,10 +3115,10 @@
       "completed": 7,
       "in_progress": 1,
       "total": 11,
-      "contribution": "4.03",
-      "percent": "67.32",
+      "contribution": "4.13",
+      "percent": "68.95",
       "verified_percent": "60.78",
-      "partial_percent": "6.54"
+      "partial_percent": "8.17"
     },
     {
       "id": "paint",

@@ -268,7 +268,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
 | TD-210 | Deliberate | Layout | css-grid WPT comparison: 89 of 168 static pages fail, every one reviewed (writing modes, masonry, subgrid baselines, logical properties, Ahem text) | Open, `layout.grid` (M9) |
-| TD-211 | Deliberate | Layout | Table subset: separated borders only, `<col>` widths, percentage cell widths, `visibility: collapse`, `empty-cells` and relative positioning of table parts ignored | Open, `layout.tables` (M9) |
+| TD-211 | Deliberate | Layout | Table subset: separated borders only, `<col>` widths, percentage cell widths, `visibility: collapse`, `empty-cells` and relative positioning of table parts ignored; css-tables WPT 17 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3475,5 +3475,11 @@ table boxes inherit from the box whose children they wrap rather than from
 each other, and an inline table's baseline is its first line in preorder
 (a top caption's, if any). Extra height of spanning cells and of a taller
 table is shared by rows in proportion to their heights.
-**Pay:** the remaining `layout.tables` steps (collapsing borders and
-columns; HTML presentational hints and the pinned css-tables layout pages).
+`tests/wpt_tables.rs` compares the pinned css-tables `checkLayout` pages:
+17 of 35 pass; `fixtures/wpt-tables/expected_failures.txt` gives each
+other page's reason (eight need list items, which Rustic does not lay out;
+four percentage cell widths or `<col>` widths; others collapsing borders,
+vertical writing modes, Ahem text, `height: stretch` and percentage
+heights inside cells).
+**Pay:** the remaining `layout.tables` step (collapsing borders, columns,
+percentages, `empty-cells`, `visibility: collapse`), then shrink the list.

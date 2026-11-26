@@ -755,7 +755,12 @@ every one reported its height. No recursion: nested tables are more frames.
   maximum interpolates every column, and space beyond grows columns by
   their maximums. `table-layout: fixed` with a definite width takes the
   first row's fixed (or percentage) widths and shares the rest among the
-  other columns.
+  other columns, or with no other columns among the fixed-length ones. A
+  cell's minimum is its min-content width or `min-width`, not its `width`;
+  floated, inline and absolutely positioned tables are also never narrower
+  than their minimum, a table's `max-width` never lowers its contribution
+  below it, and an absolutely positioned table grows to its content.
+  Cell padding percentages resolve against the row width.
 - Rows: the tallest single-row cell, a specified row height (a minimum)
   and baseline-aligned cells' ascent plus descent. Spanning cells, and a
   taller specified table height, grow rows in proportion to their heights.
@@ -791,7 +796,13 @@ pass). `crates/rustic-layout/tests/tables.rs` checks exact geometry for
 column and row sizing, slots with `colspan`/`rowspan`, specified and
 centred tables, fixed layout, captions, header and footer groups,
 specified heights with baseline and bottom alignment, RTL, anonymous
-tables, rows and cells, and inline tables; `flow/table.rs` unit-tests the column algorithms.
+tables, rows and cells, and inline tables; `flow/table.rs` unit-tests the column algorithms. `tests/wpt_tables.rs` compares the 35 static
+`checkLayout` pages of the pinned css-tables directory
+(`tools/import_wpt_tables_tests.py`, sharing the css-grid importer): 17
+pass and the other 18 are reviewed failures (list items, percentage and
+column widths, collapsing borders, vertical writing modes, Ahem text,
+`height: stretch`; TD-211). Its `offsetParent` also stops at `td`, `th`
+and `table` for static elements, as CSSOM View specifies.
 
 Specification basis, reviewed 2026-11-27: CSS 2.2
 [§17](https://www.w3.org/TR/CSS22/tables.html), CSS Tables 3

@@ -1,0 +1,5164 @@
+#test css/css-tables/absolute-tables-001.html
+#selector .tbl
+<!doctype html>
+
+
+
+<link rel="author" title="Anders Ruud" href="mailto:andruud@chromium.org">
+<link rel="author" title="David Grogan" href="mailto:dgrogan@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/CSS22/visudet.html#the-width-property" title="See Note in <percentage>">
+<meta name="assert" content="percent lengths of an abspos table are resolved against the padding box of the parent" />
+<style>
+    main div {
+        position: relative;
+        border: 5px solid black;
+        height: 60px;
+        width: 60px;
+        padding: 5px 7px 11px 13px;
+        margin: 10px;
+    }
+
+    .tbl {
+        display: table;
+        background-color: skyblue;
+        position: absolute;
+        width: 50%;
+        height: 50%;
+    }
+
+    .cell {
+        display: table-cell;
+        outline: 1px dashed blue;
+    }
+
+    .topleft { left: 0; top: 0; }
+    .topright { right: 0; top: 0; }
+    .bottomright { right: 0; bottom: 0; }
+    .bottomleft { left: 0; bottom: 0; }
+
+    .vertical  { writing-mode: vertical-lr; }
+
+</style>
+<p>Tests that percent lengths of an absolutely positioned table is resolved
+against the <em>padding box</em> of the parent.
+<hr>
+<output id="log"></output>
+<main>
+<div>
+  <span class="tbl topleft" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=0 data-offset-y=0>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+<div>
+  <span class="tbl topright" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=40 data-offset-y=0>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+<div>
+  <span class="tbl bottomright" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=40 data-offset-y=38>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+<div>
+  <span class="tbl bottomleft" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=0 data-offset-y=38>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+
+<div class="vertical">
+  <span class="tbl topleft" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=0 data-offset-y=0>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+<div class="vertical">
+  <span class="tbl topright" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=40 data-offset-y=0>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+<div class="vertical">
+  <span class="tbl bottomright" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=40 data-offset-y=38>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+<div class="vertical">
+  <span class="tbl bottomleft" data-expected-client-width=40 data-expected-client-height=38 data-offset-x=0 data-offset-y=38>
+    <span class="cell" data-expected-client-width=40 data-expected-client-height=38>abc</span>
+  </span>
+</div>
+</main>
+
+#end
+#test css/css-tables/absolute-tables-002.html
+#selector .table
+<!doctype html>
+
+
+
+<link rel="author" title="David Grogan" href="mailto:dgrogan@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#used-width-of-table">
+<meta name="assert" content="When sizing and positioning abspos tables, the intrinsic width is obeyed when the intrinsic width is larger than specified width" />
+<style>
+.cb {
+  position: relative;
+  height: 200px;
+  width: 200px;
+  outline: 2px dashed lightblue;
+}
+
+.table {
+  background-color: orange;
+  position: absolute;
+  width: 50px;
+  right: 0px;
+}
+
+.cell {
+  border: 1px solid green;
+  width: 100px;
+}
+
+.cell > div {
+  width: 200px;
+}
+
+.vertical { writing-mode: vertical-lr; }
+.horizontal { writing-mode: horizontal-tb; }
+</style>
+
+<output id="log"></output>
+
+<main>
+<div class="cb">
+  <table class="table" data-expected-width=208 data-offset-x="-8">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table horizontal" data-expected-width=208 data-offset-x="-8">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb">
+  <table class="table vertical" data-expected-width=208 data-offset-x="-8">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table vertical" data-expected-width=208 data-offset-x="-8">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</main>
+
+#end
+#test css/css-tables/absolute-tables-003.html
+#selector .table
+<!doctype html>
+
+
+
+<link rel="author" title="David Grogan" href="mailto:dgrogan@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#used-width-of-table">
+<meta name="assert" content="When sizing and positioning abspos tables, the specified width is obeyed when the intrinsic width is smaller" />
+<style>
+.cb {
+  position: relative;
+  height: 200px;
+  width: 200px;
+  outline: 2px dashed lightblue;
+}
+
+.table {
+  background-color: orange;
+  position: absolute;
+  width: 50px;
+  right: 0px;
+}
+
+.cell {
+  border: 1px solid green;
+  width: 100px;
+}
+
+.cell > div {
+  width: 20px;
+}
+
+.vertical { writing-mode: vertical-lr; }
+.horizontal { writing-mode: horizontal-tb; }
+</style>
+
+<output id="log"></output>
+
+<main>
+<div class="cb">
+  <table class="table" data-expected-width=50 data-offset-x="150">
+    <tr>
+      <td class="cell" data-expected-width=46>
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table horizontal" data-expected-width=50 data-offset-x="150">
+    <tr>
+      <td class="cell" data-expected-width=46>
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb">
+  <table class="table vertical" data-expected-width=108 data-offset-x="92">
+    <tr>
+      <td class="cell" data-expected-width=104>
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table vertical" data-expected-width=108 data-offset-x="92">
+    <tr>
+      <td class="cell" data-expected-width=104>
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</main>
+
+#end
+#test css/css-tables/absolute-tables-004.html
+#selector .table
+<!doctype html>
+
+
+
+<link rel="author" title="David Grogan" href="mailto:dgrogan@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#computing-the-table-height">
+<meta name="assert" content="When sizing and positioning abspos tables, the intrinsic height is obeyed when the intrinsic height is larger than specified height" />
+<style>
+.cb {
+  position: relative;
+  height: 200px;
+  width: 200px;
+  outline: 2px dashed lightblue;
+}
+
+.table {
+  background-color: orange;
+  position: absolute;
+  height: 50px;
+  right: 0px;
+}
+
+.cell {
+  border: 1px solid green;
+  height: 100px;
+}
+
+.cell > div {
+  height: 200px;
+}
+
+.vertical { writing-mode: vertical-lr; }
+.horizontal { writing-mode: horizontal-tb; }
+</style>
+
+<output id="log"></output>
+
+<main>
+<div class="cb">
+  <table class="table" data-expected-width=8 data-expected-height=208 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table horizontal" data-expected-width=8 data-expected-height=208 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb">
+  <table class="table vertical" data-expected-width=8 data-expected-height=208 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table vertical" data-expected-width=8 data-expected-height=208 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</main>
+
+#end
+#test css/css-tables/absolute-tables-005.html
+#selector .table
+<!doctype html>
+
+
+
+<link rel="author" title="David Grogan" href="mailto:dgrogan@chromium.org">
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#computing-the-table-height">
+<meta name="assert" content="When sizing and positioning abspos tables, the specified height is obeyed when the intrinsic height is smaller" />
+<style>
+.cb {
+  position: relative;
+  height: 200px;
+  width: 200px;
+  outline: 2px dashed lightblue;
+}
+
+.table {
+  background-color: orange;
+  position: absolute;
+  height: 50px;
+  right: 0px;
+}
+
+.cell {
+  border: 1px solid green;
+  height: 100px;
+}
+
+.cell > div {
+  height: 20px;
+}
+
+.vertical { writing-mode: vertical-lr; }
+.horizontal { writing-mode: horizontal-tb; }
+</style>
+
+<output id="log"></output>
+
+<main>
+<div class="cb">
+  <table class="table" data-expected-width=8 data-expected-height=108 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table horizontal" data-expected-width=8 data-expected-height=108 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb">
+  <table class="table vertical" data-expected-width=8 data-expected-height=50 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+<div class="cb vertical">
+  <table class="table vertical" data-expected-width=8 data-expected-height=50 data-offset-x="192">
+    <tr>
+      <td class="cell">
+        <div></div>
+      </td>
+    </tr>
+  </table>
+</div>
+</main>
+
+#end
+#test css/css-tables/absolute-tables-height-001.html
+#selector .table
+<!DOCTYPE html>
+
+
+
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#used-width-of-table">
+<meta name="assert" content="Absolutely positioned tables should resolve percentage and fixed heights against their containing block.">
+<style>
+.containingBlock {
+    position: relative;
+    width: 100px;
+    height: 50px;
+    outline: 1px solid lightblue;
+}
+.table {
+    position: absolute;
+    background: orange;
+    border-spacing: 0;
+}
+td {
+    padding: 0;
+}
+</style>
+
+<output id="log"></output>
+
+<!-- height: 100% should resolve against the containing block -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: 100%;" data-expected-width=100 data-expected-height=50>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- height: 50% should resolve against the containing block -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: 50%;" data-expected-width=100 data-expected-height=25>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- height: fixed should be honored -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: 30px;" data-expected-width=100 data-expected-height=30>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- height: 100% with auto-height containing block (height comes from sibling) -->
+<div style="position: relative; width: 100px;">
+    <table class="table" style="width: 100%; height: 100%;" data-expected-width=100 data-expected-height=40>
+        <tr><td></td></tr>
+    </table>
+    <div style="height: 40px;"></div>
+</div>
+
+<!-- bottom: 0 should position the table at the bottom -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: 50%; bottom: 0;" data-expected-width=100 data-expected-height=25 data-offset-y=25>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- height: stretch should fill the containing block -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: stretch;" data-expected-width=100 data-expected-height=50>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- height: fit-content should use content height -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: fit-content;" data-expected-width=100 data-expected-height=0>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- height: min-content should use content height -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: min-content;" data-expected-width=100 data-expected-height=0>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- height: max-content should use content height -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: max-content;" data-expected-width=100 data-expected-height=0>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- min-height should be honored -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; min-height: 30px;" data-expected-width=100 data-expected-height=30>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+<!-- max-height should clamp -->
+<div class="containingBlock">
+    <table class="table" style="width: 100%; height: 100%; max-height: 20px;" data-expected-width=100 data-expected-height=20>
+        <tr><td></td></tr>
+    </table>
+</div>
+
+
+#end
+#test css/css-tables/absolute-tables-height-quirks-001.html
+#selector .table
+
+
+
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#used-width-of-table">
+<meta name="assert" content="Absolutely positioned table with height: 100% should not stretch to the viewport in quirks mode.">
+<style>
+.table {
+    position: absolute;
+    background: orange;
+    border-spacing: 0;
+}
+td {
+    padding: 0;
+}
+</style>
+
+<output id="log"></output>
+
+<!-- height: 100% with auto-height containing block should not stretch to viewport -->
+<div style="position: relative; width: 100px;">
+    <table class="table" style="width: 100%; height: 100%;" data-expected-width=100 data-expected-height=40>
+        <tr><td><div style="height: 40px;"></div></td></tr>
+    </table>
+</div>
+
+
+#end
+#test css/css-tables/auto-layout-calc-width-001.html
+#selector #theTable
+<!DOCTYPE html>
+
+
+
+<link rel="author" title="David Grogan" href="dgrogan@chromium.org">
+<link rel="author" title="Xiaocheng Hu" href="xiaochengh@chromium.org">
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#distributing-width-to-columns">
+<link rel="help" href="https://github.com/w3c/csswg-drafts/issues/94">
+
+<style>
+table {
+  width: 200px;
+  border-collapse: collapse;
+  table-layout: auto;
+  height: 20px;
+}
+
+td {
+  padding: 0px;
+  background: lime;
+  outline: 1px solid blue;
+}
+</style>
+
+<h2>Calc width on col is treated as auto in auto tables</h2>
+
+<table id=theTable>
+  <col style="width:calc(20% + 80px)">
+  <tr>
+    <td data-expected-width=100></td>
+    <td data-expected-width=100></td>
+  </tr>
+</table>
+
+
+#end
+#test css/css-tables/border-spacing-included-in-sizes-001.html
+#selector tbody
+#selector tfoot tr
+<!DOCTYPE html>
+
+
+
+<link rel="author" title="David Grogan" href="mailto:dgrogan@chromium.org">
+<link rel="help" href="https://drafts.csswg.org/cssom-view/#dom-htmlelement-offsetheight">
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#bounding-box-assignment">
+<link rel="bookmark" href="https://crbug.com/613753" />
+<meta name="assert" content="border-spacing occurring outside rows and sections is not included in their height and width" />
+
+<style>
+  #theTable td {
+    width: 100px;
+    height: 100px;
+    background-color: green;
+    padding: 0px;
+  }
+
+  #theTable {
+    border-spacing: 10px;
+  }
+
+  .outline {
+    outline: 2px solid black;
+  }
+</style>
+
+<table id=theTable>
+  <tbody class="outline" data-expected-height=100>
+    <tr>
+      <td></td>
+      <td></td>
+    </tr>
+  </tbody>
+  <tbody class="outline" data-expected-height=150>
+    <tr></tr>
+    <tr></tr>
+    <tr></tr>
+    <tr>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr></tr>
+    <tr></tr>
+  </tbody>
+  <tbody class="outline" data-expected-height=100>
+    <tr>
+      <td></td>
+      <td></td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr style="outline: 2px dashed black" data-expected-width=210 data-expected-height=100>
+      <td></td>
+      <td></td>
+    </tr>
+  </tfoot>
+</table>
+
+#end
+#test css/css-tables/colspan-001.html
+#selector td
+<!DOCTYPE html>
+<link rel="author" title="Morten Stenshorne" href="mailto:mstensho@chromium.org">
+<link rel="help" href="https://bugs.chromium.org/p/chromium/issues/detail?id=1430449">
+<p>There should be five squares.</p>
+<table cellspacing="0" cellpadding="0">
+  <tr>
+    <td colspan="2" style="background:blue;" data-expected-width="75" data-expected-height="75">
+      <div style="width:50px; height:75px;"></div>
+    </td>
+    <td colspan="2" style="background:green;" data-expected-width="75" data-expected-height="75">
+      <div style="width:50px; height:75px;"></div>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:black;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+    <td colspan="2" style="background:lime;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+    <td style="background:hotpink;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+  </tr>
+</table>
+
+
+
+
+#end
+#test css/css-tables/colspan-002.html
+#selector td
+<!DOCTYPE html>
+<link rel="author" title="Morten Stenshorne" href="mailto:mstensho@chromium.org">
+<link rel="help" href="https://bugs.chromium.org/p/chromium/issues/detail?id=1430449">
+<p>There should be five squares.</p>
+<table cellspacing="0" cellpadding="0">
+  <tr>
+    <td colspan="3" style="background:blue;" data-expected-width="75" data-expected-height="75">
+      <div style="width:50px; height:75px;"></div>
+    </td>
+    <td colspan="3" style="background:green;" data-expected-width="75" data-expected-height="75">
+      <div style="width:50px; height:75px;"></div>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:black;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+    <td colspan="4" style="background:lime;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+    <td style="background:hotpink;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+  </tr>
+</table>
+
+
+
+
+#end
+#test css/css-tables/colspan-003.html
+#selector td
+<!DOCTYPE html>
+<link rel="author" title="Morten Stenshorne" href="mailto:mstensho@chromium.org">
+<link rel="help" href="https://bugs.chromium.org/p/chromium/issues/detail?id=1430449">
+<p>There should be five squares.</p>
+<table cellspacing="0" cellpadding="0">
+  <tr>
+    <td colspan="10" style="background:blue;" data-expected-width="75" data-expected-height="75">
+      <div style="width:50px; height:75px;"></div>
+    </td>
+    <td colspan="10" style="background:green;" data-expected-width="75" data-expected-height="75">
+      <div style="width:50px; height:75px;"></div>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:black;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+    <td colspan="18" style="background:lime;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+    <td style="background:hotpink;" data-expected-width="50" data-expected-height="50">
+      <div style="width:50px; height:50px;"></div>
+    </td>
+  </tr>
+</table>
+
+
+
+
+#end
+#test css/css-tables/column-track-merging.html
+#selector main table
+<!doctype html>
+<title>Column track merging</title>
+
+
+
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#dimensioning-the-row-column-grid--step2" />
+<style>
+
+main table {
+  border: 10px solid gray;
+  border-spacing: 20px;
+}
+
+main td {
+  width: 50px;
+  height:50px;
+  padding: 0;
+  background:linear-gradient(to right, yellow, orange);
+}
+main caption {
+  background: #EEE;
+}
+main .desc {
+  margin-top: 20px;
+  color: rgb(50,0,0);
+}
+main pre {
+  white-space: pre-wrap;
+
+}
+</style>
+<h3>Column merging investigation</h3>
+<o>Empty columns is a column that has no originating cells</o>
+<p><a href="https://www.w3.org/TR/css-tables-3/#dimensioning-the-row-column-grid--step2">Table standard</a> discusses this under "track merging".</p>
+<ul>
+  <li>Do empty columns get coalesced?</li>
+  <li>How does this interact with table-layout:fixed, table width</li>
+  <li>Is there a difference between columns defined by COL, vs TD.colspan? Yes!</li>
+  <li>Do COLs with specified width get merged?</li>
+</ul>
+<p>Compatibility</p>
+<li>Edge17 has a bug where width of a colspanned cell always includes cell width + width of border spacing. It should be max(cell width, border spacing)</li>
+<li>Safari matches Chrome Legacy. TD-originated columns are always merged.</li>
+<li>Firefox follows the standard, but has a few bugs.</li>
+<main>
+
+<h3>TD merging</h3>
+
+<pre class="desc">Auto table, and TD.colspan=10
+  FF/Chrome Legacy/Safari: Standard. Tracks merge.
+  Edge17: Tracks do not merge. Wide cell is 180px (9 * border spacing)
+</pre>
+<table id="td_auto" data-expected-width=180>
+<caption>auto</caption>
+<tr>
+  <td colspan=10 data-expected-width=50></td>
+  <td></td>
+</tr>
+<tr>
+  <td colspan=10></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="desc">Auto table(400px), and TD.colspan=10
+  FF/Chrome Legacy/Safari/Edge17: Standard. Tracks merge. Colspan cell grows because it is unconstrained.
+</pre>
+<table id="td_auto_width" style="width:400px" data-expected-width=400>
+<caption>auto 400px</caption>
+<tr>
+  <td colspan=10 data-expected-width=270></td>
+  <td></td>
+</tr>
+<tr>
+  <td colspan=10></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="desc">Auto table(130px), and TD.colspan=10
+  FF/Chrome Legacy/Safari: Standard. Tracks merge. Colspan cell shrinks to min width becuase it is unconstrained.
+  Edge17: Non-compliant, buggy. Wide cell too wide, narrow cell disappears.
+</pre>
+<table id="td_auto_width_130" style="width:130px" data-expected-width=130>
+<caption>auto 130px</caption>
+<tr>
+  <td colspan=10 data-expected-width=10><div style="width:10px"></div></td>
+  <td></td>
+</tr>
+<tr>
+  <td colspan=10></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="td_fixed">Fixed(400px) table, and TD.colspan=10
+  Chrome/Safari: Non-compliant. Tracks merge. Cells are the same size, fixed algo distributes extra width evenly.
+  Firefox: Standard.
+  Edge17: Standard, buggy. Wide cell too wide. Edge's bug is that it computes max width as (width + border_spacing) instead of max(width, border_spacing).
+</pre>
+<table id="td_fixed" style="table-layout:fixed; width: 400px" data-expected-width=400>
+<caption>fixed 400px</caption>
+<tr>
+  <td colspan=10 data-expected-width=180></td>
+  <td></td>
+</tr>
+<tr>
+  <td colspan=10></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="td_fixed">Fixed(130px) table, and TD.colspan=10
+  Chrome/Safari: Non-compliant.Tracks merge, cells same size.
+  Firefox: Standard + buggy. Table does not grow.
+  Edge17: Standard + buggy. Wide cell too wide.
+</pre>
+<table id="td_fixed" style="table-layout:fixed; width: 130px" data-expected-width=310>
+<caption>fixed 130px</caption>
+<tr>
+  <td colspan=10 data-expected-width=180></td>
+  <td></td>
+</tr>
+<tr>
+  <td colspan=10></td>
+  <td></td>
+</tr>
+</table>
+
+<h3>COL merging. Same tests with COL span=10 replacing TD</h3>
+
+<pre class="desc">Auto table
+  FF/Chrome Legacy/Safari, Edge17: Standard. wide cell is 50px, tracks do merge.
+</pre>
+<table id="col_auto" data-expected-width=180>
+<caption>auto</caption>
+<col span=10>
+<tr>
+  <td data-expected-width=50></td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="desc">Auto table(400px)
+  FF/Chrome Legacy/Safari, Edge17: Standard. Both cells grow the same because unconstrained.
+</pre>
+<table id="col_auto_width" style="width:400px" data-expected-width=400>
+<caption>auto 400px</caption>
+<col span=10>
+<tr>
+  <td data-expected-width=160></td>
+  <td></td>
+</tr>
+<tr>
+  <td ></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="desc">Auto table(130px)
+  FF/Chrome Legacy/Safari, Edge17: Standard. Both cells shrink.
+</pre>
+<table id="col_auto_width_130" style="width:130px" data-expected-width=130>
+<caption>auto 130px</caption>
+<col span=10>
+<tr>
+  <td data-expected-width=28><div style="width:10px"></div></td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="desc">Fixed(400px) table
+  Chrome/Safari,Firefox: Standard.
+  Edge17: Buggy. Fixed cells grow to fill table.
+</pre>
+<table id="col_fixed" style="table-layout:fixed; width: 400px" data-expected-width=400>
+<caption>fixed 400px</caption>
+<col span=10>
+<tr>
+  <td data-expected-width=50></td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="td_fixed">Fixed(130px) table
+  Chrome/Safari: Standard, very buggy. Non-collapsed columns shrink to single border spacing.
+  Firefox: Standard.
+  Edge17: Non-compliant, collapses columns.
+</pre>
+<table id="col_fixed_130" style="table-layout:fixed; width: 130px" data-expected-width=340>
+<col span=10>
+<caption>fixed 130px</caption>
+<tr>
+  <td data-expected-width=50></td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td></td>
+</tr>
+</table>
+
+<h3>COL merging when COL has specified width.</h3>
+
+<ul><li>Chrome Legacy/Edge17/Safari: non-compliant, merge COLs with specified widths.
+ <li>Firefox: Standard, unless COL width is 0px. Buggy, does not include border-spacing around columns.</ul>
+<pre class="desc">Auto table, COL width 30px.
+  Chrome Legacy/Edge17/Safari: non-compliant, merge.
+  Firefox: Standard, buggy. does not include border-spacing around columns.
+</pre>
+<table id="col_auto" data-expected-width=580>
+<caption>auto col 30px</caption>
+<col span=10 style="width:30px">
+<tr>
+  <td data-expected-width=50></td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="desc">Auto table, COL width 5%.
+  Chrome Legacy/Edge17/Safari: non-compliant, merge.
+  Firefox: Standard, buggy. does not include border-spacing around columns.
+</pre>
+<table id="col_auto" data-expected-width=640>
+<caption>auto col 10%</caption>
+<col span=5 style="width:10%">
+<tr>
+  <td data-expected-width=100></td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td></td>
+</tr>
+</table>
+
+<pre class="desc">Auto table, COL width 0px.
+  Everyone: merges COL
+</pre>
+<table id="col_auto" data-expected-width=180>
+<caption>auto col 0px</caption>
+<col span=10 style="width:0px">
+<tr>
+  <td data-expected-width=50></td>
+  <td></td>
+</tr>
+<tr>
+  <td></td>
+  <td></td>
+</tr>
+</table>
+
+
+</main>
+
+
+
+</body>
+</html>
+#end
+#test css/css-tables/fixed-layout-calc-width-001.html
+#selector #theTable
+<!DOCTYPE html>
+
+
+
+<link rel="author" title="David Grogan" href="dgrogan@chromium.org">
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#distributing-width-to-columns">
+<link rel="help" href="https://github.com/w3c/csswg-drafts/issues/94">
+
+<style>
+table {
+  width: 200px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  height: 20px;
+}
+
+td {
+  padding: 0px;
+  background: lime;
+  outline: 1px solid blue;
+}
+</style>
+
+<h2>Calc width on col is treated as auto, even in fixed tables</h2>
+
+<table id=theTable>
+  <col style="width:calc(20% + 80px)">
+  <tr>
+    <td data-expected-width=100></td>
+    <td data-expected-width=100></td>
+  </tr>
+</table>
+
+
+#end
+#test css/css-tables/fixed-layout-excess-width-distribution-001.html
+#selector #theTable
+<!DOCTYPE html>
+
+
+
+<link rel="author" title="David Grogan" href="dgrogan@chromium.org">
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#distributing-width-to-columns">
+
+<style>
+table {
+  width: 300px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  height: 20px;
+}
+
+td {
+  padding: 0px;
+  background: lime;
+  outline: 1px solid blue;
+}
+
+td:nth-child(1) { width: 20px; }
+td:nth-child(2) { width: 10px; }
+td:nth-child(3) { width: 10%; }
+</style>
+
+<h2>Fixed layout tables with excess width and no auto columns</h2>
+
+FF/Edge give excess only to fixed columns, in proportion to their relative
+widths. This is what the spec dictates.
+<br>Chrome (62) gives excess to ALL columns, in proportion to their
+contribution to total width.
+<table id=theTable>
+  <tr>
+    <td data-expected-width=180></td>
+    <td data-expected-width=90></td>
+    <td data-expected-width=30></td>
+  </tr>
+</table>
+
+
+#end
+#test css/css-tables/fractional-percent-width.html
+#selector .cell
+<!DOCTYPE html>
+
+
+
+<link rel="author" title="Jihwan Marc Kim" href="mailto:bluewhale.marc@gmail.com" />
+<link rel="help" href="https://crbug.com/1283025" />
+<meta name="flags" content="" />
+<meta name="assert" content="percent lengths of fractional td width should rendered correctly" />
+<style>
+  main div {
+    position: relative;
+    border: 1px solid black;
+    width: 400px;
+  }
+  .cell {
+    background-color: skyblue;
+    height: 20px;
+  }
+</style>
+<p>
+  Tests that percent lengths of fractional td width should rendered correctly
+  even it is smaller than 1.
+</p>
+
+<hr />
+<output id="log"></output>
+<main>
+  <div>
+    <table width="100%">
+      <tbody>
+        <tr>
+          <td class="cell" width="0.5%" data-expected-client-width="2"></td>
+          <td>0.5%</td>
+        </tr>
+      </tbody>
+    </table>
+    <table width="100%">
+      <tbody>
+        <tr>
+          <td class="cell" width="1%" data-expected-client-width="4"></td>
+          <td>1%</td>
+        </tr>
+      </tbody>
+    </table>
+    <table width="100%">
+      <tbody>
+        <tr>
+          <td class="cell" width="5%" data-expected-client-width="20"></td>
+          <td>5%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+
+#end
+#test css/css-tables/height-distribution/extra-height-given-to-all-row-groups-003.html
+#selector #theTable
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+
+
+<link rel="author" title="David Grogan" href="dgrogan@chromium.org">
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#height-distribution-algorithm">
+<link rel="bookmark" href="https://bugs.chromium.org/p/chromium/issues/detail?id=708345" />
+<meta name="assert" content="All rows of equal intrinsic height should be increased the same amount, regardless of which group they are in, tbody+tbody case" />
+<title>
+all row groups receive extra height distribution
+</title>
+
+<style>
+table {
+  border-collapse: collapse;
+}
+
+td {
+  padding: 0px;
+}
+
+td div {
+  width: 100px;
+  height:10px;
+}
+
+tbody {
+  outline: 2px solid lightblue;
+}
+
+</style>
+
+<table id="theTable" style="height:100px">
+  <tbody data-expected-height=50>
+    <tr>
+      <td><div></div></td>
+    </tr>
+  </tbody>
+  <tbody data-expected-height=50>
+    <tr>
+      <td><div></div></td>
+    </tr>
+  </tbody>
+</table>
+
+
+#end
+#test css/css-tables/height-distribution/extra-height-given-to-all-row-groups-004.html
+#selector #theTable
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+
+
+<link rel="author" title="David Grogan" href="dgrogan@chromium.org">
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#height-distribution-algorithm">
+<link rel="bookmark" href="https://bugs.chromium.org/p/chromium/issues/detail?id=708345" />
+<meta name="assert" content="All rows of equal intrinsic height should be increased the same amount, regardless of which group they are in, thead+tbody case" />
+<title>
+all row groups receive extra height distribution
+</title>
+
+<style>
+table {
+  border-collapse: collapse;
+}
+
+td {
+  padding: 0px;
+}
+
+td div {
+  width: 100px;
+  height:10px;
+}
+
+thead, tbody {
+  outline: 2px solid lightblue;
+}
+
+</style>
+
+<table id="theTable" style="height:100px">
+  <thead data-expected-height=50>
+    <tr>
+      <td><div></div></td>
+    </tr>
+  </thead>
+  <tbody data-expected-height=50>
+    <tr>
+      <td><div></div></td>
+    </tr>
+  </tbody>
+</table>
+
+
+#end
+#test css/css-tables/percent-height-overflow-auto-in-restricted-block-size-cell.html
+#selector #container
+<!DOCTYPE html>
+<link rel="author" title="Morten Stenshorne" href="mailto:mstensho@chromium.org">
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#row-layout">
+<style>
+  .table { display:table; height:100px; background:pink; }
+  .cell { overflow:auto; width:100px; height:100%; background:blue; }
+</style>
+<p>There should be a 100px tall pink block below, with a scrollable box inside.</p>
+<div id="container" class="table" data-expected-height="100">
+  <div class="cell" data-expected-height="100" data-expected-scroll-height="500">
+    <div style="width:100px; height:500px;"></div>
+  </div>
+</div>
+
+
+
+
+#end
+#test css/css-tables/table-min-max-width-intrinsic-contribution-border-padding.html
+#selector .container
+<!DOCTYPE html>
+<title>CSS Tables: a table's min-width and max-width in its intrinsic width contributions, with border and padding</title>
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#used-min-width-of-table">
+<link rel="help" href="https://drafts.csswg.org/css-sizing-3/#intrinsic-contribution">
+<link rel="help" href="https://html.spec.whatwg.org/multipage/rendering.html#tables-2">
+<meta name="assert" content="A table's min-width and max-width clamp its intrinsic width contributions in the same box-sizing as its used width, so a shrink-to-fit container is as wide as the table.">
+
+
+
+<style>
+.container {
+    float: left;
+    clear: left;
+}
+.table {
+    border: 10px solid;
+    padding: 10px;
+    border-spacing: 0;
+}
+td, .cell {
+    padding: 0;
+    font-size: 0;
+}
+.cell {
+    display: table-cell;
+}
+.content {
+    width: 20px;
+    height: 10px;
+}
+.wrap {
+    display: inline-block;
+    width: 100px;
+    height: 10px;
+}
+</style>
+<body>
+<div class="container" data-expected-width="200"><table class="table" style="min-width: 200px" data-expected-width="200"><tr><td><div class="content"></div></td></tr></table></div>
+<div class="container" data-expected-width="200"><table class="table" style="max-width: 200px" data-expected-width="200"><tr><td><span class="wrap"></span> <span class="wrap"></span></td></tr></table></div>
+<div class="container" data-expected-width="240"><div class="table" style="display: table; box-sizing: content-box; min-width: 200px" data-expected-width="240"><div class="cell"><div class="content"></div></div></div></div>
+<div class="container" data-expected-width="200"><div class="table" style="display: table; box-sizing: border-box; min-width: 200px" data-expected-width="200"><div class="cell"><div class="content"></div></div></div></div>
+<div class="container" data-expected-width="200"><div class="table" style="display: table; box-sizing: content-box; max-width: 160px" data-expected-width="200"><div class="cell"><span class="wrap"></span> <span class="wrap"></span></div></div></div>
+</body>
+#end
+#test css/css-tables/table-min-max-width-intrinsic-contribution.html
+#selector .container
+<!DOCTYPE html>
+<title>CSS Tables: a table's min-width and max-width in its intrinsic width contributions</title>
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#used-min-width-of-table">
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#computing-the-table-width">
+<meta name="assert" content="A table's min-width raises its intrinsic width contributions, and its max-width caps its max-content contribution but never below the table's min-content width.">
+
+
+
+<style>
+.container {
+    float: left;
+    clear: left;
+}
+table {
+    border-spacing: 0;
+}
+td {
+    padding: 0;
+}
+.content {
+    width: 100px;
+    height: 10px;
+}
+.wrap {
+    display: inline-block;
+    width: 100px;
+    height: 10px;
+}
+</style>
+<body>
+<div class="container" data-expected-width="300"><table style="min-width: 300px"><tr><td><div class="content"></div></td></tr></table></div>
+<div class="container" data-expected-width="100"><table style="max-width: 50px"><tr><td><div class="content"></div></td></tr></table></div>
+<div class="container" data-expected-width="200"><table style="max-width: 150px"><tr><td><div class="content"></div></td><td><div class="content"></div></td></tr></table></div>
+<div class="container" data-expected-width="150"><table style="max-width: 150px"><tr><td><span class="wrap"></span> <span class="wrap"></span> <span class="wrap"></span></td></tr></table></div>
+</body>
+#end
+#test css/css-tables/tentative/caption.html
+#selector table
+<!doctype html>
+
+
+
+<title>caption</title>
+<meta name="flags" content="ahem">
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="stylesheet" type="text/css" href="/fonts/ahem.css" />
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://html.spec.whatwg.org/multipage/tables.html#the-caption-element"/>
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#bounding-box-assignment" />
+<style>
+  main table {
+    border-spacing: 0 0;
+    position:relative;
+    background: gray;
+  }
+  main td {
+    background: #BFB;
+  }
+  main caption {
+    background: yellow;
+  }
+  main caption > div {
+    display: inline-block;
+    background: rgba(0,0,0,0.1);
+  }
+  main caption > div:after {
+    content: "c";
+  }
+  .lh {
+    line-height:30px;
+  }
+</style>
+<h1>Caption sizing and positioning</h1>
+<p class="error">There is a fundamental disagreement between Chrome Legacy and Firefox on caption size influence on table width. Chrome uses caption min width as lower limit of table's grid box, FF does not. Firefox also does not support multiple captions.</p>
+
+<main>
+
+<h2>Caption width limits</h2>
+
+<p class="testdesc">Caption minmax and grid width
+caption.min is lower limit of grid min.</p>
+<table>
+  <caption data-expected-width=50><div style="width:50px"></div><div style="width:30px"></caption>
+  <td data-expected-width=50>auto</td>
+</table>
+
+<p class="testdesc">Caption.min vs caption.css_width
+Caption.css_width is upper limit of caption.min
+Caption.css_width is lower limit of caption.min
+</p>
+<table>
+  <caption style="width:100px" data-expected-width=100><div style="width:200px"></div></caption>
+  <td data-expected-width=100>auto</td>
+</table>
+<table>
+  <caption style="width:300px" data-expected-width=300><div style="width:200px"></div></caption>
+  <td data-expected-width=300>auto</td>
+</table>
+
+
+<p class="testdesc">Caption width:50%
+Percent width is resolved wrt to table width.</p>
+<table style="width:200px">
+  <caption style="width:50%" data-expected-width=100><div></div></caption>
+  <td data-expected-width=200>auto</td>
+</table>
+
+<table style="width:200px">
+  <caption style="width:50%" data-expected-width=100><div style="width:200px"></div></caption>
+  <td data-expected-width=200>auto</td>
+</table>
+
+<p class="testdesc">Caption and size of empty table
+  Larger of table borders, and caption min size.</p>
+<table style="border:50px solid green;border-spacing:10px" data-expected-width=100>
+  <caption><div style="width:50px">c</div><div style="width:50px">c</div></caption>
+</table>
+
+<p class="testdesc">Caption height:80%
+github spec <a href="https://github.com/w3c/csswg-drafts/issues/4676">issue</a>.
+TablesNG will not resolve percentage heights per spec. FF agrees.
+</p>
+<table style="width:200px;height:100px">
+  <caption style="height:80%" data-expected-height=30><div style="height:30px"></div></caption>
+  <td data-expected-width=200>auto</td>
+</table>
+
+<p class="testdesc">Multiple captions
+Do we allow multiple captions? There are 4 in this test.</p>
+<table>
+  <caption class="lh" data-offset-y=0>over1</caption>
+  <caption class="lh" data-offset-y=30>over2</caption>
+  <caption class="lh" style="caption-side:bottom" data-offset-y=90>under1</caption>
+  <caption class="lh" style="caption-side:bottom" data-offset-y=120>under2</caption>
+  <td class="lh" data-offset-y=60>2 above me, 2 below me?</td>
+</table>
+<p class="testdesc">Caption margins
+Margins between captions do not collapse</p>
+<table style="width:200px">
+  <caption class="lh" style="margin:20px;" data-offset-y=20 data-offset-x=20>20px margins</caption>
+  <td data-expected-width=200 data-offset-y=70>1 caption</td>
+</table>
+<table style="width:200px">
+  <caption class="lh" style="margin:20px;" data-offset-y=20 data-offset-x=20>20px margins</caption>
+  <caption class="lh" style="margin:20px;" data-offset-y=90 data-offset-x=20>20px margins</caption>
+  <td data-expected-width=200 data-offset-y=140>2 captions</td>
+</table>
+
+
+<p class="testdesc">Caption margins auto
+auto margins center captions that are less wide than the table.
+</p>
+<table style="width:200px">
+  <caption class="lh" style="margin:auto" data-offset-x=0><div style="width:100px">auto margins</div></caption>
+  <td data-expected-width=200>1 caption</td>
+</table>
+<table style="width:200px">
+  <caption class="lh" style="margin:auto;width:50%" data-offset-x=50><div style="width:100px">auto margins</div></caption>
+  <td data-expected-width=200>1 caption</td>
+</table>
+
+
+<p class="testdesc">Vertical writing mode caption
+</p>
+<table>
+  <caption style="writing-mode:vertical-rl;height:min-content;font:10px Ahem;color:rgba(0,0,0,0.3)" data-expected-height=100 ><div style="height:100px;">vertical</div> caption bigger than table</caption>
+  <tbody data-offset-y=100>
+    <td>vertical!</td>
+  </tbody>
+</table>
+
+</main>
+
+#end
+#test css/css-tables/tentative/col-collapse-table-size.html
+#selector main table
+<!doctype html>
+
+
+
+<title>col visibility:collapse and minmax sizes</title>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#visibility-collapse-track-rendering"/>
+
+<style>
+
+  main table {
+    right: 0;
+    display:inline-table;
+    border: 1px solid black;
+  }
+  main col {
+    visibility:collapse;
+  }
+  main td {
+    width: 200px;
+    height: 20px;
+  }
+  main caption {
+    background: yellow;
+  }
+  main td:nth-child(1) {
+    background: rgba(255,0,0,0.2);
+  }
+  main td:nth-child(2) {
+    background: rgba(200,200,200,1.0);
+  }
+  main table:hover col {
+    visibility: visible;
+  }
+</style>
+
+<h1>Interactions between &lt;COL&gt; visiblity:collapse, and table inline size</h1>
+<p>What happens to the table size when column collapses? Should the space taken up by the table
+  remain the same, but the table iteslf should shrink?</p>
+<p>Hovering over tables will turn off column collapsing</p>
+<main>
+
+<p style="position:absolute;top:200px;left:0;width: 300px">
+Tables to the right are absolutely positioned</p>
+<table id="abs" style="position:absolute;top:200px;right:0">
+  <col>
+  <td style="width:100px"></td>
+  <td>absolute, right:0</td>
+</table>
+
+ <table id="abscaption" style="position:absolute; top:260px;right:0" >
+  <col>
+  <caption style="width:250px">caption</caption>
+  <td></td>
+  <td>absolute, right:0</td>
+</table>
+
+<p style="margin-top:200px">Inline tables</p>
+<table id="caption">
+  <col>
+  <caption style="width:500px">caption</caption>
+  <td></td>
+  <td></td>
+</table><span style="font-size:50px">after</span>
+<p>
+
+<table id="plain">
+  <col>
+  <td style="width:100px">td</td>
+  <td></td>
+</table><span style="font-size:50px">after</span>
+
+<p>Table as a flex item</p>
+
+<div style="display:flex;width:700px">
+
+<table id="plain">
+  <col>
+  <td style="width:100px">td</td>
+  <td></td>
+</table>
+<div style="flex-grow:1;background-color:yellow">
+</div>
+</main>
+
+
+#end
+#test css/css-tables/tentative/colspan-redistribution.html
+#selector table
+<!doctype html>
+<title>COLSPAN redistribution</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#distributing-width-to-columns" />
+<style>
+  main table {
+    border-spacing: 8px 8px;
+    margin-top:8px;
+    background: gray;
+  }
+  main td {
+    background: #BFB;
+    font-size: 10px;
+  }
+  main td > div {
+    display: inline-block;
+    background: rgba(56,162,56,0.3);
+  }
+</style>
+<main>
+<h1>Colspan&gt;1 width redistribution</h1>
+<p>TD with colspan&gt;1  redistributes its min/max/percent widths to the spanned cells.</p>
+<p>Creating explainable tests with percentage cells is complicated. Cell's percentage cannot be observed directly, but must be inferred from td+table widths. Rules that govern relationship between table grid width and percentage cell width are:</p>
+<ol>
+  <li id="rule1"><span  class="rule1">Rule#1</span>, Each percentage column sets the floor for  maximum table width. That table width is column.min_width / column.percent * 100.<br> Ex: 20px wide column, with 20% width, implies that the entire table must be at least 100px wide.</li>
+  <li id="rule2"><span class="rule2">Rule#2</span>, Sum of all percentages, combined with sum of widths of all non-percentages sets the floor maximum table widths. <br>Let P% be sum of all percentages, and Fpx sum of widths of all non-percentage columns. Maximum table width = Fpx * (1 + (100-P%)/P%).<br>
+  Ex: if percentage columns are 20%, and non-percentage columns are 100px, implies that that 80% is at least 100px, and that the entire table is at least 125px.
+  </li>
+</ol>
+<h2>Test design</h2>
+<p>All examples have border-spacing:8, td.padding:0.</p>
+<p>Tests are mostly tables with 2 rows. 1st row are the columns, 2nd row is the colspan&gt;1 column being distributed. Most test's colspan&gt;1 cell colspan encloses all cells except the last one. Each test is accompanied by test description. Test description contains:</p>
+<ol>
+  <li>First line describes the test geometry: cell:css/min/max. C1:20%/20px means width:20%, intrinsic min width 20px. If max is omitted, min == max.</li>
+  <li>Second line describes algorithm being tested in detail</li>
+  <li>Third line describes computation that generates the result.</li>
+  <li class="error">Red paragraphs are major browser disagreements</li>
+</ol>
+
+<h2>Colspan&gt;1 cell's percentage distribution auto tables</h2>
+<p>Rules</p>
+<ul>
+  <li>Percentages can only be redistributed to non-percentage cells.</li>
+  <li>If percentage does not get redistributed, treat colspan&gt;1 cell width as Auto</li>
+  <li>If all columns are empty (no max width), redistribute percentage evenly.</li>
+</ul>
+
+<p class="testdesc">C0:10%/20px C1:10%/20px C2:auto
+No colspan&gt;1 cells, shows what table looks like without colspan&gt;1 cell distribution.
+Table width by rule#1, 20px/0.1(10%) + 4*8 => 232px. Excess table width is distributed to auto cell.</p>
+<table data-expected-width="232">
+  <tr>
+    <td style="width:10%"><div style="width:20px">x</div></td>
+    <td style="width:10%"><div style="width:20px">x</div></td>
+    <td>x</td>
+  </tr>
+</table>
+
+<p class="testdesc">Colspan&gt;1:40%/Auto C0:10%/20px C1:10%/20px C2:auto
+Percentage does not get redistributed because all columns are percentages.
+Table width by rule#1 same as previous example.</p>
+<table data-expected-width="232">
+  <tr>
+    <td style="width:10%" data-expected-width="20"><div style="width:20px">x</div></td>
+    <td style="width:10%"><div style="width:20px">x</div></td>
+    <td>x</td>
+  </tr>
+  <tr>
+    <td colspan=2 style="width:40%">40%</td>
+  </tr>
+</table>
+
+<p class="testdesc">Colspan&gt;1:20%/100px C0:Auto/0 C1:Auto/0 C2:Auto/Auto
+Percentage gets redistributed evenly to empty cells.
+Each cell gets 10%, then (100-8)/2=>46px min width. Table min width is 46/0.1(10%) + 4*8 => 460 + 32 => 492</p>
+<p class="error">Chrome Legacy is wrong, 1st span cell gets all the width. FF/Edge agree.</p>
+<table data-expected-width="492">
+  <tr>
+    <td data-expected-width="46"></td>
+    <td></td>
+    <td>x</td>
+  </tr>
+  <tr>
+    <td colspan=2 style="width:20%"><div style="width:100px">100px</div></td>
+</table>
+
+<p class="testdesc">Colspan&gt;1: 19%/200px colspan&gt;1 cell, C0: 20%.20px, C1: 80px/80px
+Percentage is not getting redistributed, because column% > colspan&gt;1%</p>
+<table data-expected-width="224">
+  <tr>
+    <td style="width:20%" data-expected-width="40"><div style="width:20px">20</div></td>
+    <td style="width:80px" data-expected-width="160"><div style="width:80px">80</div></td>
+  </tr>
+  <tr>
+    <td colspan=2 style="width:19%" data-expected-width="208"><div style="width:208px">208</div></td>
+  </tr>
+</table>
+
+<h2>Colspan&gt;1 cell's percentage distribution fixed tables</h2>
+<p>Colspan cells distribute width over col widths.
+<p>Rules</p>
+<ul>
+  <li>Percentages are not distributed to fixed columns.</li>
+  <li>Percentages are not distributed to percentage columns.</li>
+  <li>Percentages are distributed to auto columns, each column gets distributed%/colspan percent.</li>
+</ul>
+<p class="testdesc">Auto column distribution
+auto colums get percentage widths distributed evenly.
+C0/C1 become 25% columns.
+Assignable table size is 400-4*8=368. Column size is 25% of 368 = 92px</p>
+<p class="error">FF disagrees in how border-spacing is handled and ends up with slightly different cell widths. </p>
+<table style="table-layout:fixed; width: 400px">
+  <col style="width:auto">
+  <col style="width:auto">
+  <tr>
+    <td colspan="2" style="width:50%">50%</td>
+    <td>a</td>
+  </tr>
+  <tr>
+    <td data-expected-width=92>a</td>
+    <td data-expected-width=92>aa</td>
+    <td>a</td>
+  </tr>
+</table>
+
+<p class="testdesc">Fixed column distribution
+fixed columns do not get percentage distribution.</p>
+<table style="table-layout:fixed; width: 400px">
+  <col style="width:50px">
+  <col style="width:50px">
+  <tr>
+    <td colspan="2" style="width:50%">50%</td>
+    <td>a</td>
+  </tr>
+  <tr>
+    <td data-expected-width="50">a</td>
+    <td data-expected-width="50">a</td>
+    <td>a</td>
+  </tr>
+</table>
+
+<p class="testdesc">Percentage column distribution
+percentage columns do not get percentage distribution.</p>
+<table style="table-layout:fixed; width: 400px">
+  <col style="width:12.5%">
+  <col style="width:25%">
+  <tr>
+    <td colspan="2" style="width:50%">50%</td>
+    <td>a</td>
+  </tr>
+  <tr>
+    <td data-expected-width="46">a</td>
+    <td data-expected-width="92">a</td>
+    <td>a</td>
+  </tr>
+</table>
+
+<p class="testdesc">Distribute over percentage/auto/fixed mix cells
+Collspanned TD distributes 50%. Auto TD gets 50%/(colspanned span = 4): 12.5%
+12.5%* 400px is 50.
+</p>
+<table style="table-layout:fixed; width: 400px;border-spacing:0">
+  <col style="width:25%">
+  <col style="width:25px">
+  <col style="width:25px">
+  <col style="width:auto">
+  <tr>
+    <td colspan="4" style="width:50%">50%</td>
+    <td>a</td>
+  </tr>
+  <tr>
+    <td></td>
+    <td>a</td>
+    <td>a</td>
+    <td data-expected-width="50" style="background-color:yellow">a</td>
+    <td>a</td>
+  </tr>
+</table>
+
+<h2>Colspan&gt;1 cell's minimum width distribution</h2>
+<h3>All unconstrained columns</h3>
+
+<p class="testdesc">Colspan&gt;1: Auto/300px C0:Auto/75pxpx C1:Auto:25px; C2:20px/Auto
+Basic distribution over auto columns, cells grow evenly.
+Distribute 300-8=292 proportional to maxwidth. C0 gets 75/100*292=219.</p>
+<table data-expected-width="344">
+  <tr>
+    <td data-expected-width="219"><div style="width:75px">75px</div></td>
+    <td><div style="width:25px">25px</div></td>
+    <td style="width:20px">x</td>
+  </tr>
+  <tr>
+    <td data-expected-width="300" colspan=2><div style="width:300px">300px min</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Colspan&gt;1: 260px/300px C0:Auto/100px C1:Auto/100px C2:Auto/Auto
+Colspan&gt;1 cell min width wins over css width.
+Table width same as previous example.</p>
+<table data-expected-width="344">
+  <tr>
+    <td data-expected-width="146"><div style="width:100px">100px</div></td>
+    <td><div style="width:100px">100px</div></td>
+    <td style="width:20px">x</td>
+  </tr>
+  <tr>
+    <td data-expected-width="300" colspan=2 style="width:260px"><div style="width:300px">300px min</div></td>
+  </tr>
+</table>
+
+<h3>All fixed columns</h3>
+<li>column gets min_width proportional to its max width.
+
+<p 7 class="testdesc">Colspan&gt;1: 260/300 C0:100/50/100 C1:100/100 C2:20/Auto
+Distribute surplus proportional to max width.
+Colspan&gt;1 is distributing 292, surplus 92, each column gets 46.
+</p>
+<table data-expected-width="344">
+  <tr>
+    <td style="width:100px" data-expected-width="146"><div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td style="width:100px"><div style="width:100px">100px</div></td>
+    <td style="width:20px">x</td>
+  </tr>
+  <tr>
+    <td data-expected-width="300" colspan=2 style="width:260px"><div style="width:300px">300px min</div></td>
+  </tr>
+</table>
+
+<p 8 class="testdesc">Colspan&gt;1: 300/300 C0:100/25 C1:100/75 C2:20/Auto
+Column minimum width is less than its CSS width.
+Just like last example, both columns get 46.
+<table data-expected-width="334" style="width:1px">
+  <tr>
+    <td style="width:100px" data-expected-width="146"><div style="width:25px">25px</div></td>
+    <td style="width:100px"><div style="width:75px">75px</div></td>
+    <td style="width:20px"><div style="width:10px">x</div></td>
+  </tr>
+  <tr>
+    <td data-expected-width="300" colspan=2 style=""><div style="width:300px">300px min</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Colspan&gt;1: 300/300 C0:20/100 C1:100/75 C2:20/Auto
+First column's min width > css width.
+Like last example, each column minimum width increases in proportion to the max.</p>
+<p class="error">Chrome differs from FF/Edge. It distributes min-width in proportion to css width, not max width</p>
+<table data-expected-width="344">
+  <tr>
+    <td style="width:20px" data-expected-width="146"><div style="width:100px">20/100px</div></td>
+    <td style="width:40px"><div style="width:100px">40/100px</div></td>
+    <td style="width:20px">x</td>
+  </tr>
+  <tr>
+    <td data-expected-width="300" colspan=2 style=""><div style="width:300px">300px min</div></td>
+  </tr>
+</table>
+
+<h3>All percent columns</h3>
+  <ul>
+    <li>min width never gets smaller than it started.
+    <li>min width becomes cell.percent/cells.percent * colspan&gt;1_cell.min_width</li>
+    <li>max width becomes cell.percent/cells.percent * colspan&gt;1_cell.max_width</li>
+  </ul>
+
+<p 10 class="testdesc">Colspan&gt;1:Auto/300px C0:25%/50 C1:25%/30 C2:20/Auto
+Colspan&gt;1 min width gets distributed proportional to percentage (not min/max width).
+Columns get min_width = 146, causes table width of 146/0.25 + 4*8 = 616.
+<table data-expected-width="616">
+  <tr>
+    <td style="width:25%" data-expected-width="146"><div style="width:50px">25%/50</div></td>
+    <td style="width:25%"><div style="width:30px">25%/30</div></td>
+    <td style="width:20px">x</td>
+  </tr>
+  <tr>
+    <td colspan=2 style=""><div style="width:300px">300px min</div></td>
+  </tr>
+</table>
+
+<p 11 class="testdesc">Colspan&gt;1:Auto/400px C0:20%/50 C1:60%/50 C2:20/Auto.
+Colspan&gt;1 min width gets distributed proportional to percentage (not min/max width).
+Cells get 98/294, table by rule#1 98px/0.2 + 32 = 522</p>
+<p class="error">Edge disagrees, table is 870</p>
+<div style="width:600px">
+<table data-expected-width="522">
+  <tr>
+    <td style="width:20%" data-expected-width="98"><div style="width:50px">20%/50px</div></td>
+    <td style="width:60%" data-expected-width="294"><div style="width:50px">60%/50px</div></td>
+    <td style="width:20px">x</td>
+  </tr>
+  <tr>
+    <td colspan=2 style=""><div style="width:400px">400px min</div></td>
+  </tr>
+</table>
+</div>
+
+<p 12 class="testdesc">Colspan&gt;1:Auto/468 C0:50%/150 C1:30%/150 C2:20/Auto
+This tests conflict resolution where min-width > redistributed min width.
+Colspanned redistribution: distributed 468-8 = 460 over C0/C1
+Colspanned 468px needs to distribute 460px over C0/C1.
+C0 percent size is 50% * 460 = 230
+C1 percent size is 30% * 460 = 138, defaults to min size of 150
+Column 1 size is 230 + 50%/80% * 80 = 280px
+Column 2 size is 150 + 30%/80% * 80 = 180px
+Column 3 remains 20px
+Assignable table inline size
+C1 dominates estimate: 180/30% + 4*8 = 632
+Compute final column widths from assignable table size:
+C0 = 50% of 600 = 300 C1 = 30% of 600 = 180 , C2 gets the remaining 120</p>
+<table data-expected-width="632">
+  <tr>
+    <td style="width:50%" data-expected-width="300"><div style="width:150px">50%/150px</div></td>
+    <td style="width:30%" data-expected-width="180"><div style="width:150px">30%/150px</div></td>
+    <td style="width:20px" data-expected-width="120">x</td>
+  </tr>
+  <tr>
+    <td colspan=2 style=""><div style="width:468px">408px min</div></td>
+  </tr>
+</table>
+
+
+<p 13 class="testdesc"> Colspan&gt;1:Auto/400px C0:50%/75px/125px, C1:30%/75px/125px C2:20px/Auto
+Colspan&gt;1 cell distribution over different percentages.
+400-8px min width gets redistributed as 245/147 (no min width limits)
+</p>
+<p class="error">Edge is different, table is 685 instead of 522.</p>
+<table data-expected-width="522">
+  <tr>
+    <td style="width:50%" data-expected-width="245"><div style="width:75px">50%/75</div><div style="width:50px">/125</div></td>
+    <td style="width:30%" data-expected-width="147"><div style="width:75px">30%/75</div><div style="width:50px">/125</div></td>
+    <td style="width:20px">x</td>
+  </tr>
+  <tr>
+    <td colspan=2 style=""><div style="width:400px">400px min</div></td>
+  </tr>
+</table>
+
+<h3>Auto/fixed mix columns</h3>
+<p class="testdesc">Colspan&gt;1: Auto/500; C0: Auto/40 C1:150/100
+Colspan&gt;1 excess min: 500-140-8=352; excess max: 500-190-8=302
+Initial min/max C0:40/40, C1:100/150
+Excess is distributed to Auto C0:392/342, C1:100/150
+Assignable width is 492. C0 gets 342, C1 get max:150
+Chrome Legacy does something very different to arrive at the same answer.
+Initial min/max is the same.
+Min gets distributed to C0 and C1 in proportion to max_width: C0:342/40 C1:150/150,
+Min also gets clamped to css width. This is the key difference betweeen NG
+and Legacy code. NG cannot clamp to css width, because it is not available.
+Max gets distributed to both in proportion to max_width: C0:342/103 C1:150/389
+Assignable table width is: 492 (sum of min), min gets used as final width.
+
+Analysis: colspan&gt;1 cell distribution over fixed/auto.
+Legacy incorrectly distributes minmax over both fixed and auto cells
+in proportion to max width,and clamps min to css width.
+
+This width becomes final width for auto tables without any further distribution.
+FF distributes min only over auto, and max over auto.
+Final distribution uses Guess 2 rules: start off with Auto(min), Fixed(max),
+distribute excess to Auto. Ends up with the same result as Legacy.</p>
+<table data-expected-width=516>
+  <tr>
+    <td data-expected-width=342>
+      <div style="width:40px">Auto</div></td>
+    <td style="width:150px" data-expected-width=150>
+      <div style="width:100px">150</div></td>
+  </tr>
+  <tr>
+    <td colspan="2">
+      <div style="width:500px">500</div></td>
+  </tr>
+</table>
+<p class="testdesc">C0:70/Auto C1:70/Auto C2:Auto/50
+This testcase demonstrates how Legacy Chrome handling of min widths is broken.
+There are 2 fixed columns, and 1 auto. The width of fixed columns should be
+the same, but is not. The problem happens when min-width of fixed columns is
+less than fixed width, and there are auto columns.</p>
+
+<p class="error">Chrome Legacy incorrectly assigns minimum width to C0/C1
+to css width of 70. It does compute assignable table width correctly
+as 166 px. This violates the invariant:
+assignable table width >= sum of min widths.
+Chrome resolves invariant violation by truncating one fixed width column
+below its minimum width. </p>
+<table style="width:1px" data-expected-width=166>
+  <tr>
+    <td style="width:70px" data-expected-width=42>0</td>
+    <td style="width:70px" data-expected-width=42>0</td>
+    <td data-expected-width=50><div style="width:50px" >50</div></td>
+  </tr>
+  <tr>
+    <td colspan=3 ><div style="width:150px"></div>
+    </td>
+  </tr>
+</table>
+
+<h3>Percentage/fixed mix columns</h3>
+<p>The Legacy code that deals with this is confusing, it tries to redistribute minimum width in proportion to max width, unless there are auto cells. All the browsers disagree on final widths. Some things everyone agrees on:
+    <li>if there are auto cells, fixed cells do not grow.</li>
+</p>
+
+<p class="testdesc">Colspan&gt;1:N/A C0:60%/100 C2:100/100
+An example what table looks like without colspan&gt;1 distribution.
+Table width by rule#2: (60/(100-60) +1) * 100 = 250 + 24 = 274</p>
+<table data-expected-width="274">
+  <tr>
+    <td data-expected-width="150" style="width:60%"><div style="width:100px">60%</div></td>
+    <td data-expected-width="100" style="width:100px"><div style="width:100px">100px</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Colspan&gt;1:N/A C0:50%/100 C1:50%/100 C2:100/100
+Total column percent is 100%, forcing maximum table grid width by rule #2 to infinity.
+Table css width is 1px, overriding grid max width.
+Final column width is column's minimum width.
+</p>
+<div style="width:500px">
+  <table style="width:1px">
+    <tr>
+      <td data-expected-width="100" style="width:50%"><div style="width:100px">50%</div></td>
+      <td data-expected-width="100" style="width:50%"><div style="width:100px">50%</div></td>
+      <td data-expected-width="100" style="width:100px"><div style="width:100px">100px</div></td>
+    </tr>
+  </table>
+</div>
+
+<p class="testdesc">Colspan&gt;1:N/A C0:50%/100 C1:50%/100 C2:100/100
+Same example as above, but table width is auto.
+Table grows to size of containing block.</p>
+<div style="width:500px">
+  <table>
+    <tr>
+      <td data-expected-width="184" style="width:50%"><div style="width:100px">50%</div></td>
+      <td data-expected-width="184" style="width:50%"><div style="width:100px">50%</div></td>
+      <td data-expected-width="100" style="width:100px"><div style="width:100px">100px</div></td>
+    </tr>
+  </table>
+</div>
+
+<p class="testdesc">Colspan&gt;1: Auto/200px C0:40%/20 C1:50/50 C2:100/20
+Table css width is 1px. This forces grid minimum.
+FF: %ge cell gets its percentage width resolved wrt distributing cell.
+fixed cells get remaining excess width redistributed in proportion
+to max size.
+Chrome algorithm: distributes proportionally to min_width. The problem with
+this is that 40% cell will end up with 0 if no min width.
+<p class="error">Edge distributes all the width to the %ge cell, Chrome distributes proportionally to min width. </p>
+<table style="width:1px" data-expected-width="252">
+  <tr>
+    <td style="width:40%" data-expected-width=80><div style="width:20px">40%</div></td>
+    <td style="width:50px" data-expected-width=120><div style="width:50px">50</div></td>
+    <td data-expected-width="20" style="width:100px"><div style="width:20px">20</div></td>
+  </tr>
+  <tr>
+    <td colspan=2 data-expected-width="208" ><div style="width:208px">208px min</div></td>
+  </tr>
+</table>
+
+<h2>Colspan&gt;1 cell's maximum width distribution</h2>
+<li>Only constrained colspans can distribute max-width over fixed columns</li>
+
+<p class="testdesc">Colspan: constrained. Col: constrained
+Constrained colspan redistributes widths over constrained cols.
+</p>
+<table data-expected-width=216>
+  <col style="width:50px">
+  <col style="width:50px">
+  <tr>
+    <td>50</td>
+    <td>50</td>
+  </tr>
+  <tr>
+    <td colspan=2 style="width:200px" data-expected-width=200>200</td>
+  </tr>
+</table>
+<p class="testdesc">Colspan: unconstrained. Col: constrained
+Colspan max-width does not get redistributed.
+</p>
+<table data-expected-width=124>
+  <col style="width:50px">
+  <col style="width:50px">
+  <tr>
+    <td>50</td>
+    <td>50</td>
+  </tr>
+  <tr>
+    <td colspan=2 data-expected-width=108><div style="width:50px">50</div><div style="width:50px">50</div><div style="width:50px">50</div><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Colspan: unconstrained, Col: constrained/%
+Colspanned col distributes width over %ge column.
+max-guess is 50px + 200px*50% = 150px
+distributable_size is 50px
+%ge column gets percentage_size + distributable_size = 150px
+Later, this makes table 300px wide.
+</p>
+<p class="error">FF, Legacy, and TablesNG all disagree about the correct widths. FF feels more like the right answer, but I can't figure out the math behind it.</p>
+<table data-expected-width=308>
+  <col style="width:50px">
+  <col style="width:50%">
+  <tr>
+    <td data-expected-width=142>50</td>
+    <td>50</td>
+  </tr>
+  <tr>
+    <td colspan=2 data-expected-width=292><div style="width:50px">50</div><div style="width:50px">50</div><div style="width:50px">50</div><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<h2>Merging cell widths into column widths</h2>
+<p>What happens when different types of cells get merged into a single column?</p>
+<p class="testdesc">C0:0 25%/50px C0:1 50%/40px
+C0:0 alone would imply table width of 50/.25 = 200px.
+C0:1 alone would imply table width of 40/.5 = 80px.
+But, largest percentage and largest min width win, so the table width is 50/.5 = 100px.
+</p>
+<table data-expected-width=124>
+  <tr>
+    <td style="width:25%" data-expected-width=50>
+      <div style="width:50px">25%/50px</div></td>
+    <td data-expected-width=50>Auto</td>
+  </tr>
+  <tr>
+    <td style="width:50%">
+      <div style="width:40px">50%/40</div></td>
+    <td>Auto</td>
+  </tr>
+</table>
+
+<p class="testdesc">Merging fixed and percentage
+Column that contains both percent and fixed cells is treated as percent.
+<table data-expected-width=632>
+  <tr>
+    <td style="width:25%" data-expected-width=150>
+      <div style="width:100px" >25%/100</div></td>
+    <td style="width:50px" data-expected-width=50>50px fixed</td>
+    <td>auto</td>
+  </tr>
+  <tr>
+    <td style="width:150px">150</td>
+    <td>Auto</td>
+    <td>Auto</td>
+  </tr>
+</table>
+
+<p class="testdesc">Order of colspan&gt;1 cell redistribution
+Initial minmax of all cells is 50px.
+C0:1 redistributes 200
+C1:2 redistributes 400
+Chrome distributes right-to-left:
+C1:2 distributes 400, and C1 and C2 both get 200
+When C0:1 turns come, C0+C1 are already long enough, nothing to distirbute
+<p class="error">
+In testcase /tables/mozilla_expected_failures/core/col_span2.html
+distribution right-to-left is described as a bug.
+Firefox and Edge both distribute left to right.
+Chrome is only one that distributes right to left.
+Firefox distribution is not cumulative, it uses original minmax to compute final widths. Edge agrees with TablesNG.
+But, mozilla is stable for row reordering.</p>
+</p>
+<table data-expected-width=532>
+  <tr>
+    <td colspan=2><div style="width:208px">200</div></td>
+    <td><div style="width:50px">50</div></td>
+  </tr>
+  <tr>
+    <td><div style="width:50px">50</div></td>
+    <td colspan=2><div style="width:408px">400</div></td>
+  </tr>
+  <tr>
+    <td data-expected-width=100>Auto</td>
+    <td data-expected-width=267><div style="width:50px">Auto</div></td>
+    <td data-expected-width=133>Auto</td>
+  </tr>
+</table>
+<table data-expected-width=482>
+  <tr>
+    <td colspan=2><div style="width:408px">400</div></td>
+    <td><div style="width:50px">50</div></td>
+  </tr>
+  <tr>
+    <td><div style="width:50px">50</div></td>
+    <td colspan=2><div style="width:208px">200</div></td>
+  </tr>
+  <tr>
+    <td data-expected-width=200>Auto</td>
+    <td data-expected-width=200><div style="width:50px">Auto</div></td>
+    <td data-expected-width=50>Auto</td>
+  </tr>
+</table>
+<p class="testdesc">Order of colspan&gt;1 cell redistribution
+Similar to previous testcase, but colspan is 3, not 2.</p>
+<p class="error">
+In testcase /tables/mozilla_expected_failures/core/col_span2.html
+distribution right-to-left is described as a bug.
+Firefox and Edge both distribute left to right.
+TablesNG matches Edge/FF.</p>
+</p>
+<table data-expected-width=740>
+  <tr>
+    <td colspan=3><div style="width:316px">300</div></td>
+    <td><div style="width:50px">50</div></td>
+  </tr>
+  <tr>
+    <td><div style="width:50px">50</div></td>
+    <td colspan=3><div style="width:616px">600</div></td>
+  </tr>
+  <tr>
+    <td data-expected-width=100>Auto</td>
+    <td data-expected-width=240><div style="width:50px">Auto</div></td>
+    <td data-expected-width=240><div style="width:50px">Auto</div></td>
+    <td data-expected-width=120>Auto</td>
+  </tr>
+</table>
+</main>
+
+#end
+#test css/css-tables/tentative/column-widths.html
+#selector table
+<!doctype html>
+<title>Column widths</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#distributing-width-to-columns" />
+<style>
+  main table {
+    background: gray;
+    border-spacing: 8px 8px;
+    table-layout: auto;
+    margin-top: 4px;
+  }
+  main td {
+    background: #BFB;
+    font-size: 10px;
+  }
+  main td > div {
+    display: inline-block;
+    background: rgba(56,162,56,0.3);
+  }
+</style>
+<main>
+<h1>Col width</h1>
+<p>how does col width interact with td widths to produce final column width?</p>
+<p>Inputs are colgroup/col widths, and td widths.
+<p>td widths merge, then merge again with col to produce column widths.
+<p>Output is column min/max/percent w0dths.
+<p>Colgroup/col has css min_width, css max_width, css percent.</p>
+<p>TD has intrinsic minmax, css width, css percent width, css max width, css min width</p>
+
+<h2>Initial cell assignment</h2>
+
+
+<p class="testdesc">Unconstrained single TD, table-layout:auto
+td.min = minmax.min
+td.max = minmax.max</p>
+<table style="width:1px" data-expected-width=266>
+  <tr>
+    <td><div style="width:50px">min</div><div style="width:250px">min</div></td>
+  </tr>
+</table>
+<table data-expected-width=316>
+  <tr>
+    <td><div style="width:50px">max</div><div style="width:250px">max</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Unconstrained single TD, table-layout:fixed
+td.min = 0
+td.max = minmax.max</p>
+<table style="width:1px;table-layout:fixed" data-expected-width=16>
+  <tr>
+    <td><div style="width:50px">min</div><div style="width:250px">min</div></td>
+  </tr>
+</table>
+<table style="table-layout:fixed;width:300px" data-expected-width=300>
+  <tr>
+    <td><div style="width:50px">max</div><div style="width:250px">max</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Constrained single TD, table-layout:auto
+  td.min = minmax.min
+  td.max = max(minmax.min, css.width)
+</p>
+<table data-expected-width=266>
+  <tr>
+    <td style="width:200px"><div style="width:50px">max</div><div style="width:250px">max</div></td>
+  </tr>
+</table>
+<table data-expected-width=416>
+  <tr>
+    <td style="width:400px"><div style="width:50px">max</div><div style="width:250px">max</div></td>
+  </tr>
+</table>
+<table style="width:1px" data-expected-width=26>
+  <tr>
+    <td style="width:50px"><div style="width:10px">min</div></td>
+  </tr>
+</table>
+<table data-expected-width=266>
+  <tr>
+    <td style="width:100px"><div style="width:50px">min</div><div style="width:250px">min</div></td>
+  </tr>
+</table>
+<table data-expected-width=416>
+  <tr>
+    <td style="width:400px"><div style="width:50px">min</div><div style="width:250px">min</div></td>
+  </tr>
+</table>
+
+
+<h2>TD/TD merging</h2>
+
+<p>TD merging only happens in auto, in fixed only 1st row gets measured</p>
+
+<p class="testdesc">Two unconstrained TDs, table-layout:auto or fixed
+  td.min = max(C0.min, C1.min). always 0 in fixed layout.
+  td.max = max(C0.max, C1.max)
+</p>
+<table data-expected-width=316>
+  <tr>
+    <td data-expected-width=300><div style="width:50px">auto</div><div style="width:250px">max</div></td>
+  </tr>
+  <tr>
+    <td><div style="width:100px">auto</div><div style="width:150px">auto</div></td>
+  </tr>
+</table>
+<table style="width:1px" data-expected-width=266>
+  <tr>
+    <td data-expected-width=250><div style="width:50px">auto</div><div style="width:250px">max</div></td>
+  </tr>
+  <tr>
+    <td><div style="width:100px">auto</div><div style="width:150px">auto</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Unconstrained (UN) and constrained (CON) TD
+  td.min = max(UN.min, CON.min)
+  td.max = max(UN.min, CON.max)
+</p>
+<p class="error">Chrome Legacy and Edge fail this test. They do not limit unconstrained maximum: td.max = max(UN.max, CON.max).</p>
+<table style="width:1px" data-expected-width=36>
+  <tr>
+    <td style="width:50px" data-expected-width=20><div style="width:20px">min</div></td>
+  </tr>
+  <tr>
+    <td><div style="width:15px">min</div></td>
+  </tr>
+</table>
+<table data-expected-width=66>
+  <tr>
+    <td style="width:50px" data-expected-width=50><div style="width:20px">max</div></td>
+  </tr>
+  <tr>
+    <td><div style="width:40px">max</div><div style="width:40px">max</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Two percent TDs
+  td.percent = max(C1.percent, C2.percent)
+  td.max = max(C1.max, C2.max)
+  td.min = max(C1.min, C2.min)
+</p>
+<table data-expected-width=324>
+  <tr>
+  <td style="width:10%"><div style="width:60px">60</div></td>
+  <td>auto</td>
+</tr>
+<tr>
+  <td style="width:20%" data-expected-width=60><div style="width:50px">50</div></td>
+  <td data-expected-width=240>auto</td>
+</tr>
+</table>
+
+<h2>COL/TD merging</h2>
+
+<p class="testdesc">col auto td auto
+column.min = td.min
+column.max = td.max</p>
+<table data-expected-width=66>
+  <col>
+  <td><div style="width:50px">auto</div></td>
+</table>
+
+<p class="testdesc">col fixed td auto
+  column.min = td.min
+  column.max = max(col[px], td.min)
+</p>
+<table data-expected-width=116>
+  <col style="width:100px">
+  <td><div style="width:50px">auto</div></td>
+</table>
+<table data-expected-width=126>
+  <col style="width:100px">
+  <td><div style="width:110px">110</div><div style="width:110px">110</div></td>
+</table>
+<table style="width:1px" data-expected-width=66>
+  <col style="width:100px">
+  <td><div style="width:50px">min</div></td>
+</table>
+
+<p class="testdesc">col % td auto
+column.min = td.min
+column.max = max(td.max, col.max)
+column.percent = col[%]
+<table data-expected-width=224>
+  <col style="width:80%">
+  <td><div style="width:50px">auto</div></td>
+  <td style="width:40px">40</td>
+</table>
+<table style="width:1px" data-expected-width=94>
+  <col style="width:80%">
+  <td style="width:50px"><div style="width:30px">auto</div></td>
+  <td><div style="width:40px"></div></td>
+</table>
+<table data-expected-width=274>
+  <col style="width:80%">
+  <td><div style="width:200px" data-expected-width=200>auto</div></td>
+  <td style="width:30px"><div style="width:30px">30</div></td>
+</table>
+
+<p class="testdesc">col auto td percent
+column.min = td.min
+column.max = td.max
+column.percent = td.percent
+<table data-expected-width=174>
+  <col>
+  <td style="width:80%" data-expected-width=120><div style="width:100px">auto</div></td>
+  <td ><div style="width:30px">10</div></td>
+</table>
+
+<p class="testdesc">col fixed td percent
+column.min = td.min
+column.max = max(td.max, col.max)
+column.percent = td.percent
+<table data-expected-width=424>
+  <col style="width:200px">
+  <td style="width:50%" data-expected-width=200><div style="width:50px">50</div></td>
+  <td><div style="width:50px">50</div>
+</table>
+<table style="width:1px" data-expected-width=124>
+  <col style="width:200px">
+  <td style="width:60%" data-expected-width=50><div style="width:50px">50</div></td>
+  <td><div style="width:50px">50</div>
+</table>
+
+<p class="testdesc">col percent td percent
+column.min = td.min
+column.max = max(td.max, col.max)
+column.percent = max(td.percent, col.percent)</p>
+<table data-expected-width=524>
+  <col style="width:60%">
+  <td style="width:50%" data-expected-width=300><div style="width:100px">100</div></td>
+  <td><div style="width:200px">200</div></td>
+</table>
+<table data-expected-width=524>
+  <col style="width:50%">
+  <td style="width:60%" data-expected-width=300><div style="width:100px">100</div></td>
+  <td><div style="width:200px">200</div></td>
+</table>
+
+<p class="testdesc">col auto td fixed
+column.min = td.min
+column.max = td.max</p>
+<table data-expected-width=116>
+  <col>
+  <td style="width:100px">100</td>
+</table>
+
+<p class="testdesc">col fixed td fixed
+column.min = td.min
+column.max = max(td.max, col.max)</p>
+<table data-expected-width=216>
+  <col style="width:200px">
+  <td style="width:100px">100</td>
+</table>
+<table data-expected-width=216>
+  <col style="width:100px">
+  <td style="width:200px">100</td>
+</table>
+
+<p class="testdesc">col percent td fixed
+column.min = td.min
+column.percent = col.percent
+column.max = max(td.max, col.max)</p>
+<table data-expected-width=424>
+  <col style="width:50%">
+  <td style="width:100px" data-expected-width=200>100</td>
+  <td><div style="width:200px">200</div>
+</table>
+
+<table style="width:1px" data-expected-width=234>
+  <col style="width:50%">
+  <td style="width:100px" data-expected-width=10><div style="width:10px">10</div></td>
+  <td><div style="width:200px">200</div></td>
+</table>
+
+<p class="testdesc">col fixed td fixed inside table-layout:fixed
+constrained columns take precedence in fixed layout.
+<table style="width:324px;table-layout:fixed" data-expected-width=324>
+  <col style="width:100px">
+  <td style="width:200px" data-expected-width=100>100</td>
+  <td data-expected-width=200><div style="width:400px" >200</div></td>
+</table>
+
+<p class="testdesc">col percent td fixed inside table-layout:fixed
+constrained columns take precedence in fixed layout.
+<table style="width:324px;table-layout:fixed" data-expected-width=324>
+  <col style="width:50%">
+  <td style="width:200px" data-expected-width=150>150</td>
+  <td><div style="width:400px">150</div></td>
+</table>
+</main>
+
+#end
+#test css/css-tables/tentative/element-sizing.html
+#selector table
+<!doctype html>
+
+
+
+<title>TABLE fragment sizes</title>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/" />
+
+<main>
+<h1>TBODY/TR Element sizes and border spacing</h1>
+<p>Legacy Chrome:TR includes start/end, not before/after. 1st TBODY includes before/after, 2nd TBODY includes only after, not before.</p>
+<p>Firefox: TR/TBODY do not include start/end before/after.</p>
+<p>Proposal: match firefox</p>
+
+<table style="width:100px;border-spacing:10px;background:#ddd">
+  <tbody data-expected-width=80>
+    <tr data-expected-width=80>
+      <td data-expected-width=80>0,0</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>TR width is used for TD's percentage resolution</p>
+<table style="width:120px;border-spacing:10px;background:#ddd">
+  <tbody data-expected-width=100>
+    <tr data-expected-width=100>
+      <td style="padding:30%" data-expected-width=100 ><div data-offset-x=30>0,0</div></td>
+    </tr>
+  </tbody>
+</table>
+</main>
+
+#end
+#test css/css-tables/tentative/rowspan-height-redistribution.html
+#selector table
+<!doctype html>
+<title>ROWSPAN redistribution</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#row-layout" />
+<link rel="help" href="https://github.com/w3c/csswg-drafts/issues/4418" />
+<style>
+  main table {
+    margin-top: 8px;
+    border-collapse: collapse;
+    background: rgba(0,0,255,0.1);
+    background-image: linear-gradient(45deg, #DDD 25%, transparent 25%), linear-gradient(-45deg, #DDD 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #DDD 75%), linear-gradient(-45deg, transparent 75%, #DDD 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+  .sizer {
+    width: 30px;
+    height: 100px;
+  }
+  main tbody tr:nth-child(odd) {
+    background: rgba(255,255,0,1.0);
+  }
+  main tbody tr:nth-child(even) {
+    background: rgba(255,165,0,1.0);
+  }
+  main td div {
+    background: radial-gradient(ellipse at center, rgba(255,255,255,0.5) 0%, rgba(0,255,0,0.7) 100%);
+  }
+  main .td-padding td {
+    padding: 2px;
+  }
+  main .td-padding-xl td {
+    padding: 10px;
+  }
+</style>
+<main>
+<h1>ROWSPAN > 1 to row distribution</h1>
+<p>The algorithm has not been standardized. This is my understanding of how it works.</p>
+<ol>
+  <li>rowspan>1 TDs are sorted:</li>
+    <ol>
+      <li>If TD span the same rows, taller TD is distributed first.</li>
+      <li>If one TD is fully enclosed by another, inner TD is distributed first.</li>
+      <li>Otherwise, higher TD is distributed first.</li>
+    </ol>
+  <li>Each rowspan>1 TD's height is distributed as following</li>
+    <ol>
+      <li>rowspan > 1 TDs have height TDh, span N rows. N rows have total height of Rh. TDh - Rh height, Dh, must be distributed as follows.</li>
+      <li>If percentage resolution size is available (this happens when redistributiong table/section height), percentage rows grow to their percentage size, proportional to (percentage size - current size). Dh shrinks by distributed height. Justification: explicit percentage rows should grow to their percentage.</li>
+      <li>Rows that originate rowspan>1 cells get all the Dh height, distributed evenly. Justification: rowspan>1 rows are likely to need to grow later. If there are multiple rowspan>1 cells, there can be multiple originating rows.</li>
+      <li>Unconstrained non-empty rows grow, proportional to their existing height.</li>
+      <li>If all rows are empty, last row gets all the height. Justification: ???</li>
+      <li>Contstrained rows grow in proportion to current height.</li>
+    </ol>
+  </ol>
+<p class="error">It is unclear what the existing ChromeLegacy/FF algorithms do for distribution over rowspan>1 and empty cells. <a href="https://dxr.mozilla.org/mozilla-central/source/layout/tables/nsTableRowGroupFrame.cpp#509">FF special cases</a> "there is no cell originating in the row with owspan=1 and there are at least 2 cells spanning the row. Chrome Legacy also tries to do something similar, but they disagree on what. TablesNG will try to ship without special cases.</p>
+ <p class="error">Safari fails most of these tests</p>
+<p>Color scheme</p>
+<table>
+  <tr>
+    <td>odd rows are yellow</td>
+  </tr>
+  <tr>
+    <td>even rows are orange</td>
+  </tr>
+  <tr>
+    <td><div style="height:50px">inner divs have a green gradient</div>
+    </td>
+  </tr>
+  <tr>
+    <td>row</td>
+  </tr>
+  <tr>
+    <td>row</td>
+  </tr>
+ <tr>
+    <td>row</td>
+  </tr>
+  <tr>
+    <td>row</td>
+  </tr>
+
+</table>
+<h2>Unconstrained rows</h2>
+ <p>Rows whose height is not fixed or percent are unconstrained.</p>
+<p class="testdesc">Unconstrained rows
+Unconstrained rows are redistributed proportionally. Rows are constrained if their height is fixed, or percent.</p>
+<table>
+  <tbody>
+    <tr data-expected-height="50">
+      <td>0,0</td>
+      <td rowspan="2"><div class="sizer"></div></td>
+    </tr>
+    <tr data-expected-height="50">
+      <td>0,1</td>
+    </tr>
+</table>
+
+<p class="testdesc">Unconstrained rows with zero height do not grow.</p>
+<table>
+  <tbody>
+    <tr data-expected-height="50">
+      <td>0,0</td>
+      <td rowspan="3"><div class="sizer"></div></td>
+    </tr>
+    <tr data-expected-height="0">
+    </tr>
+    <tr data-expected-height="50">
+      <td>0,2</td>
+    </tr>
+</table>
+
+<p class="testdesc">rowspan>1 is zero height, spanned rows have height.</p>
+<table>
+  <tbody>
+    <tr data-expected-height="0">
+      <td></td>
+      <td rowspan="3"><div class="sizer"></div></td>
+      <td></td>
+    </tr>
+    <tr data-expected-height="50">
+      <td>1,0</td>
+      <td></td>
+    </tr>
+    <tr data-expected-height="50">
+      <td>2,0</td>
+      <td></td>
+    </tr>
+</table>
+
+<p class="testdesc">Unconstrained rows are redistributed proportionally to heights</p>
+<table>
+  <tbody>
+    <tr data-expected-height="75">
+      <td><div style="height:45px">0,0</div></td>
+      <td rowspan="2"><div class="sizer"></div></td>
+    </tr>
+    <tr data-expected-height="25">
+      <td><div style="height:15px">0,1</div></td>
+    </tr>
+</table>
+
+<h2>Fixed rows</h2>
+
+<p class="testdesc">Constrained fixed rows
+do not grow if there are unconstrained ones</p>
+<p class="error">Edge grows constrained rows too</p>
+<table>
+  <tbody>
+    <tr style="height: 30px" data-expected-height="30">
+      <td>0,0 30px</td>
+      <td rowspan="2"><div class="sizer"></div></td>
+    </tr>
+    <tr data-expected-height="70">
+      <td>0,1</td>
+    </tr>
+</table>
+
+<p class="testdesc"> Constrained fixed rows
+grow proportionally to their size if there are no unconstrained rows</p>
+<table>
+  <tbody>
+    <tr style="height: 20px" data-expected-height="25">
+      <td>20</td>
+      <td rowspan="3"><div class="sizer"></div></td>
+    </tr>
+    <tr style="height: 20px" data-expected-height="25">
+      <td>20</td>
+    </tr>
+    <tr style="height: 40px" data-expected-height="50">
+      <td>40</td>
+    </tr>
+</table>
+
+<h2>Percent rows</h2>
+
+<p class="testdesc">Constrained percent rows
+grow like unconstrained ones when percent resolution size is undefined.</p>
+<p class="error">FF always treats percent rows as constrained. Chrome legacy does resolve percentage against final height of the table. I do not think that can work. Edge follows NG.</p>
+<table>
+  <tbody>
+    <tr style="height: 30%" data-expected-height="50">
+      <td>0,0 30%</td>
+      <td rowspan="2"><div class="sizer"></div></td>
+    </tr>
+    <tr data-expected-height="50">
+      <td>0,1</td>
+    </tr>
+    <tr style="height:100px"><td>100px</td></tr>
+</table>
+
+
+<p class="testdesc">Percent rows with zero height
+do not grow.</p>
+<p class="error">Legacy Chrome has a strange gap between rows</p>
+<table>
+  <tbody>
+    <tr data-expected-height="50">
+      <td>0,0</td>
+      <td rowspan="3"><div class="sizer"></div></td>
+    </tr>
+    <tr style="height:10%;background:red" data-expected-height="0">
+    </tr>
+    <tr data-expected-height="50">
+      <td>2,0</td>
+    </tr>
+</table>
+
+<h2>Order of rowspan distribution</h2>
+
+
+<p class="testdesc">If cells span the same rows, bigger cell is distributed first
+Not sure how to test this, I think it is just an optimization, there is no observable effect.
+<p class="error">FF and Legacy Chrome unexpectedly distribute height evenly between rows in the first test case. Edge and TablesNG do not.</p>
+<table>
+  <tr data-expected-height=0>
+    <td rowspan=3><div style="height:50px"></div></td>
+    <td rowspan=3><div style="height:99px"></div></td>
+  </tr>
+  <tr data-expected-height=0>
+  </tr>
+  <tr data-expected-height=99>
+  </tr>
+  <tr>
+    <td>bottom</td>
+    <td>bottom</td>
+  </tr>
+</table>
+<table>
+  <tr data-expected-height=0>
+    <td rowspan=3><div style="height:50px"></div></td>
+    <td rowspan=3><div style="height:99px"></div></td>
+    <td style="width:20px"></td>
+  </tr>
+  <tr data-expected-height=0>
+    <td></td>
+  </tr>
+  <tr data-expected-height=99>
+    <td></td>
+  </tr>
+  <tr>
+    <td>bottom</td>
+    <td>bottom</td>
+  </tr>
+</table>
+<table>
+  <tr data-expected-height=0>
+    <td rowspan=3><div style="height:99px;width:20px"></div></td>
+  </tr>
+  <tr></tr>
+  <tr data-expected-height=99></tr>
+ <tr>
+    <td>bottom</td>
+    <td>bottom</td>
+  </tr>
+</table>
+
+
+<p class="testdesc">If one cell is fully enclosed by another, inner cell wins.
+<p class="error">Not in Edge</p>
+<table>
+  <tr data-expected-height=0>
+    <td rowspan=4><div style="height:50px;width:20px"></div></td>
+    <td></td>
+  <tr data-expected-height=0>
+    <td></td>
+    <td rowspan=2><div style="height:100px;width:20px"></div></td>
+  </tr>
+  <tr data-expected-height=100></tr>
+  <tr data-expected-height=0></tr>
+</tr>
+</table>
+
+<p class="testdesc">First row wins.
+rowspan-4 distributes 50 to last empty row, row3. rowspan-3 distributes 100px to only nonempty row, row3.
+<p class="error">Edge disagrees here.</p>
+<table>
+  <tr data-expected-height=0>
+    <td rowspan=4><div style="height:50px;width:20px"></div></td>
+    <td></td>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=100>
+    <td></td>
+    <td rowspan=3><div style="height:100px;width:20px"></div></td>
+  </tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+</tr>
+</table>
+
+<h2>Rowspan distribution over empty rows.</h2>
+
+<p class="testdesc">Rowspans that span non-existent rows
+Span is truncated so only existing rows are spanned.</p>
+<table>
+  <tbody data-expected-height="100">
+    <tr>
+      <td data-expected-height="50">0,0</td>
+      <td data-expected-height="100" rowspan="5"><div style="height:100px;">rowspan 5</div></td>
+    </tr>
+    <tr>
+      <td data-expected-height="50">1,0</td>
+    </tr>
+    <tr data-expected-height="0"></tr>
+  </tbody>
+  <tbody>
+    <tr>
+      <td>body 2</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="testdesc">Rowspan spans only empty rows
+Last spanned row gets all the height.
+<p class="error">Edge distributes height to all empty rows, not just last.</p>
+<table>
+  <tr>
+    <td>first row</td>
+  </tr>
+  <tr data-expected-height=0>
+    <td></td>
+    <td rowspan=5><div style="height:100px;width:30px;"></div></td>
+  </tr>
+  <tr data-expected-height=0><td></td></tr>
+  <tr data-expected-height=0><td></td></tr>
+  <tr data-expected-height=0><td></td></tr>
+  <tr data-expected-height=100><td></td></tr>
+  <tr>
+    <td>last row</td>
+  </tr>
+</table>
+
+<p class="testdesc">TD is not considered empty if it has padding, but no content
+<table>
+  <tr>
+    <td>first row</td>
+  </tr>
+  <tr data-expected-height=0>
+    <td></td>
+    <td style="height:100px" rowspan=3></td>
+  </tr>
+  <tr data-expected-height=100><td style="padding:2px"></td></tr>
+  <tr data-expected-height=0></tr>
+  <tr>
+    <td>last row</td>
+  </tr>
+</table>
+
+<p class="testdesc">row with an empty tall cell is not considered empty.
+<p class="error">
+<table>
+  <tr>
+    <td rowspan=5><div style="height:100px">rowspan</div></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr data-expected-height=100>
+    <td rowspan=5></td>
+    <td></td>
+  </tr>
+  <tr></tr>
+  <tr></tr>
+  <tr></tr>
+  <tr></tr>
+</table>
+
+<p class="testdesc">Empty rows with border-spacing big enough for rowspan cell
+rows are 0 height, cell spans the entire table.
+<table style="border-spacing:20px;border-collapse:separate " data-expected-height=100>
+  <tr data-expected-height=0>
+    <td rowspan=4><div style="height:60px;width:40px"></div></td>
+  </tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+</table>
+
+<p class="testdesc">row with a non-empty rowspan>0 cell is empty.
+Distributes to all rows except start row?
+<p class="error">
+<table>
+  <tr>
+    <td rowspan=5><div style="height:100px">rowspan</div></td>
+    <td></td>
+  </tr>
+  <tr data-expected-height=100>
+    <td rowspan=5><div style="height:100px">rowspan</div></td>
+  </tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+  <tr></tr>
+  <tr></tr>
+</table>
+<table>
+  <tr>
+    <td rowspan=5><div style="height:100px">rowspan</div></td>
+    <td></td>
+  </tr>
+  <tr data-expected-height=100>
+    <td>yo</td>
+  </tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+  <tr data-expected-height=0></tr>
+</table>
+
+
+<p class="testdesc">Distribution over rowspan > 1 rows
+Distribution over rowspan > 1 rows
+
+<table class="td-padding-xl" data-expected-height=360>
+  <tr>
+    <td rowspan=6><div style="width:50px;height:280px"></div></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+  </tr>
+  <tr style="height:30%;background:purple">
+    <td data-expected-height=20></td>
+  </tr>
+  <tr data-expected-height=110>
+    <td rowspan=7 ></td>
+  </tr>
+  <tr data-expected-height=110>
+    <td rowspan=17 ><div style="width:50px;height:40px"></div></td>
+  </tr>
+  <tr>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+  </tr>
+    <tr>
+    <td></td>
+  </tr>
+    <tr>
+    <td></td>
+  </tr>
+</table>
+
+<p class="testdesc">Distribution of table height over rowspan > 1 rows
+If there are any unconstrained non-empty rows, they get it.
+When all rows are empty, last row takes it</p>
+<table class="td-padding-xl" style="height:460px">
+  <tr>
+    <td rowspan=6><div style="width:50px;height:280px" data-expected-height=280></div></td>
+    <td></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+  </tr>
+  <tr style="height:30%;background:purple" data-expected-height=120>
+    <td ></td>
+  </tr>
+  <tr data-expected-height=110>
+    <td rowspan=7 ></td>
+  </tr>
+  <tr data-expected-height=110>
+    <td rowspan=17><div style="width:50px;height:40px"></div></td>
+  </tr>
+  <tr>
+    <td></td>
+  </tr>
+  <tr>
+    <td></td>
+  </tr>
+    <tr>
+    <td></td>
+  </tr>
+    <tr>
+    <td></td>
+  </tr>
+</table>
+
+<p class="testdesc">Distribution of rowspan over percentage rows
+Percentage rows are considered empty if they cannot resolve</p>
+<table>
+  <tbody>
+    <tr style="height:20%">
+      <td rowspan=3><div style="height:100px;width:100px"></div></td>
+      <td></td>
+    </tr>
+    <tr style="height:30%">
+      <td></td>
+    </tr>
+    <tr data-expected-height=100 style="height:50%">
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+</main>
+
+#end
+#test css/css-tables/tentative/table-minmax.html
+#selector table
+<!doctype html>
+<title>Table minmax tricks</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/" />
+<style>
+  main table {
+    background: gray;
+    border-spacing: 10px 10px;
+    table-layout: auto;
+  }
+  main td {
+    background: #BFB;
+    font-size: 10px;
+    box-sizing: border-box;
+  }
+  main td > div {
+    display: inline-block;
+    background: rgba(56,162,56,0.3);
+    line-height: 2;
+  }
+  .container {
+    border: 5px solid orange;
+    margin-top: 8px;
+    box-sizing: border-box;
+    width: 600px;
+  }
+</style>
+<main>
+<h2>Table minmax</h2>
+
+<p>How do different layout algorithms deal with table with an infinite max width?`</p>
+<xmp>
+  <table>
+    <td style="width:100%"><div style="width:30px">100%</div></td>
+    <td><div style="width:100px">100px</div></td>
+  </table>
+</xmp>
+<p>Block layout clamps the max width, but  flex/grid/table layouts do not. What happens?</p>
+
+<p class="testdesc">Block layout</p>
+<div class="container">
+  <table data-expected-width=590>
+    <td style="width:100%"><div style="width:30px">100%</div></td>
+    <td><div style="width:100px">100px</div></td>
+  </table>
+  <div>sibling</div>
+</div>
+
+<p class="testdesc">Block layout with floats</p>
+<div class="container">
+  What about this?
+  <table style="float:left" data-expected-width=590>
+    <td style="width:100%"><div style="width:30px">100%</div></td>
+    <td><div style="width:100px">100px</div></td>
+  </table>
+  <div style="float:left">sibling</div>
+  <div style="clear:both"></div>
+</div>
+
+
+<p class="testdesc">Table layout</p>
+
+<table class="container" style="width:auto">
+  <td>
+    <table data-expected-width=160>
+      <td style="width:100%"><div style="width:30px">100%</div></td>
+      <td><div style="width:50px">50px</div><div style="width:50px">50px</div></td>
+    </table>
+  </td>
+  <td><div style="width:100px;">sibling</div></td>
+</table>
+
+<p class="testdesc">Flex layout 1 1 auto</p>
+<p class="error">Edge is wider than flexbox</p>
+<div class="container" style="display:flex;justify-content:center">
+  <table style="flex: 1 1 auto" data-expected-width=355>
+    <td style="width:100%"><div style="width:30px">100%</div></td>
+    <td><div style="width:50px">50px</div><div style="width:50px">50px</div></td>
+  </table>
+  <div style="background:yellow;flex:1 1 40px">40px</div>
+</div>
+
+<p class="testdesc">Flex layout 0 0 auto</p>
+
+<div  class="container" style="display:flex;justify-content:center">
+  <table style="flex: 0 0 auto" data-expected-width=160>
+    <td style="width:100%"><div style="width:30px">100%</div></td>
+    <td><div style="width:50px">50px</div><div style="width:50px">50px</div></td>
+  </table>
+  <div style="background:yellow;flex:1 1 auto">auto</div>
+</div>
+
+<h2>Empty table sizes</h2>
+<p class="testdesc">Completely empty table</p>
+<table style="border-spacing: 0px 0px;" data-expected-height=0 data-expected-width=0></table>
+
+<p class="testdesc">Completely empty table with min-content width</p>
+<table style="border-spacing: 0px 0px;width:min-content" data-expected-height=0 data-expected-width=0></table>
+
+
+<p class="testdesc">Completely empty table with max-content width</p>
+<table style="border-spacing: 0px 0px;width:max-content" data-expected-height=0 data-expected-width=0></table>
+
+<p class="testdesc">Completely empty table with width/height</p>
+<table style="border-spacing: 0px 0px;width:50px;height:50px" data-expected-height=50 data-expected-width=50></table>
+
+<p class="testdesc">Empty table with border spacing</p>
+<p class="error">Edge has width</p>
+<table style="border-spacing: 10px 10px;" data-expected-height=0 data-expected-width=0></table>
+
+<p class="testdesc">Table with just tbody and border spacing</p>
+<p class="error">Chrome Legacy has width and 1/2 height. Edge has width. Proposal: make table empty.</p>
+<table style="border-spacing: 10px 10px;" data-expected-height=0 data-expected-width=0>
+  <tbody>
+  </tbody>
+</table>
+
+<p class="testdesc">Table with tbody, tr, and border spacing</p>
+<p class="error">Edge has height, 1/2 width. Chrome Legacy has width/height. Proposal: make table empty.</p>
+<table style="border-spacing: 10px 10px;" data-expected-height=0 data-expected-width=0>
+  <tbody>
+    <tr></tr>
+  </tbody>
+</table>
+
+<p class="testdesc">Empty table with borders</p>
+<p class="error">Edge has width 30, height 20</p>
+<table style="border: 10px solid green" data-expected-height=20 data-expected-width=20></table>
+
+<p class="testdesc">Empty table with padding</p>
+<p class="error">Edge has width 30, height 20</p>
+<table style="padding: 10px" data-expected-height=20 data-expected-width=20></table>
+
+<p class="testdesc">Empty table with caption</p>
+<table data-expected-height=30 data-expected-width=100><caption><div style="width:100px;height:30px">caption</div></caption></table>
+</main>
+
+
+#end
+#test css/css-tables/tentative/table-width-redistribution-fixed-padding.html
+#selector table
+<!doctype html>
+<title>Columns widths fixed + padding</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#distributing-width-to-columns" />
+<style>
+  body {
+    background: #EEE;
+  }
+  main table {
+    background: gray;
+    border-spacing: 8px 8px;
+    table-layout: fixed;
+  }
+  main td {
+    padding: 6px;
+    background: #BFB;
+    font-size: 10px;
+    box-sizing:content-box;
+  }
+  main td > div {
+    display: inline-block;
+    background: rgba(56,162,56,0.3);
+  }
+</style>
+<main>
+<h1>Fixed tables with padding: Compute column computed widths from assignable table width</h1>
+
+<p>This test is the similar to table-width-redistribution-fixed.html,
+  except that all cells have 6px padding. The comments in this test refer to padding incompatibilities only.</p>
+
+<p class="error">Percentage sizes and box-sizing are handled differently in FF/Chrome. In Chrome, %ge size is always treated as border-box size: column width = % * table width. In FF, box-sizing:content-box, %ge size is % * table width + border_padding, box-sizing:border-box same as Chrome. </p>
+
+<h2>Fixed only</h2>
+
+<p 3 class="testdesc">Table: 50px; C0:100/50/100 C1:100/50/100
+When table.css_width is < columns.css_width, how is the conflict resolved?
+columns.css_width wins
+<p class="error">
+<table style="width:50px" data-expected-width=248>
+  <tr>
+    <td style="width:100px" data-expected-width=112>
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td style="width:100px" data-expected-width=112>
+      <div style="width:50px">50</div><div style="width:25px">25</div></td>
+  </tr>
+</table>
+
+<p 4 class="testdesc">Table: 300px; C0:100/100/200 C1:100/90/115
+When table.css_width is > columns.css_width , how is the conflict resolved?
+table.css_width wins</p>
+<table style="width:300px" data-expected-width=300>
+  <tr>
+    <td style="width:100px" data-expected-width=138>
+      <div style="width:100px">100</div><div style="width:100px">100</div></td>
+    <td style="width:100px" data-expected-width=138>
+      <div style="width:90px">90</div><div style="width:25px">25</div></td>
+  </tr>
+</table>
+
+<p 5 class="testdesc">Table: 300px; C0:100/50/50 C1:100/100/100
+Fixed cells must grow, but their min widths differ.
+Fixed cells grow in proportion to their css width.
+<table style="width:calc(300px + 24px)" data-expected-width=324>
+  <tr>
+    <td style="width:100px" data-expected-width=150>
+      <div style="width:50px">50</div></td>
+    <td style="width:100px" data-expected-width=150>
+      <div style="width:100px">100</div></td>
+  </tr>
+</table>
+
+<p 6 class="testdesc">Table: 50px; C0:100/50/50 C1:100/100/100
+What happens when column.min_width > column.css_width
+column.css_width wins over column.min_width.
+<table style="width:100px" data-expected-width=248>
+  <tr>
+    <td style="width:100px" data-expected-width=112>
+      <div style="width:200px"></div></td>
+    <td style="width:100px" data-expected-width=112>
+      <div style="width:200px"></div></td>
+  </tr>
+</table>
+
+<p 7 class="testdesc">Table: 1px.
+What happens to min_width when multiple cells specify css_width of the same column?
+1st cell wins.
+<table style="width:1px" data-expected-width=128>
+  <tr>
+    <td style="width:100px" data-expected-width=112>
+      <div style="width:200px">200</div></td>
+  </tr>
+      <td style="width:150px" data-expected-width=112>
+        <div style="width:150px">150</div></td>
+  </tr>
+</table>
+
+
+<h2>Colspan distribution</h2>
+
+<p 9 class="testdesc">Table: 1px
+Does column.min_width change with colspan distribution from later rows to first row?
+No
+<table style="width:1px" data-expected-width=86>
+  <tr>
+    <td data-expected-width=0>
+      <div style="width:50px"></div></td>
+    <td style="width:50px" data-expected-width=62>
+      <div style="width:50px"></div></td>
+  </tr>
+  <tr>
+    <td colspan=2 style="width:200px" data-expected-width=70>
+      <div style="width:200px"></div></td>
+  </tr>
+</table>
+
+
+<h2>Colspan header cells</h2>
+<section>
+<ol>
+  <li>Fixed/percentage colspan cells get distributed evenly.</li>
+  <li>Auto cells. Is the table even fixed?</li>
+</ol>
+
+<p 12 class="testdesc">Assi: 300px
+To make CO distributable width 100, declare it as 100px+8px spacing - 12px padding.
+To make C1 distributable width 200, declare it as 220px+8px spacing - 12px padding.
+Fixed header cells with colspan get divided evenly.
+</p>
+<p class="error">Legacy chrome does not substract border spacing before distribution</p>
+<table style="width:calc(300px + 40px)" data-expected-width=340>
+  <tr>
+    <td colspan=2 style="width:96px" data-expected-width=108>108</td>
+    <td colspan=2 style="width:196px" data-expected-width=208>208</td>
+  </tr>
+  <tr>
+    <td data-expected-width=50>1</td>
+    <td>1</td>
+    <td data-expected-width=100>1</td>
+    <td>1</td>
+  </tr>
+</table>
+
+<p 13 class="testdesc">Assignable: 400px, C0:40% C1:20% C2:40%
+Percentage header cells with colspan.
+Colspan cells do not distribute border_padding, they just distribute widths.
+C0/1/2/3 will not have border-padding becaouse of colspan, C4 because border-box
+TD0 splits
+C0/1 get 20% max (40 + padding)/ 2 = 22px,
+C2/3 10% and (20 + padding) / 2 = 12px max,
+C4 40%, 12px percent border padding, and 52 max
+
+Assignable width is 440 - 48, everyone gets according to percent.
+C0/C1 get 80, C2/C3 get 40, and C4 gets 160.
+</p>
+<p class="error">Firefox seems to have a rounding error.</p>
+<table style="width: calc(400px + 6 * 8px)" data-expected-width=448>
+  <tr>
+    <td colspan=2 style="width:40%" data-expected-width=168><div style="width:40px"></div></td>
+    <td colspan=2 style="width:20%" data-expected-width=88><div style="width:20px"></div></td>
+    <td style="width:40%;box-sizing:border-box" data-expected-width=160><div style="width:40px"></div></td>
+  </tr>
+  <tr>
+    <td data-expected-width=80>Auto</td>
+    <td data-expected-width=80>Auto</td>
+    <td data-expected-width=40>Auto</td>
+    <td data-expected-width=40>Auto</td>
+    <td data-expected-width=160>Auto</td>
+  </tr>
+</table>
+
+<p 14 class="testdesc">Assignable: 1px, C0 Auto/100 colspan=2 , C1 100/Auto
+Auto header cells with colspan, table is min width
+min_width does not get redistributed.
+</p>
+<table style="width:1px" data-expected-width=144>
+  <tr>
+    <td colspan=2 data-expected-width=8>
+      <div style="width:100px">100</div></td>
+    <td style="width:100px" data-expected-width=112>100</td>
+  </tr>
+  <tr>
+    <td data-expected-width=0>x</td>
+    <td data-expected-width=0>x</td>
+    <td data-expected-width=112>x</td>
+  </tr>
+</table>
+
+<p 16 class="testdesc">Assignable: 200; C0: colspan:2 Auto C1:colspan 8 Auto
+Auto colspan cells, and nothing else. Tricky because this means that internally
+table has to represent 10 cells, and wide cells that span beyond table width
+are usually truncated.
+C0: 20*2+8=48, C1: 20*8 + 7*8=216</p>
+<table style="width:calc(200px + 88px)" data-expected-width=288>
+  <tr>
+    <td colspan=2 style="height:20px" data-expected-width=48></td>
+    <td colspan=8 style="height:20px" data-expected-width=216></td>
+  </tr>
+</table>
+
+<h2>Percentage only</h2>
+
+<p 17 class="testdesc">Assignable: 100px;columns add to 100%, auto width
+Column percent adds to a 100, but because box-sizing is content box,
+Column content size adds up to table width.
+Column border size adds up to table width + padding (36px).
+Columns get scaled down.
+Scaling down is not defined by standard. FF and NG differ by a px (rounding?).
+</p>
+<table style="width:calc(100px + 68px)" data-expected-width=168>
+  <tr>
+    <td style="width:50%" data-expected-width=63>50%</td>
+    <td style="width:30%" data-expected-width=42>30%</td>
+    <td style="width:20%" data-expected-width=31>20%</td>
+  </tr>
+</table>
+
+<p 18 class="testdesc">Assignable: 100px;columns add to 50%, auto width
+Columns grow proportional to percent.
+Slight rounding differences between NG and FF.
+<table style="width:calc(100px + 68px)" data-expected-width=168>
+  <tr>
+    <td style="width:25%" data-expected-width=60>25%</td>
+    <td style="width:15%" data-expected-width=42.5>15%</td>
+    <td style="width:10%" data-expected-width=33>10%</td>
+  </tr>
+</table>
+
+
+<p 19 class="testdesc">Assignable: 100px;columns add to 50%, with min width
+Min width is ignored.
+<table style="width:calc(100px + 68px)" data-expected-width=168>
+  <tr>
+    <td style="width:50%" data-expected-width=63><div style="width:50px">50</div></td>
+    <td style="width:30%" data-expected-width=42><div style="width:50px">50</div></td>
+    <td style="width:20%" data-expected-width=31><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<h2>Percentage/auto/fixed mix</h2>
+
+<p class="testdesc">Assignable: 100px;C0:50% C1:100px
+Clean split
+<table style="width:calc(100px + 24px)" data-expected-width=124>
+  <tr>
+    <td style="width:50%" data-expected-width=38>50%</td>
+    <td style="width:50px" data-expected-width=62>50px</td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 100px;C0:60% C1:60px
+Overconstrained: widths add up to 132.
+Fixed widths get distributed first, percentage takes the rest.
+<table style="width:calc(100px + 32px)" data-expected-width=132>
+  <tr>
+    <td style="width:20%" data-expected-width=9>20%</td>
+    <td style="width:60%" data-expected-width=19>60%</td>
+    <td style="width:60px" data-expected-width=72>60px</td>
+  </tr>
+</table>
+</main>
+
+#end
+#test css/css-tables/tentative/table-width-redistribution-fixed.html
+#selector table
+<!doctype html>
+<title>Fixed table final assignable  distribution</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#distributing-width-to-columns" />
+<style>
+  main table {
+    background: gray;
+    border-spacing: 8px 8px;
+    table-layout: fixed;
+  }
+  main table:hover { table-layout: auto; } /* useful for comparisons */
+  main td {
+    background: #BFB;
+    font-size: 10px;
+  }
+  main td > div {
+    display: inline-block;
+    background: rgba(56,162,56,0.3);
+    height:10px;
+  }
+</style>
+<main>
+ <h1>Fixed tables: Compute column computed widths from assignable table width</h1>
+<ul>
+  <li>auto columns have a min width of 0. Max width still gets computed.</li>
+  <li>percent columns have a min width of 0.</li>
+  <li>fixed column.min_width is css width. It never changes.</li>
+  <li>fixed column.max_width is max(cells.max_width, css width).</li>
+  <li>colspan header cells distribute
+    <ul>
+      <li>max_width evenly between columns.</li>
+      <li>do not distribute min width</li>
+      <li>percentage evenly between columns</li>
+    </ul>
+  </li>
+</ul>
+
+<h2>Is table treated as fixed?</h2>
+<p class="testdesc">table width:auto is not treated as fixed.</p>
+<table style="table-layout:fixed; width:auto" data-expected-width=324>
+  <tr>
+    <td style="width:200px">200</td>
+    <td><div style="width:100px">min</div></td>
+  </tr>
+</table>
+<p class="testdesc">table width:px is treated as fixed.</p>
+<table style="table-layout:fixed; width:224px" data-expected-width=224>
+  <tr>
+    <td style="width:200px">200</td>
+    <td><div style="width:100px">min</div></td>
+  </tr>
+</table>
+<p class="testdesc">table width:min-content is treated as fixed.</p>
+<table style="table-layout:fixed; width:min-content" data-expected-width=224>
+  <tr>
+    <td style="width:200px">200</td>
+    <td><div style="width:100px">min</div></td>
+  </tr>
+</table>
+
+<h2>Fixed only</h2>
+
+<p class="testdesc">Table: 50px; C0:100/50/100 C1:100/50/75
+When table.css_width is &lt; columns.css_width, how is the conflict resolved?
+columns.css_width wins</p>
+<table style="width:50px" data-expected-width=224>
+  <tr>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:50px">50</div><div style="width:25px">25</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Table: 300px; C0:100/100/200 C1:100/90/115
+When table.css_width is > columns.css_width , how is the conflict resolved?
+table.css_width wins</p>
+<table style="width:300px" data-expected-width=300>
+  <tr>
+    <td style="width:100px" data-expected-width=138>
+      <div style="width:100px">100</div><div style="width:100px">100</div></td>
+    <td style="width:100px" data-expected-width=138>
+      <div style="width:90px">90</div><div style="width:25px">25</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Table: 300px; C0:100/50/50 C1:100/100/100
+Fixed cells must grow, but their min widths differ.
+Fixed cells grow in proportion to their css width.
+<table style="width:calc(300px + 24px)" data-expected-width=324>
+  <tr>
+    <td style="width:100px" data-expected-width=150>
+      <div style="width:50px">50</div></td>
+    <td style="width:100px" data-expected-width=150>
+      <div style="width:100px">100</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Table: 50px; C0:100/50/50 C1:100/100/100
+What happens when column.min_width > column.css_width
+column.css_width wins over column.min_width.
+<table style="width:100px" data-expected-width=224>
+  <tr>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:200px"></div></td>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:200px"></div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Table: 1px.
+What happens to min_width when multiple cells specify css_width of the same column?
+1st cell wins.
+<table style="width:1px" data-expected-width=116>
+  <tr>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:200px">200</div></td>
+  </tr>
+      <td style="width:150px" data-expected-width=100>
+        <div style="width:150px">150</div></td>
+  </tr>
+</table>
+
+<h2>Auto only</h2>
+
+<p class="testdesc">Width is distributed evenly
+</p>
+<table style="width:548px">
+  <tr>
+    <td data-expected-width=100><div style="width:10px;height:30px"></div></td>
+    <td data-expected-width=100><div style="width:20px;height:30px"></div></td>
+    <td data-expected-width=100><div style="width:30px;height:30px"></div></td>
+    <td data-expected-width=100><div style="width:40px;height:30px"></div></td>
+    <td data-expected-width=100><div style="width:120px;height:30px"></div></td>
+  </tr>
+</table>
+
+<h2>Colspan distribution</h2>
+
+<p class="testdesc">Table: 1px
+Does column.min_width change with colspan distribution from later rows to first row?
+No
+<table style="width:1px" data-expected-width=74>
+  <tr>
+    <td data-expected-width=0>
+      <div style="width:50px"></div></td>
+    <td style="width:50px" data-expected-width=50>
+      <div style="width:50px"></div></td>
+  </tr>
+  <tr>
+    <td colspan=2 style="width:200px" data-expected-width=58>
+      <div style="width:200px"></div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Table: 632px
+Does column.percent change with colspan distribution?
+No.
+<table style="width:632px" data-expected-width=632>
+  <tr>
+    <td data-expected-width=360>
+      <div style="width:50px"></div></td>
+    <td style="width:20%"  data-expected-width=120>
+      <div style="width:50px"></div></td>
+    <td style="width:20%" data-expected-width=120></td>
+  </tr>
+  <tr>
+    <td colspan="2" style="width:90%">
+      <div style="width:100px"></div></td>
+    <td>auto</td>
+  </tr>
+</table>
+
+<h2>Colspan header cells</h2>
+<section>
+<ol>
+  <li>Fixed/percentage colspan cells get distributed evenly.</li>
+  <li>Auto cells</li>
+</ol>
+
+<p class="testdesc">Assignable: 400px
+Fixed header cells with colspan.
+Columns divded evenly</p>
+<p class="error">Legacy Chrome is slightly off, something about spacing and wide cells.</p>
+<table style="width:calc(600px + 40px)" data-expected-width=640>
+  <tr>
+    <td colspan=2 style="width:108px" data-expected-width=208>108</td>
+    <td colspan=2 style="width:208px" data-expected-width=408>208</td>
+  </tr>
+  <tr>
+    <td data-expected-width=100>1</td>
+    <td>1</td>
+    <td data-expected-width=200>1</td>
+    <td>1</td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 400px, C0:40% C1:20% C2:40%
+Percentage header cells with colspan
+C0 splits into C0.0 and C0.1, 16px each with 20%
+C1 splits into C1.0 and C1.1, 6px each with 10%
+Assignable width is 400, everyone gets according to percent.
+80/80/40/40/160.</p>
+<p class="error">Firefox is slightly off, with C2 taking 6px more. Unknown what math is used to get this answer.</p>
+<table style="width:448px" data-expected-width=448>
+  <tr>
+    <td colspan=2 style="width:40%" data-expected-width=168><div style="width:40px"></div></td>
+    <td colspan=2 style="width:20%" data-expected-width=88><div style="width:160px"></div></td>
+    <td style="width:40%" data-expected-width=160><div style="width:40px"></div></td>
+  </tr>
+  <tr>
+    <td data-expected-width=80>Auto</td>
+    <td data-expected-width=80>Auto</td>
+    <td data-expected-width=40>Auto</td>
+    <td data-expected-width=40>Auto</td>
+    <td data-expected-width=160>Auto</td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 1px, C0 Auto/100 colspan=2 , C1 100/Auto
+Auto header cells with colspan, table is min width
+min_width does not get redistributed.
+</p>
+<table style="width:1px" data-expected-width=132>
+  <tr>
+    <td colspan=2 data-expected-width=8>
+      <div style="width:100px">100</div></td>
+    <td style="width:100px" data-expected-width=100>100</td>
+  </tr>
+  <tr>
+    <td data-expected-width=0>x</td>
+    <td data-expected-width=0>x</td>
+    <td data-expected-width=100>x</td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 200; C0: colspan:2 Auto C1:colspan 8 Auto
+Auto colspan cells, and nothing else. Tricky because this means that internally
+table has to represent 8 cells, and wide cells that span beyond table width
+are usually truncated.
+C0: 20*2+8=48, C1: 20*8 + 7*8=216</p>
+<table style="width:calc(200px + 88px)" data-expected-width=288>
+  <tr>
+    <td colspan=2 style="height:20px" data-expected-width=48></td>
+    <td colspan=8 style="height:20px" data-expected-width=216></td>
+  </tr>
+</table>
+
+<h2>Percentage only</h2>
+
+<p class="testdesc">Assignable: 100px;columns add to 100%, auto width
+Columns are exact percentage size.
+<table style="width:calc(100px + 32px)" data-expected-width=132>
+  <tr>
+    <td style="width:50%" data-expected-width=50>50%</td>
+    <td style="width:30%" data-expected-width=30>30%</td>
+    <td style="width:20%" data-expected-width=20>20%</td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 100px;columns add to 50%, auto width
+Columns grow proportional to percent.
+<table style="width:calc(100px + 32px)" data-expected-width=132>
+  <tr>
+    <td style="width:25%" data-expected-width=50>25%</td>
+    <td style="width:15%" data-expected-width=30>15%</td>
+    <td style="width:10%" data-expected-width=20>10%</td>
+  </tr>
+</table>
+
+
+<p class="testdesc">Assignable: 100px;columns add to 50%, with min width
+Min width is ignored.
+<table style="width:calc(100px + 32px)" data-expected-width=132>
+  <tr>
+    <td style="width:50%" data-expected-width=50><div style="width:50px">50</div></td>
+    <td style="width:30%" data-expected-width=30><div style="width:50px">50</div></td>
+    <td style="width:20%" data-expected-width=20><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 100px;columns add to 1000%
+Columns are scaled so they add up to 100%
+<table style="width:calc(100px + 32px)" data-expected-width=132>
+  <tr>
+    <td style="width:200%" data-expected-width=20><div style="width:50px">50</div></td>
+    <td style="width:300%" data-expected-width=30><div style="width:50px">50</div></td>
+    <td style="width:500%" data-expected-width=50><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+
+
+<h2>Percentage/auto/fixed mix</h2>
+
+<p class="testdesc">Assignable: 100px;C0:50% C1:100px C2: Auto
+C0, C1 get assigned values, C2 fills the rest.
+<table style="width:calc(100px + 32px)" data-expected-width=132>
+  <tr>
+    <td style="width:50%" data-expected-width=50>50%</td>
+    <td style="width:30px" data-expected-width=30>30px</td>
+    <td data-expected-width=20></td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 100px;C0:50% C1:50px
+Clean split
+<table style="width:calc(100px + 24px)" data-expected-width=124>
+  <tr>
+    <td style="width:50%" data-expected-width=50>50%</td>
+    <td style="width:50px" data-expected-width=50>50px</td>
+  </tr>
+</table>
+
+<p class="testdesc">Assignable: 100px;C0:20% C1:60% C2:60px
+Overconstrained: widths add up to 140.
+Fixed widths get distributed first, percentage takes the rest.
+<table style="width:calc(100px + 32px)" data-expected-width=132>
+  <tr>
+    <td style="width:20%" data-expected-width=10>20%</td>
+    <td style="width:60%" data-expected-width=30>60%</td>
+    <td style="width:60px" data-expected-width=60>60px</td>
+  </tr>
+</table>
+
+<h2>Fixed 0-width columns</h2>
+<p>Fixed 0-width columns are an exception. They are treated as a mix of fixed and auto columns.</p>
+  <li>If there are only zero-width columns, width is distibuted evenly.</li>
+  <li>If there are any fixed,percentage, or auto columns,  0-width columns do not grow.</li>
+<p class="testdesc">Assignable: 100px;C0:0-width, C1:0-width
+  All 0-width columns grow.
+</p>
+<table style="width:calc(100px + 24px)" data-expected-width=124>
+  <tr>
+    <td style="width:0" data-expected-width=50>0</td>
+    <td style="width:0" data-expected-width=50>0</td>
+  </tr>
+</table>
+<p class="testdesc">Assignable: 100px;C0:0-width, C1:auto
+  0-width column does not grow.
+</p>
+<table style="width:calc(100px + 24px)" data-expected-width=124>
+  <tr>
+    <td style="width:0" data-expected-width=0>0</td>
+    <td style="width:auto" data-expected-width=100>0</td>
+  </tr>
+</table>
+<p class="testdesc">Assignable: 100px;C0:0-width, C1:50px
+  0-width column does not grow.
+</p>
+<table style="width:calc(100px + 24px)" data-expected-width=124>
+  <tr>
+    <td style="width:0" data-expected-width=0>0</td>
+    <td style="width:50px" data-expected-width=100>0</td>
+  </tr>
+</table>
+<p class="testdesc">Assignable: 100px;C0:0-width, C1:50%
+  0-width column does not grow.
+</p>
+<table style="width:calc(100px + 24px)" data-expected-width=124>
+  <tr>
+    <td style="width:0" data-expected-width=0>0</td>
+    <td style="width:50%" data-expected-width=100>0</td>
+  </tr>
+</table>
+
+</main>
+
+#end
+#test css/css-tables/tentative/table-width-redistribution.html
+#selector table
+<!doctype html>
+<title>Auto table final assignable  distribution</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#distributing-width-to-columns" />
+<style>
+  main table {
+    background: gray;
+    border-spacing: 8px 8px;
+  }
+  main td {
+    background: #BFB;
+    font-size: 10px;
+  }
+  main td > div {
+    display: inline-block;
+    background: rgba(56,162,56,0.3);
+  }
+</style>
+ <main>
+<h1>Compute column computed widths from assignable table width</h1>
+<h2>Test design</h2>
+<p>All examples have border-spacing:8, td.padding:0</p>
+
+<h2>Table css sizing</h2>
+
+<p class="testdesc">Table: 50px; C0:100/50/100 C1:100/50/100
+When table.css_width is < columns.css_width, column.min_width is lower limit.
+<p class="error">
+<table style="width:50px" data-expected-width=124>
+  <tr>
+    <td style="width:100px" data-expected-width=50>
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td style="width:100px" data-expected-width=50>
+      <div style="width:50px">50</div><div style="width:25px">25</div></td>
+  </tr>
+</table>
+
+
+<p class="testdesc">Table: 300px; C0:100/100/200 C1:100/90/115
+When table.css_width is > columns.css_width , how is the conflict resolved?
+table.css_width wins</p>
+<table style="width:300px" data-expected-width=300>
+  <tr>
+    <td style="width:100px" data-expected-width=138>
+      <div style="width:100px">100</div><div style="width:100px">100</div></td>
+    <td style="width:100px" data-expected-width=138>
+      <div style="width:90px">90</div><div style="width:25px">25</div></td>
+  </tr>
+</table>
+
+<h2>Content sizings: min|max|fit|fill-available</h2>
+
+<p class="testdesc">table width:min-content; C0:Auto/50/100 C1:100/50/75 C2:20%/50/75
+</p>
+<p class="error">Edge treats as max-content.</p>
+<table style="width:min-content" data-expected-width=182>
+  <tr>
+    <td data-expected-width=50>
+      <div style="width:50px" >au</div><div style="width:50px">to</div></td>
+    <td style="width:100px" data-expected-width=50>
+      <div style="width:50px" >fix</div><div style="width:25px">ed</div></td>
+    <td style="width:20%" data-expected-width=50>
+      <div style="width:50px">per</div><div style="width:25px">cent</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">table width:max-content; C0:Auto/50/100 C1:100/50/75 C2:20%/50/75
+Each column gets maximum width.
+C0: 100 C1:100 C2: 75
+max-content does not allow for assignable size to be influenced by inverse percent.
+Table size is 275 + 32 = 307
+If percent influenced table size, table size would have been 407
+</p>
+<table style="width:max-content" data-expected-width=307>
+  <tr>
+    <td data-expected-width=120>
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:50px">50</div><div style="width:25px">25</div></td>
+    <td style="width:20%" data-expected-width=55>
+      <div style="width:50px">50</div><div style="width:25px">25</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">table width:fit-content; C0:Auto/50/100 C1:100/50/75 C2:20%/50/75
+Percent column determines assignable table width, which gets distributed to all columns.
+Assignable width from %: 20%=75, 100%=375</p>
+</p>
+<table style="width:fit-content" data-expected-width=407>
+  <tr>
+    <td data-expected-width=200>
+      <div style="width:50px" >au</div><div style="width:50px">to</div></td>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:50px" >fix</div><div style="width:25px">ed</div></td>
+    <td style="width:20%" data-expected-width=75>
+      <div style="width:50px">per</div><div style="width:25px">cent</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">table width:-webkit-fill-available; C0:Auto/50/100 C1:100/50/75 C2:20%/50/75
+</p>
+<p class="error">Edge treats as fit-content</p>
+<div style="width:632px">
+<table style="width:-webkit-fill-available;width:-moz-available;" data-expected-width=632>
+  <tr>
+    <td data-expected-width=380>
+      <div style="width:50px" >au</div><div style="width:50px">to</div></td>
+    <td style="width:100px" data-expected-width=100>
+      <div style="width:50px" >fix</div><div style="width:25px">ed</div></td>
+    <td style="width:20%" data-expected-width=120>
+      <div style="width:50px">per</div><div style="width:25px">cent</div></td>
+  </tr>
+</table>
+</div>
+
+<h2>Auto columns distribution</h2>
+
+<p class="testdesc">Assi:300px C0: Auto/75/75 C1:Auto/25/25
+Non-empty auto cells get surplus width proportionally to their max width.
+Guess3: 100. Guess4: 300, diff 200, fixed priority.
+C0: 75 + 75/100*200 = 225  C1: 25 + 25/100*200 = 75</p>
+<table style="width:calc(300px + 24px)" data-expected-width=324>
+  <tr>
+    <td data-expected-width=225><div style="width:75px">75</div></td>
+    <td data-expected-width=75><div style="width:25px">25</div></td>
+  </tr>
+</table>
+<p class="testdesc">Assignable:300px C0: Auto/75/75 C1:Auto/13/25 C2:Auto/0/0
+Empty cells get nothing if there are non-empty auto cells.
+Guess3: 100, Guess4: 300; diff 200, fixed priority.
+C0: 75 + 75/100*200 = 225  C1: 25 + 25/100*200 = 75; C2: 0
+</p>
+<table style="width:calc(300px + 32px)" data-expected-width=332>
+  <tr>
+    <td data-expected-width=225>
+      <div style="width:75px">75</div></td>
+    <td data-expected-width=75>
+      <div style="width:13px">13</div><div style="width:12px">12</div></td>
+    <td data-expected-width=0></td>
+  </tr>
+</table>
+
+<h2>Guess 0: Auto(min), Fixed(min), Percentage(min) to Guess 1.</h2>
+
+<p class="testdesc">Assi: 1px; C0:Auto/50/100 C1:100/50/100 C2:50%/50/100
+All columns get minimum width.
+Guess0: 150
+C0: 50, C1:50, C2: 50</p>
+<table style="width:1px" data-expected-width=182>
+  <tr>
+    <td data-expected-width=50>
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=50 style="width:100px">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=50 style="width:50%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+</table>
+
+<p class="testdesc">Assi: 160px; C0:Auto/50/100 C1:100/50/100 C2:50%/50/100
+%ge column grows.
+Guess0: 150, Guess1: 180; diff 10.
+C0: 50, C1:50, C2: 50 + 10 * 10/10 = 60</p>
+<table style="width:calc(160px + 32px)" data-expected-width=192>
+  <tr>
+    <td data-expected-width=50>
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=50 style="width:100px">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=60 style="width:50%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+</table>
+
+<p class="testdesc">Assi: 210px; C0:Auto/50/100 C1:100/50/100 C2:30%/50/100 C3:30%/50/100
+2 %ge columns grow evenly.
+Guess 0: 200, Guess 1: 240, diff 10
+C2: 50 + 10 * 70/140 C3: 50 + 10 * 70/140
+<table style="width:calc(40px + 210px)" data-expected-width=250>
+  <tr>
+    <td data-expected-width=50>
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=50 style="width:100px">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=55 style="width:30%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=55 style="width:30%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+</table>
+
+<p class="testdesc">Assi: 220px; C0:Auto/50/100 C1:100/50/100 C2:25%/50/100 C3:40%50/100
+%ge columns grow in proportion to increase from previous guess.
+Guess 0: 200. C2[G1] = .25*220 = 55 C3[G1] = .4 * 220 = 88 Guess 1: 100 + 55 + 88 = 243
+diff = 220 - 200 = 20. C2 grew 5, C3 grew 38, total grew 43.
+C2: 50 + 20 *5/43 = 52.32; C3: 50 + 20 * 38 / 43 = 67.67
+<table style="width:calc(40px + 220px)" data-expected-width=260>
+  <tr>
+    <td data-expected-width=50>
+      <div style="width:50px">50</div> <div style="width:50px">50</div></td>
+    <td data-expected-width=50 style="width:100px">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width=52 style="width:25%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td  data-expected-width=68 style="width:40%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+</table>
+
+<h2>Guess 1 to Guess 2: Auto(min), Percentage(%max) to Fixed(min => max)</h2>
+<p>These tests are non-intuitive to evaluate. When table size increases betwee Guess 1 and 2,
+  although the standard says that fixed columns are growing, %ge columns grow too because their max width depends on table width.</p>
+
+<p class="testdesc">Assi:166, C0:Auto/50/100 C1:100/50/100 C2:40%/50/100
+Edge example, Guess 1 %ge cell has grown to the max.
+C2: grows to .4*165 = 66.4, table is 166.4+32 = 198.4</p>
+<table style="width:calc(166px + 32px)" data-expected-width=198>
+  <tr>
+    <td data-expected-width="50" >
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="50" style="width:100px">
+       <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="66" style="width:40%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Assi:216, C0:Auto/50/100 C1:100/50/100 C2:40%/50
+  %ge cell grows to the max, the rest goes to fixed.
+Guess 1 size is 50 + 50 + (.4*216=>86.4) = 186.4
+Guess 2 size is 50 + 100 + 86.4 = 236
+Assi - Guess1 = 29.6; C2 = 50 + 29.6 * 50/50 = 79.6
+</p>
+<table style="width:calc(216px + 32px)" data-expected-width=248>
+  <tr>
+    <td data-expected-width="50" >
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="80" style="width:100px">
+       <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="86" style="width:40%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<h2>Guess 2 to Guess 3: Percentage(%max), Fixed(max), Auto(min=>max)</h2>
+
+<p class="testdesc">Assi:300
+Guess 2 size is 50 + 100 + .4*300 = 270
+Guess 3 size is 100 + 100 + 120 = 320
+Assi - Guess2 = 30, C0 = 50 + 30 = 80
+<table style="width:calc(300px + 32px)" data-expected-width=332>
+  <tr>
+    <td data-expected-width="80" >
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="100" style="width:100px">
+       <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="120" style="width:40%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<h2>Guess3 to Guess4, Auto(max), Percentage(%max), Fixed(max) grow first available Auto|Fixed|Percent</h2>
+
+<p class="testdesc">Assi: 500, C0:Auto, C1: Fixed, C2: Percent
+Guess 3 is 100 + 100 + .4 * 500 = 400
+C0 gets the 100
+<table style="width:calc(500px + 32px)" data-expected-width=532>
+  <tr>
+    <td data-expected-width="200" >
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="100" style="width:100px">
+       <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="200" style="width:40%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Assi: 500, C0:Fixed, C1: Fixed, C2: Percent
+Guess 3 is 100 + 100 + .4 * 500 = 400, 100 to be redistributed
+Fixed cells, C0 and C1 get 50 each.
+<table style="width:calc(500px + 32px)" data-expected-width=532>
+  <tr>
+    <td data-expected-width="150" style="width:100px">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="150" style="width:100px">
+       <div style="width:50px">50</div><div style="width:50px">50</div></td>
+    <td data-expected-width="200" style="width:40%">
+      <div style="width:50px">50</div><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">Assi: 700, C0:10%/40, C1: 20%/50, C2: 40%/50
+Percentage cells only.
+Compute columns as %ge of total width:
+C0: 700*10/70, C1: 700*20/70 C2: 700*40/70
+<table style="width:calc(700px + 32px)" data-expected-width=732>
+  <tr>
+    <td data-expected-width=100 style="width:10%">
+      <div style="width:40px">40</div></td>
+    <td data-expected-width=200 style="width:20%">
+       <div style="width:50px">50</div></td>
+    <td data-expected-width=400 style="width:40%">
+      <div style="width:50px">50</div></td>
+  </tr>
+</table>
+<p class="testdesc">Assi: 600, C0:10%/40, C1: 20%/50, C2: 40%/50, C3: 100%/50
+Percentage cells only. Over 100% columns get their percentage truncated.
+<table style="width:calc(600px + 40px)" data-expected-width=640>
+  <tr>
+    <td data-expected-width=60 style="width:10%">
+      <div style="width:40px">40</div></td>
+    <td data-expected-width=120 style="width:20%">
+       <div style="width:50px">50</div></td>
+    <td data-expected-width=240 style="width:40%">
+      <div style="width:50px">50</div></td>
+    <td data-expected-width=180 style="width:100%">
+      <div style="width:50px">50</div></td>
+  </tr>
+</table>
+<p class="testdesc">C0:20%/60, C1:Auto/50.
+Tests table max width from single cell.
+<table data-expected-width="324">
+  <tr>
+    <td style="width:20%"  data-expected-width="60"><div style="width:60px">60</div></td>
+    <td><div style="width:50px">50</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">C0:10%/70, C1:Auto/50.
+Table limited to 1px. Tests that single cell specifies max width, not min width.
+<table style="width:1px" data-expected-width="134">
+  <tr>
+    <td style="width:20%"  data-expected-width="60"><div style="width:60px">60</div></td>
+    <td><div style="width:50px" data-expected-width="50">50</div></td>
+  </tr>
+</table>
+
+<p class="testdesc">C0:10%/70 border 10px, C1:Auto/50.
+Cell border padding do not affect max width.
+<table data-expected-width="524">
+  <tr>
+    <td style="width:20%;border:10px solid yellow;padding:10px"  data-expected-width="100"><div style="width:60px">60</div></td>
+    <td><div style="width:50px">50</div></td>
+  </tr>
+</table>
+</main>
+
+
+
+#end
+#test css/css-tables/tentative/tbody-height-redistribution.html
+#selector table
+<!doctype html>
+<title>TBODY redistribution</title>
+
+
+
+<style>
+/* custom table tags */
+
+    x-table { display: table; }
+    x-colgroup { display: table-column-group; }
+    x-col { display: table-column; }
+    x-tbody { display: table-row-group; }
+    x-thead { display: table-header-group; }
+    x-tfoot { display: table-footer-group; }
+    x-tr { display: table-row; }
+    x-td { display: table-cell; }
+    x-caption { display: table-caption; }
+
+/* layout of the page */
+
+    hr + p { font-weight: bold; margin-bottom: 0; }
+    p + p { margin-top: 0; }
+
+    html, body { padding: 0; margin: 0; }
+    main, #log { padding: 10px; width: 50%; box-sizing: border-box; }
+    main { float: left; }
+    #log { float: right; background: #eee; }</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#height-distribution-algorithm" />
+<style>
+  main table {
+    border-collapse: collapse;
+    background: #DDD;
+  }
+  main td {
+    padding: 0;
+  }
+  main td .empty {
+    line-height: 0;
+  }
+  main tbody tr:nth-child(1)  {
+    background: rgba(255, 156, 0, 0.5);
+  }
+  main tbody tr:nth-child(2)  {
+    background: rgba(255, 255, 0, 0.5);
+  }
+  main tbody tr:nth-child(3) {
+    background: rgba(0, 255, 0, 0.5);
+  }
+</style>
+<main>
+<h1>TBODY/THEAD/TFOOT height redistribution.</h1>
+<li>FF passes most of the tests.
+<li>Legacy Chrome does not distribute TBODY height to rows.
+<li>At the time this test was written, there was no spec. Currently, spec is in the process of being written.
+
+<p>1) Empty row group's size is 0 with collapsed borders</p>
+<table id="one" style="border-collapse: collapse;border-spacing: 10px 10px;border:10px solid green"
+  data-expected-width="0" data-expected-height="0">
+  <tbody>
+    <tr> </tr>
+  </tbody>
+</table>
+<p>2) Empty row group's size is 0 with separate borders.</p>
+<table id="two" style="border-collapse: separate;border-spacing: 10px 10px;border:10px solid green"
+  data-expected-width="20" data-expected-height="20">
+  <tbody>
+    <tr> </tr>
+  </tbody>
+</table>
+<p>3) Row group height is redistributed to unconstrained rows in proportion to their size.</p>
+<table id="three">
+  <tbody style="height:100px" data-expected-height="100">
+    <tr data-expected-height="25">
+      <td><div style="height:10px" >0,0</div></td>
+    </tr>
+    <tr data-expected-height="75">
+      <td><div style="height:30px" >0,0</div></td>
+    </tr>
+  </tbody>
+</table>
+<p>4) Constrained fixed rows do not grow if there are unconstrained rows</p>
+<table id="four">
+  <tbody style="height:100px">
+    <tr style="height: 10px" data-expected-height="10">
+      <td></td>
+    </tr>
+    <tr data-expected-height="90">
+      <td>0,1</td>
+    </tr>
+  </tbody>
+</table>
+<p>5) Constrained percentage are resolved against row group height.</p>
+<table id="five">
+  <tbody style="height:100px">
+    <tr style="height:25%" data-expected-height="25">
+      <td>0,0</td>
+    </tr>
+    <tr style="height:50%" data-expected-height="50">
+      <td>0,0</td>
+    </tr>
+    <tr data-expected-height="25">
+      <td>0,2</td>
+    </tr>
+  </tbody>
+</table>
+<p>6) Row group height is treated as min-height.</p>
+<table id="six">
+  <tbody style="height:100px" data-expected-height="125">
+    <tr style="height:125px">
+      <td>0,0</td>
+    </tr>
+  </tbody>
+</table>
+<p>7) Constrained/unconstrained mix: row group height is distributed to unconstrained cells.</p>
+<table id="seven">
+  <tbody style="height:100px">
+    <tr style="height:20px" data-expected-height="20"><td>0,0</td></tr>
+    <tr style="height:30px" data-expected-height="30"><td>0,1</td></tr>
+    <tr data-expected-height="25"><td>0,2</td></tr>
+    <tr data-expected-height="25"><td>0,3</td></tr>
+  </tbody>
+</table>
+<p>8) Unconstrained empty rows grow to fill table if all other rows are constrained. Not in FF.</p>
+<table id="eight">
+  <tbody style="height:100px">
+    <tr style="height:20px" data-expected-height="20"><td>0,0</td></tr>
+    <tr style="height:30px" data-expected-height="30"><td>0,1</td></tr>
+    <tr data-expected-height="50"><td></td></tr>
+  </tbody>
+</table>
+<br>
+<table id="eightplus">
+  <tbody style="height:100px">
+    <tr data-expected-height="50"><td></td></tr>
+    <tr style="height:20px" data-expected-height="20"><td>0,1</td></tr>
+    <tr style="height:30px" data-expected-height="30"><td>0,2</td></tr>
+  </tbody>
+</table>
+<p>9) Empty section height is not ignored</p>
+<table id="nine" >
+  <tbody style="height:75px"  data-expected-height="75">
+  </tbody>
+</table>
+<p>10) Section with empty rows is not considered empty.</p>
+<p>In FF, empty section height is 100, but table's height is 0?</p>
+<table id="nine" >
+  <tbody style="height:75px"  data-expected-height="75">
+    <tr data-expected-height="25"></tr>
+    <tr data-expected-height="25"></tr>
+    <tr data-expected-height="25"></tr>
+  </tbody>
+</table>
+<p>11) Mixed constrained and unconstrained empty rows: only unconstrained rows grow.</p>
+  <table id="ten" style="width:50px">
+  <tbody style="height:50px"  data-expected-height="50">
+    <tr style="height:0" data-expected-height="0"><td></td></tr>
+    <tr data-expected-height="25"><td></td></tr>
+    <tr data-expected-height="25"><td></td></tr>
+  </tbody>
+</table>
+</main>
+
+#end
+#test css/css-tables/tentative/td-box-sizing-001.html
+#selector table
+<!doctype html>
+<title>TD box sizing</title>
+
+
+
+<style>
+/*
+Tables-ng test styling.
+
+Usage:
+
+<link rel="stylesheet" type="text/css" href="./support/table-tentative.css">
+<p class="testdesc">Short description here
+  Analysis
+<p class="error">Current disagreements between browsers</p>
+*/
+main td {
+  padding: 0;
+}
+.error {
+  color: #b70000;
+}
+p {
+  margin-top:4px;
+  margin-bottom:4px;
+}
+body {
+  counter-reset: testid;
+}
+.testdesc {
+  white-space: pre-line;
+  margin-top: 16px;
+}
+.testdesc:before {
+  content: counter(testid) ". ";
+  counter-increment: testid;
+}
+.testdesc:first-line {
+  font-family: monospace;
+}
+</style>
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/" />
+<style>
+  main table {
+    background: gray;
+    border-spacing: 10px 10px;
+    table-layout: auto;
+  }
+  main td {
+    padding: 20px;
+    background: #BFB;
+    font-size: 10px;
+    box-sizing: border-box;
+  }
+  main td > div {
+    display: inline-block;
+    background: rgba(56,162,56,0.3);
+  }
+</style>
+<main>
+<h1>TD and box sizing</h1>
+
+<p>TD defaults to box-sizing: content-box. How does box-sizing affect final TD size?</p>
+<ol>
+  <li>Auto table layout</li>
+  <ol>
+    <li>Percent cells ignore box-sizing, it is always border-box.</li>
+    <li>Fixed cells respect box-sizing.</li>
+  </ol>
+  <li>Fixed table layout</li>
+  <ol>
+    <li>Percent cells respect box sizing when computing cell width from assignable width.</li>
+    <li>Percent cells ignore box sizing when computing grid max from cell width.</li>
+  </ol>
+</ol>
+<h2>Table-layout: auto</h2>
+<h4>TD width:%</h4>
+<p class="testdesc">content-box, C0:50%/100 C1:Auto
+Percent gets resolved to compute grid max size.
+C0 max_width is max_width + 2 padding = 100 + 2*20 = 140
+Table width is 1/50%*140 + 3*padding = 280+30 = 310
+<table data-expected-width=310>
+  <tr>
+    <td style="width:50%;box-sizing:content-box" data-expected-width=140>
+      <div style="width:100px">50%/100</div></td>
+    <td data-expected-width=140>Auto</td>
+  </tr>
+</table>
+<p class="testdesc">border-box, C0:50%/100 C1:Auto
+Same test as above, but box-sizing is border-box.
+<table data-expected-width=310>
+  <tr>
+    <td style="width:50%;box-sizing:border-box" data-expected-width=140>
+      <div style="width:100px">50%/100</div></td>
+    <td data-expected-width=140>Auto</td>
+  </tr>
+</table>
+<p class="testdesc">content-box, C0:80%/100 C1:Auto
+Percent gets resolved to compute final cell size from assignable width.
+C0 border box width is 500 * 80%
+<table style="width:530px" data-expected-width=530>
+  <tr>
+    <td style="width:80%;box-sizing:content-box" data-expected-width=400>
+      <div style="width:100px">80%/100</div></td>
+    <td data-expected-width=100>Auto</td>
+  </tr>
+</table>
+
+<p class="testdesc">border-box, C0:80%/100 C1:Auto
+Same as above, but border-box
+<table style="width:530px" data-expected-width=530>
+  <tr>
+    <td style="width:80%;box-sizing:border-box" data-expected-width=400>
+      <div style="width:100px">80%/100</div></td>
+    <td data-expected-width=100>Auto</td>
+  </tr>
+</table>
+
+
+<h4>TD width:fixed</h4>
+
+<p class="testdesc">content-box, C0:100/Auto C1:100/Auto
+Tests whether box-sizing affects how percentages are computed.
+C0 max_width is max_width + 2 padding = 100 + 2*20 = 140
+Table width is 1/50%*140 + 3*padding = 280+30 = 310
+<table data-expected-width=310>
+  <tr>
+    <td style="width:100px;box-sizing:content-box" data-expected-width=140>100</td>
+    <td style="width:100px;box-sizing:content-box">100</td>
+  </tr>
+</table>
+
+<p class="testdesc">border-box, C0:100/Auto C1:100/Auto
+Same test as above, but box-sizing is border-box.
+<table data-expected-width=230>
+  <tr>
+    <td style="width:100px;box-sizing:border-box" data-expected-width=100>100</td>
+    <td style="width:100px;box-sizing:border-box" data-expected-width=100>100</td>
+  </tr>
+</table>
+
+<h4>TD height: fixed</h4>
+
+<p class="testdesc">content-box, C0 height:100px
+<table data-expected-height=160>
+  <tr>
+    <td style="height:100px;box-sizing:content-box" data-expected-height=140>100 height</td>
+  </tr>
+</table>
+
+<p class="testdesc">border-box, C0 height:100px
+<table data-expected-height=120>
+  <tr>
+    <td style="height:100px;box-sizing:border-box" data-expected-height=100>100 height</td>
+  </tr>
+</table>
+
+<h2>Table-layout: fixed</h2>
+
+<h4>TD width:%</h4>
+
+<p class="testdesc">content-box, C0:50%/100 C1:Auto
+Percent gets resolved to compute grid max size.
+C0 max_width is max_width + 2 padding = 100 + 2*20 = 140
+Table width is 1/50%*140 + 3*padding = 280+30 = 310
+<table style="table-layout:fixed" data-expected-width=310>
+  <tr>
+    <td style="width:50%;box-sizing:content-box" data-expected-width=140>
+      <div style="width:100px">50%/100</div></td>
+    <td data-expected-width=140>Auto</td>
+  </tr>
+</table>
+
+<p class="testdesc">border-box, C0:50%/100 C1:Auto
+Same test as above, but box-sizing is border-box.
+<table  style="table-layout:fixed" data-expected-width=310>
+  <tr>
+    <td style="width:50%;box-sizing:border-box" data-expected-width=140>
+      <div style="width:100px">50%/100</div></td>
+    <td data-expected-width=140>Auto</td>
+  </tr>
+</table>
+
+<p class="testdesc">content-box, C0:60%/100 C1:Auto
+Percent gets resolved to compute final cell size from assignable width.
+Assignable width is 530 - 3*10 = 500
+C0 content box width is 500 * 60% + 40px padding = 340
+C1 is 500 - 340 = 160
+<p class="error">Legacy/Edge treat %ge TD as border box, and end up with 300px</p>
+<table  style="table-layout:fixed;width:530px" data-expected-width=530>
+  <tr>
+    <td style="width:60%;box-sizing:content-box" data-expected-width=340>
+      <div style="width:100px">60%/100</div></td>
+    <td data-expected-width=160>Auto</td>
+  </tr>
+</table>
+
+<p class="testdesc">border-box, C0:60%/100 C1:Auto
+Same as above, but border-box
+<table  style="table-layout:fixed;width:530px" data-expected-width=530>
+  <tr>
+    <td style="width:60%;box-sizing:border-box" data-expected-width=300>
+      <div style="width:100px">80%/100</div></td>
+    <td data-expected-width=200>Auto</td>
+  </tr>
+</table>
+
+
+<h4>TD width:fixed</h4>
+<p class="testdesc">content-box, C0:100/Auto C1:100/Auto
+Tests whether box-sizing affects how percentages are computed.
+C0 max_width is max_width + 2 padding = 100 + 2*20 = 140
+Table width is 1/50%*140 + 3*padding = 280+30 = 310
+<table  style="table-layout:fixed" data-expected-width=310>
+  <tr>
+    <td style="width:100px;box-sizing:content-box" data-expected-width=140>100</td>
+    <td style="width:100px;box-sizing:content-box">100</td>
+  </tr>
+</table>
+<p class="testdesc">border-box, C0:100/Auto C1:100/Auto
+Same test as above, but box-sizing is border-box.
+<table  style="table-layout:fixed" data-expected-width=230>
+  <tr>
+    <td style="width:100px;box-sizing:border-box" data-expected-width=100>100</td>
+    <td style="width:100px;box-sizing:border-box" data-expected-width=100>100</td>
+  </tr>
+</table>
+</main>
+
+#end
+#test css/css-tables/tentative/td-box-sizing-002.html
+#selector .t
+<!doctype html>
+
+
+
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://www.w3.org/TR/css-tables-3/#computing-the-table-width" />
+<style>
+  .t {
+    display: table;
+    border-top-width: 20px;
+    border-bottom-width: 40px;
+    border-left-width: 20px;
+    border-right-width: 40px;
+    border-style: solid;
+    border-color: gray;
+    padding: 10px;
+    border-spacing: 0;
+    width:100px;
+    height: 100px;
+  }
+  .inline {
+    display: inline-table;
+  }
+  .cell {
+    display: table-cell;
+    background: yellow;
+  }
+  main td {
+    padding: 0;
+    background: yellow;
+  }
+</style>
+<main>
+<p>box-sizing: default; border-collapse: separate </p>
+<table class="t" style="border-collapse: separate" data-expected-width="100" data-expected-height="100">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>
+<p>box-sizing: border-box; border-collapse: separate</p>
+<table class="t" style="box-sizing:border-box;border-collapse: separate" data-expected-width="100" data-expected-height="100">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>
+<p>box-sizing: content-box; border-collapse: separate</p>
+<table class="t" style="box-sizing:content-box;border-collapse: separate" data-expected-width="180" data-expected-height="180">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>
+<p>box-sizing: default; border-collapse: collapse </p>
+<table class="t" style="border-collapse: collapse" data-expected-width="100" data-expected-height="100">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>
+<p>box-sizing: border-box; border-collapse: collapse</p>
+<table class="t" style="box-sizing:border-box;border-collapse: collapse" data-expected-width="100" data-expected-height="100">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>
+<p>box-sizing: content-box; border-collapse: collapse</p>
+<table class="t" style="box-sizing:content-box;border-collapse: collapse" data-expected-width="130" data-expected-height="130">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>
+<p>div with display:table; box-sizing: default; border-collapse: separate</p>
+<div class="t" style="border-collapse: separate" data-expected-width="180" data-expected-height="180">
+    <div class="cell"></div>
+</div>
+<p>div with display:table; box-sizing: border-box; border-collapse: separate</p>
+<div class="t" style="box-sizing:border-box;border-collapse: separate" data-expected-width="100" data-expected-height="100">
+    <div class="cell"></div>
+</div>
+<p>div with display:table;box-sizing: content-box; border-collapse: separate</p>
+<div class="t" style="box-sizing:content-box;border-collapse: separate" data-expected-width="180" data-expected-height="180">
+    <div class="cell"></div>
+</div>
+
+<h2>Same tests, but tables are inline.</h2>
+<div>
+<table class="t inline" style="box-sizing:border-box;border-collapse: separate" data-expected-width="100" data-expected-height="100">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>box-sizing: border-box; border-collapse: separate
+
+<div>
+<table class="t inline" style="box-sizing:content-box;border-collapse: separate" data-expected-width="180" data-expected-height="180">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>box-sizing: content-box; border-collapse: separate</div>
+<div>
+<table class="t inline" style="box-sizing:border-box;border-collapse: collapse" data-expected-width="100" data-expected-height="100">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>box-sizing: border-box; border-collapse: collapse</div>
+<div>
+<table class="t inline" style="box-sizing:content-box;border-collapse: collapse" data-expected-width="130" data-expected-height="130">
+  <tbody>
+    <td></td>
+  </tbody>
+</table>box-sizing: content-box; border-collapse: collapse</div>
+<div>
+<div class="t inline" style="box-sizing:border-box;border-collapse: separate" data-expected-width="100" data-expected-height="100">
+    <div class="cell"></div>
+</div>
+div with display:inline-table; box-sizing: border-box;
+</div>
+<div>
+<div class="t inline" style="box-sizing:content-box;border-collapse: separate" data-expected-width="180" data-expected-height="180">
+   <div class="cell"></div>
+</div>
+div with display:inline-table;box-sizing: content-box</div>
+</main>
+
+#end
+#test css/css-tables/tentative/td-box-sizing-003.html
+#selector table
+<!doctype html>
+<title>TD box sizing</title>
+
+
+
+<style>
+/* custom table tags */
+
+    x-table { display: table; }
+    x-colgroup { display: table-column-group; }
+    x-col { display: table-column; }
+    x-tbody { display: table-row-group; }
+    x-thead { display: table-header-group; }
+    x-tfoot { display: table-footer-group; }
+    x-tr { display: table-row; }
+    x-td { display: table-cell; }
+    x-caption { display: table-caption; }
+
+/* layout of the page */
+
+    hr + p { font-weight: bold; margin-bottom: 0; }
+    p + p { margin-top: 0; }
+
+    html, body { padding: 0; margin: 0; }
+    main, #log { padding: 10px; width: 50%; box-sizing: border-box; }
+    main { float: left; }
+    #log { float: right; background: #eee; }</style>
+<link rel='stylesheet' href='/fonts/ahem.css' />
+<link rel="author" title="Aleks Totic" href="atotic@chromium.org" />
+<link rel="help" href="https://drafts.csswg.org/css-tables-3/#computing-cell-measures" />
+<style>
+  main table {
+    border-spacing: 0;
+  }
+  main td {
+    background: gray;
+    width:100px;
+    padding: 0;
+  }
+  .bb {
+    box-sizing: border-box;
+  }
+</style>
+<main>
+<p>Tests of intrinsic cell sizing wrt border/padding, and box-sizing.</p>
+<p>box-sizing: content-box; border px; padding px.
+<table>
+  <tbody>
+  <tr>
+      <td data-expected-width="100">
+        <div style="width:50px;height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+<table>
+  <tbody>
+  <tr data-expected-width="120">
+      <td data-expected-width="120" style="border:10px solid black">
+        <div style="height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+<table>
+  <tbody>
+  <tr data-expected-width="140">
+      <td data-expected-width="140" style="border:10px solid black;padding: 10px">
+        <div style="height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+<p>box-sizing: border-box, border px, padding px.
+<table>
+  <tbody>
+  <tr>
+      <td data-expected-width="100" class="bb">
+        <div style="height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+<table>
+  <tbody>
+  <tr>
+      <td data-expected-width="100" class="bb" style="border:10px solid black" >
+        <div style="height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+<table>
+  <tbody>
+  <tr>
+      <td data-expected-width="100" class="bb" style="border:10px solid black;padding: 10px">
+        <div style="height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+
+<p>box-sizing: border-box;padding: px, width px</p>
+<li>td's intrinsic width must be >= border + padding</li>
+
+<table style="width:300px;table-layout:fixed">
+  <tbody>
+    <tr>
+      <td style="box-sizing:border-box;padding-left:50px;padding-right:50px;width:30px" data-expected-width=100></td>
+      <td>auto</td>
+      <td>auto</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>box-sizing: border-box; border px; padding %.</p>
+<li>intrinsic size of % padding is 0.
+<li>final size of % padding is computed against table's width.
+<table data-expected-width="240">
+  <tbody>
+  <tr>
+      <td data-expected-width="120" style="border:10px solid black;padding: 30%">
+        <div data-offset-x="72" data-offset-y="72" style="width:50px;height:50px;background:yellow">0,0</div>
+      </td>
+      <td style="border:10px solid black;padding: 30%">
+        <div style="width:50px;height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+<table data-expected-width="300">
+  <caption><div style="width:300px;background:#ddd">300px caption</div></caption>
+  <tbody>
+  <tr>
+      <td data-expected-width="150" style="border:10px solid black;padding: 30%">
+        <div data-offset-x="90" data-offset-y="90" style="width:50px;height:50px;background:yellow">0,0</div>
+      </td>
+      <td style="border:10px solid black;padding: 30%">
+        <div style="width:50px;height:50px;background:yellow">0,0</div>
+      </td>
+  </tr>
+  </tbody>
+</table>
+
+<p>Block percentage resolution of TD children + row fixed height during intrinsic pass</p>
+<li>Chrome Legacy/Edge/Safari do not use row fixed height for percetage block size resolution.</li>
+<li>FF uses row height as %ge resolution size.</li>
+<li>Proposal: file an issue on what is the right thing to do.</li>
+<table>
+  <tr>
+    <td style="height:100px;font: 50px/1 Ahem;" id="cell" data-expected-height="100">
+      y<div style="display:inline-block;height:100%;width:50px;background:yellow"
+      data-expected-height="100"></div>
+    </td>
+  </tr>
+</table>
+<table>
+  <tr style="height:100px">
+    <td style="font: 50px/1 Ahem;" id="cell" data-expected-height="100">
+      y<div style="display:inline-block;height:100%;width:50px;background:yellow" data-expected-height="0"></div>
+    </td>
+  </tr>
+</table>
+
+
+</main>
+
+#end

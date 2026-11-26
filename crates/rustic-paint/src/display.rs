@@ -1028,16 +1028,22 @@ impl Builder<'_> {
         let mut colors = [Srgba::WHITE; 4];
         for (i, &(style_property, color_property)) in sides.iter().enumerate() {
             colors[i] = color(style, color_property)?;
-            if widths[i] > 0.0
-                && !matches!(
-                    style.get(style_property),
-                    V::BorderStyle(BorderStyle::Solid)
-                )
-            {
-                return Err(PaintError::Unsupported {
-                    node: fragment.node,
-                    reason: UnsupportedPaint::BorderStyle,
-                });
+            // `inset` and `outset` are solid with the top and left sides
+            // darker (inset) or the bottom and right ones (outset); CSS
+            // Backgrounds 3 §4.2 leaves the shades to the implementation.
+            let top_left = i == 0 || i == 3;
+            match style.get(style_property) {
+                V::BorderStyle(BorderStyle::Solid) => {}
+                V::BorderStyle(BorderStyle::Inset) if top_left => colors[i] = darker(colors[i]),
+                V::BorderStyle(BorderStyle::Outset) if !top_left => colors[i] = darker(colors[i]),
+                V::BorderStyle(BorderStyle::Inset | BorderStyle::Outset) => {}
+                _ if widths[i] <= 0.0 => {}
+                _ => {
+                    return Err(PaintError::Unsupported {
+                        node: fragment.node,
+                        reason: UnsupportedPaint::BorderStyle,
+                    });
+                }
             }
         }
         if widths.iter().all(|&w| w <= 0.0) {
@@ -2629,5 +2635,16 @@ pub(crate) fn over(src: Srgba, dst: Srgba) -> Srgba {
         g: mix(src.g, dst.g),
         b: mix(src.b, dst.b),
         a: 255,
+    }
+}
+/// The shaded side of an `inset` or `outset` border: two thirds of each
+/// channel, alpha kept (black stays black).
+fn darker(c: Srgba) -> Srgba {
+    let scale = |v: u8| ((u16::from(v) * 2 + 1) / 3) as u8;
+    Srgba {
+        r: scale(c.r),
+        g: scale(c.g),
+        b: scale(c.b),
+        a: c.a,
     }
 }

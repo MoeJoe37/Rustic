@@ -304,6 +304,27 @@ fn hidden_boxes_paint_nothing_of_their_own_but_children_may_paint() {
 }
 
 #[test]
+fn inset_and_outset_borders_shade_opposite_sides() {
+    for (style, top_left, bottom_right) in [
+        ("inset", rgb(0, 0, 170), rgb(0, 0, 255)),
+        ("outset", rgb(0, 0, 255), rgb(0, 0, 170)),
+    ] {
+        let p = page(
+            "<div></div>",
+            &format!("{RESET} div {{ width: 10px; height: 10px; border: 4px {style} blue }}"),
+            20.0,
+            20.0,
+        );
+        let surface = render(&p, 1.0);
+        // Middle of each side, away from the mitred corners.
+        assert_eq!(surface.pixel(9, 1), Some(top_left), "{style} top");
+        assert_eq!(surface.pixel(1, 9), Some(top_left), "{style} left");
+        assert_eq!(surface.pixel(9, 16), Some(bottom_right), "{style} bottom");
+        assert_eq!(surface.pixel(16, 9), Some(bottom_right), "{style} right");
+    }
+}
+
+#[test]
 fn unsupported_paint_features_fail_atomically_with_their_node() {
     for (css, reason) in [
         ("border: 2px dashed red", UnsupportedPaint::BorderStyle),

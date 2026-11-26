@@ -38,7 +38,9 @@ beyond checking element names.
   at the group opacity. `opacity: 0` paints nothing, descendants included.
 - **Backgrounds.** Background color fills the box named by the last
   `background-clip` layer (border, padding or content box).
-- **Borders.** Solid borders only. When all four sides share a color the
+- **Borders.** Solid borders, and `inset`/`outset` as solid sides with the
+  top and left (inset) or bottom and right (outset) at two thirds of each
+  color channel; other styles fail. When all four sides share a color the
   border is one ring, so no seam appears at the corners. Otherwise each side is
   a quadrilateral mitred along the corner diagonal.
 - **Colors.** Computed colors (`rgb`, `lab`, `lch`, `oklab`, `oklch` and every
@@ -486,7 +488,7 @@ group. `url()` filters fail with a typed error. See TD-58.
 Non-solid outline styles, non-solid text decoration styles, `text-underline-offset` and
 `text-decoration-thickness`, emphasis marks and shadows; `background-image`,
 `object-fit` and `image-rendering`,
-animated image playback, gradients, non-solid borders,
+animated image playback, gradients, dotted, dashed, double, groove and ridge borders,
 `text-shadow`, `background-blend-mode`, `backdrop-filter`, `filter` URLs, `clip-path` URLs and the
 `evenodd` rule, `xywh()`, `rect()`, `path()` and `shape()`, `transform-style: preserve-3d`, coverage-conflation-free corner
 joins, PNG compression, reference chains in reftests and a broad imported

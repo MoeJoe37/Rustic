@@ -17,8 +17,8 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 
 use rustic_css::{
-    CssWideKeyword, DeclaredValue, MediaEnvironment, PropertyDeclaration, PropertyId,
-    PropertyValue, Specificity,
+    CssWideKeyword, DeclaredValue, Direction, MediaEnvironment, PropertyDeclaration, PropertyId,
+    PropertyValue, Specificity, WritingMode,
 };
 
 use rustic_url::Url;
@@ -85,7 +85,8 @@ impl SpecifiedStyle {
 
     /// `property: value` lines for every longhand that differs from its
     /// initial value, in [`PropertyId::ALL`] order, then every custom
-    /// property in name order.
+    /// property in name order. Logical longhands, which repeat their
+    /// physical counterparts' values, are left out.
     ///
     /// A value equal to the *computed* initial value (such as the `16px`
     /// font size a root passes down by inheritance) also counts as initial.
@@ -93,7 +94,10 @@ impl SpecifiedStyle {
         let computed = ComputedStyle::initial();
         let mut out = String::new();
         for (&property, value) in PropertyId::ALL.iter().zip(&self.values) {
-            if *value != property.initial_value() && value != computed.get(property) {
+            if !property.is_logical()
+                && *value != property.initial_value()
+                && value != computed.get(property)
+            {
                 out.push_str(property.name());
                 out.push_str(": ");
                 out.push_str(&value.to_string());
@@ -747,10 +751,12 @@ impl Cascade {
             .iter()
             .map(|&name| {
                 let outcome = match resolve(by_name[name].iter().copied()) {
-                    Resolved::Declared(DeclaredValue::Custom(value)) => CustomOutcome::Value(value),
+                    Resolved::Declared(DeclaredValue::Custom(value), _) => {
+                        CustomOutcome::Value(value)
+                    }
                     Resolved::Initial => CustomOutcome::Initial,
-                    Resolved::Inherit => CustomOutcome::Inherit,
-                    Resolved::Declared(_) | Resolved::Unset => CustomOutcome::Unset,
+                    Resolved::Inherit(_) => CustomOutcome::Inherit,
+                    Resolved::Declared(..) | Resolved::Unset => CustomOutcome::Unset,
                 };
                 (name, outcome)
             })
@@ -760,7 +766,7 @@ impl Cascade {
                 .iter()
                 .filter(|c| c.declaration.property == property),
         ) {
-            Resolved::Declared(DeclaredValue::Unparsed(unparsed)) => Some(&**unparsed),
+            Resolved::Declared(DeclaredValue::Unparsed(unparsed), _) => Some(&**unparsed),
             _ => None,
         };
         let font = FontDependencies {
@@ -778,53 +784,92 @@ impl Cascade {
             &self.registry,
             font,
         );
-        let values = PropertyId::ALL
+        let value_of = |property: PropertyId, writing: Option<(WritingMode, Direction)>| {
+            let inherit = || parent.get(property).clone();
+            let unset = || {
+                if property.inherited() {
+                    inherit()
+                } else {
+                    property.initial_value()
+                }
+            };
+            let in_cycle = match property {
+                PropertyId::FontSize => font_size_cycle,
+                PropertyId::LineHeight => line_height_cycle,
+                _ => false,
+            };
+            if in_cycle {
+                return unset();
+            }
+            // A physical longhand competes with the logical declarations
+            // that map onto it (CSS Logical 1 §4).
+            let sets = |declared: PropertyId| {
+                declared == property
+                    || writing.is_some_and(|(mode, direction)| {
+                        declared.is_logical() && declared.to_physical(mode, direction) == property
+                    })
+            };
+            let resolved = resolve(
+                candidates
+                    .iter()
+                    .filter(|c| c.declaration.property.longhand().is_some_and(sets)),
+            );
+            match resolved {
+                Resolved::Declared(DeclaredValue::Value(value), _) => value.clone(),
+                Resolved::Declared(DeclaredValue::Unparsed(unparsed), declared) => cache
+                    .substitution
+                    .borrow_mut()
+                    .longhand(unparsed, declared.unwrap_or(property), &custom)
+                    .unwrap_or_else(unset),
+                Resolved::Initial => property.initial_value(),
+                // `inherit` on a logical longhand takes the parent's value
+                // of that logical longhand.
+                Resolved::Inherit(Some(declared)) => parent.get(declared).clone(),
+                Resolved::Inherit(None) => inherit(),
+                Resolved::Declared(..) | Resolved::Unset => unset(),
+            }
+        };
+        let has_logical = candidates.iter().any(|c| {
+            c.declaration
+                .property
+                .longhand()
+                .is_some_and(PropertyId::is_logical)
+        });
+        let writing = has_logical.then(|| {
+            let mode = match value_of(PropertyId::WritingMode, None) {
+                PropertyValue::WritingMode(mode) => mode,
+                _ => WritingMode::HorizontalTb,
+            };
+            let direction = match value_of(PropertyId::Direction, None) {
+                PropertyValue::Direction(direction) => direction,
+                _ => Direction::Ltr,
+            };
+            (mode, direction)
+        });
+        let mut values: Vec<PropertyValue> = PropertyId::ALL
             .iter()
             .map(|&property| {
-                let inherit = || parent.get(property).clone();
-                let unset = || {
-                    if property.inherited() {
-                        inherit()
-                    } else {
-                        property.initial_value()
-                    }
-                };
-                let in_cycle = match property {
-                    PropertyId::FontSize => font_size_cycle,
-                    PropertyId::LineHeight => line_height_cycle,
-                    _ => false,
-                };
-                if in_cycle {
-                    return unset();
-                }
-                let resolved = resolve(
-                    candidates
-                        .iter()
-                        .filter(|c| c.declaration.property == property),
-                );
-                match resolved {
-                    Resolved::Declared(DeclaredValue::Value(value)) => value.clone(),
-                    Resolved::Declared(DeclaredValue::Unparsed(unparsed)) => cache
-                        .substitution
-                        .borrow_mut()
-                        .longhand(unparsed, property, &custom)
-                        .unwrap_or_else(unset),
-                    Resolved::Initial => property.initial_value(),
-                    Resolved::Inherit => inherit(),
-                    Resolved::Declared(_) | Resolved::Unset => unset(),
+                if property.is_logical() {
+                    // Replaced by the physical counterpart's value below.
+                    PropertyValue::Number(0.0)
+                } else {
+                    value_of(property, writing)
                 }
             })
             .collect();
+        crate::computed::copy_logical(&mut values);
         SpecifiedStyle { values, custom }
     }
 }
 
 /// The cascade's decision for one property.
 enum Resolved<'a> {
-    /// The winning declaration's value (never a CSS-wide keyword).
-    Declared(&'a DeclaredValue),
+    /// The winning declaration's value (never a CSS-wide keyword) and
+    /// longhand.
+    Declared(&'a DeclaredValue, Option<PropertyId>),
     Initial,
-    Inherit,
+    /// `inherit`, from a declaration of this longhand.
+    Inherit(Option<PropertyId>),
     Unset,
 }
 
@@ -848,7 +893,9 @@ fn resolve<'a, 'b: 'a>(candidates: impl Iterator<Item = &'a Candidate<'b>>) -> R
         }
         match &candidate.declaration.value {
             DeclaredValue::CssWide(CssWideKeyword::Initial) => return Resolved::Initial,
-            DeclaredValue::CssWide(CssWideKeyword::Inherit) => return Resolved::Inherit,
+            DeclaredValue::CssWide(CssWideKeyword::Inherit) => {
+                return Resolved::Inherit(candidate.declaration.property.longhand());
+            }
             DeclaredValue::CssWide(CssWideKeyword::Unset) => return Resolved::Unset,
             DeclaredValue::CssWide(CssWideKeyword::Revert) => {
                 if candidate.level == RevertLevel::UserAgent {
@@ -862,7 +909,7 @@ fn resolve<'a, 'b: 'a>(candidates: impl Iterator<Item = &'a Candidate<'b>>) -> R
                     None => skip_attached = true,
                 }
             }
-            value => return Resolved::Declared(value),
+            value => return Resolved::Declared(value, candidate.declaration.property.longhand()),
         }
     }
     Resolved::Unset

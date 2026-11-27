@@ -19,9 +19,9 @@ use crate::{
 
 /// The supported subset of the HTML user-agent stylesheet (HTML §15.3).
 ///
-/// Rules use only the properties Rustic parses today. Logical properties
-/// such as `margin-inline-start` are written as their left-to-right physical
-/// equivalents until writing modes exist.
+/// Rules use only the properties Rustic parses today, with the HTML
+/// specification's flow-relative properties (`margin-block`,
+/// `padding-inline-start`).
 pub const HTML_USER_AGENT_STYLESHEET: &str = r#"@namespace "http://www.w3.org/1999/xhtml";
 
 [hidden], area, base, basefont, datalist, head, link, meta, noembed,
@@ -32,26 +32,26 @@ body { margin: 8px }
 
 address, blockquote, center, dialog, div, figure, figcaption, footer, form,
 header, hr, legend, listing, main, p, plaintext, pre, search, xmp { display: block }
-blockquote, figure, listing, p, plaintext, pre, xmp { margin-top: 1em; margin-bottom: 1em }
-blockquote, figure { margin-left: 40px; margin-right: 40px }
+blockquote, figure, listing, p, plaintext, pre, xmp { margin-block: 1em }
+blockquote, figure { margin-inline: 40px }
 address { font-style: italic }
 listing, plaintext, pre, xmp { font-family: monospace; white-space: pre }
 dialog:not([open]) { display: none }
 
 article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section { display: block }
-h1 { margin-top: 0.67em; margin-bottom: 0.67em; font-size: 2em; font-weight: bold }
-h2 { margin-top: 0.83em; margin-bottom: 0.83em; font-size: 1.5em; font-weight: bold }
-h3 { margin-top: 1em; margin-bottom: 1em; font-size: 1.17em; font-weight: bold }
-h4 { margin-top: 1.33em; margin-bottom: 1.33em; font-size: 1em; font-weight: bold }
-h5 { margin-top: 1.67em; margin-bottom: 1.67em; font-size: 0.83em; font-weight: bold }
-h6 { margin-top: 2.33em; margin-bottom: 2.33em; font-size: 0.67em; font-weight: bold }
+h1 { margin-block: 0.67em; font-size: 2em; font-weight: bold }
+h2 { margin-block: 0.83em; font-size: 1.5em; font-weight: bold }
+h3 { margin-block: 1em; font-size: 1.17em; font-weight: bold }
+h4 { margin-block: 1.33em; font-size: 1em; font-weight: bold }
+h5 { margin-block: 1.67em; font-size: 0.83em; font-weight: bold }
+h6 { margin-block: 2.33em; font-size: 0.67em; font-weight: bold }
 
 dir, dd, dl, dt, menu, ol, ul { display: block }
 li { display: list-item }
-dir, dl, menu, ol, ul { margin-top: 1em; margin-bottom: 1em }
-:is(dir, dl, menu, ol, ul) :is(dir, dl, menu, ol, ul) { margin-top: 0; margin-bottom: 0 }
-dd { margin-left: 40px }
-dir, menu, ol, ul { padding-left: 40px }
+dir, dl, menu, ol, ul { margin-block: 1em }
+:is(dir, dl, menu, ol, ul) :is(dir, dl, menu, ol, ul) { margin-block: 0 }
+dd { margin-inline-start: 40px }
+dir, menu, ol, ul { padding-inline-start: 40px }
 
 table { display: table; box-sizing: border-box; border-spacing: 2px; border-collapse: separate; text-indent: initial }
 caption { display: table-caption; text-align: center }
@@ -426,7 +426,8 @@ pub fn dump_computed_styles(
         out.push_str(&indent);
         out.push_str(&label(element));
         out.push('\n');
-        for &property in PropertyId::ALL {
+        // Logical longhands repeat their physical counterparts' values.
+        for &property in PropertyId::ALL.iter().filter(|p| !p.is_logical()) {
             let value = style.computed.get(property);
             let default = if property.inherited() {
                 inherited_from.get(property)

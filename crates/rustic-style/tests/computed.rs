@@ -487,3 +487,61 @@ fn table_presentational_hints_map_to_css_below_author_rules() {
         "9px"
     );
 }
+
+#[test]
+fn logical_properties_map_through_the_writing_mode() {
+    let html = "<div id=h></div><div id=r></div><div id=v></div><div id=s></div>";
+    let sheet = "div { margin-inline-start: 7px; padding-block-end: 3px; inline-size: 40px; \
+                 border-start-end-radius: 2px } #v { writing-mode: vertical-rl } \
+                 #s { writing-mode: sideways-lr } #r { direction: rtl }";
+    let at = |id, p| computed(html, sheet, id, p);
+    assert_eq!(at("h", "margin-left"), "7px");
+    assert_eq!(at("h", "padding-bottom"), "3px");
+    assert_eq!(at("h", "width"), "40px");
+    assert_eq!(at("h", "border-top-right-radius"), "2px");
+    assert_eq!(at("r", "margin-right"), "7px");
+    assert_eq!(at("r", "margin-left"), "0px");
+    assert_eq!(at("v", "margin-top"), "7px");
+    assert_eq!(at("v", "padding-left"), "3px");
+    assert_eq!(at("v", "height"), "40px");
+    assert_eq!(at("v", "width"), "auto");
+    assert_eq!(at("v", "border-bottom-right-radius"), "2px");
+    assert_eq!(at("s", "margin-bottom"), "7px");
+    assert_eq!(at("s", "padding-right"), "3px");
+    // A logical longhand computes to its physical counterpart's value.
+    assert_eq!(at("v", "margin-inline-start"), "7px");
+    assert_eq!(at("v", "inline-size"), "40px");
+    assert_eq!(at("h", "margin-block-start"), "0px");
+}
+
+#[test]
+fn the_later_of_a_logical_and_a_physical_declaration_wins() {
+    let html = "<div id=a></div><div id=b></div><div id=c></div><div id=d></div>";
+    let sheet = "#a { margin-left: 1px; margin-inline-start: 2px } \
+                 #b { margin-inline-start: 2px; margin-left: 1px } \
+                 #c { margin-inline: 4px 5px; margin: 0 9px } \
+                 div#d { width: 10px } #d { inline-size: 20px }";
+    assert_eq!(computed(html, sheet, "a", "margin-left"), "2px");
+    assert_eq!(computed(html, sheet, "b", "margin-left"), "1px");
+    assert_eq!(computed(html, sheet, "b", "margin-inline-start"), "1px");
+    assert_eq!(computed(html, sheet, "c", "margin-right"), "9px");
+    // Specificity still decides before order.
+    assert_eq!(computed(html, sheet, "d", "width"), "10px");
+}
+
+#[test]
+fn logical_values_inherit_substitute_and_reset() {
+    let html = "<div id=p><div id=c></div></div><div id=w></div><div id=x></div>";
+    let sheet = "#p { margin-inline-start: 6px; margin-top: 2px } \
+                 #c { writing-mode: vertical-lr; margin-inline-start: inherit; \
+                 --b: 8px; border-block: var(--b) solid } \
+                 #w { writing-mode: tb-rl } #x { writing-mode: lr }";
+    // `inherit` on a logical longhand takes the parent's logical value.
+    assert_eq!(computed(html, sheet, "c", "margin-top"), "6px");
+    assert_eq!(computed(html, sheet, "c", "border-left-width"), "8px");
+    assert_eq!(computed(html, sheet, "c", "border-right-style"), "solid");
+    assert_eq!(computed(html, sheet, "c", "border-top-style"), "none");
+    assert_eq!(computed(html, sheet, "w", "writing-mode"), "vertical-rl");
+    assert_eq!(computed(html, sheet, "x", "writing-mode"), "horizontal-tb");
+    assert_eq!(computed(html, sheet, "c", "writing-mode"), "vertical-lr");
+}

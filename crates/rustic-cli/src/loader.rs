@@ -2517,7 +2517,7 @@ fn cssom_value(
     layout_box: Option<CssomBox>,
     property: PropertyId,
 ) -> String {
-    if let Some(pixels) = layout_box.and_then(|b| b.length(property)) {
+    if let Some(pixels) = layout_box.and_then(|b| b.length(style.physical(property))) {
         return Length::px(pixels.get()).to_string();
     }
     let computed = style.get(property);

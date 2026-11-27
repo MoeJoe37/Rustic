@@ -23,7 +23,7 @@ use rustic_css::{
     FontSize, FontSizeKeyword, FontStretch, FontStyle, FontUnitRatios, FontWeight, Gap, Length,
     LengthPercentage, LengthPercentageOrAuto, LengthUnit, LineHeight, MaxSize, Overflow, Position,
     PositionComponent, PositionValue, PropertyId, PropertyValue, Size, Spacing, TextAlign,
-    VerticalAlign,
+    VerticalAlign, WritingMode,
 };
 
 use crate::fonts::{FontMetricsSource, FontQuery, INITIAL_FONT, unit_ratios};
@@ -375,6 +375,28 @@ impl ComputedStyle {
         !self.anchored.is_empty()
     }
 
+    /// The element's `writing-mode`.
+    pub fn writing_mode(&self) -> WritingMode {
+        match self.get(PropertyId::WritingMode) {
+            PropertyValue::WritingMode(mode) => *mode,
+            _ => WritingMode::HorizontalTb,
+        }
+    }
+
+    /// The element's `direction`.
+    pub fn direction(&self) -> Direction {
+        match self.get(PropertyId::Direction) {
+            PropertyValue::Direction(direction) => *direction,
+            _ => Direction::Ltr,
+        }
+    }
+
+    /// The physical longhand `property` sets on this element: itself, or
+    /// a logical longhand's mapping for the element's writing mode.
+    pub fn physical(&self, property: PropertyId) -> PropertyId {
+        property.to_physical(self.writing_mode(), self.direction())
+    }
+
     /// Replace the computed value of `property` (layout uses this to
     /// substitute resolved anchor positions into a copy of the style).
     pub fn set(&mut self, property: PropertyId, value: PropertyValue) {
@@ -401,12 +423,13 @@ impl ComputedStyle {
 
     /// `property: value` lines for every longhand whose computed value differs
     /// from the computed initial value, in [`PropertyId::ALL`] order, then
-    /// every custom property in name order.
+    /// every custom property in name order. Logical longhands, which repeat
+    /// their physical counterparts' values, are left out.
     pub fn dump_non_initial(&self) -> String {
         let initial = Self::initial();
         let mut out = String::new();
         for (&property, value) in PropertyId::ALL.iter().zip(&self.values) {
-            if value != initial.get(property) {
+            if !property.is_logical() && value != initial.get(property) {
                 out.push_str(property.name());
                 out.push_str(": ");
                 out.push_str(&value.to_string());
@@ -623,9 +646,13 @@ fn compute_values(
     };
 
     let mut anchored = Vec::new();
-    let values = PropertyId::ALL
+    let mut values: Vec<PropertyValue> = PropertyId::ALL
         .iter()
         .map(|&property| {
+            if property.is_logical() {
+                // Replaced by the physical counterpart's value below.
+                return PropertyValue::Number(0.0);
+            }
             let mut value = specified.get(property);
             if let PropertyValue::Anchored(a) = value {
                 anchored.push((property, a.function.map_fallback(|lp| basis.lp(lp, false))));
@@ -890,6 +917,7 @@ fn compute_values(
             }
         })
         .collect();
+    copy_logical(&mut values);
     ComputedStyle {
         values,
         // Registered lengths compute to pixels, against this element.
@@ -898,6 +926,24 @@ fn compute_values(
             .absolutize(&|lp| basis.lp(lp, false)),
         font_ratios,
         anchored,
+    }
+}
+
+/// Give each logical longhand its physical counterpart's computed value,
+/// for the element's own `writing-mode` and `direction` (CSS Logical 1 §4).
+pub(crate) fn copy_logical(values: &mut [PropertyValue]) {
+    let mode = match values[index(PropertyId::WritingMode)] {
+        PropertyValue::WritingMode(mode) => mode,
+        _ => WritingMode::HorizontalTb,
+    };
+    let direction = match values[index(PropertyId::Direction)] {
+        PropertyValue::Direction(direction) => direction,
+        _ => Direction::Ltr,
+    };
+    for (i, &property) in PropertyId::ALL.iter().enumerate() {
+        if property.is_logical() {
+            values[i] = values[index(property.to_physical(mode, direction))].clone();
+        }
     }
 }
 

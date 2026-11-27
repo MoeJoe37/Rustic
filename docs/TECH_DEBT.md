@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
@@ -269,6 +269,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
 | TD-210 | Deliberate | Layout | css-grid WPT comparison: 89 of 168 static pages fail, every one reviewed (writing modes, masonry, subgrid baselines, logical properties, Ahem text) | Open, `layout.grid` (M9) |
 | TD-211 | Deliberate | Layout | Table subset: collapsed borders place cells by whole rather than half borders; column boxes get no geometry and table parts are not relatively positioned; css-tables WPT 18 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
+| TD-212 | Deliberate | Layout | Writing modes are parsed and logical properties mapped, but layout, text and paint treat every box as horizontal-tb | Open, `text.writing` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3483,5 +3484,17 @@ other page's reason (eight need list items, which Rustic does not lay out;
 three tentative width-merging rules; others collapsing borders, vertical
 writing modes, Ahem text, `height: stretch` and percentage heights inside
 cells).
-**Pay:** the remaining `layout.tables` step (collapsing borders, columns,
-percentages, `empty-cells`, `visibility: collapse`), then shrink the list.
+**Pay:** half-border collapsed geometry, column box geometry and
+relatively positioned table parts, then shrink the list.
+
+### TD-212 — Writing modes are parsed but not laid out
+`text.writing` step 1 parses `writing-mode`, `text-orientation` and
+`text-combine-upright` and maps every flow-relative property to its
+physical longhand, but layout, text shaping and paint still treat every box
+as `horizontal-tb`: a `vertical-rl` box lays out horizontally with its
+logical margins on the vertical-mode physical sides. Transitions on a
+logical longhand and on its physical counterpart are tracked separately
+(the cascade then picks one by order), and `writing-mode` on the root does
+not propagate to the initial containing block yet.
+**Pay:** the remaining `text.writing` steps (vertical block flow and
+orthogonal flows, vertical text, vertical flex/grid/tables).

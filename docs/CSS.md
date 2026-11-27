@@ -328,6 +328,28 @@ gives `table` `border-spacing: 2px`. `tests/tables.rs` covers them, and the
 pinned WPT `css-tables/parsing` cases are part of the conformance gate. The
 table box tree and table layout are the later `layout.tables` steps.
 
+`text.writing` (M9) adds `writing-mode` (`horizontal-tb`, `vertical-rl`,
+`vertical-lr`, `sideways-rl`, `sideways-lr`; the SVG 1.1 values `lr`,
+`lr-tb`, `rl`, `rl-tb` parse as `horizontal-tb` and `tb`, `tb-rl` as
+`vertical-rl`), `text-orientation` (`mixed`/`upright`/`sideways`) and
+`text-combine-upright` (`none`/`all`), all inherited and not animatable,
+and the flow-relative longhands of CSS Logical Properties 1: `block-size`,
+`inline-size` and their `min-`/`max-` forms; `margin-`, `padding-` and
+`inset-` `block-start`/`block-end`/`inline-start`/`inline-end`; the twelve
+`border-{block,inline}-{start,end}-{width,style,color}`; and
+`border-{start,end}-{start,end}-radius`. Each shares its physical
+counterparts' grammar, initial value and animation type. Shorthands:
+`margin-block`, `margin-inline`, `padding-block`, `padding-inline`,
+`inset-block`, `inset-inline` (one or two values, start then end),
+`border-block-width`/`-style`/`-color` and the `inline` forms,
+`border-block-start` (and the other three sides, like `border-top`) and
+`border-block`/`border-inline` (both sides). The mapping (CSS Writing
+Modes 4 §6.4) lives in `rustic-css/src/logical.rs`
+(`PropertyId::to_physical`); how the cascade applies it is under
+[Cascade](#cascade). The pinned WPT `css-writing-modes/parsing` and
+`css-logical/parsing` cases are part of the conformance gate. Laying out
+vertical writing modes is the later `text.writing` steps (TD-212).
+
 Lengths accept the absolute units, the font-relative units (`em`, `rem`, `ex`,
 `rex`, `ch`, `rch`, `cap`, `rcap`, `ic`, `ric`, `lh`, `rlh`) and the viewport
 units including the small/large/dynamic variants, plus unitless zero. Every
@@ -451,6 +473,20 @@ and normal levels, inclusive; a `style` attribute is its own layer after the
 unlayered one, an important one skips only style-attribute and animation
 declarations, and the animation origin is its own layer. Undeclared properties
 inherit or take their initial value.
+
+Flow-relative longhands (CSS Logical 1 §4) are resolved first for the
+element's `writing-mode` and `direction` (which never depend on them): each
+physical longhand's candidates are its own declarations and the logical
+declarations that map onto it, so the usual order decides between
+`margin-left` and a later `margin-inline-start`. A logical longhand's value
+is then its physical counterpart's; `inherit` on a logical declaration
+takes the parent's value of that logical longhand, and a `var()` in one is
+substituted for the logical longhand it was written for. The style dump
+leaves logical longhands out, since they repeat physical values; CSSOM
+lists them and resolves `inline-size` and the logical margins and paddings
+to used pixels like their physical counterparts. The user-agent sheet uses
+the HTML specification's logical properties (`margin-block: 1em` on `p`,
+`padding-inline-start: 40px` on lists).
 
 The result is the *specified* value. Inheritance and `inherit` take the parent
 element's *computed* value (see [Computed style](#computed-style)), so

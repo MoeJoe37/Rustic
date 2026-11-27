@@ -208,6 +208,9 @@ fn every_longhand_has_an_initial_value_that_reparses() {
             "overflow-wrap",
             "hyphens",
             "white-space",
+            "writing-mode",
+            "text-orientation",
+            "text-combine-upright",
         ]
     );
 }

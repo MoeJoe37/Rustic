@@ -231,6 +231,8 @@
 ["valid-value", "color", "rgb(from alpha(from currentcolor / 0.5) r g b)", "alpha() relative color function is not implemented"],
 ["valid-value", "color", "rgb(from alpha(from red / 0.5) r g b / alpha)", "alpha() relative color function is not implemented"],
 ["valid-value", "color", "transparent", "named colors serialize as rgb() instead of the keyword"],
+["valid-value", "border-block-end-color", "transparent", "named colors serialize as rgb() instead of the keyword"],
+["valid-value", "border-inline-end-color", "transparent", "named colors serialize as rgb() instead of the keyword"],
 ["valid-value", "display", "block flow list-item", "display: multi-keyword forms with flow, list-item, run-in or ruby are not implemented"],
 ["valid-value", "display", "block flow-root list-item", "display: multi-keyword forms with flow, list-item, run-in or ruby are not implemented"],
 ["valid-value", "display", "block list-item flow", "display: multi-keyword forms with flow, list-item, run-in or ruby are not implemented"],

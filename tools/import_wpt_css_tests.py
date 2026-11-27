@@ -65,6 +65,9 @@ DIRECTORIES = (
     "css/css-grid/subgrid",
     # M9 `layout.tables`: table box properties.
     "css/css-tables/parsing",
+    # M9 `text.writing`: writing modes and flow-relative properties.
+    "css/css-writing-modes/parsing",
+    "css/css-logical/parsing",
 )
 
 FUNCTIONS = {

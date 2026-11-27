@@ -2189,8 +2189,51 @@
           "label": "Writing modes, vertical text and font loading",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": []
+          "status": "in_progress",
+          "evidence": [],
+          "steps": [
+            {
+              "label": "writing-mode, text-orientation and text-combine-upright values and the flow-relative (logical) properties",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-css/src/logical.rs",
+                  "marker": "fn to_physical"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/cascade.rs",
+                  "marker": "A physical longhand competes with the logical declarations"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/computed.rs",
+                  "marker": "fn the_later_of_a_logical_and_a_physical_declaration_wins"
+                }
+              ]
+            },
+            {
+              "label": "Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Vertical flex, grid and table layout, and text-combine-upright",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "Web fonts: @font-face rules, font loading and the FontFace API",
+              "status": "planned",
+              "evidence": []
+            }
+          ]
         },
         {
           "id": "text.conformance",

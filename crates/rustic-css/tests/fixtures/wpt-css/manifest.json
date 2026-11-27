@@ -19,11 +19,13 @@
     "css/css-grid/parsing",
     "css/css-align/parsing",
     "css/css-grid/subgrid",
-    "css/css-tables/parsing"
+    "css/css-tables/parsing",
+    "css/css-writing-modes/parsing",
+    "css/css-logical/parsing"
   ],
-  "case_count": 4099,
+  "case_count": 4438,
   "skipped_calls": 219,
-  "cases_sha256": "258814d0468d5ce59ce9232a8663423ef5393b2f60f3a090b8b9d4397c5f384d",
+  "cases_sha256": "4d6887e8ffb4e8cd8e4ede80f5e604a165e11a71f11b84fe6df0d2ac03d559ee",
   "files": [
     {
       "path": "css/selectors/parsing/invalid-pseudos.html",
@@ -2219,6 +2221,270 @@
       "path": "css/css-tables/parsing/table-layout-valid.html",
       "sha256": "2bed69eb7182d9a07bc5a7f08c2a346c2ba18adcf2b582a8ae73d48882bf5d3b",
       "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/direction-invalid.html",
+      "sha256": "fa2f04672d4d505b9800ef9fe17caa7b2ca6245f8a7e3ee0e143ab89b3f83117",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/direction-valid.html",
+      "sha256": "3558d72f698d5b9197e100eeb3655973b9c00c5c1bc69300babcad6a2a31de16",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/text-combine-upright-invalid.html",
+      "sha256": "c49c6be4c6eb0f1d60e48a68f7da94d5f4df16e528794bb83c5b9fa284b6a0a0",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/text-combine-upright-valid.html",
+      "sha256": "8f8a4bd0c4d5e9aa989adbdc5d91d2a5ba0397a3eb876da040e3a546d0fc2dc3",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/text-orientation-invalid.html",
+      "sha256": "4ebd24fd523a0f3749b675536e0abc2331bed6ecc916a0fc15fe9689f5eca23f",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/text-orientation-valid.html",
+      "sha256": "4f44b5afb6192b4862515405c901c55a29b1b5d922b7da9cb21ce61915810015",
+      "cases": 3,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/unicode-bidi-invalid.html",
+      "sha256": "d32f05d56efe82d16eb473fb2ea36284babdc07b5105335d1954863ac0547e14",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/unicode-bidi-valid.html",
+      "sha256": "a492726768cb3a5bbb0c4ae6f73ded2c65b268653b1635ebe74c5085ce9c5a70",
+      "cases": 6,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/writing-mode-invalid.html",
+      "sha256": "c04371d19fa6327faaa363479c4499624e6fcbd173ea20215c92cc4dfa594827",
+      "cases": 2,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-writing-modes/parsing/writing-mode-valid.html",
+      "sha256": "df702c06f39a36aa64422d45f5478909c0a12fc014abf9918e80fd607ba0983f",
+      "cases": 3,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/block-size-invalid.html",
+      "sha256": "c2c74f3a6492b6af42977d5dd44534c7d1f817e37363968b3d607f98daba0f49",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/block-size-valid.html",
+      "sha256": "096547cb543b89d43d55ff0125a3524bc3d8dc1193ba41d88b0d14a7d2d92515",
+      "cases": 8,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-block-color-invalid.html",
+      "sha256": "608f331623f9a03d10eff61bdd6ec17e7aec13f18f8d623ea2d7c96c7303f100",
+      "cases": 15,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-block-color-valid.html",
+      "sha256": "05c627751f5af318faaa734f85781b890bce2f585fa47968dc583aaa2a07a5be",
+      "cases": 7,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-block-style-invalid.html",
+      "sha256": "317fe7df21efd8821fbc90a8e3303df23b381c0cf30076a5e0b92d0c4af2c18b",
+      "cases": 6,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-block-style-valid.html",
+      "sha256": "2670a512cc637458732b6ecf08c17f1a90636b327852fb5b1a72623f0d275abb",
+      "cases": 13,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-block-valid.html",
+      "sha256": "997ce40dedbb6e1e18838ec18df1539fe98656e643d6b7b1bd9824bc03b48cbf",
+      "cases": 6,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-block-width-invalid.html",
+      "sha256": "c8f7f07a71a1cfcb9262242cd208dfb430b153b8010376d84352e931c233b6bc",
+      "cases": 7,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-block-width-valid.html",
+      "sha256": "4323060025d6b3241675488ee748ba66aee6c056bfe58366deb3a443008e1326",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-inline-color-invalid.html",
+      "sha256": "e6b03afa919e832b931d80b626e37effc331669fc27500435b9bc3b6b82ae663",
+      "cases": 15,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-inline-color-valid.html",
+      "sha256": "9e68c888da0ef769dcc6ab4c2cb1f0ec11ec88b1eec3055937b6e84c831c1b9c",
+      "cases": 7,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-inline-style-invalid.html",
+      "sha256": "adf88e3d0f9354f137ad7b27e6b23116f9aea0321c71e6527952b8d8823a4f0a",
+      "cases": 6,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-inline-style-valid.html",
+      "sha256": "2f4014d1e769837eb8a746c9e59a17349c8e353bdeb600c3249eda328834ba22",
+      "cases": 13,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-inline-valid.html",
+      "sha256": "ebcb96949ca3da895b20cf3276542d5f9ffe88e92d6e99131052e8b8bfc4550e",
+      "cases": 6,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-inline-width-invalid.html",
+      "sha256": "2f32decd90d63a0ad920795a6053e4bcd1cabe1e7ca9c4dc599f9871e8bf946f",
+      "cases": 7,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/border-inline-width-valid.html",
+      "sha256": "4c697a0e7f3010a499d774b408d4c4aad4169b0056995696018e52ac9d811801",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/inline-size-invalid.html",
+      "sha256": "9b0f4010dcd6383755a42d349856d2085ab063063aed478183885d213b9b1a72",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/inline-size-valid.html",
+      "sha256": "37d4835a490d1ce12c1ae6adf659e5fd4866143cb7570a83c475c530adbec4ae",
+      "cases": 8,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/inset-block-inline-invalid.html",
+      "sha256": "381ded26e471ca2fd91b78087fbab8bdf411bed8591759a27761ce655d76d196",
+      "cases": 7,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/inset-block-inline-valid.html",
+      "sha256": "1999cee9154762e2ad7f8b596fc788e09d727e78382dbfa76c908ac0066b0b18",
+      "cases": 12,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/inset-invalid.html",
+      "sha256": "c03a41eedd7828e005d1bcbd30993cf7d7eb13faf4f40a5ea1e7853289d79dfb",
+      "cases": 3,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/inset-valid.html",
+      "sha256": "c5170b0450c51609725feea9014fee152038800071d145cf5d8ff99d5cdb107e",
+      "cases": 8,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/margin-block-inline-invalid.html",
+      "sha256": "1b45bb92d8a43fa8a84b4aafbc0677b02057e317bcdb724a39c4c4429dd1a099",
+      "cases": 7,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/margin-block-inline-valid.html",
+      "sha256": "063d41496bb65aaab308f67fda0fca7b85101065f84f529c7c1424bbb26acdd9",
+      "cases": 14,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/max-block-size-invalid.html",
+      "sha256": "cb1e494d7d794f7a4612781b967e3d5f6c6ea680e2b007ca51b1362e933e79d8",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/max-block-size-valid.html",
+      "sha256": "b446a4aaf75c0b66b209972f3978580200fd82e250c97ee2f551535e38a4fb60",
+      "cases": 8,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/max-inline-size-invalid.html",
+      "sha256": "22e10c297d816ae9198974f66b0c168f3444a88759f41ffc625549ffa3e88955",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/max-inline-size-valid.html",
+      "sha256": "b878eb6f37dd200d476654c6bb6d165b55c5b4fda1367b00056371fd8a822c53",
+      "cases": 8,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/min-block-size-invalid.html",
+      "sha256": "e2b992a19ecb88e42fe96bc57a287a465910d0501370983311e297413550e4e9",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/min-block-size-valid.html",
+      "sha256": "dd5f37dd70929ca410434026d3bb3c161dcaeed1cdd1c75ffa928dcecb9785ba",
+      "cases": 8,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/min-inline-size-invalid.html",
+      "sha256": "b8d472793ff19fab17d6183d0b14d4860762a897787a67ecedd49212914d7e06",
+      "cases": 10,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/min-inline-size-valid.html",
+      "sha256": "190e8886a8bdad6d63e4d07687df1c51af93403abb03c2e620c2c404c4b2e34a",
+      "cases": 8,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/padding-block-inline-invalid.html",
+      "sha256": "9771556c0f34dfb5469db01130d0692c596f22f296aa4b2213d1edc2f34e5aad",
+      "cases": 17,
+      "skipped_calls": 0
+    },
+    {
+      "path": "css/css-logical/parsing/padding-block-inline-valid.html",
+      "sha256": "f906aaba8413f094b7d5be91d1df868afd05adf9f40872e70cc40d3019566cef",
+      "cases": 9,
       "skipped_calls": 0
     }
   ]

@@ -1468,13 +1468,11 @@
     },
     {
       "name": "If the context node is a document, inserting a doctype after the document element should throw a HierarchyRequestError.",
-      "status": "FAIL",
-      "message": "too many detached documents"
+      "status": "PASS"
     },
     {
       "name": "If the context node is a DocumentFragment, inserting a document or a doctype should throw a HierarchyRequestError.",
-      "status": "FAIL",
-      "message": "too many detached documents"
+      "status": "PASS"
     },
     {
       "name": "If the context node is an element, inserting a document or a doctype should throw a HierarchyRequestError.",

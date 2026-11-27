@@ -16,7 +16,9 @@
 //! `text-transform`, `letter-spacing`, `word-spacing`, `white-space`,
 //! `text-decoration-line`/`-style`/`-color` and the list-valued
 //! `background-image`/`-position`/`-size`/`-repeat`/`-attachment`/`-origin`/
-//! `-clip`. Shorthands: `margin`, `padding`, `border-width`, `border-style`,
+//! `-clip`, plus `writing-mode`, `text-orientation`, `text-combine-upright`
+//! and the flow-relative longhands (`logical.rs`). Shorthands:
+//! `margin`, `padding`, `border-width`, `border-style`,
 //! `border-color`, `border-top`/`-right`/`-bottom`/`-left`, `border`, `inset`,
 //! `overflow`, `text-decoration`, `font` and `background`. Every property also
 //! accepts the CSS-wide keywords.
@@ -256,6 +258,63 @@ keywords! {
         Absolute => "absolute",
         Fixed => "fixed",
         Sticky => "sticky",
+    }
+}
+
+keywords! {
+    /// `writing-mode` values (CSS Writing Modes 4 §3.1). The SVG 1.1 values
+    /// are parse-time aliases of these.
+    WritingMode {
+        HorizontalTb => "horizontal-tb",
+        VerticalRl => "vertical-rl",
+        VerticalLr => "vertical-lr",
+        SidewaysRl => "sideways-rl",
+        SidewaysLr => "sideways-lr",
+    }
+}
+
+impl WritingMode {
+    /// Parse a keyword, mapping the deprecated SVG 1.1 values (`lr`,
+    /// `lr-tb`, `rl`, `rl-tb`, `tb`, `tb-rl`) as CSS Writing Modes 4 §3.1
+    /// requires.
+    pub(crate) fn parse(name: &str) -> Option<Self> {
+        Self::from_name(name).or_else(|| match name.to_ascii_lowercase().as_str() {
+            "lr" | "lr-tb" | "rl" | "rl-tb" => Some(Self::HorizontalTb),
+            "tb" | "tb-rl" => Some(Self::VerticalRl),
+            _ => None,
+        })
+    }
+
+    /// Whether lines are horizontal (the inline axis is horizontal).
+    pub fn is_horizontal(self) -> bool {
+        self == Self::HorizontalTb
+    }
+
+    /// Whether lines are vertical.
+    pub fn is_vertical(self) -> bool {
+        !self.is_horizontal()
+    }
+
+    /// Whether blocks progress leftwards (`vertical-rl`, `sideways-rl`).
+    pub fn is_block_flipped(self) -> bool {
+        matches!(self, Self::VerticalRl | Self::SidewaysRl)
+    }
+}
+
+keywords! {
+    /// `text-orientation` values (CSS Writing Modes 4 §5.1).
+    TextOrientation {
+        Mixed => "mixed",
+        Upright => "upright",
+        Sideways => "sideways",
+    }
+}
+
+keywords! {
+    /// `text-combine-upright` values (CSS Writing Modes 3 §9.1).
+    TextCombineUpright {
+        None => "none",
+        All => "all",
     }
 }
 
@@ -761,6 +820,12 @@ pub enum PropertyValue {
     TextAlign(TextAlign),
     /// `direction`.
     Direction(Direction),
+    /// `writing-mode`.
+    WritingMode(WritingMode),
+    /// `text-orientation`.
+    TextOrientation(TextOrientation),
+    /// `text-combine-upright`.
+    TextCombineUpright(TextCombineUpright),
     /// `text-transform`.
     TextTransform(TextTransform),
     /// `letter-spacing`, `word-spacing`.
@@ -1013,6 +1078,43 @@ property_ids! {
     PositionAnchor => "position-anchor", false;
     PositionArea => "position-area", false;
     ViewTransitionName => "view-transition-name", false;
+    WritingMode => "writing-mode", true;
+    TextOrientation => "text-orientation", true;
+    TextCombineUpright => "text-combine-upright", true;
+    BlockSize => "block-size", false;
+    InlineSize => "inline-size", false;
+    MinBlockSize => "min-block-size", false;
+    MinInlineSize => "min-inline-size", false;
+    MaxBlockSize => "max-block-size", false;
+    MaxInlineSize => "max-inline-size", false;
+    MarginBlockStart => "margin-block-start", false;
+    MarginBlockEnd => "margin-block-end", false;
+    MarginInlineStart => "margin-inline-start", false;
+    MarginInlineEnd => "margin-inline-end", false;
+    PaddingBlockStart => "padding-block-start", false;
+    PaddingBlockEnd => "padding-block-end", false;
+    PaddingInlineStart => "padding-inline-start", false;
+    PaddingInlineEnd => "padding-inline-end", false;
+    InsetBlockStart => "inset-block-start", false;
+    InsetBlockEnd => "inset-block-end", false;
+    InsetInlineStart => "inset-inline-start", false;
+    InsetInlineEnd => "inset-inline-end", false;
+    BorderBlockStartWidth => "border-block-start-width", false;
+    BorderBlockEndWidth => "border-block-end-width", false;
+    BorderInlineStartWidth => "border-inline-start-width", false;
+    BorderInlineEndWidth => "border-inline-end-width", false;
+    BorderBlockStartStyle => "border-block-start-style", false;
+    BorderBlockEndStyle => "border-block-end-style", false;
+    BorderInlineStartStyle => "border-inline-start-style", false;
+    BorderInlineEndStyle => "border-inline-end-style", false;
+    BorderBlockStartColor => "border-block-start-color", false;
+    BorderBlockEndColor => "border-block-end-color", false;
+    BorderInlineStartColor => "border-inline-start-color", false;
+    BorderInlineEndColor => "border-inline-end-color", false;
+    BorderStartStartRadius => "border-start-start-radius", false;
+    BorderStartEndRadius => "border-start-end-radius", false;
+    BorderEndStartRadius => "border-end-start-radius", false;
+    BorderEndEndRadius => "border-end-end-radius", false;
 }
 
 impl PropertyId {
@@ -1023,6 +1125,9 @@ impl PropertyId {
     /// colors and font settings exist.
     pub fn initial_value(self) -> PropertyValue {
         use PropertyId as P;
+        if self.is_logical() {
+            return self.physical_template().initial_value();
+        }
         let zero = LengthPercentage::ZERO;
         match self {
             P::Display => PropertyValue::Display(Display::Inline),
@@ -1106,6 +1211,9 @@ impl PropertyId {
                 PropertyValue::VerticalAlign(VerticalAlign::Keyword(VerticalAlignKeyword::Baseline))
             }
             P::Direction => PropertyValue::Direction(Direction::Ltr),
+            P::WritingMode => PropertyValue::WritingMode(WritingMode::HorizontalTb),
+            P::TextOrientation => PropertyValue::TextOrientation(TextOrientation::Mixed),
+            P::TextCombineUpright => PropertyValue::TextCombineUpright(TextCombineUpright::None),
             P::TextAlign => PropertyValue::TextAlign(TextAlign::Start),
             P::TextIndent => PropertyValue::LengthPercentage(zero),
             P::TextTransform => PropertyValue::TextTransform(TextTransform::default()),
@@ -1195,6 +1303,7 @@ impl PropertyId {
             | P::GridColumnEnd => {
                 PropertyValue::Grid(crate::grid::initial(self).expect("a grid longhand"))
             }
+            _ => unreachable!("logical longhands returned above"),
         }
     }
 }
@@ -1532,6 +1641,9 @@ pub fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         P::BackgroundOrigin,
         P::BackgroundClip,
     ];
+    if let Some(longhands) = crate::logical::shorthand_longhands(name) {
+        return Some(longhands);
+    }
     Some(match name {
         "margin" => MARGIN,
         "padding" => PADDING,
@@ -1679,7 +1791,7 @@ pub(crate) fn nonnegative(value: &Value) -> Option<LengthPercentage> {
     length_percentage(value).filter(|lp| !lp.is_negative())
 }
 
-fn lp_or_auto(value: &Value, allow_negative: bool) -> Option<LengthPercentageOrAuto> {
+pub(crate) fn lp_or_auto(value: &Value, allow_negative: bool) -> Option<LengthPercentageOrAuto> {
     if keyword(value, "auto") {
         return Some(LengthPercentageOrAuto::Auto);
     }
@@ -1700,7 +1812,7 @@ fn corner_radius(parts: &[&Value]) -> Option<CornerRadius> {
     })
 }
 
-fn border_width(value: &Value) -> Option<BorderWidth> {
+pub(crate) fn border_width(value: &Value) -> Option<BorderWidth> {
     if let Some(name) = ident(value) {
         return match name.to_ascii_lowercase().as_str() {
             "thin" => Some(BorderWidth::Thin),
@@ -2119,6 +2231,10 @@ fn font(parts: &[&Value]) -> Option<Vec<PropertyValue>> {
 /// Parse a longhand value from its non-whitespace component values.
 pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<PropertyValue> {
     use PropertyId as P;
+    if property.is_logical() {
+        // A logical longhand has its physical counterparts' grammar.
+        return longhand(property.physical_template(), parts);
+    }
     if property == P::Display {
         return display(parts).map(PropertyValue::Display);
     }
@@ -2378,6 +2494,11 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
             None => VerticalAlign::LengthPercentage(length_percentage(value)?),
         }),
         P::Direction => PropertyValue::Direction(Direction::from_name(name()?)?),
+        P::WritingMode => PropertyValue::WritingMode(WritingMode::parse(name()?)?),
+        P::TextOrientation => PropertyValue::TextOrientation(TextOrientation::from_name(name()?)?),
+        P::TextCombineUpright => {
+            PropertyValue::TextCombineUpright(TextCombineUpright::from_name(name()?)?)
+        }
         P::TextAlign => PropertyValue::TextAlign(TextAlign::from_name(name()?)?),
         P::TextIndent => PropertyValue::LengthPercentage(length_percentage(value)?),
         P::LetterSpacing | P::WordSpacing => PropertyValue::Spacing(spacing(value)?),
@@ -2462,10 +2583,42 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         } else {
             LineHeight::LengthPercentage(nonnegative(value)?)
         }),
+        _ => unreachable!("logical longhands are handled above"),
     })
 }
 
 /// Expand `top [right [bottom [left]]]` to four values.
+/// A `border-top`-like value: width, style and color, each defaulted.
+pub(crate) fn border_side(parts: &[&Value]) -> Option<[PropertyValue; 3]> {
+    let (mut width, mut style, mut color) = (None, None, None);
+    for v in parts {
+        if width.is_none() {
+            if let Some(w) = border_width(v) {
+                width = Some(w);
+                continue;
+            }
+        }
+        if style.is_none() {
+            if let Some(s) = ident(v).and_then(BorderStyle::from_name) {
+                style = Some(s);
+                continue;
+            }
+        }
+        if color.is_none() {
+            if let Some(c) = Color::parse(v) {
+                color = Some(c);
+                continue;
+            }
+        }
+        return None;
+    }
+    Some([
+        PropertyValue::BorderWidth(width.unwrap_or(BorderWidth::Medium)),
+        PropertyValue::BorderStyle(style.unwrap_or(BorderStyle::None)),
+        PropertyValue::Color(color.unwrap_or(Color::CurrentColor)),
+    ])
+}
+
 fn four<T: Clone>(items: Vec<T>) -> Option<Vec<T>> {
     let mut items = items;
     match items.len() {
@@ -2485,6 +2638,9 @@ fn four<T: Clone>(items: Vec<T>) -> Option<Vec<T>> {
 }
 
 pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValue>> {
+    if let Some(values) = crate::logical::shorthand(name, parts) {
+        return values;
+    }
     let each = |f: &dyn Fn(&Value) -> Option<PropertyValue>| -> Option<Vec<PropertyValue>> {
         four(parts.iter().map(|v| f(v)).collect::<Option<Vec<_>>>()?)
     };
@@ -2612,31 +2768,7 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
         "scroll-timeline" => crate::animation::timeline_shorthand(parts, false),
         "view-timeline" => crate::animation::timeline_shorthand(parts, true),
         "border" | "border-top" | "border-right" | "border-bottom" | "border-left" => {
-            let (mut width, mut style, mut color) = (None, None, None);
-            for v in parts {
-                if width.is_none() {
-                    if let Some(w) = border_width(v) {
-                        width = Some(w);
-                        continue;
-                    }
-                }
-                if style.is_none() {
-                    if let Some(s) = ident(v).and_then(BorderStyle::from_name) {
-                        style = Some(s);
-                        continue;
-                    }
-                }
-                if color.is_none() {
-                    if let Some(c) = Color::parse(v) {
-                        color = Some(c);
-                        continue;
-                    }
-                }
-                return None;
-            }
-            let width = PropertyValue::BorderWidth(width.unwrap_or(BorderWidth::Medium));
-            let style = PropertyValue::BorderStyle(style.unwrap_or(BorderStyle::None));
-            let color = PropertyValue::Color(color.unwrap_or(Color::CurrentColor));
+            let [width, style, color] = border_side(parts)?;
             let sides = if name == "border" { 4 } else { 1 };
             let mut out = Vec::with_capacity(3 * sides);
             for value in [width, style, color] {
@@ -2735,6 +2867,9 @@ impl fmt::Display for PropertyValue {
             Self::TableLayout(v) => write!(f, "{v}"),
             Self::CaptionSide(v) => write!(f, "{v}"),
             Self::EmptyCells(v) => write!(f, "{v}"),
+            Self::WritingMode(v) => write!(f, "{v}"),
+            Self::TextOrientation(v) => write!(f, "{v}"),
+            Self::TextCombineUpright(v) => write!(f, "{v}"),
             Self::Opacity(n) => write_number(f, *n),
             Self::Easing(functions) => functions.fmt(f),
             Self::Animation(value) => value.fmt(f),

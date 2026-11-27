@@ -39,6 +39,9 @@ pub enum AnimationType {
 /// The animation type of `property`.
 pub fn animation_type(property: PropertyId) -> AnimationType {
     use PropertyId as P;
+    if property.is_logical() {
+        return animation_type(property.physical_template());
+    }
     match property {
         P::AnimationTimingFunction
         | P::TransitionTimingFunction
@@ -56,6 +59,9 @@ pub fn animation_type(property: PropertyId) -> AnimationType {
         | P::AnimationComposition
         | P::AnimationTimeline
         | P::Direction
+        | P::WritingMode
+        | P::TextOrientation
+        | P::TextCombineUpright
         | P::UnicodeBidi => AnimationType::NotAnimatable,
         P::Color
         | P::BackgroundColor
@@ -278,6 +284,7 @@ fn try_interpolate(
 ) -> Option<PropertyValue> {
     use PropertyId as P;
     use PropertyValue as V;
+    let property = property.physical_template();
     let negative_ok = matches!(
         property,
         P::MarginTop

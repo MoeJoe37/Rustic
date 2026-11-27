@@ -37,6 +37,7 @@ mod error;
 mod flex;
 mod grid;
 mod length;
+mod logical;
 mod media;
 mod parser;
 mod properties;
@@ -98,10 +99,10 @@ pub use properties::{
     FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle, FontVariantCaps,
     FontWeight, GenericFamily, Hyphens, LengthPercentageOrAuto, LineBreak, LineHeight, MaxSize,
     OutlineStyle, Overflow, OverflowWrap, Position, PropertyDeclaration, PropertyError, PropertyId,
-    PropertyName, PropertyValue, Spacing, TableLayout, TextAlign, TextCase, TextDecorationLine,
-    TextDecorationStyle, TextTransform, UnicodeBidi, VerticalAlign, VerticalAlignKeyword,
-    Visibility, WhiteSpace, WordBreak, ZIndex, longhands_of, parse_declaration,
-    serialize_four_sided_shorthand,
+    PropertyName, PropertyValue, Spacing, TableLayout, TextAlign, TextCase, TextCombineUpright,
+    TextDecorationLine, TextDecorationStyle, TextOrientation, TextTransform, UnicodeBidi,
+    VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, WordBreak, WritingMode, ZIndex,
+    longhands_of, parse_declaration, serialize_four_sided_shorthand,
 };
 pub use registered::{
     PropertySyntax, RegisteredItem, RegisteredValue, SyntaxComponent, SyntaxMultiplier, SyntaxType,

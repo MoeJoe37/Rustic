@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-214, TD-215, TD-216, TD-217, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
@@ -271,6 +271,10 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-211 | Deliberate | Layout | Table subset: collapsed borders place cells by whole rather than half borders; column boxes get no geometry and table parts are not relatively positioned; css-tables WPT 20 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
 | TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition; no opposite-direction parallel children, cross-mode baselines, compressed `text-combine-upright` or orthogonal relayout after stretching | Open, `text.writing` (M9) |
 | TD-213 | Deliberate | Text | Web fonts load before the first layout (no `font-display` periods or relayout on arrival); `local()` matches family names; script-created `FontFace`s cannot fetch and do not reach layout | Open, `text.writing` (M9) |
+| TD-214 | Deliberate | CSSOM | `element.style` keeps declarations as written in the `style` attribute: shorthands are not expanded into longhands, values are not normalized, and only longhands have IDL attributes | Open, CSSOM (M9) |
+| TD-216 | Deliberate | HTML | Dialogs and popovers without focus steps, inertness, light dismiss, `::backdrop`, close watchers or real top-layer painting (a maximal `z-index`); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks and `setAttribute('open')` fires no toggle | Open, `html.elements` (M9) |
+| TD-217 | Deliberate | HTML | Image source selection at load only: no reselection on resize, no `currentSrc`, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Open, `html.elements` (M9) |
+| TD-215 | Deliberate | DOM | Ranges without `Selection`, `getElementsByName` or `Range` geometry; live-range nodes stay roots one collection after their object dies; six heavy range WPT pages exceed the script turn budget | Open, `dom.ranges` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3532,3 +3536,56 @@ string rejects `load()` with a `NetworkError`, `document.fonts` has no
 **Pay:** load fonts through the renderer's resource scheduler with
 `font-display` periods and relayout, decode script fonts with
 `rustic-text`, and feed `document.fonts` into the document font database.
+
+### TD-214 — Inline style declarations subset
+`element.style` (SCRIPTING.md, Inline style) parses the `style` attribute on
+every read and writes it back on every change. A declaration keeps the
+value text as written (whitespace collapsed): `setProperty('margin', '1px')`
+stores `margin: 1px` rather than four longhands, so `marginTop` reads empty
+and `getPropertyValue('margin')` composes a shorthand only from longhands
+that are present. Values are validated by the property parser but not
+normalized (`10PX` stays `10PX`), shorthands have no camel-case IDL
+attributes, and the object is a `CSSStyleDeclaration` rather than a
+`CSSStyleProperties`. **Pay:** keep the parsed declaration block next to the
+attribute, expand and serialize shorthands with the specified-value
+serializers, and give shorthands their attributes.
+
+### TD-215 — Ranges and traversal subset
+`dom.ranges` follows DOM §5–6 (DOM.md, Live ranges; SCRIPTING.md, Traversal
+and ranges), with these gaps. There is no `Selection` (`getSelection()` is
+undefined), so the range mutation WPT pages fail their selected-range half;
+`getElementsByName` and `Range.getClientRects()`/`getBoundingClientRect()`
+are missing. A live range's or iterator's nodes are collection roots until
+the collection after its script object dies. Six range WPT pages
+(`compareBoundaryPoints`, `comparePoint`, `intersectsNode`, `isPointInRange`,
+`mutations-dataChange`, `set`) exceed the one-million-step script turn
+budget and are left out of the pinned selection, as are the five
+iframe-based content pages. Cross-document `replaceChild` queues two
+records (TD-153), and two NodeIterator removal-during-filtering cases fail.
+**Pay:** add `Selection` with the range it owns, `getElementsByName`, range
+geometry, and trace live ranges as host edges of their objects.
+
+### TD-216 — Interactive elements subset
+`details`, `dialog` and popovers (SCRIPTING.md, Interactive elements) follow
+their state machines, but `showModal()` neither moves focus nor makes the
+rest of the document inert, there is no close watcher (Escape does not
+cancel), auto popovers do not light-dismiss and only hide other auto popovers
+that are not their ancestors, and `::backdrop` is not generated. The top
+layer is approximated with `z-index: 2147483647` on `:modal` and
+`:popover-open`, so an ancestor's stacking context or transform still
+contains them. A closed `details` hides its non-`summary` element children
+through the UA sheet (text directly inside stays visible, and a second
+`summary` is hidden). `toggle` and `close` events are queued as microtasks;
+`open` changes through `setAttribute` fire no `toggle`, and `UA` colors are
+fixed light-scheme values (no `Canvas`/`CanvasText`). **Pay:** a real top
+layer in layout and paint with `::backdrop`, focus and inertness, close
+watchers, the popover stack, a details slot, and attribute-change steps.
+
+### TD-217 — Image source selection subset
+`img` and `picture` sources (PAINT.md) are chosen once, when the document's
+images load: a resize or a change of device pixel ratio does not select
+again, and `currentSrc` is not exposed. `sizes` accepts `px`, `em`, `rem`,
+`vw` and `vh` lengths (no `calc()` or `sizes=auto`), `h` descriptors are
+ignored, and `source type` accepts the formats `rustic-codecs` decodes.
+**Pay:** reselect on viewport changes, expose `currentSrc`, and resolve
+source sizes with the full length grammar.

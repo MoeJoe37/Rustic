@@ -2776,13 +2776,22 @@ fn block_layout(input: LayoutInput<'_>) -> Result<Laidout, LoadError> {
         Some(_) => PathBuf::new(),
         None => fs::canonicalize(path).map_err(LoadError::Io)?,
     };
+    let viewport = view.viewport();
+    let view_info = crate::srcset::ViewInfo {
+        width: viewport.width().get(),
+        height: viewport.height().get(),
+        ratio: view.scale().get(),
+    };
     let images = if let Some(applied) = applied_files {
         crate::images::load_applied(
             document,
             &tree,
             &canonical,
             limits.images,
-            limits.read_chunk_bytes,
+            crate::images::ImageRead {
+                chunk_bytes: limits.read_chunk_bytes,
+                view: view_info,
+            },
             cancellation,
             Some((applied, network.map(|session| &**session))),
         )
@@ -2794,6 +2803,7 @@ fn block_layout(input: LayoutInput<'_>) -> Result<Laidout, LoadError> {
             limits.images,
             limits.read_chunk_bytes,
             cancellation,
+            view_info,
         )
     };
     if !images.sizes.is_empty() {

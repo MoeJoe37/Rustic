@@ -23,6 +23,8 @@ use super::{
 
 const IMPLEMENTATION: &str = "DOMImplementation";
 const MAX_AUXILIARY_DOCUMENTS: usize = 16;
+/// Live auxiliary documents from which each new one asks for a collection.
+const COLLECT_DOCUMENTS_AT: usize = 4;
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     install_interface(
@@ -371,7 +373,12 @@ fn create_document(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResu
     let namespace = required_arg(agent, args, 0)?;
     let qualified_name = required_arg(agent, args, 1)?;
     let namespace = to_nullable_dom_string(agent, namespace)?;
-    let name = string(agent, qualified_name)?;
+    // `[LegacyNullToEmptyString] DOMString qualifiedName`.
+    let name = if qualified_name == Value::NULL {
+        rustic_dom::DomString::default()
+    } else {
+        string(agent, qualified_name)?
+    };
     let doctype = args.get(2).copied().filter(|value| !value.is_nullish());
     let doctype = doctype
         .map(|value| require_doctype(agent, value))
@@ -468,6 +475,11 @@ fn register(
             let Ok(mut documents) = page.additional.try_borrow_mut() else {
                 return agent.type_error("document registry is busy");
             };
+            // Documents die with their wrappers; collect before the cap is
+            // reached, so creating documents in a loop keeps working.
+            if documents.len() >= COLLECT_DOCUMENTS_AT {
+                agent.request_collection();
+            }
             if documents.len() >= MAX_AUXILIARY_DOCUMENTS {
                 return Err(exception(
                     agent,

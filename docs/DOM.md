@@ -105,8 +105,26 @@ HTML template cloning steps; adoption follows
 [adopt](https://dom.spec.whatwg.org/#concept-node-adopt) except that IDs change
 (TD-16). Reviewed 2026-11-08 against the living standards. Clone and adoption
 work iteratively and roll back on any node, data, depth or allocation failure,
-leaving both documents, their IDs and accounting unchanged. Live ranges,
-mutation records and custom element adopting steps are not implemented.
+leaving both documents, their IDs and accounting unchanged. Custom element
+adopting steps are not implemented.
+
+## Live ranges and node iterators
+
+A document tracks the live ranges and `NodeIterator`s its script objects own
+(`create_live_range`, `create_node_iterator`; at most `MAX_LIVE_ENTRIES`),
+because their boundary points and references must follow each mutation as it
+happens. The structural primitives apply the DOM's steps: `unlink` runs the
+removal steps (points inside the removed node move to its old parent and
+index, later offsets in the parent drop by one, iterators run their
+pre-removing steps) and `link_before` the insertion steps. A move to the
+node's current position, and `replaceChild(node, node)`, still remove and
+insert as the standard says. `replace_character_data`, `set_character_data`,
+`split_text_with_preflight` and `merge_text` (normalize) apply "replace
+data", `splitText` and normalize's boundary moves. Entry ids are unique
+across documents: adopting a detached subtree moves the entries inside it to
+the adopting document with renamed nodes. `live_nodes` lists every node an
+entry refers to; the binding layer treats them as roots while the owning
+objects live (TD-215).
 
 ### Shadow roots
 

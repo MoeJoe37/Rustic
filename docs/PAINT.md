@@ -289,8 +289,12 @@ one onto device pixels it copies them exactly. `image-rendering`,
 `object-fit`, `object-position` and inline-level images are not supported
 yet (TD-53).
 
-The command line loads each `img` that generated a box and has a non-empty
-`src`: the URL resolves against the document base and must name a file in
+The command line loads each `img` that generated a box and has a usable
+source: the first matching `source` of its `picture` (by `media` and a
+decodable `type`), else its own `srcset` and `src`, with `sizes` resolving
+`w` descriptors and the view's device pixel ratio choosing the candidate
+(HTML §4.8.4.3, `rustic-cli/src/srcset.rs`; TD-217). The chosen density
+divides the natural size. The URL resolves against the document base and must name a file in
 the document's directory or below it (like linked stylesheets); the file is
 read in bounded chunks into an `ImageStore` and decoded as PNG, JPEG, GIF or
 WebP with `rustic-codecs`; animated images show their first frame (TD-82). One image

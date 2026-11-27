@@ -35,6 +35,7 @@ pub(super) use forms::install as install_forms;
 pub use forms::{
     AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
 };
+pub(super) use forms::{fire_at, fire_plain, toggle_event};
 pub(super) use handlers::install as install_handlers;
 pub(in crate::page) use handlers::install_animation as install_animation_handlers;
 pub use input::{AssistiveAction, InputEvent, KeyInput, Modifiers};
@@ -722,10 +723,23 @@ fn fire_with_target(
             if click && !canceled && !checkbox_activated {
                 let bubbles = event.bubbles(agent)?;
                 forms::activate_button(agent, path, bubbles)?;
+                super::elements::activate(agent, path, bubbles)?;
             }
             Ok(!canceled)
         })
     })
+}
+
+/// A trusted plain `Event` (not bubbling) for a native caller to fire.
+pub(super) fn state_event(agent: &mut Agent, kind: &str, cancelable: bool) -> JsResult<Value> {
+    state::trusted_event(
+        agent,
+        "Event",
+        kind,
+        if cancelable { Event::CANCELABLE } else { 0 },
+        Value::NULL,
+        Value::NULL,
+    )
 }
 
 /// Trusted events produced by the local script host and parser.

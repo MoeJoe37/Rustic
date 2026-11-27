@@ -545,3 +545,63 @@ fn logical_values_inherit_substitute_and_reset() {
     assert_eq!(computed(html, sheet, "x", "writing-mode"), "horizontal-tb");
     assert_eq!(computed(html, sheet, "c", "writing-mode"), "vertical-lr");
 }
+
+#[test]
+fn details_dialogs_and_popovers_style_from_their_state() {
+    let parser = CssParser::default();
+    let mut page = document(
+        "<details id=closed><summary id=s>S</summary><p id=hidden>x</p></details>\
+         <details open><p id=shown>x</p></details>\
+         <dialog id=dialog open></dialog><dialog id=modal open></dialog>\
+         <div popover id=pop></div><div popover id=shown-pop></div>",
+    );
+    let find = |doc: &Document, id: &str| {
+        doc.walk(doc.root())
+            .unwrap()
+            .map(|(n, _)| n)
+            .find(|&n| id_of(doc, n).as_deref() == Some(id))
+            .unwrap()
+    };
+    let modal = find(page.document(), "modal");
+    let shown = find(page.document(), "shown-pop");
+    page.document_mut()
+        .top_layer_add(modal, rustic_dom::TopLayer::Modal)
+        .unwrap();
+    page.document_mut()
+        .top_layer_add(shown, rustic_dom::TopLayer::Popover)
+        .unwrap();
+    let mut cascade = Cascade::new();
+    let (sheet, diagnostics) =
+        StyleSheet::parse(&parser, HTML_USER_AGENT_STYLESHEET, Origin::UserAgent).unwrap();
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    cascade.push(sheet);
+    let doc = page.document();
+    let styles = style_tree(
+        doc,
+        doc.root(),
+        &cascade,
+        &parser,
+        &MatchContext::html(),
+        &ComputeContext::default(),
+    )
+    .unwrap();
+    let value = |id: &str, property: &str| {
+        let style = styles
+            .iter()
+            .find(|s| id_of(doc, s.node).as_deref() == Some(id))
+            .unwrap_or_else(|| panic!("no element #{id}"));
+        style
+            .computed
+            .get(PropertyId::from_name(property).unwrap())
+            .to_string()
+    };
+    assert_eq!(value("hidden", "display"), "none");
+    assert_eq!(value("s", "display"), "block");
+    assert_eq!(value("shown", "display"), "block");
+    assert_eq!(value("dialog", "position"), "absolute");
+    assert_eq!(value("modal", "position"), "fixed");
+    assert_eq!(value("modal", "z-index"), "2147483647");
+    assert_eq!(value("pop", "display"), "none");
+    assert_eq!(value("shown-pop", "display"), "block");
+    assert_eq!(value("shown-pop", "position"), "fixed");
+}

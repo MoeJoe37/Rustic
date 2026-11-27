@@ -365,8 +365,35 @@ same turn budget, so a single call cannot run unmetered.
   `CSSTransition`, `TransitionEvent`, `AnimationEvent`,
   `AnimationPlaybackEvent`, `ViewTransition`, `StyleSheetList`,
   `CSSStyleSheet`, `CSSRuleList`, `MediaList`, the `CSSRule` family and
-  `CSSStyleProperties`, `DOMException` and the `console` namespace. IMPLEMENTATION.md lists the members of each; treat that
+  `CSSStyleProperties`, `NodeIterator`, `TreeWalker`, `NodeFilter`,
+  `AbstractRange`, `StaticRange`, `Range`, `FontFace`, `FontFaceSet`,
+  `DOMException` and the `console` namespace. IMPLEMENTATION.md lists the members of each; treat that
   list, not this one, as the contract.
+- **Traversal and ranges** (DOM §5–6, `page/traversal.rs`, `page/ranges.rs`,
+  `page/range_content.rs`). `createNodeIterator`, `createTreeWalker`,
+  `createRange`, `new Range()` and `new StaticRange()` follow the standard's
+  algorithms; filters run with no tree borrowed and an active flag that throws
+  `InvalidStateError` on reentry. A `Range` keeps its document's wrapper and an
+  entry id; the document moves its points (DOM.md, Live ranges). The content
+  operations run in one pass over the document. The `ParentNode` and
+  `ChildNode` mixins (`append`, `prepend`, `replaceChildren`, `before`,
+  `after`, `replaceWith`, `remove`) and `isEqualNode` are in `page/mixins.rs`.
+  Limits: TD-215.
+- **Interactive elements** (HTML §4.11, §6.12, `page/elements.rs`).
+  `HTMLDetailsElement` (`open`, `name`; a click on the first `summary`
+  toggles it, name groups are exclusive), `HTMLDialogElement` (`open`,
+  `returnValue`, `show`, `showModal`, `close`, `requestClose`), the popover
+  API on `HTMLElement` (`popover`, `showPopover`, `hidePopover`,
+  `togglePopover`, `popovertarget` invokers) and `ToggleEvent`. Modal dialogs
+  and showing popovers are in the document's top layer, which `:modal` and
+  `:popover-open` match; the UA sheet styles `details`, `dialog` and
+  `[popover]` (CSS.md). Limits: TD-216.
+- **Inline style** (CSSOM §6.7, `page/inline_style.rs`). `element.style`
+  returns one `CSSStyleDeclaration` per element whose only store is the
+  `style` attribute: reads parse it, writes serialize it back, so the cascade
+  and mutation observers see each change. The per-property attributes,
+  `cssText`, `setProperty`, `removeProperty` and priorities work on it;
+  computed declarations stay read-only. Limits: TD-214.
 - **Selectors** ([ADR 0030](adr/0030-dom-selectors-and-node-lists.md)).
   `querySelector`, `querySelectorAll`, `matches` and `closest` use the same
   matcher as the cascade, so a selector means the same thing to script and to
@@ -446,8 +473,12 @@ static reference.
 
 The headless CLI runs upstream `testharness.js` at revision
 `cb97c571c3b1947e08b8615eeb4028a2794b23a4`. The checked-in Linux CI baseline
-contains **132 files and 1,368 subtests**, with **1,280 passing**
-and **88 expected failures**. It includes DOM nodes/events/collections,
+contains **168 files and 6,425 subtests**, with **4,942 passing**
+and **1,483 expected failures** (1,409 of them need the Selection API, which
+the DOM range mutation tests use for half of their cases). It includes DOM
+nodes/events/collections, DOM traversal and ranges (the iframe-based range
+content pages need non-script helpers and are left out; six range pages
+exceed the one-million-step script turn budget, TD-215),
 HTML timers and animation frames, CSSOM and CSSOM View, text encoding, URL,
 Blob and Fetch, and Wasm constructors, reflection, globals, memories and tables.
 See the [manifest and digests](../crates/rustic-cli/tests/fixtures/wpt-web/manifest.json)

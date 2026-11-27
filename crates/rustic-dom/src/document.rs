@@ -10,9 +10,15 @@ mod adoption;
 mod character_data;
 mod invariants;
 mod journal;
+mod live;
 pub(crate) mod marking;
+mod top_layer;
 
 pub use journal::MutationEntry;
+
+pub use live::{BoundaryPoint, IteratorState, LiveId, MAX_LIVE_ENTRIES};
+
+pub use top_layer::TopLayer;
 
 pub use invariants::InvariantViolation;
 
@@ -100,6 +106,10 @@ pub struct Document {
     journal: Option<Vec<MutationEntry>>,
     /// Controls the HTML parser associated with its form element pointer.
     form_associations: Vec<(NodeId, NodeId)>,
+    /// Live ranges and node iterators that mutations update.
+    live_set: live::LiveSet,
+    /// Modal dialogs and showing popovers, bottom first.
+    top_layer: Vec<(NodeId, TopLayer)>,
 }
 
 impl Document {
@@ -148,6 +158,8 @@ impl Document {
             mutation_revision: 0,
             journal: None,
             form_associations: Vec::new(),
+            live_set: live::LiveSet::default(),
+            top_layer: Vec::new(),
         })
     }
 
@@ -545,6 +557,10 @@ impl Document {
                 .into_iter()
                 .flatten()
                 .for_each(|entry| self.push_reserved(entry));
+            // The DOM still removes and inserts the node: ranges inside it
+            // move to its parent.
+            self.live_before_remove(child, parent);
+            self.live_after_insert(parent, child);
             return Ok(());
         }
         for entry in entries.into_iter().flatten() {
@@ -654,12 +670,20 @@ impl Document {
         // combined record itself.
         let log = self.journal.take();
         let result = if node == child {
+            self.live_before_remove(child, parent);
+            self.live_after_insert(parent, child);
             Ok(())
-        } else if parent == self.root {
+        } else if parent == self.root || !self.live_set.is_empty() {
+            // The DOM removes `child` before inserting `node` (which live
+            // ranges observe); a rejected insertion puts both back.
+            let saved = (!self.live_set.is_empty()).then(|| self.live_set.clone());
             self.unlink(child);
             let inserted = self.insert_before(parent, node, reference);
             if inserted.is_err() {
                 self.link_before(parent, child, reference);
+                if let Some(saved) = saved {
+                    self.live_set = saved;
+                }
             }
             inserted
         } else {
@@ -776,6 +800,7 @@ impl Document {
         node.previous_sibling = previous;
         node.next_sibling = before;
         self.raise_height_bounds(parent, child);
+        self.live_after_insert(parent, child);
     }
 
     /// Raise the cached height bounds of `parent` and its ancestors after
@@ -1037,12 +1062,13 @@ impl Document {
         if !self.form_associations.is_empty() {
             self.form_associations.retain(|&(control, _)| control != id);
         }
-        let node = self.live(id);
-        let (Some(parent), previous, next) =
-            (node.parent(), node.previous_sibling(), node.next_sibling())
-        else {
+        let Some(parent) = self.live(id).parent() else {
             return;
         };
+        self.live_before_remove(id, parent);
+        self.top_layer_before_remove(id);
+        let node = self.live(id);
+        let (previous, next) = (node.previous_sibling(), node.next_sibling());
         self.note_child_change();
         if let Some(previous) = previous {
             self.live_mut(previous).next_sibling = next;

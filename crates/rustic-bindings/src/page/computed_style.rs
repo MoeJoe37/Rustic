@@ -15,8 +15,8 @@ use crate::dom_exception;
 use crate::webidl::{IntegerConversion, to_unsigned_long};
 
 use super::{
-    ComputedStyleSnapshot, creation, events, illegal_constructor, install_interface, prototype,
-    read_layout, require_receiver, required_arg, window, with_page,
+    ComputedStyleSnapshot, creation, events, illegal_constructor, inline_style, install_interface,
+    prototype, read_layout, require_receiver, required_arg, window, with_page,
 };
 
 const INTERFACE: &str = "CSSStyleDeclaration";
@@ -232,11 +232,226 @@ const LONGHAND_GETTERS: [NativeFn; PropertyId::ALL.len()] = [
     get_longhand::<187> as NativeFn,
 ];
 
+const LONGHAND_SETTERS: [NativeFn; PropertyId::ALL.len()] = [
+    set_longhand::<0> as NativeFn,
+    set_longhand::<1> as NativeFn,
+    set_longhand::<2> as NativeFn,
+    set_longhand::<3> as NativeFn,
+    set_longhand::<4> as NativeFn,
+    set_longhand::<5> as NativeFn,
+    set_longhand::<6> as NativeFn,
+    set_longhand::<7> as NativeFn,
+    set_longhand::<8> as NativeFn,
+    set_longhand::<9> as NativeFn,
+    set_longhand::<10> as NativeFn,
+    set_longhand::<11> as NativeFn,
+    set_longhand::<12> as NativeFn,
+    set_longhand::<13> as NativeFn,
+    set_longhand::<14> as NativeFn,
+    set_longhand::<15> as NativeFn,
+    set_longhand::<16> as NativeFn,
+    set_longhand::<17> as NativeFn,
+    set_longhand::<18> as NativeFn,
+    set_longhand::<19> as NativeFn,
+    set_longhand::<20> as NativeFn,
+    set_longhand::<21> as NativeFn,
+    set_longhand::<22> as NativeFn,
+    set_longhand::<23> as NativeFn,
+    set_longhand::<24> as NativeFn,
+    set_longhand::<25> as NativeFn,
+    set_longhand::<26> as NativeFn,
+    set_longhand::<27> as NativeFn,
+    set_longhand::<28> as NativeFn,
+    set_longhand::<29> as NativeFn,
+    set_longhand::<30> as NativeFn,
+    set_longhand::<31> as NativeFn,
+    set_longhand::<32> as NativeFn,
+    set_longhand::<33> as NativeFn,
+    set_longhand::<34> as NativeFn,
+    set_longhand::<35> as NativeFn,
+    set_longhand::<36> as NativeFn,
+    set_longhand::<37> as NativeFn,
+    set_longhand::<38> as NativeFn,
+    set_longhand::<39> as NativeFn,
+    set_longhand::<40> as NativeFn,
+    set_longhand::<41> as NativeFn,
+    set_longhand::<42> as NativeFn,
+    set_longhand::<43> as NativeFn,
+    set_longhand::<44> as NativeFn,
+    set_longhand::<45> as NativeFn,
+    set_longhand::<46> as NativeFn,
+    set_longhand::<47> as NativeFn,
+    set_longhand::<48> as NativeFn,
+    set_longhand::<49> as NativeFn,
+    set_longhand::<50> as NativeFn,
+    set_longhand::<51> as NativeFn,
+    set_longhand::<52> as NativeFn,
+    set_longhand::<53> as NativeFn,
+    set_longhand::<54> as NativeFn,
+    set_longhand::<55> as NativeFn,
+    set_longhand::<56> as NativeFn,
+    set_longhand::<57> as NativeFn,
+    set_longhand::<58> as NativeFn,
+    set_longhand::<59> as NativeFn,
+    set_longhand::<60> as NativeFn,
+    set_longhand::<61> as NativeFn,
+    set_longhand::<62> as NativeFn,
+    set_longhand::<63> as NativeFn,
+    set_longhand::<64> as NativeFn,
+    set_longhand::<65> as NativeFn,
+    set_longhand::<66> as NativeFn,
+    set_longhand::<67> as NativeFn,
+    set_longhand::<68> as NativeFn,
+    set_longhand::<69> as NativeFn,
+    set_longhand::<70> as NativeFn,
+    set_longhand::<71> as NativeFn,
+    set_longhand::<72> as NativeFn,
+    set_longhand::<73> as NativeFn,
+    set_longhand::<74> as NativeFn,
+    set_longhand::<75> as NativeFn,
+    set_longhand::<76> as NativeFn,
+    set_longhand::<77> as NativeFn,
+    set_longhand::<78> as NativeFn,
+    set_longhand::<79> as NativeFn,
+    set_longhand::<80> as NativeFn,
+    set_longhand::<81> as NativeFn,
+    set_longhand::<82> as NativeFn,
+    set_longhand::<83> as NativeFn,
+    set_longhand::<84> as NativeFn,
+    set_longhand::<85> as NativeFn,
+    set_longhand::<86> as NativeFn,
+    set_longhand::<87> as NativeFn,
+    set_longhand::<88> as NativeFn,
+    set_longhand::<89> as NativeFn,
+    set_longhand::<90> as NativeFn,
+    set_longhand::<91> as NativeFn,
+    set_longhand::<92> as NativeFn,
+    set_longhand::<93> as NativeFn,
+    set_longhand::<94> as NativeFn,
+    set_longhand::<95> as NativeFn,
+    set_longhand::<96> as NativeFn,
+    set_longhand::<97> as NativeFn,
+    set_longhand::<98> as NativeFn,
+    set_longhand::<99> as NativeFn,
+    set_longhand::<100> as NativeFn,
+    set_longhand::<101> as NativeFn,
+    set_longhand::<102> as NativeFn,
+    set_longhand::<103> as NativeFn,
+    set_longhand::<104> as NativeFn,
+    set_longhand::<105> as NativeFn,
+    set_longhand::<106> as NativeFn,
+    set_longhand::<107> as NativeFn,
+    set_longhand::<108> as NativeFn,
+    set_longhand::<109> as NativeFn,
+    set_longhand::<110> as NativeFn,
+    set_longhand::<111> as NativeFn,
+    set_longhand::<112> as NativeFn,
+    set_longhand::<113> as NativeFn,
+    set_longhand::<114> as NativeFn,
+    set_longhand::<115> as NativeFn,
+    set_longhand::<116> as NativeFn,
+    set_longhand::<117> as NativeFn,
+    set_longhand::<118> as NativeFn,
+    set_longhand::<119> as NativeFn,
+    set_longhand::<120> as NativeFn,
+    set_longhand::<121> as NativeFn,
+    set_longhand::<122> as NativeFn,
+    set_longhand::<123> as NativeFn,
+    set_longhand::<124> as NativeFn,
+    set_longhand::<125> as NativeFn,
+    set_longhand::<126> as NativeFn,
+    set_longhand::<127> as NativeFn,
+    set_longhand::<128> as NativeFn,
+    set_longhand::<129> as NativeFn,
+    set_longhand::<130> as NativeFn,
+    set_longhand::<131> as NativeFn,
+    set_longhand::<132> as NativeFn,
+    set_longhand::<133> as NativeFn,
+    set_longhand::<134> as NativeFn,
+    set_longhand::<135> as NativeFn,
+    set_longhand::<136> as NativeFn,
+    set_longhand::<137> as NativeFn,
+    set_longhand::<138> as NativeFn,
+    set_longhand::<139> as NativeFn,
+    set_longhand::<140> as NativeFn,
+    set_longhand::<141> as NativeFn,
+    set_longhand::<142> as NativeFn,
+    set_longhand::<143> as NativeFn,
+    set_longhand::<144> as NativeFn,
+    set_longhand::<145> as NativeFn,
+    set_longhand::<146> as NativeFn,
+    set_longhand::<147> as NativeFn,
+    set_longhand::<148> as NativeFn,
+    set_longhand::<149> as NativeFn,
+    set_longhand::<150> as NativeFn,
+    set_longhand::<151> as NativeFn,
+    set_longhand::<152> as NativeFn,
+    set_longhand::<153> as NativeFn,
+    set_longhand::<154> as NativeFn,
+    set_longhand::<155> as NativeFn,
+    set_longhand::<156> as NativeFn,
+    set_longhand::<157> as NativeFn,
+    set_longhand::<158> as NativeFn,
+    set_longhand::<159> as NativeFn,
+    set_longhand::<160> as NativeFn,
+    set_longhand::<161> as NativeFn,
+    set_longhand::<162> as NativeFn,
+    set_longhand::<163> as NativeFn,
+    set_longhand::<164> as NativeFn,
+    set_longhand::<165> as NativeFn,
+    set_longhand::<166> as NativeFn,
+    set_longhand::<167> as NativeFn,
+    set_longhand::<168> as NativeFn,
+    set_longhand::<169> as NativeFn,
+    set_longhand::<170> as NativeFn,
+    set_longhand::<171> as NativeFn,
+    set_longhand::<172> as NativeFn,
+    set_longhand::<173> as NativeFn,
+    set_longhand::<174> as NativeFn,
+    set_longhand::<175> as NativeFn,
+    set_longhand::<176> as NativeFn,
+    set_longhand::<177> as NativeFn,
+    set_longhand::<178> as NativeFn,
+    set_longhand::<179> as NativeFn,
+    set_longhand::<180> as NativeFn,
+    set_longhand::<181> as NativeFn,
+    set_longhand::<182> as NativeFn,
+    set_longhand::<183> as NativeFn,
+    set_longhand::<184> as NativeFn,
+    set_longhand::<185> as NativeFn,
+    set_longhand::<186> as NativeFn,
+    set_longhand::<187> as NativeFn,
+];
+
+/// The inline declarations' setter for one longhand; computed declarations
+/// are read-only.
+fn set_longhand<const INDEX: usize>(
+    agent: &mut Agent,
+    declaration: Value,
+    args: &[Value],
+) -> JsResult<Value> {
+    let Some(owner) = inline_style::owner(agent, declaration)? else {
+        return set_named_longhand(agent, declaration, args);
+    };
+    let argument = required_arg(agent, args, 0)?;
+    let value = string_arg(agent, argument)?;
+    inline_style::set_property(agent, owner, PropertyId::ALL[INDEX].name(), &value, "")?;
+    Ok(Value::UNDEFINED)
+}
+
+fn string_arg(agent: &mut Agent, value: Value) -> JsResult<String> {
+    let units = creation::string(agent, value)?;
+    Ok(String::from_utf16_lossy(units.as_units()))
+}
+
 fn get_longhand<const INDEX: usize>(
     agent: &mut Agent,
     declaration: Value,
     _: &[Value],
 ) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        return inline_style::property_value(agent, owner, PropertyId::ALL[INDEX].name());
+    }
     let style = snapshot(agent, declaration)?;
     let name = PropertyId::ALL[INDEX].name();
     value(agent, style.get(name).unwrap_or(""))
@@ -264,45 +479,40 @@ fn install_longhand_getters(agent: &mut Agent, prototype: ObjectId) -> JsResult<
     // initializer returns; protect it throughout the allocating loop.
     let prototype_root = agent.root(Value::object(prototype))?;
     let result = (|| {
-        let setter = Value::object(agent.new_native_function(
-            set_named_longhand,
-            "set computed property",
-            1,
-        )?);
-        let setter_root = agent.root(setter)?;
-        let result = (|| {
-            for (&property, behavior) in PropertyId::ALL.iter().zip(LONGHAND_GETTERS) {
-                let canonical = property.name();
-                let camel = camel_name(canonical);
-                let getter = Value::object(agent.new_native_function(
-                    behavior,
-                    &format!("get {camel}"),
-                    0,
-                )?);
-                let getter_root = agent.root(getter)?;
-                let installed: JsResult<()> = (|| {
-                    for (index, name) in [canonical, camel.as_str()].into_iter().enumerate() {
-                        // A one-word longhand has identical CSS and IDL spellings:
-                        // install it once, rather than accidentally skipping both.
-                        if index == 1 && canonical == camel {
-                            continue;
-                        }
-                        let key = agent.heap.key(name)?;
-                        agent.define_property_or_throw(
-                            prototype,
-                            key,
-                            PropertyDescriptor::accessor(getter, setter, true, true),
-                        )?;
+        for ((&property, behavior), set) in PropertyId::ALL
+            .iter()
+            .zip(LONGHAND_GETTERS)
+            .zip(LONGHAND_SETTERS)
+        {
+            let canonical = property.name();
+            let camel = camel_name(canonical);
+            let getter =
+                Value::object(agent.new_native_function(behavior, &format!("get {camel}"), 0)?);
+            let getter_root = agent.root(getter)?;
+            let setter =
+                Value::object(agent.new_native_function(set, &format!("set {camel}"), 1)?);
+            let setter_root = agent.root(setter)?;
+            let installed: JsResult<()> = (|| {
+                for (index, name) in [canonical, camel.as_str()].into_iter().enumerate() {
+                    // A one-word longhand has identical CSS and IDL spellings:
+                    // install it once, rather than accidentally skipping both.
+                    if index == 1 && canonical == camel {
+                        continue;
                     }
-                    Ok(())
-                })();
-                agent.unroot(getter_root);
-                installed?;
-            }
-            Ok(())
-        })();
-        agent.unroot(setter_root);
-        result
+                    let key = agent.heap.key(name)?;
+                    agent.define_property_or_throw(
+                        prototype,
+                        key,
+                        PropertyDescriptor::accessor(getter, setter, true, true),
+                    )?;
+                }
+                Ok(())
+            })();
+            agent.unroot(setter_root);
+            agent.unroot(getter_root);
+            installed?;
+        }
+        Ok(())
     })();
     agent.unroot(prototype_root);
     result
@@ -433,12 +643,20 @@ fn value(agent: &mut Agent, text: &str) -> JsResult<Value> {
 }
 
 fn length(agent: &mut Agent, declaration: Value, _: &[Value]) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        return inline_style::length(agent, owner);
+    }
     let style = snapshot(agent, declaration)?;
     let count = u32::try_from(style.len()).map_err(|_| Abrupt::OutOfMemory)?;
     Ok(Value::number(f64::from(count)))
 }
 
 fn get_property_value(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        let argument = required_arg(agent, args, 0)?;
+        let name = string_arg(agent, argument)?;
+        return inline_style::property_value(agent, owner, &name);
+    }
     // Brand-check before invoking author code, then read layout after conversion.
     let source = element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
@@ -456,6 +674,11 @@ fn get_property_value(agent: &mut Agent, declaration: Value, args: &[Value]) -> 
 }
 
 fn get_property_priority(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        let argument = required_arg(agent, args, 0)?;
+        let name = string_arg(agent, argument)?;
+        return inline_style::property_priority(agent, owner, &name);
+    }
     // Computed declarations have no author-specified priority.
     element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
@@ -464,6 +687,11 @@ fn get_property_priority(agent: &mut Agent, declaration: Value, args: &[Value]) 
 }
 
 fn item(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        let argument = required_arg(agent, args, 0)?;
+        let index = to_unsigned_long(agent, argument, IntegerConversion::Wrap)?;
+        return inline_style::item(agent, owner, index);
+    }
     let source = element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
     let index = to_unsigned_long(agent, argument, IntegerConversion::Wrap)?;
@@ -488,11 +716,19 @@ fn read_only(agent: &mut Agent) -> Abrupt {
 }
 
 fn css_text(agent: &mut Agent, declaration: Value, _: &[Value]) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        return inline_style::css_text(agent, owner);
+    }
     element(agent, declaration)?;
     value(agent, "")
 }
 
 fn set_css_text(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    if inline_style::owner(agent, declaration)?.is_some() {
+        let argument = required_arg(agent, args, 0)?;
+        inline_style::assign_css_text(agent, declaration, argument)?;
+        return Ok(Value::UNDEFINED);
+    }
     element(agent, declaration)?;
     let argument = required_arg(agent, args, 0)?;
     let _ = creation::string(agent, argument)?;
@@ -500,6 +736,29 @@ fn set_css_text(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResu
 }
 
 fn set_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        let name = required_arg(agent, args, 0)?;
+        let name = string_arg(agent, name)?;
+        let value = required_arg(agent, args, 1)?;
+        // `[LegacyNullToEmptyString] CSSOMString value`.
+        let value = if value == Value::NULL {
+            String::new()
+        } else {
+            string_arg(agent, value)?
+        };
+        let priority = match args.get(2) {
+            Some(&priority) if priority != Value::UNDEFINED => {
+                if priority == Value::NULL {
+                    String::new()
+                } else {
+                    string_arg(agent, priority)?
+                }
+            }
+            _ => String::new(),
+        };
+        inline_style::set_property(agent, owner, &name, &value, &priority)?;
+        return Ok(Value::UNDEFINED);
+    }
     element(agent, declaration)?;
     let value = required_arg(agent, args, 1)?;
     let _ = creation::string(agent, args[0])?;
@@ -513,6 +772,11 @@ fn set_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResu
 }
 
 fn remove_property(agent: &mut Agent, declaration: Value, args: &[Value]) -> JsResult<Value> {
+    if let Some(owner) = inline_style::owner(agent, declaration)? {
+        let name = required_arg(agent, args, 0)?;
+        let name = string_arg(agent, name)?;
+        return inline_style::remove_property(agent, owner, &name);
+    }
     element(agent, declaration)?;
     let name = required_arg(agent, args, 0)?;
     let _ = creation::string(agent, name)?;

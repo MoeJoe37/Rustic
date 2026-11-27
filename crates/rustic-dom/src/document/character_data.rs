@@ -53,6 +53,8 @@ impl Document {
             self.note_mutation();
         }
         self.push_entry(entry);
+        let old_len = self.character_data(id)?.as_units().len();
+        self.live_replace_data(id, 0, old_len, value.as_units().len());
         Ok(std::mem::replace(self.character_data_mut(id), value))
     }
 
@@ -60,8 +62,8 @@ impl Document {
     ///
     /// An offset past the end fails. A count past the end is clamped, including
     /// `usize::MAX`. Surrogate halves may be edited individually. Validation and
-    /// capacity reservation precede content/accounting changes. It does not
-    /// update live ranges. An enabled journal records the edit even when the
+    /// capacity reservation precede content/accounting changes. Live ranges
+    /// follow the DOM's "replace data" steps. An enabled journal records the edit even when the
     /// replacement equals the existing range, as the DOM queues a record.
     pub fn replace_character_data(
         &mut self,
@@ -77,6 +79,7 @@ impl Document {
         let entry = self.data_entry(id)?;
         if unchanged {
             self.push_entry(entry);
+            self.live_replace_data(id, offset, plan.end - offset, value.len());
             return Ok(());
         }
         self.prepare_character_edit(id, len, &plan)?;
@@ -84,6 +87,7 @@ impl Document {
             .replace_reserved(offset..plan.end, value, plan.new_len);
         self.note_mutation();
         self.push_entry(entry);
+        self.live_replace_data(id, offset, plan.end - offset, value.len());
         Ok(())
     }
 
@@ -187,7 +191,11 @@ impl Document {
             // The existing sibling establishes the parent, legal child kind,
             // and depth for another text leaf at this position.
             self.link_before(parent, new, next);
-        } else if offset != len {
+            self.live_split(id, new, parent, offset);
+        }
+        // "Replace data" for the removed suffix.
+        self.live_replace_data(id, offset, len - offset, 0);
+        if parent.is_none() && offset != len {
             self.note_mutation();
         }
         // DOM splitText inserts the new node before replacing the old data.

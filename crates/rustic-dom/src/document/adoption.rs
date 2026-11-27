@@ -246,6 +246,11 @@ impl Document {
             }
             return Ok(Adopted { root: node, ids });
         }
+        // Ranges and iterators inside a detached subtree follow its nodes
+        // (an attached one's removal already moved them to its old parent).
+        if source.live(node).parent().is_none() {
+            self.adopt_live(source, &ids);
+        }
         source.destroy_unchecked(node);
         Ok(Adopted { root, ids })
     }

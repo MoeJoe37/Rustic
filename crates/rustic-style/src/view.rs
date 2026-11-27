@@ -90,6 +90,12 @@ pub trait ElementView: Copy + Eq + std::hash::Hash {
         None
     }
 
+    /// Why the element is in its document's top layer, if it is (a modal
+    /// dialog or a showing popover). Views without a document have none.
+    fn top_layer(&self) -> Option<rustic_dom::TopLayer> {
+        None
+    }
+
     /// Whether the element is in a user-interaction state. Without an
     /// interaction model, nothing is.
     fn in_state(&self, state: ElementState) -> bool {

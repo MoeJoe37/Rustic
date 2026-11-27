@@ -972,3 +972,50 @@ fn font_face_rules_load_local_fonts_for_their_family_and_unicode_range() {
     assert_eq!(field(texts[4], "face="), field(texts[1], "face="));
     fs::remove_dir_all(base).unwrap();
 }
+
+#[test]
+fn srcset_sizes_and_picture_sources_choose_the_image_and_its_density() {
+    let png = |w: u32, h: u32| {
+        let surface =
+            rustic_raster::Surface::new(w, h, rustic_raster::RasterLimits::default()).unwrap();
+        rustic_raster::encode_png(&surface, usize::MAX).unwrap()
+    };
+    let base = std::env::temp_dir().join(format!("rustic-cli-srcset-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("small.png"), png(40, 20)).unwrap();
+    fs::write(base.join("large.png"), png(160, 80)).unwrap();
+    let path = base.join("page.html");
+    fs::write(
+        &path,
+        "<style>* {margin:0} img {display:block}</style>\
+         <img id=a src=small.png srcset='large.png 2x'>\
+         <img id=b srcset='small.png 40w, large.png 160w' sizes='(max-width: 100px) 10px, 80px'>\
+         <picture><source srcset=large.png media='(min-width: 5000px)'>\
+         <source srcset=large.png type=image/avif><img id=c src=small.png></picture>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let rects: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.starts_with("fragment ") && l.contains("content=("))
+        .filter_map(|l| l.split("content=(").nth(1))
+        .collect();
+    // At ratio 1: `a` keeps its 1x `src` (40×20). `b` has an 80px source
+    // size, so 40w is density 0.5 and 160w density 2: 40w is chosen and
+    // drawn at 80×40. `c` skips a non-matching and an unsupported source.
+    assert!(
+        rects.iter().any(|r| r.starts_with("0,0,40,20)")),
+        "{stdout}"
+    );
+    assert!(
+        rects.iter().any(|r| r.starts_with("0,20,80,40)")),
+        "{stdout}"
+    );
+    assert!(
+        rects.iter().any(|r| r.starts_with("0,60,40,20)")),
+        "{stdout}"
+    );
+    fs::remove_dir_all(base).unwrap();
+}

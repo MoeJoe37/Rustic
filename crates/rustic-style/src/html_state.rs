@@ -570,6 +570,13 @@ pub(crate) fn form_state<E: ElementView>(state: FormState, e: E, cache: &MatchCa
         FormState::ReadWrite => read_write(e),
         FormState::ReadOnly => !read_write(e),
         FormState::PlaceholderShown => placeholder_shown(&e),
+        FormState::Open => {
+            (is_html(&e, "details") || is_html(&e, "dialog")) && has_attr(&e, "open")
+        }
+        FormState::Modal => {
+            is_html(&e, "dialog") && e.top_layer() == Some(rustic_dom::TopLayer::Modal)
+        }
+        FormState::PopoverOpen => e.top_layer() == Some(rustic_dom::TopLayer::Popover),
     }
 }
 

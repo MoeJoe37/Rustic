@@ -251,6 +251,20 @@ pub(super) fn tag_name(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsRes
     })
 }
 
+/// `document.createTextNode(value)` for native callers.
+pub(super) fn create_text_node(
+    agent: &mut Agent,
+    document: Value,
+    value: Value,
+) -> JsResult<Value> {
+    create_text(agent, document, &[value])
+}
+
+/// `document.createDocumentFragment()` for native callers.
+pub(super) fn create_fragment_node(agent: &mut Agent, document: Value) -> JsResult<Value> {
+    create_fragment(agent, document, &[])
+}
+
 fn create_text(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
     document_receiver(agent, receiver)?;
     let value = required_arg(agent, args, 0)?;

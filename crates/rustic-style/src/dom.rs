@@ -135,6 +135,10 @@ impl ElementView for DomElement<'_> {
         Self::with_work(self.document, form, self.work)
     }
 
+    fn top_layer(&self) -> Option<rustic_dom::TopLayer> {
+        self.document.top_layer_state(self.id)
+    }
+
     fn parent_shadow_host(&self) -> Option<Self> {
         let parent = self.document.node(self.node.parent()?).ok()?;
         Self::with_work(self.document, parent.shadow_host()?, self.work)

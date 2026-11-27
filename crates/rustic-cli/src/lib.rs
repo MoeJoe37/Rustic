@@ -26,6 +26,7 @@ mod netproc;
 mod network;
 mod reftest;
 mod renderer;
+mod srcset;
 mod storage;
 mod stylesheets;
 #[cfg(feature = "window")]

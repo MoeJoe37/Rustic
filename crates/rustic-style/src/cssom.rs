@@ -241,6 +241,67 @@ fn declarations(source: &str, items: &[BlockItem]) -> Vec<CssomDeclaration> {
         .collect()
 }
 
+/// CSSOM "parse a CSS declaration block" for a `style` attribute: the
+/// valid declarations Rustic supports, in order, the last of each property
+/// winning (custom properties are kept as written).
+pub fn parse_declaration_block(source: &str) -> Vec<CssomDeclaration> {
+    let parser = CssParser::default();
+    let Ok(values) = parser.component_values(source) else {
+        return Vec::new();
+    };
+    let mut out: Vec<CssomDeclaration> = Vec::new();
+    for item in parse_block_contents(&values.value, 0).value {
+        let BlockItem::Declaration(declaration) = item else {
+            continue;
+        };
+        let custom = declaration.name.starts_with("--");
+        if !custom && rustic_css::parse_declaration(&declaration).is_err() {
+            continue;
+        }
+        let parsed = CssomDeclaration {
+            name: if custom {
+                declaration.name.clone()
+            } else {
+                declaration.name.to_ascii_lowercase()
+            },
+            value: values_text(source, &declaration.value),
+            important: declaration.important,
+        };
+        out.retain(|d| d.name != parsed.name);
+        out.push(parsed);
+    }
+    out
+}
+
+/// The value text `value` would have as property `name` (CSSOM
+/// `setProperty` step 5), or `None` when it does not parse as one value
+/// of that property.
+pub fn parse_property_value(name: &str, value: &str) -> Option<String> {
+    let declarations = parse_declaration_block(&format!("{name}: {value}"));
+    match declarations.as_slice() {
+        [one] if !one.important && one.name.eq_ignore_ascii_case(name) => Some(one.value.clone()),
+        _ => None,
+    }
+}
+
+/// CSSOM "serialize a CSS declaration block".
+pub fn serialize_declaration_block(declarations: &[CssomDeclaration]) -> String {
+    let mut out = String::new();
+    for d in declarations {
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(&d.name);
+        out.push_str(": ");
+        out.push_str(&d.value);
+        if d.important {
+            out.push_str(" !important");
+        }
+        out.push(';');
+    }
+    out
+}
+
 fn style_text(prefix: &str, declarations: &[CssomDeclaration], children: &[CssomRule]) -> String {
     let mut out = String::from(prefix);
     out.push_str(" {");

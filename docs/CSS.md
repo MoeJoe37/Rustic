@@ -538,6 +538,18 @@ each with `type`, `cssText`, `parentRule` and `parentStyleSheet`. The model
 is read-only and its text is the source text with whitespace collapsed
 ([TD-204](TECH_DEBT.md)).
 
+The UA sheet styles `details` and `summary`, `dialog` (`:modal` places it
+`fixed`) and `[popover]` (hidden until `:popover-open`); `:open`, `:modal`
+and `:popover-open` match from the `open` attribute and the document's top
+layer ([TD-216](TECH_DEBT.md)).
+
+`element.style` is writable: its declarations live in the element's `style`
+attribute, which `rustic_style::parse_declaration_block`,
+`parse_property_value` and `serialize_declaration_block` read, validate and
+write ([TD-214](TECH_DEBT.md)). `@font-face` rules are parsed into
+`StyleSheet::font_faces` and listed by `Cascade::font_faces` (TEXT.md, Web
+fonts).
+
 ### Cascade layers
 
 `@layer a, b.c;` declares layers; `@layer name { ... }` and anonymous

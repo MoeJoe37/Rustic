@@ -38,6 +38,20 @@ address { font-style: italic }
 listing, plaintext, pre, xmp { font-family: monospace; white-space: pre }
 dialog:not([open]) { display: none }
 
+details, summary { display: block }
+details:not([open]) > :not(summary) { display: none }
+dialog { position: absolute; inset-inline-start: 0; inset-inline-end: 0;
+  width: fit-content; height: fit-content; margin: auto; border: solid;
+  padding: 1em; background-color: white; color: black }
+dialog:modal { position: fixed; overflow: auto; inset-block: 0;
+  max-width: calc(100% - 6px - 2em); max-height: calc(100% - 6px - 2em) }
+[popover] { position: fixed; inset: 0; width: fit-content; height: fit-content;
+  margin: auto; border: solid; padding: 0.25em; overflow: auto;
+  color: black; background-color: white }
+[popover]:not(:popover-open):not(dialog[open]) { display: none }
+dialog:popover-open { display: block }
+:modal, :popover-open { z-index: 2147483647 }
+
 article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section { display: block }
 h1 { margin-block: 0.67em; font-size: 2em; font-weight: bold }
 h2 { margin-block: 0.83em; font-size: 1.5em; font-weight: bold }

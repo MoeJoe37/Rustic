@@ -651,6 +651,13 @@ impl Agent {
         self.heap.gc_stress || self.heap.bytes_used() >= self.heap.gc_threshold
     }
 
+    /// Collect at the next safe point, whatever the heap's growth: for a
+    /// host whose own resources (such as documents) run out before the
+    /// heap does. Native code cannot collect itself.
+    pub fn request_collection(&mut self) {
+        self.heap.gc_threshold = 0;
+    }
+
     /// Collect everything not reachable from the agent's intrinsics, the
     /// host root table and `roots`. Every handle the caller still uses
     /// must be reachable from one of them: a collected cell's index is

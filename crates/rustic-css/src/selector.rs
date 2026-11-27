@@ -367,6 +367,12 @@ pub enum FormState {
     ReadWrite,
     /// `:placeholder-shown`.
     PlaceholderShown,
+    /// `:open`: an open `details` or `dialog` (HTML §4.16.3).
+    Open,
+    /// `:modal`: a dialog opened with `showModal()`.
+    Modal,
+    /// `:popover-open`: a popover in the showing state.
+    PopoverOpen,
 }
 
 impl FormState {
@@ -382,6 +388,9 @@ impl FormState {
             Self::ReadOnly => "read-only",
             Self::ReadWrite => "read-write",
             Self::PlaceholderShown => "placeholder-shown",
+            Self::Open => "open",
+            Self::Modal => "modal",
+            Self::PopoverOpen => "popover-open",
         }
     }
 
@@ -397,6 +406,9 @@ impl FormState {
             "read-only" => Self::ReadOnly,
             "read-write" => Self::ReadWrite,
             "placeholder-shown" => Self::PlaceholderShown,
+            "open" => Self::Open,
+            "modal" => Self::Modal,
+            "popover-open" => Self::PopoverOpen,
             _ => return None,
         })
     }

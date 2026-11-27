@@ -64,6 +64,37 @@ the `FontFace` page test. Limits: TD-212 (vertical layout) and TD-213 (web
 fonts). Guides: [layout](LAYOUT.md#writing-modes-textwriting-m9),
 [text](TEXT.md#web-fonts).
 
+## M9 DOM — Ranges, traversal and inline style (`dom.ranges`)
+
+`NodeIterator`, `TreeWalker` and `NodeFilter`, and `AbstractRange`,
+`StaticRange` and live `Range` (boundary points, comparisons, `toString`,
+and delete/extract/clone/insert/surround) follow DOM §5–6. Documents keep
+live ranges and iterators and update them inside their mutation primitives,
+including no-op moves, `splitText`, `normalize` and adoption of detached
+subtrees. The `ParentNode`/`ChildNode` mixins, `isEqualNode` and
+`element.style` (declarations in the `style` attribute) came with them, as
+the WPT helpers need them; `createDocument(ns, null)` now treats the null
+name as empty, and documents ask for a collection once several are alive,
+so pages that build documents in loops stay under the document cap.
+Evidence: `rustic-dom/tests/live.rs`, the range, inline style and mixin page
+tests, and 36 pinned WPT files under `dom/traversal` and `dom/ranges` (3,626
+subtests pass; the other 1,431 are mostly the missing Selection API). Limits:
+TD-214, TD-215.
+
+## M9 HTML — Interactive elements and responsive images (`html.elements`, steps 1–4)
+
+`details`/`summary` (open, exclusive name groups, summary activation,
+`toggle`), `dialog` (`show`, `showModal`, `close`, `requestClose`,
+`returnValue`, `beforetoggle`/`toggle`/`cancel`/`close`) and the popover API
+(attribute states, show/hide/toggle, `popovertarget` invokers) are scriptable
+and styled through `:open`, `:modal` and `:popover-open` over a document top
+layer. `img` sources follow `srcset`, `sizes` and `picture`'s `source`
+elements, and the chosen density scales the natural size. Evidence: the
+details/dialog/popover page test, the UA style test in
+`rustic-style/tests/computed.rs`, `srcset` unit tests and the CLI layout
+test. Limits: TD-216, TD-217. Steps 5 (iframes and lazy loading) and 6
+(remaining form controls) are open.
+
 ## CSS-09 — Animations and modern CSS
 
 `rustic_style::AnimationController` holds a document's animations and

@@ -50,6 +50,16 @@ impl Default for ImageLimits {
     }
 }
 
+/// How one document's images are read: the chunk size and the view that
+/// selects among `srcset` candidates.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ImageRead {
+    /// Bytes per file read.
+    pub(crate) chunk_bytes: usize,
+    /// The view source selection uses.
+    pub(crate) view: crate::srcset::ViewInfo,
+}
+
 /// Decoded images and the natural sizes layout needs, by element.
 #[derive(Debug, Default)]
 pub struct LoadedImages {
@@ -136,13 +146,14 @@ pub fn load(
     limits: ImageLimits,
     chunk_bytes: usize,
     cancellation: &CancellationToken,
+    view: crate::srcset::ViewInfo,
 ) -> LoadedImages {
     load_applied(
         document,
         tree,
         path,
         limits,
-        chunk_bytes,
+        ImageRead { chunk_bytes, view },
         cancellation,
         None,
     )
@@ -155,10 +166,11 @@ pub(crate) fn load_applied(
     tree: &BoxTree,
     path: &Path,
     limits: ImageLimits,
-    chunk_bytes: usize,
+    read: ImageRead,
     cancellation: &CancellationToken,
     applied: Option<(&AppliedLocalFiles, Option<&dyn crate::network::Session>)>,
 ) -> LoadedImages {
+    let ImageRead { chunk_bytes, view } = read;
     // A network document always reads through its applied snapshot.
     let network = applied.and_then(|(_, network)| network);
     let applied = applied.map(|(applied, _)| applied);
@@ -188,8 +200,9 @@ pub(crate) fn load_applied(
                 base = Some(Url::parse(&href, document_url.as_ref()).ok());
             }
         } else if is_html(element, "img") && replaced.contains_key(&id) {
-            if let Some(src) = attribute(element, "src").filter(|s| !s.is_empty()) {
-                sources.push((id, src));
+            // `srcset`, `sizes` and `picture` sources choose the URL.
+            if let Some(chosen) = crate::srcset::img_source(document, id, view) {
+                sources.push((id, chosen.url, chosen.density));
             }
         }
     }
@@ -202,7 +215,7 @@ pub(crate) fn load_applied(
     });
     let mut decoded: HashMap<rustic_codecs::ImageId, Option<Arc<Image>>> = HashMap::new();
     let mut decoded_bytes = 0usize;
-    for (node, src) in sources {
+    for (node, src, density) in sources {
         if cancellation.check().is_err() {
             break;
         }
@@ -278,9 +291,11 @@ pub(crate) fn load_applied(
         let Some(image) = image.clone() else {
             continue;
         };
+        // The selected density scales the natural size.
+        let density = if density > 0.0 { density } else { 1.0 };
         let size = (
-            CssPx::new(f64::from(image.width())),
-            CssPx::new(f64::from(image.height())),
+            CssPx::new(f64::from(image.width()) / density),
+            CssPx::new(f64::from(image.height()) / density),
         );
         let (Ok(w), Ok(h)) = size else {
             continue;

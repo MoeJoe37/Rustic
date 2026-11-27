@@ -298,6 +298,16 @@ fn compare_document_position(
     Ok(Value::number(f64::from(position)))
 }
 
+/// `parent.replaceChild(node, child)` for native callers.
+pub(super) fn replace_child_value(
+    agent: &mut Agent,
+    parent: Value,
+    node: Value,
+    child: Value,
+) -> JsResult<Value> {
+    replace_child(agent, parent, &[node, child])
+}
+
 /// `replaceChild(node, child)`; [`rustic_dom::Document::replace_child`]
 /// validates, replaces and records the DOM's mutation entries.
 fn replace_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
@@ -327,12 +337,21 @@ fn replace_child(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult
                     DomError::InvalidReference,
                 ));
             }
-            // Adopt by inserting before `child`, then remove `child`: the
+            // Remove `child`, then adopt before its next sibling (as live
+            // ranges observe); a rejected adoption puts `child` back. The
             // DOM's single record becomes two here (TD-153).
-            super::insert_node(agent, document, wrappers, replacement, parent, Some(old))?;
+            let reference = document.node(old).ok().and_then(Node::next_sibling);
             document
                 .detach(old)
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+            if let Err(error) =
+                super::insert_node(agent, document, wrappers, replacement, parent, reference)
+            {
+                document
+                    .insert_before(parent, old, reference)
+                    .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+                return Err(error);
+            }
             return Ok(child);
         }
         document
@@ -399,13 +418,8 @@ fn normalize(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value>
                 continue;
             }
             document
-                .append_character_data(id, &units)
+                .merge_text(id, &run, &units)
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-            for sibling in run {
-                document
-                    .detach(sibling)
-                    .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-            }
         }
         Ok(Value::UNDEFINED)
     })

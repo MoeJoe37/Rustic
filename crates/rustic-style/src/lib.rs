@@ -70,7 +70,10 @@ pub use animation::{
 pub use cascade::{Cascade, SpecifiedStyle, StyleInputs, TreeContext, TreeScope};
 pub use computed::{ComputeContext, ComputedStyle};
 pub use containers::{ContainerInfo, ContainerSize};
-pub use cssom::{CssomDeclaration, CssomRule, CssomRuleKind, CssomSheet};
+pub use cssom::{
+    CssomDeclaration, CssomRule, CssomRuleKind, CssomSheet, parse_declaration_block,
+    parse_property_value, serialize_declaration_block,
+};
 pub use dom::{
     DomElement, ElementStyle, ScopedSelector, SelectorQueryError, SelectorWork, query_selector_all,
     shadow_tree_context, style_tree, style_tree_animated, style_tree_with_sizes,

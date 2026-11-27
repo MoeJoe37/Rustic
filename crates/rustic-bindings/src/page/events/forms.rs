@@ -1087,7 +1087,7 @@ pub(super) fn new_event(
     fields: &[Value],
 ) -> JsResult<Value> {
     let view = with_page(agent, |_, page| Ok(page.window))?;
-    let ui = interface != "SubmitEvent";
+    let ui = !matches!(interface, "SubmitEvent" | "ToggleEvent");
     let extra = PrivateArray::new(agent, &base_fields(view))?;
     let holder = PrivateArray::new(agent, fields)?;
     with_root(agent, holder.value(), |agent| {
@@ -1106,6 +1106,57 @@ pub(super) fn new_event(
             Ok(event)
         })
     })
+}
+
+/// A trusted `ToggleEvent` (`beforetoggle` or `toggle`) from `old` to `new`
+/// (`"open"` or `"closed"`).
+pub(in crate::page) fn toggle_event(
+    agent: &mut Agent,
+    kind: &str,
+    cancelable: bool,
+    old: &str,
+    new: &str,
+) -> JsResult<Value> {
+    let old = agent.string(old)?;
+    let new = agent.string(new)?;
+    new_event(
+        agent,
+        "ToggleEvent",
+        kind,
+        if cancelable { Event::CANCELABLE } else { 0 },
+        &[old, new],
+    )
+}
+
+/// Fire a trusted event at a node; whether it was not canceled.
+pub(in crate::page) fn fire_at(agent: &mut Agent, target: Value, event: Value) -> JsResult<bool> {
+    with_root(agent, event, |agent| {
+        let state = Event::receiver(agent, event)?;
+        fire(
+            agent,
+            Target {
+                value: target,
+                node: true,
+            },
+            event,
+            state,
+        )
+    })
+}
+
+/// Fire a trusted plain `Event` at a node; whether it was not canceled.
+pub(in crate::page) fn fire_plain(
+    agent: &mut Agent,
+    target: Value,
+    kind: &str,
+    cancelable: bool,
+) -> JsResult<bool> {
+    fire_simple(
+        agent,
+        target,
+        kind,
+        if cancelable { Event::CANCELABLE } else { 0 },
+    )
 }
 
 fn submit_event(agent: &mut Agent, submitter: Value) -> JsResult<Value> {
@@ -1180,6 +1231,7 @@ fn construct<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) -> JsR
         0 => ("FocusEvent", &["relatedTarget"]),
         1 => ("InputEvent", &["data", "inputType", "isComposing"]),
         3 => ("CompositionEvent", &["data"]),
+        4 => ("ToggleEvent", &["oldState", "newState"]),
         _ => ("SubmitEvent", &["submitter"]),
     };
     let event_type = required_arg(agent, args, 0)?;
@@ -1194,7 +1246,10 @@ fn construct<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) -> JsR
                 None => Value::UNDEFINED,
             };
             let value = match (member, value) {
-                ("inputType", Value::UNDEFINED) => agent.string("")?,
+                ("inputType" | "oldState" | "newState", Value::UNDEFINED) => agent.string("")?,
+                ("oldState" | "newState", value) => {
+                    Value::string(crate::webidl::coerce_string(agent, value)?)
+                }
                 ("inputType", value) => Value::string(crate::webidl::coerce_string(agent, value)?),
                 ("isComposing", value) => Value::boolean(agent.to_boolean(value)),
                 ("data", Value::UNDEFINED) if KIND == 3 => agent.string("")?,
@@ -1212,7 +1267,7 @@ fn construct<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) -> JsR
         let holder = PrivateArray::new(agent, &fields)?;
         with_root(agent, holder.value(), |agent| {
             let prototype = agent.host_prototype_from_new_target(interface, new_target)?;
-            let ui = KIND != 2;
+            let ui = KIND != 2 && KIND != 4;
             let view = Value::NULL;
             let extra = if ui {
                 PrivateArray::new(agent, &base_fields(view))?.value()
@@ -2125,6 +2180,7 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
         ("InputEvent", 1),
         ("SubmitEvent", 2),
         ("CompositionEvent", 3),
+        ("ToggleEvent", 4),
     ] {
         let (parent, constructor, attributes): (&str, NativeFn, &[(&str, &str, NativeFn)]) =
             match kind {
@@ -2146,6 +2202,14 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
                     "UIEvent",
                     construct::<3>,
                     &[("data", "get data", event_field::<0>)],
+                ),
+                4 => (
+                    "Event",
+                    construct::<4>,
+                    &[
+                        ("oldState", "get oldState", event_field::<0>),
+                        ("newState", "get newState", event_field::<1>),
+                    ],
                 ),
                 _ => (
                     "Event",

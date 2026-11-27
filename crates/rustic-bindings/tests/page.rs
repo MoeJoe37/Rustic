@@ -2814,3 +2814,224 @@ fn font_faces_settle_from_binary_data_and_the_document_set_tracks_them() {
         "loaded true; SyntaxError; NetworkError error; matched 1; ready true"
     );
 }
+
+#[test]
+fn range_content_operations_follow_the_dom_algorithms() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    expect_ok(
+        &mut agent,
+        r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        const html = document.appendChild(document.createElement('html'));
+        const p = html.appendChild(document.createElement('p'));
+        p.append('Hello ', document.createElement('b'), ' world');
+        p.childNodes[1].append('big');
+        const serialize = n => n.nodeType === 3 ? n.data
+            : '<' + n.localName + '>' + Array.from(n.childNodes, serialize).join('') + '</' + n.localName + '>';
+        const r = document.createRange();
+        r.setStart(p.firstChild, 3);
+        r.setEnd(p.childNodes[1].firstChild, 2);
+        assert(r.toString() === 'lo bi', 'stringifier: ' + r.toString());
+        assert(r.commonAncestorContainer === p, 'common ancestor');
+        const copy = r.cloneContents();
+        assert(Array.from(copy.childNodes, serialize).join('') === 'lo <b>bi</b>', 'clone');
+        assert(serialize(p) === '<p>Hello <b>big</b> world</p>', 'clone leaves the tree');
+        const extracted = r.extractContents();
+        assert(Array.from(extracted.childNodes, serialize).join('') === 'lo <b>bi</b>', 'extract');
+        assert(serialize(p) === '<p>Hel<b>g</b> world</p>', 'extract cuts: ' + serialize(p));
+        assert(r.collapsed && r.startContainer === p && r.startOffset === 1, 'extract collapses');
+        const i = document.createElement('i');
+        r.insertNode(i);
+        assert(serialize(p) === '<p>Hel<i></i><b>g</b> world</p>', 'insertNode');
+        assert(r.startOffset === 1 && r.endOffset === 2, 'collapsed range grows over the node');
+        r.setStart(p.lastChild, 1);
+        r.setEnd(p.lastChild, 6);
+        const u = document.createElement('u');
+        r.surroundContents(u);
+        assert(serialize(p) === '<p>Hel<i></i><b>g</b> <u>world</u></p>', 'surround: ' + serialize(p));
+        assert(r.startContainer === p && r.startOffset === 4 && r.endOffset === 5, 'selects newParent');
+        r.selectNodeContents(p);
+        r.setStart(p.firstChild, 1);
+        r.deleteContents();
+        assert(serialize(p) === '<p>H</p>', 'delete: ' + serialize(p));
+        assert(r.collapsed && r.startContainer === p && r.startOffset === 1, 'delete collapses after the start node');
+        r.selectNode(p);
+        assert(r.compareBoundaryPoints(Range.START_TO_END, r) === 1, 'compareBoundaryPoints');
+        assert(r.comparePoint(p, 0) === 0 && r.isPointInRange(html, 0), 'points');
+        assert(r.intersectsNode(p.firstChild) && !r.intersectsNode(document.createElement('x')), 'intersects');
+        // Live updates and the static variant.
+        const live = document.createRange();
+        live.setStart(p.firstChild, 1);
+        p.firstChild.data = 'Hi there';
+        assert(live.startOffset === 0, 'replace data clamps the offset');
+        const fixed = new StaticRange({startContainer: p, startOffset: 0, endContainer: p, endOffset: 1});
+        p.removeChild(p.firstChild);
+        assert(fixed.endOffset === 1 && !fixed.collapsed && fixed instanceof AbstractRange, 'static ranges are not live');
+        let threw = false;
+        try { r.surroundContents(document); } catch (e) { threw = e.name === 'InvalidNodeTypeError'; }
+        assert(threw, 'a document cannot surround');
+    "#,
+    );
+}
+
+#[test]
+fn inline_style_reads_and_writes_the_style_attribute() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    expect_ok(
+        &mut agent,
+        r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        const div = document.appendChild(document.createElement('div'));
+        div.setAttribute('style', 'color: red; bogus: 1; margin-top: 2px !important');
+        const style = div.style;
+        assert(style === div.style && style instanceof CSSStyleDeclaration, 'one declaration per element');
+        assert(style.length === 2 && style[0] === 'color' && style.item(1) === 'margin-top', 'indexed names');
+        assert(style.color === 'red' && style.getPropertyPriority('margin-top') === 'important', 'values');
+        style.display = 'none';
+        assert(div.getAttribute('style') === 'color: red; margin-top: 2px !important; display: none;', div.getAttribute('style'));
+        style.width = 'nonsense';
+        assert(style.width === '', 'invalid values are ignored');
+        style.setProperty('Background-Color', 'blue', 'important');
+        assert(style.backgroundColor === 'blue' && style.getPropertyPriority('background-color') === 'important', 'setProperty');
+        assert(style.removeProperty('color') === 'red' && style.color === '', 'removeProperty');
+        style.cssText = 'padding-left: 3px; nope: 4';
+        assert(style.cssText === 'padding-left: 3px;' && style.length === 1, 'cssText');
+        div.style = 'opacity: 0.5';
+        assert(div.getAttribute('style') === 'opacity: 0.5;', 'PutForwards=cssText');
+        style.setProperty('opacity', '');
+        assert(div.getAttribute('style') === '', 'an empty value removes');
+        let threw = false;
+        try { getComputedStyle(div).color = 'red'; } catch (e) { threw = e.name === 'NoModificationAllowedError'; }
+        assert(threw, 'computed declarations stay read-only');
+    "#,
+    );
+}
+
+#[test]
+fn parent_and_child_node_mixins_convert_strings_and_skip_their_arguments() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    expect_ok(
+        &mut agent,
+        r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        const list = document.appendChild(document.createElement('ul'));
+        const names = () => Array.from(list.childNodes, n => n.nodeType === 3 ? n.data : n.localName).join(',');
+        const [a, b] = [document.createElement('a'), document.createElement('b')];
+        list.append(a, 'text', b);
+        assert(names() === 'a,text,b', names());
+        list.prepend('first');
+        b.before(b, 'x');
+        a.after('y');
+        // `b` moves into the converted fragment before the insertion.
+        assert(names() === 'first,a,y,text,b,x', names());
+        a.replaceWith('z', a);
+        b.remove();
+        assert(names() === 'first,z,a,y,text,x', names());
+        list.replaceChildren(b);
+        assert(names() === 'b', names());
+        const other = document.createElement('ul');
+        other.append(document.createElement('b'));
+        assert(list.isEqualNode(other) && !list.isEqualNode(a) && !list.isEqualNode(null), 'isEqualNode');
+        other.firstChild.setAttribute('id', 'x');
+        assert(!list.isEqualNode(other), 'attributes count');
+        let threw = false;
+        try { a.append(a); } catch (e) { threw = e.name === 'HierarchyRequestError'; }
+        assert(threw, 'hierarchy checks still apply');
+    "#,
+    );
+}
+
+/// Run `source` and fail with the message of anything it throws.
+fn expect_ok(agent: &mut Agent, source: &str) {
+    let wrapped = format!(
+        "(() => {{ try {{ {source}; return 'ok'; }} catch (e) {{ return String(e); }} }})()"
+    );
+    let result = agent.evaluate(&wrapped).unwrap();
+    let text = agent.to_string(result).unwrap();
+    let text = String::from_utf16_lossy(&agent.heap.string(text).units().collect::<Vec<_>>());
+    assert_eq!(text, "ok");
+}
+
+#[test]
+fn details_dialog_and_popover_follow_their_state_machines() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    expect_ok(
+        &mut agent,
+        r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        globalThis.log = [];
+        const html = document.appendChild(document.createElement('html'));
+        const body = html.appendChild(document.createElement('body'));
+        // details: summary clicks toggle, name groups are exclusive.
+        const [one, two] = ['details', 'details'].map(n => body.appendChild(document.createElement(n)));
+        assert(one instanceof HTMLDetailsElement && !one.open, 'details interface');
+        one.name = two.name = 'group';
+        const summary = one.appendChild(document.createElement('summary'));
+        one.addEventListener('toggle', e => log.push('one ' + e.oldState + '>' + e.newState));
+        two.addEventListener('toggle', e => log.push('two ' + e.newState));
+        two.open = true;
+        summary.click();
+        assert(one.open && !two.open && one.hasAttribute('open'), 'summary opens one and closes two');
+        // dialog: show/showModal/close with returnValue and events.
+        const dialog = body.appendChild(document.createElement('dialog'));
+        assert(dialog instanceof HTMLDialogElement && !dialog.open && dialog.returnValue === '', 'dialog');
+        dialog.addEventListener('close', () => log.push('close ' + dialog.returnValue));
+        dialog.addEventListener('cancel', e => { log.push('cancel'); e.preventDefault(); });
+        dialog.showModal();
+        assert(dialog.open, 'showModal opens');
+        let threw = '';
+        try { dialog.show(); } catch (e) { threw = e.name; }
+        assert(threw === 'InvalidStateError', 'show() on a modal dialog throws');
+        dialog.requestClose('nope');
+        assert(dialog.open, 'a canceled requestClose keeps it open');
+        dialog.close('done');
+        assert(!dialog.open && dialog.returnValue === 'done', 'close sets returnValue');
+        const loose = document.createElement('dialog');
+        threw = '';
+        try { loose.showModal(); } catch (e) { threw = e.name; }
+        assert(threw === 'InvalidStateError', 'a disconnected dialog cannot be modal');
+        // popover: attribute reflection, invokers, auto popovers hide each other.
+        const [p1, p2] = ['div', 'div'].map(n => body.appendChild(document.createElement(n)));
+        p1.popover = 'auto'; p2.popover = 'bogus';
+        assert(p1.popover === 'auto' && p2.popover === 'manual' && document.body !== null, 'popover states');
+        p1.id = 'p1';
+        p1.addEventListener('beforetoggle', e => log.push('before ' + e.newState));
+        const button = body.appendChild(document.createElement('button'));
+        button.setAttribute('popovertarget', 'p1');
+        button.click();
+        assert(p1.matches(':popover-open'), 'the invoker shows its popover');
+        assert(p2.togglePopover() === true && p1.matches(':popover-open'), 'manual popovers do not hide auto ones');
+        p1.hidePopover();
+        assert(!p1.matches(':popover-open') && p2.togglePopover({force: false}) === false, 'hide');
+        threw = '';
+        try { button.showPopover(); } catch (e) { threw = e.name; }
+        assert(threw === 'NotSupportedError', 'only popovers show');
+        assert(new ToggleEvent('toggle', {newState: 'open'}).newState === 'open', 'ToggleEvent');
+        Promise.resolve().then(() => { globalThis.done = log.join(', '); });
+    "#,
+    );
+    agent.run_jobs().unwrap();
+    let done = agent.evaluate("done").unwrap();
+    let done = agent.to_string(done).unwrap();
+    let done = String::from_utf16_lossy(&agent.heap.string(done).units().collect::<Vec<_>>());
+    assert_eq!(
+        done,
+        "cancel, before open, before closed, two open, two closed, one closed>open, close done"
+    );
+}

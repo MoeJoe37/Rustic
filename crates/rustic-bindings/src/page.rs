@@ -28,17 +28,23 @@ mod creation;
 mod cssom;
 mod documents;
 mod dom_rect;
+mod elements;
 mod encoding;
 mod events;
 mod fetch;
 mod fonts;
 mod html_collections;
+mod inline_style;
+mod mixins;
 mod mutation_observer;
 mod node_tree;
 mod popups;
+mod range_content;
+mod ranges;
 mod resize_observer;
 mod scrolling;
 mod selectors;
+mod traversal;
 mod url;
 mod view_transitions;
 mod wasm;
@@ -313,6 +319,17 @@ struct Page {
     view_transitions: view_transitions::ViewTransitions,
     /// `FontFace` and `document.fonts` state.
     fonts: fonts::Fonts,
+    /// `NodeIterator`/`TreeWalker` object → slots.
+    traversers: ObjectId,
+    /// `Range`/`StaticRange` object → slots.
+    ranges: ObjectId,
+    /// Inline style declaration → its element, and element → declaration.
+    inline_styles: ObjectId,
+    element_styles: ObjectId,
+    /// Script objects owning live ranges and iterators in documents.
+    tracked: ranges::Tracked,
+    /// Dialog, details and popover state.
+    elements: elements::Elements,
 }
 
 impl ExecutionHost for Page {
@@ -328,6 +345,16 @@ impl ExecutionHost for Page {
         trees.push(&mut *document);
         for cell in additional.values_mut() {
             trees.push(cell.tree.get_mut());
+        }
+        // Live ranges and node iterators keep their nodes' trees alive while
+        // their script objects live; dead objects' entries go first.
+        self.tracked.prune(agent, &mut trees);
+        let mut native_nodes = native_nodes;
+        for tree in &trees {
+            native_nodes
+                .try_reserve(tree.live_nodes().count())
+                .map_err(|_| OutOfMemory)?;
+            native_nodes.extend(tree.live_nodes());
         }
         wrappers
             .collect_documents_with_nodes(agent, &mut trees, Roots::default(), &native_nodes)
@@ -676,6 +703,31 @@ fn install_page(
     let view_transitions = view_transitions::ViewTransitions::new(agent)?;
     fonts::install(agent)?;
     let fonts = fonts::Fonts::new(agent)?;
+    traversal::install(agent)?;
+    ranges::install(agent)?;
+    mixins::install(agent)?;
+    elements::install(agent)?;
+    let elements = elements::Elements::new(agent)?;
+    let traversers = agent.new_weak_map()?;
+    agent.root(Value::object(traversers))?;
+    let ranges = agent.new_weak_map()?;
+    agent.root(Value::object(ranges))?;
+    let inline_styles = agent.new_weak_map()?;
+    agent.root(Value::object(inline_styles))?;
+    let element_styles = agent.new_weak_map()?;
+    agent.root(Value::object(element_styles))?;
+    {
+        let element = prototype(agent, "Element")?;
+        let get = Value::object(agent.new_native_function(inline_style::style, "get style", 0)?);
+        let set =
+            Value::object(agent.new_native_function(inline_style::set_style, "set style", 1)?);
+        let key = agent.heap.key("style")?;
+        agent.define_property_or_throw(
+            element,
+            key,
+            PropertyDescriptor::accessor(get, set, true, true),
+        )?;
+    }
     let mut animations = animations::Animations::new(agent, tree.animations())?;
     let document_timeline = animations::create_document_timeline(agent)?;
     animations.set_document_timeline(document_timeline);
@@ -713,6 +765,12 @@ fn install_page(
         cssom,
         view_transitions,
         fonts,
+        traversers,
+        ranges,
+        inline_styles,
+        element_styles,
+        tracked: ranges::Tracked::default(),
+        elements,
     }))?;
     animations::register_document_timeline(agent, document_timeline)
 }
@@ -1054,13 +1112,15 @@ fn wrap(
             if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
                 && matches!(
                     element.name().local(),
-                    "input" | "textarea" | "button" | "form"
+                    "input" | "textarea" | "button" | "form" | "details" | "dialog"
                 ) =>
         {
             match element.name().local() {
                 "input" => "HTMLInputElement",
                 "textarea" => "HTMLTextAreaElement",
                 "button" => "HTMLButtonElement",
+                "details" => "HTMLDetailsElement",
+                "dialog" => "HTMLDialogElement",
                 _ => "HTMLFormElement",
             }
         }

@@ -46,5 +46,5 @@ pub use replaced::NaturalSize;
 pub use scroll::{ScrollPositions, ScrollRange};
 pub use sizing::{BlockMeasure, Edges, MeasureError, measure_block_width};
 pub use sticky::StickyConstraint;
-pub use text::{InlineFragment, LineFragment, PositionedGlyph, TextFragment};
+pub use text::{GlyphRotation, InlineFragment, LineFragment, PositionedGlyph, TextFragment};
 pub use tree::{BoxKind, BoxSnapshot, BoxTree, LayoutError, LayoutLimits};

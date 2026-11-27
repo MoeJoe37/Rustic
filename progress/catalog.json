@@ -2215,8 +2215,24 @@
             },
             {
               "label": "Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/writing.rs",
+                  "marker": "fn transpose"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/writing.rs",
+                  "marker": "fn graft"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/writing.rs",
+                  "marker": "fn an_orthogonal_box_is_sized_in_its_own_inline_axis"
+                }
+              ]
             },
             {
               "label": "Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting",

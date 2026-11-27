@@ -379,4 +379,15 @@ impl AbsoluteHeight {
         })?;
         Ok(solved)
     }
+
+    /// Solve again with a used height of at least `floor` (a table never
+    /// shorter than its content, CSS 2.2 §17.5.3), so offsets from the end
+    /// side account for the extra height.
+    pub(crate) fn solve_at_least(&self, content: f64, floor: f64) -> Result<Solved, MeasureError> {
+        let solved = self.solve(content)?;
+        if solved.size >= floor {
+            return Ok(solved);
+        }
+        Ok(self.axis.solve(Some(floor), |_| content).1)
+    }
 }

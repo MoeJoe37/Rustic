@@ -239,7 +239,12 @@ boxes draw their start and end edges once), then one `ItemRole::Text` item per
 text fragment. That item's `Shape::Path` indexes `DisplayList::paths`: the
 fragment's glyph outlines from the face's `glyf` table, scaled by
 `font-size / unitsPerEm` and placed at each glyph's pen position on the
-fragment's baseline, filled in the text's `color`. Inline content is clipped
+fragment's baseline, filled in the text's `color`. On a vertical line
+(`TextFragment::rotation`, CSS Writing Modes 4 §5.1) each outline turns a
+quarter turn about its glyph's origin: clockwise in `vertical-rl`,
+`vertical-lr` and `sideways-rl`, counterclockwise in `sideways-lr`, and the
+fragment's decorations become vertical bands on the line's under side.
+Inline content is clipped
 by its block's own overflow as well as its ancestors'. Outlines are read once
 per face and glyph; `PaintLimits::max_path_points` bounds the total points, and
 a layout with text but no fonts is `PaintError::Font`. The rasterizer

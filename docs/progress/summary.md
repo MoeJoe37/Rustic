@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 52.28%** = 50.83% verified complete + 1.45% partial credit. 119/228 capabilities complete, 12 in progress.
+**Overall completion: 52.40%** = 50.83% verified complete + 1.57% partial credit. 119/228 capabilities complete, 12 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `fba0c9a82fe10d9a5a9cee141b2a1a79145d0517f744bbdc649377bff564c876`.
+Catalog: `engine-v4`. Source fingerprint: `b9a8b378583e50300f87c8095cb9b8b4d18bfd617fb8a39e0098784d1e4930fc`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `fba0c9a82fe10d9a5a9cee141b2a1a79145d0
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 6/54 | 13.05% | 10.63% | 22.35% |
+| M9 Compatibility expansion | 6/54 | 13.58% | 10.63% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -34,7 +34,7 @@ Catalog: `engine-v4`. Source fingerprint: `fba0c9a82fe10d9a5a9cee141b2a1a79145d0
 | DOM | 8/10 | 1 | 80.14% | 76.47% | 4% | 3.20 |
 | HTML | 10/11 | 0 | 78.37% | 78.37% | 5% | 3.91 |
 | CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
-| Text & fonts | 4/7 | 1 | 60.00% | 56.00% | 3% | 1.80 |
+| Text & fonts | 4/7 | 1 | 64.00% | 56.00% | 3% | 1.92 |
 | Layout | 8/11 | 0 | 70.58% | 70.58% | 6% | 4.23 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
@@ -135,9 +135,9 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `text.shaping` — Shaping, fallback and glyph clusters · size 5 · M3 · 0.60% of engine ([source](../../crates/rustic-text/src/shape.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-text/tests/shape.rs), [test](../../crates/rustic-text/tests/shape.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/shaping_reference.rs))
 - **complete** `text.bidi` — Bidi and mixed-direction text · size 3 · M3 · 0.36% of engine ([source](../../crates/rustic-text/src/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [source](../../crates/rustic-layout/src/lines.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-text/src/bidi.rs), [source](../../crates/rustic-layout/src/inline.rs), [test](../../crates/rustic-text/tests/scopes.rs), [test](../../crates/rustic-layout/tests/text_policies.rs))
 - **complete** `text.breaking` — Line breaking and grapheme navigation · size 3 · M3 · 0.36% of engine ([source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs), [source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs), [source](../../crates/rustic-layout/src/tailoring.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-text/src/hyphen.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs))
-- **in progress 20.00%** `text.writing` — Writing modes, vertical text and font loading · size 5 · M9 · 0.60% of engine
+- **in progress 40.00%** `text.writing` — Writing modes, vertical text and font loading · size 5 · M9 · 0.60% of engine
   - [x] writing-mode, text-orientation and text-combine-upright values and the flow-relative (logical) properties ([source](../../crates/rustic-css/src/logical.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/computed.rs))
-  - [ ] Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows
+  - [x] Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows ([source](../../crates/rustic-layout/src/flow/writing.rs), [source](../../crates/rustic-layout/src/flow/writing.rs), [test](../../crates/rustic-layout/tests/writing.rs))
   - [ ] Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting
   - [ ] Vertical flex, grid and table layout, and text-combine-upright
   - [ ] Web fonts: @font-face rules, font loading and the FontFace API

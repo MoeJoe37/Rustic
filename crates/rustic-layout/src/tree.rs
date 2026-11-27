@@ -160,6 +160,34 @@ impl BoxSnapshot {
     pub(crate) const fn table_span(&self) -> (u32, u32) {
         self.span
     }
+    /// A copy under `parent` with `style` and `kind` (writing-mode
+    /// layout's transposed boxes). `plain` drops what makes a box special
+    /// (replaced content, HTML element roles, text, spans).
+    pub(crate) fn derived(
+        &self,
+        parent: Option<usize>,
+        style: Option<Arc<ComputedStyle>>,
+        kind: BoxKind,
+        plain: bool,
+    ) -> Self {
+        let mut copy = self.clone();
+        copy.parent = parent;
+        copy.style = style;
+        copy.kind = kind;
+        if plain {
+            copy.text = Vec::new();
+            copy.special_layout = false;
+            copy.html_tag = HtmlTag::Other;
+            copy.natural = None;
+            copy.span = (1, 1);
+        }
+        copy
+    }
+
+    /// The shared style, for copies that keep it.
+    pub(crate) fn shared_style(&self) -> Option<&Arc<ComputedStyle>> {
+        self.style.as_ref()
+    }
 }
 
 /// HTML "rules for parsing non-negative integers", saturating.
@@ -495,6 +523,11 @@ impl BoxTree {
             }
         }
         Ok(())
+    }
+
+    /// A tree of already ordered boxes (writing-mode layout's copies).
+    pub(crate) fn from_boxes(boxes: Vec<BoxSnapshot>) -> Self {
+        Self { boxes }
     }
 
     /// Principal/text boxes in preorder. Indexes are valid only in this snapshot.

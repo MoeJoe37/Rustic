@@ -15,9 +15,10 @@ use crate::{CssPoint, CssPx, CssRect, CssSize};
 /// in, and its height from the inline boxes on it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LineFragment {
-    block: usize,
+    pub(crate) block: usize,
     pub(crate) rect: CssRect,
     pub(crate) baseline: CssPx,
+    pub(crate) rotation: GlyphRotation,
 }
 
 impl LineFragment {
@@ -29,9 +30,15 @@ impl LineFragment {
     pub const fn rect(self) -> CssRect {
         self.rect
     }
-    /// The root inline box's baseline (absolute y).
+    /// The root inline box's baseline: absolute y, or absolute x on a
+    /// vertical line.
     pub const fn baseline(self) -> CssPx {
         self.baseline
+    }
+    /// How text on this line is turned ([`GlyphRotation::None`] on a
+    /// horizontal line).
+    pub const fn rotation(self) -> GlyphRotation {
+        self.rotation
     }
 }
 
@@ -49,17 +56,33 @@ pub struct PositionedGlyph {
 /// A run of glyphs from one text box, face and bidi level on one line.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TextFragment {
-    line: usize,
-    node: NodeId,
-    source_box: usize,
-    text: Range<usize>,
+    pub(crate) line: usize,
+    pub(crate) node: NodeId,
+    pub(crate) source_box: usize,
+    pub(crate) text: Range<usize>,
     pub(crate) rect: CssRect,
     pub(crate) baseline: CssPx,
-    level: u8,
-    face: usize,
-    font_size: f64,
+    pub(crate) level: u8,
+    pub(crate) face: usize,
+    pub(crate) font_size: f64,
     pub(crate) glyphs: Vec<PositionedGlyph>,
-    parent: Option<usize>,
+    pub(crate) parent: Option<usize>,
+    pub(crate) rotation: GlyphRotation,
+}
+
+/// How a text fragment's glyphs are turned (CSS Writing Modes 4 §5.1):
+/// horizontal text, or sideways in a vertical writing mode.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum GlyphRotation {
+    /// Upright on a horizontal line.
+    #[default]
+    None,
+    /// Turned 90° clockwise: the line runs top to bottom with glyph tops
+    /// to the right (`vertical-rl`, `vertical-lr`, `sideways-rl`).
+    Clockwise,
+    /// Turned 90° counterclockwise: the line runs bottom to top with glyph
+    /// tops to the left (`sideways-lr`).
+    Counterclockwise,
 }
 
 impl TextFragment {
@@ -99,9 +122,13 @@ impl TextFragment {
     pub const fn font_size(&self) -> f64 {
         self.font_size
     }
-    /// Glyphs left to right.
+    /// Glyphs in line order (left to right on a horizontal line).
     pub fn glyphs(&self) -> &[PositionedGlyph] {
         &self.glyphs
+    }
+    /// How the glyphs are turned about their origins.
+    pub const fn rotation(&self) -> GlyphRotation {
+        self.rotation
     }
     /// The enclosing inline box fragment on the same line (an index into
     /// [`crate::BlockLayout::inlines`]); `None` when the text sits directly
@@ -114,15 +141,15 @@ impl TextFragment {
 /// One `display:inline` box's fragment on one line.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct InlineFragment {
-    line: usize,
-    node: NodeId,
-    source_box: usize,
+    pub(crate) line: usize,
+    pub(crate) node: NodeId,
+    pub(crate) source_box: usize,
     pub(crate) border: CssRect,
     pub(crate) padding: CssRect,
     pub(crate) content: CssRect,
-    starts: bool,
-    ends: bool,
-    parent: Option<usize>,
+    pub(crate) starts: bool,
+    pub(crate) ends: bool,
+    pub(crate) parent: Option<usize>,
 }
 
 impl InlineFragment {
@@ -205,6 +232,7 @@ pub(crate) fn convert(
             block,
             rect: rect(l.x + ox, l.y + oy, l.width, l.height)?,
             baseline: CssPx::new(l.baseline + oy)?,
+            rotation: GlyphRotation::None,
         });
     }
     for f in set.inlines {
@@ -253,6 +281,7 @@ pub(crate) fn convert(
             font_size: t.size,
             glyphs,
             parent: item.parent.and_then(|p| index.get(&(t.line, p)).copied()),
+            rotation: GlyphRotation::None,
         });
     }
     Ok(index)

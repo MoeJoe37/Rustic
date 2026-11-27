@@ -17,7 +17,7 @@ use rustic_css::{BlendMode, FilterFunction, Isolation};
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{
     AxisRange, BlockFragment, BlockLayout, BoxTree, Clip, CssPoint, CssPx, CssRect, CssSize,
-    InlineFragment, PositionScheme, TextFragment,
+    GlyphRotation, InlineFragment, PositionScheme, TextFragment,
 };
 use rustic_style::ComputedStyle;
 use std::collections::HashMap;
@@ -1290,13 +1290,11 @@ impl Builder<'_> {
         let x_height = metrics
             .x_height
             .map_or(size / 2.0, |x| f64::from(x) * size / em);
+        // Offsets below the baseline, in the line's own orientation.
         let (top, step) = match line.kind {
-            Line::Under => (baseline + size / 10.0, 2.0 * thickness),
-            Line::Over => (
-                baseline - f64::from(metrics.ascent) * size / em,
-                -2.0 * thickness,
-            ),
-            Line::Through => (baseline - x_height / 2.0 - thickness / 2.0, 2.0 * thickness),
+            Line::Under => (size / 10.0, 2.0 * thickness),
+            Line::Over => (-f64::from(metrics.ascent) * size / em, -2.0 * thickness),
+            Line::Through => (-x_height / 2.0 - thickness / 2.0, 2.0 * thickness),
         };
         let rect = text.rect();
         let tops: &[f64] = if line.double {
@@ -1304,11 +1302,19 @@ impl Builder<'_> {
         } else {
             &[top]
         };
-        for &y in tops {
+        for &offset in tops {
+            let (x, y) = (rect.origin().x.get(), rect.origin().y.get());
+            let (w, h) = (rect.size().width().get(), rect.size().height().get());
+            // A sideways line's "below" is its left (clockwise) or right
+            // (counterclockwise) side.
+            let (x, y, w, h) = match text.rotation() {
+                GlyphRotation::None => (x, baseline + offset, w, thickness),
+                GlyphRotation::Clockwise => (baseline - offset - thickness, y, thickness, h),
+                GlyphRotation::Counterclockwise => (baseline + offset, y, thickness, h),
+            };
             let area = CssRect::new(
-                point(rect.origin().x.get(), y)?,
-                CssSize::new(rect.size().width().get(), thickness)
-                    .map_err(|_| PaintError::InvalidInput)?,
+                point(x, y)?,
+                CssSize::new(w, h).map_err(|_| PaintError::InvalidInput)?,
             )
             .map_err(|_| PaintError::InvalidInput)?;
             self.push(DisplayItem {
@@ -1342,6 +1348,12 @@ impl Builder<'_> {
             .and_then(|fonts| fonts.faces().get(text.face()))
             .ok_or(PaintError::Font)?;
         let scale = text.font_size() / f64::from(face.units_per_em());
+        // Sideways glyphs on vertical lines turn about their origins.
+        let place: fn(f64, f64, f64, f64) -> (f64, f64) = match text.rotation() {
+            GlyphRotation::None => |x, y, u, v| (x + u, y - v),
+            GlyphRotation::Clockwise => |x, y, u, v| (x + v, y + u),
+            GlyphRotation::Counterclockwise => |x, y, u, v| (x - v, y - u),
+        };
         let mut path = Path::default();
         for glyph in text.glyphs() {
             self.cancellation
@@ -1363,10 +1375,13 @@ impl Builder<'_> {
                 path.contours.push(
                     contour
                         .iter()
-                        .map(|p| PathPoint {
-                            x: glyph.x + p.x * scale,
-                            y: glyph.y - p.y * scale,
-                            on_curve: p.on_curve,
+                        .map(|p| {
+                            let (x, y) = place(glyph.x, glyph.y, p.x * scale, p.y * scale);
+                            PathPoint {
+                                x,
+                                y,
+                                on_curve: p.on_curve,
+                            }
                         })
                         .collect(),
                 );

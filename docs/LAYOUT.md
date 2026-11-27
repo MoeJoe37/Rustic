@@ -199,10 +199,10 @@ M3 completion (2026-11-10) every declared layout unit is implemented: block
 flow and margin collapse, anonymous flow normalization, floats, clearance,
 relative/absolute/fixed/sticky positioning, overflow clipping, intrinsic and
 replaced sizing (REN-02c), inline formatting with OpenType shaping and atomic
-inlines (REN-03), and flexbox with text items and `inline-flex` (REN-08; 40 of
-91 static css-flexbox WPT pages pass, TD-72). M9 added grid and
-well-formed tables (TD-209, TD-211); multicolumn, vertical writing modes
-and fragmentation are still M9 work. Open layout debt is in
+inlines (REN-03), and flexbox with text items and `inline-flex` (REN-08; 49 of
+91 static css-flexbox WPT pages pass, TD-72). M9 added grid,
+well-formed tables and vertical writing modes (TD-209, TD-211, TD-212);
+multicolumn, upright vertical text and fragmentation are still M9 work. Open layout debt is in
 [TECH_DEBT.md](TECH_DEBT.md) (TD-48/49/70–73).
 
 ## Anonymous flow normalization (REN-01c)
@@ -817,9 +817,9 @@ centred tables, fixed layout, captions, header and footer groups,
 specified heights with baseline and bottom alignment, RTL, anonymous
 tables, rows and cells, and inline tables; `flow/table.rs` unit-tests the column algorithms. `tests/wpt_tables.rs` compares the 35 static
 `checkLayout` pages of the pinned css-tables directory
-(`tools/import_wpt_tables_tests.py`, sharing the css-grid importer): 18
-pass and the other 17 are reviewed failures (list items, tentative
-width-merging rules, collapsing borders, vertical writing modes, Ahem text,
+(`tools/import_wpt_tables_tests.py`, sharing the css-grid importer): 20
+pass and the other 15 are reviewed failures (list items, tentative
+width-merging rules, collapsing borders, Ahem text,
 `height: stretch`; TD-211). Its `offsetParent` also stops at `td`, `th`
 and `table` for static elements, as CSSOM View specifies.
 
@@ -827,6 +827,72 @@ Specification basis, reviewed 2026-11-27: CSS 2.2
 [§17](https://www.w3.org/TR/CSS22/tables.html), CSS Tables 3
 [Editor's Draft](https://drafts.csswg.org/css-tables-3/) and the HTML
 [table processing model](https://html.spec.whatwg.org/multipage/tables.html#forming-a-table).
+
+## Writing modes (`text.writing`, M9)
+
+Vertical writing modes reuse the `horizontal-tb` engine by transposition
+(`flow/writing.rs`). A *run* is a subtree laid out in one space: the root's,
+which takes the principal writing mode (the `body` child's when there is
+one, CSS Writing Modes 4 §8), and each box whose writing mode is orthogonal
+to its parent's. A run in a vertical mode is laid out on a copy of its
+boxes whose styles are transposed into its logical space: its block-start
+side becomes `top` and its line-left side `left` for margins, paddings,
+insets, borders and corner radii, `width`/`height` (with their minimums and
+maximums), `overflow-x`/`-y` and `border-spacing` swap, and the result is
+mapped back to physical coordinates. Block flow, floats, positioning,
+flex, grid and tables therefore all lay out in every vertical mode, and
+percentages resolve against the right axis. `float: left`/`right`,
+`text-align` and `caption-side` are line-relative, so they keep their
+values.
+
+An orthogonal box starts a nested run, laid out first: inside it the box is
+placed at the origin, sized `fit-content` in its inline axis against the
+initial containing block's extent in that axis (or its parent's definite
+size along it, §7.3), and stays a containing block if positioned. Its
+parent run sees it as an empty box of that border-box size, keeping its
+margins, positioning and floating; the nested run's fragments are then
+grafted in right after that box, in preorder. Once the parent run has
+placed the box, the nested run is laid out again in the space its
+containing block gives (the padding box of an absolutely positioned box's
+containing block, or the content box's extent in the box's block axis), so
+percentages resolve, and the parent run is laid out again if the box
+changed size. Runs are processed deepest first from an explicit list.
+
+Lines in a vertical run are columns: they stack in the block direction and
+text runs down (`sideways-lr`: up) with its glyphs turned sideways
+(`GlyphRotation`). The line's over side is the right one in `vertical-rl`,
+`vertical-lr` and `sideways-rl` and the left one in `sideways-lr`; in
+`vertical-lr`, where that is not the block-start side, each line's
+contents are mirrored within the line so glyph tops face right. Line and
+text baselines on vertical lines are x coordinates.
+
+Absolutely positioned tables are re-solved at their content height, so
+`bottom` (and, in vertical runs, `right`) offsets account for a table
+taller than its specified height.
+
+Limits (TD-212): text is always set sideways (no upright typesetting,
+`text-orientation`, vertical font metrics or `text-combine-upright`); a
+child with the same axis but the opposite block direction (`vertical-lr`
+in `vertical-rl`) flows in its parent's direction; an absolutely positioned
+box inside an orthogonal box whose containing block is outside it is
+placed against the nested run's root; baselines across writing modes are
+not synthesized; and a flex or grid container that stretches an orthogonal
+item does not lay its contents out again.
+
+### Evidence
+
+`crates/rustic-layout/tests/writing.rs` checks exact geometry for
+`vertical-rl` and `vertical-lr` roots, orthogonal boxes in both directions,
+percentages and positioning against an orthogonal box's containing block,
+and text direction, rotation and baselines in `vertical-rl`, `vertical-lr`
+and `sideways-lr`. `crates/rustic-raster/tests/paint.rs` rasterizes
+sideways glyphs and their underline. The pinned WPT comparisons gained
+pages that need vertical writing modes: css-flexbox 49 of 91 (was 40),
+css-grid 97 of 168 (was 79) and css-tables 20 of 35 (was 18).
+
+Specification basis, reviewed 2026-11-27: CSS Writing Modes 4
+[§6–8](https://drafts.csswg.org/css-writing-modes-4/#abstract-box) and CSS
+Logical Properties 1.
 
 ## Inline formatting and text fragments (REN-03b)
 

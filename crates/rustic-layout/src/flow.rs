@@ -22,6 +22,7 @@ use std::{collections::HashMap, error::Error, fmt};
 mod flex;
 mod grid;
 mod table;
+mod writing;
 
 use crate::anchor;
 use crate::exclusions::{Exclusions, Side};
@@ -2486,15 +2487,15 @@ impl<'a, 'c> Engine<'a, 'c> {
         });
         let frame = self.root_frame(i)?;
         let natural = self.walk(frame)?;
-        let solved = vertical.solve(natural)?;
+        // A table's height is at least its content (CSS 2.2 §17.5.3).
+        let solved = match self.nodes[i].table {
+            Some(table::TablePart::Table) => vertical.solve_at_least(natural, natural)?,
+            _ => vertical.solve(natural)?,
+        };
         let n = &mut self.nodes[i];
         n.measure.margin.top = CssPx::new(solved.margin_start)?;
         n.measure.margin.bottom = CssPx::new(solved.margin_end)?;
-        // A table's height is at least its content (CSS 2.2 §17.5.3).
-        let size = match n.table {
-            Some(table::TablePart::Table) => solved.size.max(natural),
-            _ => solved.size,
-        };
+        let size = solved.size;
         n.content_height = CssPx::new(size.max(0.0))?;
         n.border_height = n.content_height.checked_add(extras)?;
         n.pos = (
@@ -2582,6 +2583,21 @@ impl BlockLayout {
     }
 
     fn layout(
+        tree: &BoxTree,
+        viewport: CssSize,
+        limits: LayoutLimits,
+        fonts: Option<&FontDatabase>,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, FlowError> {
+        if writing::needed(tree) {
+            return writing::layout(tree, viewport, limits, fonts, cancellation);
+        }
+        Self::layout_flow(tree, viewport, limits, fonts, cancellation)
+    }
+
+    /// One `horizontal-tb` layout of `tree` (writing modes transpose into
+    /// this, [`writing`]).
+    fn layout_flow(
         tree: &BoxTree,
         viewport: CssSize,
         limits: LayoutLimits,

@@ -1,7 +1,5 @@
 # Reviewed css-tables failures: <path><TAB><reason>. A listed page that passes,
 # or an unlisted page that fails, fails the test (TD-211).
-css/css-tables/absolute-tables-003.html	a vertical-lr table needs vertical writing modes
-css/css-tables/absolute-tables-005.html	vertical-lr containing blocks and tables need vertical writing modes
 css/css-tables/absolute-tables-height-001.html	height: stretch is not implemented
 css/css-tables/column-track-merging.html	list items (ul/li) are not laid out
 css/css-tables/percent-height-overflow-auto-in-restricted-block-size-cell.html	percentage heights inside cells do not resolve against the row height

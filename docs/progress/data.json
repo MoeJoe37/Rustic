@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "fba0c9a82fe10d9a5a9cee141b2a1a79145d0517f744bbdc649377bff564c876",
-  "percent": "52.28",
+  "source_fingerprint": "b9a8b378583e50300f87c8095cb9b8b4d18bfd617fb8a39e0098784d1e4930fc",
+  "percent": "52.40",
   "verified_percent": "50.83",
-  "partial_percent": "1.45",
+  "partial_percent": "1.57",
   "completed": 119,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 6,
       "total": 54,
-      "percent": "13.05",
+      "percent": "13.58",
       "verified_percent": "10.63",
-      "partial_percent": "2.42"
+      "partial_percent": "2.95"
     },
     {
       "id": "M10",
@@ -2457,8 +2457,24 @@
             },
             {
               "label": "Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/writing.rs",
+                  "marker": "fn transpose"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/flow/writing.rs",
+                  "marker": "fn graft"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/writing.rs",
+                  "marker": "fn an_orthogonal_box_is_sized_in_its_own_inline_axis"
+                }
+              ]
             },
             {
               "label": "Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting",
@@ -2476,7 +2492,7 @@
               "evidence": []
             }
           ],
-          "credit": "20.00",
+          "credit": "40.00",
           "engine_share": "0.60"
         },
         {
@@ -2504,10 +2520,10 @@
       "completed": 4,
       "in_progress": 1,
       "total": 7,
-      "contribution": "1.80",
-      "percent": "60.00",
+      "contribution": "1.92",
+      "percent": "64.00",
       "verified_percent": "56.00",
-      "partial_percent": "4.00"
+      "partial_percent": "8.00"
     },
     {
       "id": "layout",

@@ -1,52 +1,39 @@
 # Reviewed css-grid failures: <path><TAB><reason>. A listed page that passes,
 # or an unlisted page that fails, fails the test (TD-210).
 css/css-grid/alignment/grid-align-baseline-fieldset-001.html	a fieldset grid item is refused by the block walk
-css/css-grid/alignment/grid-align-baseline-fieldset-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-fieldset-003.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-flex-001.html	logical sizing and margin properties (inline-size, margin-block, ...) are not parsed (TD-209)
-css/css-grid/alignment/grid-align-baseline-flex-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-flex-003.html	logical sizing and margin properties (inline-size, margin-block, ...) are not parsed (TD-209)
-css/css-grid/alignment/grid-align-baseline-flex-004.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-grid-001.html	logical sizing and margin properties (inline-size, margin-block, ...) are not parsed (TD-209)
-css/css-grid/alignment/grid-align-baseline-grid-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-grid-003.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-multicol-001.html	logical sizing and margin properties (inline-size, margin-block, ...) are not parsed (TD-209)
-css/css-grid/alignment/grid-align-baseline-multicol-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-multicol-003.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-nested-intrinsic-sizing-001.html	logical sizing and margin properties (inline-size, margin-block, ...) are not parsed (TD-209)
-css/css-grid/alignment/grid-align-baseline-overflow-001.html	logical sizing and margin properties (inline-size, margin-block, ...) are not parsed (TD-209)
-css/css-grid/alignment/grid-align-baseline-overflow-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-overflow-003.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-single-item-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-table-001.html	logical sizing and margin properties (inline-size, margin-block, ...) are not parsed (TD-209)
-css/css-grid/alignment/grid-align-baseline-table-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-align-baseline-table-003.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-container-baseline-001.html	vertical writing modes are not implemented (TD-209)
+css/css-grid/alignment/grid-align-baseline-fieldset-002.html	fieldset item (unsupported SpecialElement)
+css/css-grid/alignment/grid-align-baseline-fieldset-003.html	fieldset item (unsupported SpecialElement)
+css/css-grid/alignment/grid-align-baseline-flex-001.html	baseline alignment of a nested flex container differs: <div> data-offset-y: expected 35, got 15
+css/css-grid/alignment/grid-align-baseline-flex-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 40, got 45
+css/css-grid/alignment/grid-align-baseline-flex-003.html	baseline alignment of a nested flex container differs: <div> data-offset-y: expected 45, got 15
+css/css-grid/alignment/grid-align-baseline-flex-004.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 110, got 135
+css/css-grid/alignment/grid-align-baseline-grid-001.html	baseline alignment of a nested grid differs: <div> data-offset-y: expected 100, got 90
+css/css-grid/alignment/grid-align-baseline-grid-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 110, got 105
+css/css-grid/alignment/grid-align-baseline-grid-003.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 30, got 35
+css/css-grid/alignment/grid-align-baseline-multicol-001.html	multi-column layout not implemented
+css/css-grid/alignment/grid-align-baseline-multicol-002.html	multi-column layout is not implemented
+css/css-grid/alignment/grid-align-baseline-multicol-003.html	multi-column layout is not implemented
+css/css-grid/alignment/grid-align-baseline-nested-intrinsic-sizing-001.html	form control item (unsupported SpecialElement)
+css/css-grid/alignment/grid-align-baseline-overflow-001.html	baseline of a scroll container item differs: <div> data-offset-y: expected 30, got 185
+css/css-grid/alignment/grid-align-baseline-overflow-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 70, got 65
+css/css-grid/alignment/grid-align-baseline-overflow-003.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 40, got 45
+css/css-grid/alignment/grid-align-baseline-single-item-001.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-expected-height: expected 75, got 100
+css/css-grid/alignment/grid-align-baseline-table-001.html	baseline alignment of a nested table differs: <div> data-offset-y: expected 45, got 152
+css/css-grid/alignment/grid-align-baseline-table-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 115, got 0
+css/css-grid/alignment/grid-align-baseline-table-003.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 45, got 152
+css/css-grid/alignment/grid-container-baseline-001.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 0, got 75
 css/css-grid/alignment/grid-content-alignment-overflow-002.html	checks scroll sizes, which the comparison does not read
-css/css-grid/alignment/grid-content-alignment-with-span-vertical-lr-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-content-alignment-with-span-vertical-rl-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-item-aspect-ratio-justify-self-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-item-aspect-ratio-justify-self-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-justify-content-distribution-vertical-lr-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-justify-content-distribution-vertical-rl-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-justify-content-vertical-lr-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-justify-content-vertical-rl-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-justify-self-cell-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/grid-self-alignment.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/alignment/self-baseline/grid-self-baseline-two-dimensional.html	vertical writing modes are not implemented (TD-209)
+css/css-grid/alignment/grid-item-aspect-ratio-justify-self-001.html	aspect-ratio on non-replaced boxes is not implemented: <div> data-expected-width: expected 16, got 0
+css/css-grid/alignment/grid-item-aspect-ratio-justify-self-002.html	aspect-ratio on non-replaced boxes is not implemented: <div> data-expected-width: expected 16, got 0
+css/css-grid/alignment/grid-self-alignment.html	orthogonal or vertical-mode sizing differs (TD-212): <div> data-offset-x: expected 0, got 10
+css/css-grid/alignment/self-baseline/grid-self-baseline-two-dimensional.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <span> data-offset-x: expected 115, got 85
 css/css-grid/grid-definition/grid-auto-repeat-max-size-002.html	auto repetitions in intrinsic sizing ignore percentage max sizes (TD-209)
 css/css-grid/grid-items/grid-automatic-minimum-intrinsic-aspect-ratio-001.html	aspect-ratio is not parsed (TD-209)
 css/css-grid/grid-items/grid-item-minimum-size-single-axis-scroll-container.html	overflow-x hidden with overflow-y clip computes clip to hidden (TD-209)
-css/css-grid/grid-items/grid-item-percentage-resolution-writing-modes-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/grid-items/grid-item-percentage-resolution-writing-modes-quirks-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/grid-items/grid-items-minimum-width-vertical-lr-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/grid-items/grid-items-minimum-width-vertical-lr-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/grid-items/grid-items-minimum-width-vertical-rl-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/grid-items/grid-items-minimum-width-vertical-rl-002.html	vertical writing modes are not implemented (TD-209)
+css/css-grid/grid-items/grid-item-percentage-resolution-writing-modes-001.html	orthogonal grid items resolve percentages against the viewport, not their area (TD-212): <div> data-expected-width: expected 100, got 400
+css/css-grid/grid-items/grid-item-percentage-resolution-writing-modes-quirks-001.html	orthogonal grid items resolve percentages against the viewport, not their area (TD-212): <div> data-expected-width: expected 100, got 784
 css/css-grid/grid-items/grid-items-percentage-paddings-015.html	checks resolved padding, which the comparison does not read
-css/css-grid/grid-items/grid-items-percentage-paddings-margins-writing-modes-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/grid-items/grid-items-relative-offsets-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/grid-items/grid-items-relative-offsets-002.html	vertical writing modes are not implemented (TD-209)
+css/css-grid/grid-items/grid-items-percentage-paddings-margins-writing-modes-001.html	checks resolved padding, which the comparison does not read
 css/css-grid/grid-lanes/grid-lanes-container-minimum-size-single-axis-scroll-container.html	masonry (grid-lanes) is not implemented (TD-209)
 css/css-grid/grid-lanes/items/column-minimum-contribution-baseline-shim-vertical-lr.html	masonry (grid-lanes) is not implemented (TD-209)
 css/css-grid/grid-lanes/items/column-minimum-contribution-baseline-shim-vertical-rl.html	masonry (grid-lanes) is not implemented (TD-209)
@@ -68,15 +55,10 @@ css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-009.html	masonr
 css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-010.html	masonry (grid-lanes) is not implemented (TD-209)
 css/css-grid/grid-lanes/track-sizing/auto-repeat/row-auto-repeat-011.html	masonry (grid-lanes) is not implemented (TD-209)
 css/css-grid/grid-model/grid-button-001.html	a fieldset or button grid item is refused by the block walk
-css/css-grid/grid-model/grid-container-padding-border-size-001.html	vertical writing modes are not implemented (TD-209)
 css/css-grid/grid-model/grid-item-accepts-first-letter-001.html	::first-letter/::first-line text needs the Ahem font (TD-210)
 css/css-grid/grid-model/grid-item-accepts-first-line-001.html	::first-letter/::first-line text needs the Ahem font (TD-210)
-css/css-grid/layout-algorithm/grid-item-margin-auto-columns-rows-vertical-lr-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/layout-algorithm/grid-item-margin-auto-columns-rows-vertical-lr-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/layout-algorithm/grid-item-margin-auto-columns-rows-vertical-rl-001.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/layout-algorithm/grid-item-margin-auto-columns-rows-vertical-rl-002.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/layout-algorithm/grid-minimum-contribution-baseline-shim-vertical-lr.html	vertical writing modes are not implemented (TD-209)
-css/css-grid/layout-algorithm/grid-minimum-contribution-baseline-shim-vertical-rl.html	vertical writing modes are not implemented (TD-209)
+css/css-grid/layout-algorithm/grid-minimum-contribution-baseline-shim-vertical-lr.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 50, got 0
+css/css-grid/layout-algorithm/grid-minimum-contribution-baseline-shim-vertical-rl.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected -25, got 0
 css/css-grid/layout-algorithm/grid-minimum-contribution-baseline-shim.html	the baseline shim comes from ::before boxes; generated content is not laid out
 css/css-grid/placement/grid-placement-unknown-named-grid-line-001.html	implicit lines named on both sides of the grid are counted differently (TD-209)
 css/css-grid/subgrid/align-self-baseline-with-subgrid-mbp.html	baseline sharing does not cross subgrids (TD-209)

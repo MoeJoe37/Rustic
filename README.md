@@ -99,7 +99,7 @@ See the [implementation ledger](docs/IMPLEMENTATION.md) for tested contracts.
 
 [![Rustic engine progress map](docs/progress/engine.svg)](docs/progress/summary.md)
 
-**Overall engine completion: 52.28%** (50.83% verified complete + 1.45% partial credit) — 119/228 capabilities complete and 12 in progress across 25 subsystems. Current milestone: **M9 Compatibility expansion**, 13.05% done.
+**Overall engine completion: 52.40%** (50.83% verified complete + 1.57% partial credit) — 119/228 capabilities complete and 12 in progress across 25 subsystems. Current milestone: **M9 Compatibility expansion**, 13.58% done.
 
 100% requires the full capability catalog and final engine acceptance on Windows, macOS, Linux, Android and iOS. This is weighted delivery progress; see [measurement and automatic updates](docs/PROGRESS.md).
 

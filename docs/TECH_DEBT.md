@@ -142,7 +142,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-59 | Deliberate | Paint | CPU tile culling skips irrelevant commands. Filter-margin changes still repaint everything, damage uses a common-prefix/suffix diff and resize relayouts from scratch. The CI frame-time gate covers GPU compositing on lavapipe | Open, REN-04j, M9 |
 | TD-70 | Deliberate | Layout | Atomic inlines and block-in-inline splitting: baseline, relative-offset and paint-order approximations | Open, M3 layout |
 | TD-71 | Deliberate | Layout | Sticky positioning: no overflow adjustment, no nested sticky composition, inline sticky boxes stay static | Open, M3 layout |
-| TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 51 of 91 static pages fail (writing modes, images, 6 undiagnosed) | Open, REN-08 |
+| TD-72 | Deliberate | Layout | css-flexbox WPT comparison: 42 of 91 static pages fail (images, orthogonal sizing, 5 undiagnosed) | Open, REN-08 |
 | TD-73 | Watch | Base | Layout keeps its own `CssPx`/`CssRect` beside the unit-typed `rustic-base` geometry | Guarded |
 | TD-80 | Deliberate | Codecs | JPEG: no arithmetic coding, lossless, hierarchical, 12-bit or `DNL`; color management ignored | Open, paint.images |
 | TD-81 | Deliberate | Codecs | WebP and PNG ignore ICC/EXIF metadata; only JPEG applies EXIF orientation | Open, paint.images, M9 |
@@ -267,9 +267,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-200 | Deliberate | WebAssembly | The progressive decoder pulls response chunks and compiles in an agent promise reaction | Partly paid by ADR 0094, M9 |
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
-| TD-210 | Deliberate | Layout | css-grid WPT comparison: 89 of 168 static pages fail, every one reviewed (writing modes, masonry, subgrid baselines, logical properties, Ahem text) | Open, `layout.grid` (M9) |
-| TD-211 | Deliberate | Layout | Table subset: collapsed borders place cells by whole rather than half borders; column boxes get no geometry and table parts are not relatively positioned; css-tables WPT 18 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
-| TD-212 | Deliberate | Layout | Writing modes are parsed and logical properties mapped, but layout, text and paint treat every box as horizontal-tb | Open, `text.writing` (M9) |
+| TD-210 | Deliberate | Layout | css-grid WPT comparison: 71 of 168 static pages fail, every one reviewed (masonry, baselines across writing modes and subgrids, Ahem text) | Open, `layout.grid` (M9) |
+| TD-211 | Deliberate | Layout | Table subset: collapsed borders place cells by whole rather than half borders; column boxes get no geometry and table parts are not relatively positioned; css-tables WPT 20 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
+| TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition with sideways text only; no upright typesetting, opposite-direction parallel children, cross-mode baselines or orthogonal relayout after stretching | Open, `text.writing` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -1316,16 +1316,18 @@ scrolling work. **Trigger:** scrolling in an embedder, or css-position WPT.
 ### TD-72 — css-flexbox WPT comparison gaps
 
 `tests/wpt_flexbox.rs` checks the 91 static `checkLayout` pages of the pinned
-WPT revision; 40 pass (two table pages since `layout.tables`). `expected_failures.txt` gives each failure's reason:
-23 need vertical writing modes, 12 need decoded images (the harness loads
-none), and SVG, form controls, `fieldset`, `list-item`, quirks-mode
-percentages and `aspect-ratio` on non-replaced boxes cover most others; six
-are mismatches not yet diagnosed, and one percentage-height case. The harness
+WPT revision; 49 pass (two table pages since `layout.tables`, nine since
+`text.writing`). `expected_failures.txt` gives each failure's reason: 19
+need decoded images (the harness loads none; seven of them in vertical
+modes), five orthogonal or vertical-mode sizing cases (TD-212), and SVG,
+form controls, `fieldset`, `list-item`, quirks-mode percentages and
+`aspect-ratio` on non-replaced boxes cover most others; five are
+mismatches not yet diagnosed, and one percentage-height case. The harness
 approximates `offsetParent` (nearest positioned ancestor, else body with
 document coordinates), accepts values within 0.5px of the rounded result,
 treats any other expectation attribute as a failure, and has no Ahem font.
-60 pages with other scripts are not imported. **Pay:** diagnose the six,
-then writing modes and an image fixture loader. **Trigger:** any flex layout
+60 pages with other scripts are not imported. **Pay:** diagnose the five,
+then an image fixture loader and the TD-212 sizing cases. **Trigger:** any flex layout
 change (the list is exact, so passes and failures must be updated).
 
 ### TD-73 — Two geometry type families
@@ -3454,12 +3456,15 @@ subgrid baselines.
 
 `tests/wpt_grid.rs` lays out the 168 static `checkLayout` pages that
 `tools/import_wpt_grid_tests.py` extracts from the pinned css-grid directory
-and compares every element's expectations. 79 pass. Each of the other 89 is
-listed in `fixtures/wpt-grid/expected_failures.txt` with its reason: 41
-vertical writing modes, 20 masonry, 9 subgrid baselines (most with Ahem
-text), 7 logical properties, and 12 single causes (Ahem `::first-letter`/`::first-line` text, form-control
-items, generated content, `aspect-ratio`, unread expectation attributes and
-the TD-209 edge cases). Rustic's bundled test fonts have no Ahem. The list
+and compares every element's expectations. 97 pass (18 since
+`text.writing`). Each of the other 71 is listed in
+`fixtures/wpt-grid/expected_failures.txt` with its reason: 20 masonry, 13
+baselines across writing modes (orthogonal items and synthesized
+baselines, TD-212), 9 subgrid baselines (most with Ahem text), 4 baselines
+of nested flex, grid, table and scroll-container items, and single causes
+(Ahem `::first-letter`/`::first-line` text, form-control and `fieldset`
+items, multi-column layout, generated content, `aspect-ratio`, orthogonal
+percentages, unread expectation attributes and the TD-209 edge cases). Rustic's bundled test fonts have no Ahem. The list
 is a ratchet: a listed page that passes fails the test.
 **Pay:** shrink the list with TD-209; bundle Ahem in the test fonts.
 
@@ -3479,22 +3484,29 @@ each other, and an inline table's baseline is its first line in preorder
 (a top caption's, if any). Extra height of spanning cells and of a taller
 table is shared by rows in proportion to their heights.
 `tests/wpt_tables.rs` compares the pinned css-tables `checkLayout` pages:
-18 of 35 pass; `fixtures/wpt-tables/expected_failures.txt` gives each
+20 of 35 pass; `fixtures/wpt-tables/expected_failures.txt` gives each
 other page's reason (eight need list items, which Rustic does not lay out;
-three tentative width-merging rules; others collapsing borders, vertical
-writing modes, Ahem text, `height: stretch` and percentage heights inside
-cells).
+three tentative width-merging rules; others collapsing borders, Ahem text,
+`height: stretch` and percentage heights inside cells).
 **Pay:** half-border collapsed geometry, column box geometry and
 relatively positioned table parts, then shrink the list.
 
-### TD-212 — Writing modes are parsed but not laid out
-`text.writing` step 1 parses `writing-mode`, `text-orientation` and
-`text-combine-upright` and maps every flow-relative property to its
-physical longhand, but layout, text shaping and paint still treat every box
-as `horizontal-tb`: a `vertical-rl` box lays out horizontally with its
-logical margins on the vertical-mode physical sides. Transitions on a
-logical longhand and on its physical counterpart are tracked separately
-(the cascade then picks one by order), and `writing-mode` on the root does
-not propagate to the initial containing block yet.
-**Pay:** the remaining `text.writing` steps (vertical block flow and
-orthogonal flows, vertical text, vertical flex/grid/tables).
+### TD-212 — Vertical writing modes subset
+`text.writing` lays out vertical writing modes by transposing each run of
+boxes into the `horizontal-tb` engine (LAYOUT.md, Writing modes). Text is
+always set sideways: `text-orientation`, upright CJK typesetting, vertical
+font metrics (`vhea`/`vmtx`) and `text-combine-upright` are not
+implemented. A child with the same axis but the opposite block direction
+(`vertical-lr` inside `vertical-rl`) flows in its parent's direction. An
+absolutely positioned box inside an orthogonal box, whose containing block
+is outside it, is placed against the orthogonal box. Baselines are not
+synthesized across writing modes (13 css-grid pages). A flex or grid
+container that stretches or shrinks an orthogonal item keeps the item's
+contents at their first size, and orthogonal grid items resolve
+percentages against the viewport rather than their grid area. Each run
+gets its own `max_flow_work` budget. Transitions on a logical longhand and
+on its physical counterpart are tracked separately, and `writing-mode` on
+the root does not change the scrolling origin.
+**Pay:** the remaining `text.writing` steps (vertical text, vertical
+flex/grid/table fixes and `text-combine-upright`), then shrink the WPT
+lists.

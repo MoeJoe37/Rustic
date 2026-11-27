@@ -21,6 +21,7 @@ use std::{collections::HashMap, error::Error, fmt};
 
 mod flex;
 mod grid;
+mod multicol;
 mod table;
 mod writing;
 
@@ -2596,10 +2597,16 @@ impl BlockLayout {
         fonts: Option<&FontDatabase>,
         cancellation: &CancellationToken,
     ) -> Result<Self, FlowError> {
-        if writing::needed(tree) {
-            return writing::layout(tree, viewport, limits, fonts, cancellation);
+        let inner = |tree: &BoxTree| {
+            if writing::needed(tree) {
+                return writing::layout(tree, viewport, limits, fonts, cancellation);
+            }
+            Self::layout_flow(tree, viewport, limits, fonts, cancellation)
+        };
+        if multicol::needed(tree) {
+            return multicol::layout(tree, &inner);
         }
-        Self::layout_flow(tree, viewport, limits, fonts, cancellation)
+        inner(tree)
     }
 
     /// One `horizontal-tb` layout of `tree` (writing modes transpose into

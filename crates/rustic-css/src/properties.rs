@@ -1004,6 +1004,8 @@ property_ids! {
     Bottom => "bottom", false;
     Left => "left", false;
     ZIndex => "z-index", false;
+    ColumnCount => "column-count", false;
+    ColumnWidth => "column-width", false;
     Float => "float", false;
     Clear => "clear", false;
     OverflowX => "overflow-x", false;
@@ -1204,7 +1206,8 @@ impl PropertyId {
             P::Top | P::Right | P::Bottom | P::Left => {
                 PropertyValue::LengthPercentageOrAuto(LengthPercentageOrAuto::Auto)
             }
-            P::ZIndex => PropertyValue::ZIndex(ZIndex::Auto),
+            P::ZIndex | P::ColumnCount => PropertyValue::ZIndex(ZIndex::Auto),
+            P::ColumnWidth => PropertyValue::LengthPercentageOrAuto(LengthPercentageOrAuto::Auto),
             P::Float => PropertyValue::Float(Float::None),
             P::Clear => PropertyValue::Clear(Clear::None),
             P::OverflowX | P::OverflowY => PropertyValue::Overflow(Overflow::Visible),
@@ -1706,6 +1709,7 @@ pub fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "grid-column" => &[P::GridColumnStart, P::GridColumnEnd],
         "place-content" => &[P::AlignContent, P::JustifyContent],
         "list-style" => &[P::ListStyleType, P::ListStylePosition],
+        "columns" => &[P::ColumnWidth, P::ColumnCount],
         "place-items" => &[P::AlignItems, P::JustifyItems],
         "place-self" => &[P::AlignSelf, P::JustifySelf],
         "text-decoration" => TEXT_DECORATION,
@@ -1965,6 +1969,47 @@ fn single<'a>(parts: &[&'a Value]) -> Option<&'a Value> {
 fn saturate_i32(n: f64) -> i32 {
     // The clamp bounds the cast: every value in range converts exactly.
     n.clamp(f64::from(i32::MIN), f64::from(i32::MAX)) as i32
+}
+
+/// `column-count` (CSS Multicol 1 §3.2): `auto` or a positive integer.
+fn column_count(value: &Value) -> Option<ZIndex> {
+    match z_index(value)? {
+        ZIndex::Integer(n) if n < 1 => None,
+        count => Some(count),
+    }
+}
+
+/// `column-width` (CSS Multicol 1 §3.1): `auto` or a non-negative length.
+fn column_width(value: &Value) -> Option<LengthPercentageOrAuto> {
+    match lp_or_auto(value, false)? {
+        LengthPercentageOrAuto::LengthPercentage(LengthPercentage::Percentage(_)) => None,
+        width => Some(width),
+    }
+}
+
+/// `columns` (CSS Multicol 1 §3.3): a width and a count in either order,
+/// each optional (`auto` fills either).
+fn columns(parts: &[&Value]) -> Option<Vec<PropertyValue>> {
+    if parts.is_empty() || parts.len() > 2 {
+        return None;
+    }
+    let (mut count, mut width, mut autos) = (None, None, 0);
+    for part in parts {
+        if keyword(part, "auto") {
+            autos += 1;
+        } else if let Some(n) = column_count(part).filter(|c| *c != ZIndex::Auto) {
+            if count.replace(n).is_some() {
+                return None;
+            }
+        } else if width.replace(column_width(part)?).is_some() {
+            return None;
+        }
+    }
+    let _ = autos;
+    Some(vec![
+        PropertyValue::LengthPercentageOrAuto(width.unwrap_or(LengthPercentageOrAuto::Auto)),
+        PropertyValue::ZIndex(count.unwrap_or(ZIndex::Auto)),
+    ])
 }
 
 fn z_index(value: &Value) -> Option<ZIndex> {
@@ -2519,6 +2564,8 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
             })?,
         },
         P::ZIndex => PropertyValue::ZIndex(z_index(value)?),
+        P::ColumnCount => PropertyValue::ZIndex(column_count(value)?),
+        P::ColumnWidth => PropertyValue::LengthPercentageOrAuto(column_width(value)?),
         P::Float => PropertyValue::Float(Float::from_name(name()?)?),
         P::Clear => PropertyValue::Clear(Clear::from_name(name()?)?),
         P::OverflowX | P::OverflowY => PropertyValue::Overflow(Overflow::from_name(name()?)?),
@@ -2739,6 +2786,7 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
         }
         "text-decoration" => text_decoration(parts),
         "list-style" => list_style(parts),
+        "columns" => columns(parts),
         "border-radius" => {
             let (horizontal, vertical) = match parts
                 .iter()

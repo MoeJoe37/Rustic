@@ -428,10 +428,10 @@ fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_par
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(String::from_utf8_lossy(&output.stdout).contains(" line=0\n"));
-    // MathML is not laid out yet: no partial output.
+    // Slots are not laid out yet (no shadow trees): no partial output.
     fs::write(
         &path,
-        "<style>* {margin:0}</style><main>a <math></math></main>",
+        "<style>* {margin:0}</style><main>a <slot></slot></main>",
     )
     .unwrap();
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);

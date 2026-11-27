@@ -18,6 +18,48 @@
 use crate::ElementView;
 
 const HTML: &str = "http://www.w3.org/1999/xhtml";
+const MATHML: &str = "http://www.w3.org/1998/Math/MathML";
+
+/// MathML children styled by their position among their siblings
+/// (MathML Core §3, approximated with CSS: TD-221): the fraction rule
+/// under the numerator, script shifts and sizes, and the over script's
+/// place in `munderover`. As hints, these keep position-dependent
+/// selectors out of the UA sheet, so insertions elsewhere stay cheap; a
+/// MathML child's hints are computed when it is styled.
+fn mathml_position_hints<E: ElementView>(element: &E) -> String {
+    let Some(parent) = element.parent_element() else {
+        return String::new();
+    };
+    if parent.namespace() != Some(MATHML) {
+        return String::new();
+    }
+    let mut position = 1;
+    let mut sibling = element.previous_sibling_element();
+    while let Some(s) = sibling {
+        position += 1;
+        if position > 3 {
+            break;
+        }
+        sibling = s.previous_sibling_element();
+    }
+    let script = "font-size: 71%; ";
+    match (parent.local_name(), position) {
+        ("mfrac", 1) => {
+            if attribute(&parent, "linethickness").is_some_and(|t| t.trim() == "0") {
+                "padding-inline: 0.1em; ".to_owned()
+            } else {
+                "border-bottom: 0.06em solid; padding-inline: 0.1em; ".to_owned()
+            }
+        }
+        ("msup", 2) | ("msubsup", 3) => format!("vertical-align: super; {script}"),
+        ("msub", 2) | ("msubsup", 2) => format!("vertical-align: sub; {script}"),
+        ("munderover", 3) => format!("order: -1; {script}"),
+        ("munder" | "mover" | "munderover", 2) => script.to_owned(),
+        ("mroot", 2) => "font-size: 50%; vertical-align: super; ".to_owned(),
+        ("semantics", n) if n > 1 => "display: none; ".to_owned(),
+        _ => String::new(),
+    }
+}
 
 /// Attributes whose change can change hints on the element or its
 /// descendants (table attributes reach the cells).
@@ -181,8 +223,21 @@ fn table_border<E: ElementView>(table: &E) -> Option<u32> {
 /// CSS declarations for `element`'s presentational hints, or an empty
 /// string.
 pub(crate) fn presentational_hints<E: ElementView>(element: &E) -> String {
+    if element.namespace() == Some(MATHML) {
+        return mathml_position_hints(element);
+    }
     if !is_html(element) {
         return String::new();
+    }
+    // A fieldset's first child legend is its rendered legend (§15.3.13),
+    // which shrinks to fit.
+    if element.local_name().eq_ignore_ascii_case("legend")
+        && element.previous_sibling_element().is_none()
+        && element
+            .parent_element()
+            .is_some_and(|p| is_html(&p) && p.local_name().eq_ignore_ascii_case("fieldset"))
+    {
+        return "inline-size: fit-content; ".to_owned();
     }
     let mut css = String::new();
     let mut push = |property: &str, value: &str| {

@@ -57,7 +57,7 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-214, TD-215, TD-216, TD-217, TD-218, TD-219, TD-220, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-214, TD-215, TD-216, TD-217, TD-218, TD-219, TD-220, TD-221, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
@@ -274,6 +274,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-214 | Deliberate | CSSOM | `element.style` keeps declarations as written in the `style` attribute: shorthands are not expanded into longhands, values are not normalized, and only longhands have IDL attributes | Open, CSSOM (M9) |
 | TD-216 | Deliberate | HTML | Dialogs and popovers without focus steps, inertness, light dismiss, `::backdrop`, close watchers or real top-layer painting (a maximal `z-index`); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks and `setAttribute('open')` fires no toggle | Open, `html.elements` (M9) |
 | TD-217 | Deliberate | HTML | Image source selection at load only: no reselection on resize, no `currentSrc`, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Open, `html.elements` (M9) |
+| TD-221 | Deliberate | CSS, MathML | Multi-column without `column-span`, column rules, nested multi-column containers or fragmented box decorations; ruby as paired inline flex columns (no `ruby-position`, `ruby-align`, `rtc`, overhang or line-height adjustment); MathML Core approximated with CSS boxes (no operator dictionary, stretchy operators, `math-depth`, script shifts from the MATH table or `mspace`/`mpadded` attributes) | Open, `layout.formats` (M9) |
 | TD-220 | Deliberate | SVG | Inline SVG without text, gradients and patterns (their first stop's color paints), clipping, masks, markers, filters, dashes, `fill-rule: evenodd`, author style sheets or SVG images (`<img src=x.svg>`, CSS); `use` of symbols only by id in the same document; group opacity multiplies into each shape | Open, `paint.formats` (M9) |
 | TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: controls render from content attributes (no dirty value, checkedness or selectedness from script, no caret, no text scrolling in fields), `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
 | TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; `img` and `iframe` without rendered `width`/`height`, `naturalWidth`, `complete`, `decode()`, `crossOrigin` or `contentWindow`; `relList` and other token lists besides `classList` and `sandbox` | Open, `html.elements` (M9) |
@@ -3638,3 +3639,24 @@ sheets matching SVG elements, SVG as an image format and SVG DOM
 interfaces. Group `opacity` multiplies into each shape's alpha instead of
 compositing the group.
 **Pay:** with `paint.formats` steps 2–3.
+
+### TD-221 — Multi-column, ruby and MathML approximations
+Multi-column containers (`flow/multicol.rs`) lay their content out at the
+column width, balance (or fill a definite height) by breaking between
+line boxes and monolithic blocks, and move each piece into its column. A
+block split across columns keeps its whole background and border in the
+first column; `column-span`, `column-fill: auto` without a height,
+`column-rule-*`, nested multi-column containers (they lay out as one
+column) and break properties are missing. Ruby pairs each base with its
+`rt` in an anonymous inline flex column (annotation over base, the base
+on the line's baseline); `ruby-position`, `ruby-align`, `rtc`, overhang
+and inter-character ruby are missing. MathML elements lay out as CSS boxes
+from the UA sheet (fractions as flex columns with a rule, scripts with
+`vertical-align`, under/over as flex columns, radicals with a generated
+hanging sign and an overline, tables as tables): no operator dictionary,
+stretchy or large operators, `math-depth`/`math-shift`, OpenType MATH
+metrics or attribute-driven sizes (`mspace`, `mpadded`, `linethickness`
+other than 0).
+**Pay:** fragmentation-aware column layout with spanners and rules (with
+`layout.fragmentation`), CSS Ruby layout, and MathML Core layout with the
+MATH table.

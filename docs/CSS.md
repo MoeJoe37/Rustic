@@ -1207,3 +1207,14 @@ rendering as inline-blocks; their value text and painted parts come from
 their attributes (`rustic-layout/src/tree.rs`, `rustic-paint/src/controls.rs`).
 A closed `details` renders only its first `summary`, whose marker is a
 disclosure triangle. Limits: TD-219.
+
+## Multi-column, ruby and MathML
+
+`column-count`, `column-width` and the `columns` shorthand make a block
+container multi-column (CSS Multicol 1): its content lays out at the used
+column width (§3.4, with `column-gap`, `normal` being 1em) and is balanced
+into the columns, or fills a definite height with overflow columns to the
+side (`rustic-layout/src/flow/multicol.rs`). HTML `ruby` pairs each base
+with its `rt` (annotation above, base on the line's baseline; `rp` is not
+rendered). MathML elements lay out as CSS boxes styled by the UA sheet
+(MathML-in-CSS). Limits: TD-221.

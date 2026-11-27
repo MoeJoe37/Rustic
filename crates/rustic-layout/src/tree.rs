@@ -100,6 +100,9 @@ pub struct BoxSnapshot {
     /// A generated `outside` list marker (CSS Lists 3 §3.3): hangs before
     /// the first line of its list item.
     outside_marker: bool,
+    /// The anonymous block holding a multi-column container's content
+    /// (`flow::multicol`).
+    column_wrapper: bool,
 }
 
 /// HTML elements whose `overflow` can propagate to the viewport.
@@ -184,8 +187,15 @@ impl BoxSnapshot {
             copy.natural = None;
             copy.span = (1, 1);
             copy.outside_marker = false;
+            copy.column_wrapper = false;
         }
         copy
+    }
+
+    /// Whether this is the anonymous block holding a multi-column
+    /// container's content.
+    pub(crate) const fn is_column_wrapper(&self) -> bool {
+        self.column_wrapper
     }
 
     /// Whether this text box is a generated `outside` list marker.
@@ -276,6 +286,7 @@ impl BoxTree {
         let mut text_units = 0usize;
         let mut languages: Vec<(usize, Option<Arc<str>>)> = Vec::new();
         let mut ordinals = Ordinals::default();
+        let mut rubies: Vec<Ruby> = Vec::new();
         let mut initial_language = None;
         let mut ancestors = 0usize;
         let mut ancestor = document.node(root)?.parent();
@@ -307,8 +318,11 @@ impl BoxTree {
             while parents.last().is_some_and(|&(d, _, _)| d >= depth) {
                 parents.pop();
             }
-            let parent = parents.last().and_then(|&(_, parent, _)| parent);
+            let mut parent = parents.last().and_then(|&(_, parent, _)| parent);
             let inherited = parents.last().and_then(|(_, _, style)| style.clone());
+            while rubies.last().is_some_and(|r| r.depth >= depth) {
+                rubies.pop();
+            }
             let node = document.node(id)?;
             // A closed `details` renders only its first `summary` (HTML
             // §15.5.3: the rest is in a slot that is not rendered).
@@ -329,20 +343,23 @@ impl BoxTree {
             // native control or foreign content into a generic CSS block.
             let special_layout = match node.kind() {
                 NodeKind::Element(element) => {
-                    element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE)
-                        || matches!(
-                            element.name().local().to_ascii_lowercase().as_str(),
-                            "img"
-                                | "video"
-                                | "audio"
-                                | "iframe"
-                                | "embed"
-                                | "object"
-                                | "canvas"
-                                | "br"
-                                | "wbr"
-                                | "slot"
-                        )
+                    // MathML lays out as CSS boxes from the UA sheet.
+                    !matches!(
+                        element.name().namespace(),
+                        Some(rustic_dom::HTML_NAMESPACE | rustic_dom::MATHML_NAMESPACE)
+                    ) || matches!(
+                        element.name().local().to_ascii_lowercase().as_str(),
+                        "img"
+                            | "video"
+                            | "audio"
+                            | "iframe"
+                            | "embed"
+                            | "object"
+                            | "canvas"
+                            | "br"
+                            | "wbr"
+                            | "slot"
+                    )
                 }
                 _ => false,
             };
@@ -488,6 +505,47 @@ impl BoxTree {
                 }
                 _ => continue,
             };
+            // A ruby's children are grouped into base–annotation pairs,
+            // each an anonymous inline flex column with the annotation on
+            // top (CSS Ruby 1 §2, approximated).
+            if let Some(ruby) = rubies
+                .last_mut()
+                .filter(|r| r.depth + 1 == depth && parent == Some(r.index))
+            {
+                let annotation = matches!(node.kind(), NodeKind::Element(e)
+                    if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && e.name().local() == "rt");
+                // Whitespace between pairs is discarded.
+                if kind == BoxKind::Text
+                    && text
+                        .iter()
+                        .all(|&u| matches!(u, 0x09 | 0x0A | 0x0C | 0x0D | 0x20))
+                {
+                    continue;
+                }
+                if ruby.pair.is_none() || (!annotation && ruby.after_annotation) {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    ruby.pair = Some(boxes.len());
+                    ruby.after_annotation = false;
+                    boxes.push(BoxSnapshot {
+                        node: ruby.node,
+                        language: language.clone(),
+                        parent: Some(ruby.index),
+                        kind: BoxKind::Element(Display::InlineFlex),
+                        style: Some(Arc::clone(&ruby.pair_style)),
+                        text: Vec::new(),
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: false,
+                        column_wrapper: false,
+                    });
+                }
+                ruby.after_annotation |= annotation;
+                parent = ruby.pair;
+            }
             let current = boxes.len();
             // Descendant text inherits an element's own style; a text node has
             // no children, so its entry only closes the stack level.
@@ -513,7 +571,36 @@ impl BoxTree {
                 natural: natural.filter(|_| matches!(kind, BoxKind::Element(_))),
                 span,
                 outside_marker: false,
+                column_wrapper: false,
             });
+            if matches!(node.kind(), NodeKind::Element(e)
+                if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && e.name().local() == "ruby")
+                && kind == BoxKind::Element(Display::Inline)
+            {
+                let mut pair_style = (*style).clone();
+                pair_style.set(
+                    PropertyId::Display,
+                    PropertyValue::Display(Display::InlineFlex),
+                );
+                pair_style.set(
+                    PropertyId::FlexDirection,
+                    PropertyValue::FlexDirection(rustic_css::FlexDirection::ColumnReverse),
+                );
+                pair_style.set(
+                    PropertyId::AlignItems,
+                    PropertyValue::Alignment(rustic_css::Alignment::new(
+                        rustic_css::AlignKeyword::Center,
+                    )),
+                );
+                rubies.push(Ruby {
+                    depth,
+                    index: current,
+                    node: id,
+                    pair: None,
+                    after_annotation: false,
+                    pair_style: Arc::new(pair_style),
+                });
+            }
             let item = matches!(
                 (node.kind(), style.get(PropertyId::Display)),
                 (
@@ -549,6 +636,7 @@ impl BoxTree {
                         natural: None,
                         span: (1, 1),
                         outside_marker: outside,
+                        column_wrapper: false,
                     });
                 }
             }
@@ -558,6 +646,30 @@ impl BoxTree {
                 // Paint draws the SVG content; it makes no CSS boxes.
                 hidden = Some(depth);
                 continue;
+            }
+            if let (NodeKind::Element(e), BoxKind::Element(_)) = (node.kind(), kind) {
+                if e.name().namespace() == Some(rustic_dom::MATHML_NAMESPACE)
+                    && matches!(e.name().local(), "msqrt" | "mroot")
+                {
+                    // The radical sign hangs before the radicand.
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language: language.clone(),
+                        parent: Some(current),
+                        kind: BoxKind::Text,
+                        style: Some(Arc::clone(&style)),
+                        text: vec![0x221A],
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: true,
+                        column_wrapper: false,
+                    });
+                }
             }
             if let Some(control) = control {
                 // A control's rendering replaces its children: the value,
@@ -593,9 +705,36 @@ impl BoxTree {
                         natural: None,
                         span: (1, 1),
                         outside_marker: false,
+                        column_wrapper: false,
                     });
                 }
                 continue;
+            }
+            if let BoxKind::Element(Display::Block | Display::FlowRoot | Display::InlineBlock) =
+                kind
+            {
+                if is_multicol(&style) {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    let wrapper = boxes.len();
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language,
+                        parent: Some(current),
+                        kind: BoxKind::Element(Display::Block),
+                        style: Some(Arc::new(style.anonymous_flow(Display::Block))),
+                        text: Vec::new(),
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: false,
+                        column_wrapper: true,
+                    });
+                    parents.push((depth, Some(wrapper), shared));
+                    continue;
+                }
             }
             parents.push((depth, Some(current), shared));
         }
@@ -735,6 +874,31 @@ fn hidden_in_closed_details(document: &Document, id: NodeId, node: &rustic_dom::
         children.find(|&child| document.node(child).is_ok_and(|n| html(n, "summary")))
     });
     first_summary != Some(id)
+}
+
+/// Whether `style` makes a block container a multi-column container.
+fn is_multicol(style: &ComputedStyle) -> bool {
+    let count = !matches!(
+        style.get(PropertyId::ColumnCount),
+        PropertyValue::ZIndex(rustic_css::ZIndex::Auto)
+    );
+    let width = !matches!(
+        style.get(PropertyId::ColumnWidth),
+        PropertyValue::LengthPercentageOrAuto(rustic_css::LengthPercentageOrAuto::Auto)
+    );
+    count || width
+}
+
+/// An open HTML `ruby` element whose children are being paired.
+struct Ruby {
+    depth: usize,
+    index: usize,
+    node: NodeId,
+    /// The current pair's box.
+    pair: Option<usize>,
+    /// Whether the current pair has its annotation already.
+    after_annotation: bool,
+    pair_style: Arc<ComputedStyle>,
 }
 
 /// The ordinal values of list items (HTML §4.4.8, `ol` `start`,

@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "837f6d9789284b55735ecb024c3ceb290df1b9438dac40868201ef2fbfb8b6e2",
-  "percent": "54.64",
-  "verified_percent": "52.86",
-  "partial_percent": "1.78",
-  "completed": 122,
-  "in_progress": 13,
+  "source_fingerprint": "46e088cec0a8ceb1ae8bb7ea57937eb614f7bd08234d6826b0ab81bc4524d1dd",
+  "percent": "55.08",
+  "verified_percent": "53.45",
+  "partial_percent": "1.63",
+  "completed": 123,
+  "in_progress": 12,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -95,11 +95,11 @@
       "id": "M9",
       "label": "Compatibility expansion",
       "share": "22.35",
-      "completed": 9,
+      "completed": 10,
       "total": 54,
-      "percent": "23.59",
-      "verified_percent": "19.73",
-      "partial_percent": "3.86"
+      "percent": "25.57",
+      "verified_percent": "22.36",
+      "partial_percent": "3.21"
     },
     {
       "id": "M10",
@@ -3337,53 +3337,61 @@
           "label": "SVG, MathML, ruby and multi-column layout",
           "size": 5,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "SVG: the outermost svg element as a replaced element (natural size and viewBox ratio)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/tree.rs",
-                  "marker": "fn svg_natural_size"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn inline_svg_paints_shapes_strokes_and_transforms_in_its_viewport"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tree.rs",
+              "marker": "fn svg_natural_size"
             },
             {
-              "label": "Multi-column layout",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn inline_svg_paints_shapes_strokes_and_transforms_in_its_viewport"
             },
             {
-              "label": "Ruby layout",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/multicol.rs",
+              "marker": "fn balance"
             },
             {
-              "label": "MathML Core layout",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn multicol_containers_balance_their_lines_into_columns"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tree.rs",
+              "marker": "struct Ruby"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn ruby_annotations_sit_above_their_bases_on_the_line_baseline"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/html.rs",
+              "marker": "m|mfrac"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn mathml_lays_out_fractions_scripts_and_radicals_as_css_boxes"
             }
           ],
-          "credit": "25.00",
+          "credit": "100.00",
           "engine_share": "0.58"
         }
       ],
       "points": 51,
-      "completed": 8,
-      "in_progress": 1,
+      "completed": 9,
+      "in_progress": 0,
       "total": 11,
-      "contribution": "4.38",
-      "percent": "73.03",
-      "verified_percent": "70.58",
-      "partial_percent": "2.45"
+      "contribution": "4.82",
+      "percent": "80.39",
+      "verified_percent": "80.39",
+      "partial_percent": "0.00"
     },
     {
       "id": "paint",

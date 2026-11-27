@@ -23,6 +23,29 @@ use crate::{
 /// specification's flow-relative properties (`margin-block`,
 /// `padding-inline-start`).
 pub const HTML_USER_AGENT_STYLESHEET: &str = r#"@namespace "http://www.w3.org/1999/xhtml";
+@namespace m "http://www.w3.org/1998/Math/MathML";
+
+m|math { display: inline; font-family: math, serif; font-style: normal;
+  font-weight: normal; line-height: normal; text-indent: 0; direction: ltr }
+m|math[display=block i] { display: block; text-align: center; margin-block: 1em }
+m|annotation, m|annotation-xml, m|none, m|mprescripts { display: none }
+m|mi { font-style: italic }
+m|mo { padding-inline: 0.2em }
+m|mfrac { display: inline-flex; flex-direction: column; align-items: center;
+  vertical-align: 0.55em; padding-inline: 0.1em }
+m|mfrac > * { display: block; font-size: 90%; text-align: center }
+m|munder, m|mover, m|munderover { display: inline-flex; align-items: center }
+m|munder, m|munderover { flex-direction: column }
+m|mover { flex-direction: column-reverse }
+m|msqrt, m|mroot { display: inline-block; border-top: 0.06em solid;
+  margin-inline-start: 0.7em; padding-inline: 0.1em; padding-top: 0.1em }
+m|mtable { display: inline-table; vertical-align: middle }
+m|mtr { display: table-row }
+m|mtd { display: table-cell; padding: 0.2em 0.4em; text-align: center }
+m|mspace { display: inline-block }
+m|menclose { display: inline-block; border: 0.06em solid; padding: 0.1em }
+m|merror { border: 1px solid red; background-color: lightyellow }
+m|mphantom { visibility: hidden }
 
 [hidden], area, base, basefont, datalist, head, link, meta, noembed,
 noframes, param, rp, script, style, template, title { display: none }
@@ -108,13 +131,15 @@ hr { color: gray; border-style: inset; border-width: 1px; margin: 0.5em auto }
 fieldset { display: block; margin-inline: 2px; border: 2px groove gray;
   padding-block: 0.35em 0.625em; padding-inline: 0.75em; min-inline-size: min-content }
 legend { padding-inline: 2px }
-fieldset > legend:first-child { inline-size: fit-content }
+
+rp { display: none }
+rt { display: block; font-size: 50%; line-height: 1; text-align: center; text-indent: 0 }
 
 input, select, textarea, button, meter, progress { display: inline-block }
 input, select, textarea, button { font-size: 13.333px; font-family: sans-serif;
   font-weight: normal; font-style: normal; line-height: normal; color: black;
   letter-spacing: normal; word-spacing: normal; text-transform: none;
-  text-indent: 0; text-align: start; text-shadow: none; margin: 0 }
+  text-indent: 0; text-align: start; margin: 0 }
 input { padding: 1px 2px; border: 1px solid #767676; border-radius: 2px;
   background-color: white; white-space: pre; inline-size: 20ch }
 input[type=hidden i] { display: none }

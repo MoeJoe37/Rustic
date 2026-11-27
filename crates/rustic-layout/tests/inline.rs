@@ -386,11 +386,8 @@ fn unsupported_inline_content_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
     // `inline-table` is laid out since `layout.tables` (tests/tables.rs).
     for (html, reason) in [
-        (
-            "<p>x<math><mi>x</mi></math>",
-            UnsupportedFlow::SpecialElement,
-        ),
-        ("<p>x<math></math>", UnsupportedFlow::SpecialElement),
+        ("<p>x<slot>x</slot>", UnsupportedFlow::SpecialElement),
+        ("<p>x<slot></slot>", UnsupportedFlow::SpecialElement),
     ] {
         match try_layout(html, "", 100.0) {
             Err(FlowError::Unsupported { reason: got, .. }) => assert_eq!(got, reason, "{html}"),
@@ -617,4 +614,86 @@ fn form_controls_lay_out_as_inline_blocks_with_their_value() {
     // field's zero-width strut only holds its line).
     let widths: Vec<f64> = texts(&l).iter().map(|t| t.2.2).collect();
     assert_eq!(widths, [10.0, 15.0]);
+}
+
+#[test]
+fn ruby_annotations_sit_above_their_bases_on_the_line_baseline() {
+    // Two pairs; `rp` is not rendered and whitespace between pairs goes.
+    let l = layout(
+        "<p>x<ruby>xx<rp>(</rp><rt>xx</rt><rp>)</rp> x <rt>xxxx</rt></ruby>",
+        "",
+        400.0,
+    );
+    let rows = texts(&l);
+    assert_eq!(rows.len(), 5, "{rows:?}");
+    let (first, base, annotation, second_base, second) =
+        (rows[0].2, rows[1].2, rows[2].2, rows[3].2, rows[4].2);
+    // Bases share the line's baseline: the same top as the text before,
+    // which the annotations push down.
+    assert_eq!((base.1, first.1), (annotation.3, annotation.3));
+    // Annotations are centered above their bases (the test reset gives
+    // every element 10px text, `rt` included).
+    assert_eq!((annotation.2, annotation.3), (10.0, 10.0));
+    assert_eq!(annotation.1 + annotation.3, base.1);
+    assert_eq!(annotation.0 + annotation.2 / 2.0, base.0 + base.2 / 2.0);
+    // The second pair is as wide as its annotation; its base is centered.
+    assert_eq!(second.2, 20.0);
+    assert_eq!(second_base.0, second.0 + 7.5);
+}
+
+#[test]
+fn multicol_containers_balance_their_lines_into_columns() {
+    // Four 10px lines in two 50px columns with a 10px gap.
+    let l = layout(
+        "<div style='columns:2; column-gap:10px; width:110px'>x<br>x<br>x<br>x</div><p>x",
+        "",
+        400.0,
+    );
+    let rows = texts(&l);
+    let at: Vec<(f64, f64)> = rows.iter().map(|t| (t.2.0, t.2.1)).collect();
+    assert_eq!(
+        &at[..4],
+        [(0.0, 0.0), (0.0, 10.0), (60.0, 0.0), (60.0, 10.0)],
+        "{at:?}"
+    );
+    // The container is as tall as one column; what follows comes after it.
+    assert_eq!(at[4], (0.0, 20.0));
+    // `column-width` picks the count: 30px columns fit three in 110px.
+    let l = layout(
+        "<div style='column-width:30px; column-gap:10px; width:110px'>x<br>x<br>x</div>",
+        "",
+        400.0,
+    );
+    let xs: Vec<f64> = texts(&l).iter().map(|t| t.2.0).collect();
+    assert_eq!(xs, [0.0, 40.0, 80.0]);
+}
+
+#[test]
+fn mathml_lays_out_fractions_scripts_and_radicals_as_css_boxes() {
+    let l = layout(
+        "<p><math><mfrac><mi>x</mi><mi>xx</mi></mfrac><msup><mi>x</mi><mn>x</mn></msup>\
+         <msqrt><mi>x</mi></msqrt></math>",
+        "",
+        400.0,
+    );
+    let rows = texts(&l);
+    assert_eq!(rows.len(), 6, "{rows:?}");
+    // Fragments come line by line: the root line (base and superscript),
+    // then the fraction's two lines, then the radical's.
+    let line = |n: usize| -> Vec<(f64, f64, f64, f64)> {
+        rows.iter().filter(|r| r.0 == n).map(|r| r.2).collect()
+    };
+    let (numerator, denominator) = (line(1)[0], line(2)[0]);
+    // The numerator sits centered above the denominator.
+    assert!(numerator.1 + numerator.3 <= denominator.1, "{rows:?}");
+    assert_eq!(
+        numerator.0 + numerator.2 / 2.0,
+        denominator.0 + denominator.2 / 2.0
+    );
+    // The superscript is raised above its base.
+    let (base, script) = (line(0)[0], line(0)[1]);
+    assert!(script.1 < base.1, "{rows:?}");
+    // The radical sign hangs before the radicand.
+    let (radical, radicand) = (line(3)[0], line(3)[1]);
+    assert!(radical.0 + radical.2 <= radicand.0 + 0.001, "{rows:?}");
 }

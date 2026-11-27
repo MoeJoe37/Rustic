@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 54.64%** = 52.86% verified complete + 1.78% partial credit. 122/228 capabilities complete, 13 in progress.
+**Overall completion: 55.08%** = 53.45% verified complete + 1.63% partial credit. 123/228 capabilities complete, 12 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `837f6d9789284b55735ecb024c3ceb290df1b9438dac40868201ef2fbfb8b6e2`.
+Catalog: `engine-v4`. Source fingerprint: `46e088cec0a8ceb1ae8bb7ea57937eb614f7bd08234d6826b0ab81bc4524d1dd`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `837f6d9789284b55735ecb024c3ceb290df1b
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 9/54 | 23.59% | 19.73% | 22.35% |
+| M9 Compatibility expansion | 10/54 | 25.57% | 22.36% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -35,7 +35,7 @@ Catalog: `engine-v4`. Source fingerprint: `837f6d9789284b55735ecb024c3ceb290df1b
 | HTML | 11/11 | 0 | 100.00% | 100.00% | 5% | 5.00 |
 | CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
 | Text & fonts | 5/7 | 0 | 76.00% | 76.00% | 3% | 2.28 |
-| Layout | 8/11 | 1 | 73.03% | 70.58% | 6% | 4.38 |
+| Layout | 9/11 | 0 | 80.39% | 80.39% | 6% | 4.82 |
 | Paint & raster | 6/7 | 1 | 77.77% | 70.37% | 4% | 3.11 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 6 | 0.00% | 0.00% | 3% | 0.00 |
@@ -151,11 +151,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `layout.tables` — Tables · size 5 · M9 · 0.58% of engine ([source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/tables.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-layout/src/flow/table.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/tables.rs), [source](../../crates/rustic-layout/src/flow/table.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/tables.rs), [source](../../crates/rustic-layout/src/flow/table.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-style/src/hints.rs), [test](../../crates/rustic-style/tests/computed.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/wpt_tables.rs), [source](../../tools/import_wpt_tables_tests.py))
 - **planned** `layout.fragmentation` — Fragmentation, printing and advanced formatting · size 5 · M9 · 0.58% of engine
 - **planned** `layout.incremental` — Incremental/full-layout parity and conformance · size 5 · M9 · 0.58% of engine
-- **in progress 25.00%** `layout.formats` — SVG, MathML, ruby and multi-column layout · size 5 · M9 · 0.58% of engine
-  - [x] SVG: the outermost svg element as a replaced element (natural size and viewBox ratio) ([source](../../crates/rustic-layout/src/tree.rs), [test](../../crates/rustic-raster/tests/paint.rs))
-  - [ ] Multi-column layout
-  - [ ] Ruby layout
-  - [ ] MathML Core layout
+- **complete** `layout.formats` — SVG, MathML, ruby and multi-column layout · size 5 · M9 · 0.58% of engine ([source](../../crates/rustic-layout/src/tree.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-layout/src/flow/multicol.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-layout/src/tree.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-layout/tests/inline.rs))
 
 ### Paint & raster
 

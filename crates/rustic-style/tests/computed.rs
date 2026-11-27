@@ -596,7 +596,7 @@ fn details_dialogs_and_popovers_style_from_their_state() {
             .to_string()
     };
     assert_eq!(value("hidden", "display"), "none");
-    assert_eq!(value("s", "display"), "block");
+    assert_eq!(value("s", "display"), "list-item");
     assert_eq!(value("shown", "display"), "block");
     assert_eq!(value("dialog", "position"), "absolute");
     assert_eq!(value("modal", "position"), "fixed");

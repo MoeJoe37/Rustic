@@ -1252,105 +1252,7 @@
             }
           ]
         },
-        {
-          "id": "html.elements",
-          "label": "Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading",
-          "size": 8,
-          "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
-            {
-              "label": "details and summary: rendering, open and name, summary activation, toggle events and exclusive groups",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/elements.rs",
-                  "marker": "fn set_details_state"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html.rs",
-                  "marker": "details:not([open])"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn details_dialog_and_popover_follow_their_state_machines"
-                }
-              ]
-            },
-            {
-              "label": "dialog: show, showModal, close, requestClose, returnValue, the top layer and :modal",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/elements.rs",
-                  "marker": "fn open_dialog"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-dom/src/document/top_layer.rs",
-                  "marker": "pub fn top_layer_add"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn details_dialogs_and_popovers_style_from_their_state"
-                }
-              ]
-            },
-            {
-              "label": "Popover API: the popover attribute, show/hide/toggle, invokers, :popover-open and the top layer",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/elements.rs",
-                  "marker": "fn show_inner"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html_state.rs",
-                  "marker": "FormState::PopoverOpen"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn details_dialog_and_popover_follow_their_state_machines"
-                }
-              ]
-            },
-            {
-              "label": "picture, srcset and sizes: image source selection for layout and paint",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/srcset.rs",
-                  "marker": "pub(crate) fn img_source"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn srcset_sizes_and_picture_sources_choose_the_image_and_its_density"
-                }
-              ]
-            },
-            {
-              "label": "iframes: srcdoc and sandbox, and lazy loading of images and iframes",
-              "status": "planned",
-              "evidence": []
-            },
-            {
-              "label": "Form-control semantics and layout: select and option, fieldset and legend, meter, progress and the remaining input types",
-              "status": "planned",
-              "evidence": []
-            }
-          ]
-        }
+        {"id": "html.elements", "label": "Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading", "size": 8, "milestone": "M9", "status": "complete", "evidence": [{"kind": "source", "path": "crates/rustic-bindings/src/page/elements.rs", "marker": "fn set_details_state"}, {"kind": "source", "path": "crates/rustic-style/src/html.rs", "marker": "details:not([open])"}, {"kind": "test", "path": "crates/rustic-bindings/tests/page.rs", "marker": "fn details_dialog_and_popover_follow_their_state_machines"}, {"kind": "source", "path": "crates/rustic-bindings/src/page/elements.rs", "marker": "fn open_dialog"}, {"kind": "source", "path": "crates/rustic-dom/src/document/top_layer.rs", "marker": "pub fn top_layer_add"}, {"kind": "test", "path": "crates/rustic-style/tests/computed.rs", "marker": "fn details_dialogs_and_popovers_style_from_their_state"}, {"kind": "source", "path": "crates/rustic-bindings/src/page/elements.rs", "marker": "fn show_inner"}, {"kind": "source", "path": "crates/rustic-style/src/html_state.rs", "marker": "FormState::PopoverOpen"}, {"kind": "source", "path": "crates/rustic-cli/src/srcset.rs", "marker": "pub(crate) fn img_source"}, {"kind": "test", "path": "crates/rustic-cli/tests/cli.rs", "marker": "fn srcset_sizes_and_picture_sources_choose_the_image_and_its_density"}, {"kind": "source", "path": "crates/rustic-cli/src/images.rs", "marker": "pub(crate) const LAZY_LOAD_MARGIN"}, {"kind": "source", "path": "crates/rustic-bindings/src/page/token_list.rs", "marker": "const SANDBOX_TOKENS"}, {"kind": "test", "path": "crates/rustic-cli/tests/cli.rs", "marker": "fn lazy_images_load_only_near_the_viewport"}, {"kind": "test", "path": "crates/rustic-cli/tests/frames.rs", "marker": "fn lazy_frames_open_when_the_scroll_position_brings_them_near"}, {"kind": "test", "path": "crates/rustic-bindings/tests/page.rs", "marker": "fn token_lists_and_embedded_elements_reflect_their_attributes"}, {"kind": "source", "path": "crates/rustic-paint/src/controls.rs", "marker": "pub(crate) fn parts"}, {"kind": "source", "path": "crates/rustic-layout/src/tree.rs", "marker": "fn control_text"}, {"kind": "source", "path": "crates/rustic-layout/src/tree.rs", "marker": "fn marker_text"}, {"kind": "test", "path": "crates/rustic-layout/tests/inline.rs", "marker": "fn form_controls_lay_out_as_inline_blocks_with_their_value"}, {"kind": "test", "path": "crates/rustic-layout/tests/inline.rs", "marker": "fn outside_list_markers_hang_before_the_first_line"}, {"kind": "test", "path": "crates/rustic-paint/src/controls.rs", "marker": "fn meter_regions_follow_low_high_and_optimum"}]}
       ]
     },
     {
@@ -3239,7 +3141,7 @@
             {
               "kind": "source",
               "path": "crates/rustic-cli/src/images.rs",
-              "marker": "pub fn load"
+              "marker": "pub(crate) fn load_applied"
             },
             {
               "kind": "test",

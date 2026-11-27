@@ -388,6 +388,15 @@ same turn budget, so a single call cannot run unmetered.
   and showing popovers are in the document's top layer, which `:modal` and
   `:popover-open` match; the UA sheet styles `details`, `dialog` and
   `[popover]` (CSS.md). Limits: TD-216.
+- **Embedded content and token lists** (HTML §4.8.4–5, DOM §7.1,
+  `page/embedded.rs`, `page/token_list.rs`). `HTMLImageElement` and
+  `HTMLIFrameElement` reflect their content attributes (`src` as a URL,
+  `srcdoc`, `srcset`, `sizes`, `loading`, `decoding` and `referrerPolicy` as
+  keywords limited to known values). `DOMTokenList` is a live view of one
+  attribute's ordered token set, `[SameObject]` per element, behind
+  `Element.classList` and `HTMLIFrameElement.sandbox` (whose `supports()`
+  knows the sandbox keywords). `loading=lazy` images and iframes load only
+  within 1250px of the viewport (PAINT.md, lazy loading). Limits: TD-218.
 - **Inline style** (CSSOM §6.7, `page/inline_style.rs`). `element.style`
   returns one `CSSStyleDeclaration` per element whose only store is the
   `style` attribute: reads parse it, writes serialize it back, so the cascade

@@ -29,6 +29,7 @@ mod cssom;
 mod documents;
 mod dom_rect;
 mod elements;
+mod embedded;
 mod encoding;
 mod events;
 mod fetch;
@@ -44,6 +45,7 @@ mod ranges;
 mod resize_observer;
 mod scrolling;
 mod selectors;
+mod token_list;
 mod traversal;
 mod url;
 mod view_transitions;
@@ -330,6 +332,8 @@ struct Page {
     tracked: ranges::Tracked,
     /// Dialog, details and popover state.
     elements: elements::Elements,
+    /// Each element's `DOMTokenList`s.
+    token_lists: token_list::TokenLists,
 }
 
 impl ExecutionHost for Page {
@@ -708,6 +712,9 @@ fn install_page(
     mixins::install(agent)?;
     elements::install(agent)?;
     let elements = elements::Elements::new(agent)?;
+    embedded::install(agent)?;
+    token_list::install(agent)?;
+    let token_lists = token_list::TokenLists::new(agent)?;
     let traversers = agent.new_weak_map()?;
     agent.root(Value::object(traversers))?;
     let ranges = agent.new_weak_map()?;
@@ -771,6 +778,7 @@ fn install_page(
         element_styles,
         tracked: ranges::Tracked::default(),
         elements,
+        token_lists,
     }))?;
     animations::register_document_timeline(agent, document_timeline)
 }
@@ -1112,7 +1120,14 @@ fn wrap(
             if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
                 && matches!(
                     element.name().local(),
-                    "input" | "textarea" | "button" | "form" | "details" | "dialog"
+                    "input"
+                        | "textarea"
+                        | "button"
+                        | "form"
+                        | "details"
+                        | "dialog"
+                        | "img"
+                        | "iframe"
                 ) =>
         {
             match element.name().local() {
@@ -1121,6 +1136,8 @@ fn wrap(
                 "button" => "HTMLButtonElement",
                 "details" => "HTMLDetailsElement",
                 "dialog" => "HTMLDialogElement",
+                "img" => embedded::IMAGE,
+                "iframe" => embedded::IFRAME,
                 _ => "HTMLFormElement",
             }
         }

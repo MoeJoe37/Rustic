@@ -214,7 +214,6 @@ fn unsupported_contexts_and_controls_return_typed_errors() {
         "display:inline-grid",
         "display:table-cell",
         "display:inline-table",
-        "display:list-item",
     ] {
         unsupported(
             "<main></main>",
@@ -223,13 +222,7 @@ fn unsupported_contexts_and_controls_return_typed_errors() {
         );
     }
     // Block-level replaced elements are laid out since REN-02c (tests/sizing.rs).
-    for html in [
-        "<input>",
-        "<button></button>",
-        "<svg></svg>",
-        "<br>",
-        "<details></details>",
-    ] {
+    for html in ["<svg></svg>", "<math></math>", "<br>"] {
         unsupported(html, "* {display:block}", UnsupportedFlow::SpecialElement);
     }
 }

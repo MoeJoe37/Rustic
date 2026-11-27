@@ -145,6 +145,32 @@ fn local_frames_render_in_their_own_renderers_under_parent_content() {
 }
 
 #[test]
+fn lazy_frames_open_when_the_scroll_position_brings_them_near() {
+    let page = frames_page(&[
+        "loading=lazy src=\"frame.html\"",
+        "loading=lazy src=\"frame.html\" class=far",
+    ])
+    .replace("</style>", " .far{top:3000px}</style>");
+    let dir = Dir::new(
+        "lazy",
+        &[("site/page.html", &page), ("site/frame.html", BLUE_PAGE)],
+    );
+    let (output, pixels) = render(&dir, &[], &dir.path("site/page.html"), &[]);
+    assert!(output.status.success(), "{}", text(&output.stderr));
+    assert_eq!(pixel(&pixels, 20, 10), BLUE, "in view");
+    // Scrolled to the bottom (2940px, the page ends at 3040px): the far
+    // frame, now at y = 60, is near and opens.
+    let (output, pixels) = render(
+        &dir,
+        &["--scroll", "0,3000"],
+        &dir.path("site/page.html"),
+        &[],
+    );
+    assert!(output.status.success(), "{}", text(&output.stderr));
+    assert_eq!(pixel(&pixels, 60, 80), BLUE, "scrolled into view");
+}
+
+#[test]
 fn a_frame_grant_is_its_own_directory_and_a_failing_frame_costs_only_its_pixels() {
     let page = frames_page(&["src=\"sub/frame.html\"", "src=\"frame.html\""]);
     let dir = Dir::new(

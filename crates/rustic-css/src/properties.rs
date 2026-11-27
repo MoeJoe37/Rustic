@@ -386,6 +386,36 @@ keywords! {
 }
 
 keywords! {
+    /// `list-style-type` values (CSS Lists 3 §3.2, CSS Counter Styles 3
+    /// §6): the predefined counter styles Rustic renders.
+    ListStyleType {
+        None => "none",
+        Disc => "disc",
+        Circle => "circle",
+        Square => "square",
+        Decimal => "decimal",
+        DecimalLeadingZero => "decimal-leading-zero",
+        LowerRoman => "lower-roman",
+        UpperRoman => "upper-roman",
+        LowerAlpha => "lower-alpha",
+        UpperAlpha => "upper-alpha",
+        LowerLatin => "lower-latin",
+        UpperLatin => "upper-latin",
+        LowerGreek => "lower-greek",
+        DisclosureOpen => "disclosure-open",
+        DisclosureClosed => "disclosure-closed",
+    }
+}
+
+keywords! {
+    /// `list-style-position` values (CSS Lists 3 §3.3).
+    ListStylePosition {
+        Outside => "outside",
+        Inside => "inside",
+    }
+}
+
+keywords! {
     /// `empty-cells` values (CSS 2.2 §17.6.1.1).
     EmptyCells {
         Show => "show",
@@ -802,6 +832,10 @@ pub enum PropertyValue {
     CaptionSide(CaptionSide),
     /// `empty-cells`.
     EmptyCells(EmptyCells),
+    /// `list-style-type`.
+    ListStyleType(ListStyleType),
+    /// `list-style-position`.
+    ListStylePosition(ListStylePosition),
     /// `opacity`, as a number (a percentage is divided by 100). Out-of-range
     /// values are clamped to `0..=1` when computed.
     Opacity(f64),
@@ -980,6 +1014,8 @@ property_ids! {
     TableLayout => "table-layout", false;
     CaptionSide => "caption-side", true;
     EmptyCells => "empty-cells", true;
+    ListStyleType => "list-style-type", true;
+    ListStylePosition => "list-style-position", true;
     Opacity => "opacity", false;
     VerticalAlign => "vertical-align", false;
     Direction => "direction", true;
@@ -1178,6 +1214,8 @@ impl PropertyId {
             P::TableLayout => PropertyValue::TableLayout(TableLayout::Auto),
             P::CaptionSide => PropertyValue::CaptionSide(CaptionSide::Top),
             P::EmptyCells => PropertyValue::EmptyCells(EmptyCells::Show),
+            P::ListStyleType => PropertyValue::ListStyleType(ListStyleType::Disc),
+            P::ListStylePosition => PropertyValue::ListStylePosition(ListStylePosition::Outside),
             P::Opacity => PropertyValue::Opacity(1.0),
             P::AnimationTimingFunction | P::TransitionTimingFunction => {
                 PropertyValue::Easing(EasingList::default())
@@ -1667,6 +1705,7 @@ pub fn longhands_of(name: &str) -> Option<&'static [PropertyId]> {
         "grid-row" => &[P::GridRowStart, P::GridRowEnd],
         "grid-column" => &[P::GridColumnStart, P::GridColumnEnd],
         "place-content" => &[P::AlignContent, P::JustifyContent],
+        "list-style" => &[P::ListStyleType, P::ListStylePosition],
         "place-items" => &[P::AlignItems, P::JustifyItems],
         "place-self" => &[P::AlignSelf, P::JustifySelf],
         "text-decoration" => TEXT_DECORATION,
@@ -2488,6 +2527,10 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::TableLayout => PropertyValue::TableLayout(TableLayout::from_name(name()?)?),
         P::CaptionSide => PropertyValue::CaptionSide(CaptionSide::from_name(name()?)?),
         P::EmptyCells => PropertyValue::EmptyCells(EmptyCells::from_name(name()?)?),
+        P::ListStyleType => PropertyValue::ListStyleType(ListStyleType::from_name(name()?)?),
+        P::ListStylePosition => {
+            PropertyValue::ListStylePosition(ListStylePosition::from_name(name()?)?)
+        }
         P::Opacity => PropertyValue::Opacity(opacity(value)?),
         P::VerticalAlign => PropertyValue::VerticalAlign(match name() {
             Some(n) => VerticalAlign::Keyword(VerticalAlignKeyword::from_name(n)?),
@@ -2637,6 +2680,35 @@ fn four<T: Clone>(items: Vec<T>) -> Option<Vec<T>> {
     Some(items)
 }
 
+/// `list-style` (CSS Lists 3 §3.4): a type, a position and an image in any
+/// order. Images are accepted only as `none` (TD-219); a `none` that is
+/// not the image's is the type's.
+fn list_style(parts: &[&Value]) -> Option<Vec<PropertyValue>> {
+    let (mut kind, mut position, mut nones) = (None, None, 0);
+    for part in parts {
+        let name = ident(part)?;
+        if name.eq_ignore_ascii_case("none") {
+            nones += 1;
+        } else if let Some(p) = ListStylePosition::from_name(name) {
+            if position.replace(p).is_some() {
+                return None;
+            }
+        } else if kind.replace(ListStyleType::from_name(name)?).is_some() {
+            return None;
+        }
+    }
+    let kind = match (kind, nones) {
+        (Some(kind), 0 | 1) => kind,
+        (None, 0) => ListStyleType::Disc,
+        (None, 1 | 2) => ListStyleType::None,
+        _ => return None,
+    };
+    Some(vec![
+        PropertyValue::ListStyleType(kind),
+        PropertyValue::ListStylePosition(position.unwrap_or(ListStylePosition::Outside)),
+    ])
+}
+
 pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValue>> {
     if let Some(values) = crate::logical::shorthand(name, parts) {
         return values;
@@ -2666,6 +2738,7 @@ pub(crate) fn shorthand(name: &str, parts: &[&Value]) -> Option<Vec<PropertyValu
             Some(vec![PropertyValue::Overflow(x), PropertyValue::Overflow(y)])
         }
         "text-decoration" => text_decoration(parts),
+        "list-style" => list_style(parts),
         "border-radius" => {
             let (horizontal, vertical) = match parts
                 .iter()
@@ -2867,6 +2940,8 @@ impl fmt::Display for PropertyValue {
             Self::TableLayout(v) => write!(f, "{v}"),
             Self::CaptionSide(v) => write!(f, "{v}"),
             Self::EmptyCells(v) => write!(f, "{v}"),
+            Self::ListStyleType(v) => write!(f, "{v}"),
+            Self::ListStylePosition(v) => write!(f, "{v}"),
             Self::WritingMode(v) => write!(f, "{v}"),
             Self::TextOrientation(v) => write!(f, "{v}"),
             Self::TextCombineUpright(v) => write!(f, "{v}"),

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 53.83%** = 51.78% verified complete + 2.05% partial credit. 121/228 capabilities complete, 12 in progress.
+**Overall completion: 54.19%** = 52.86% verified complete + 1.33% partial credit. 122/228 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `41a8c7b9f572ed9165b636f1c906c8ea97e21b50f03535caba40d543b09f410a`.
+Catalog: `engine-v4`. Source fingerprint: `efa7c800f61dc62000599497d1aba830fbdcf1709792f161e128528bfc24ada9`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `41a8c7b9f572ed9165b636f1c906c8ea97e21
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 8/54 | 20.00% | 14.89% | 22.35% |
+| M9 Compatibility expansion | 9/54 | 21.61% | 19.73% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -32,7 +32,7 @@ Catalog: `engine-v4`. Source fingerprint: `41a8c7b9f572ed9165b636f1c906c8ea97e21
 | Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | URLs & encoding | 10/12 | 0 | 83.33% | 83.33% | 2% | 1.66 |
 | DOM | 9/10 | 1 | 88.97% | 85.29% | 4% | 3.55 |
-| HTML | 10/11 | 1 | 92.79% | 78.37% | 5% | 4.63 |
+| HTML | 11/11 | 0 | 100.00% | 100.00% | 5% | 5.00 |
 | CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
 | Text & fonts | 5/7 | 0 | 76.00% | 76.00% | 3% | 2.28 |
 | Layout | 8/11 | 0 | 70.58% | 70.58% | 6% | 4.23 |
@@ -114,13 +114,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `html.scripts` — Parser/script reentry and encoding restart · size 3 · M5 · 0.40% of engine ([source](../../crates/rustic-html/src/parser.rs), [source](../../crates/rustic-html/src/local_encoding.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs), [test](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs))
 - **complete** `html.loader` — Bounded local loader and dump-dom command · size 2 · M1 · 0.27% of engine ([source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/cli.rs))
 - **complete** `html.conformance` — Parser corpora, chunk invariance and fuzz gate · size 3 · M1 · 0.40% of engine ([source](../../tools/import_html_tests.py), [test](../../crates/rustic-html/tests/corpus.rs), [source](../../crates/rustic-html/src/parser/fragment.rs), [test](../../crates/rustic-html/tests/tree_construction.rs), [test](../../crates/rustic-html/tests/fragment.rs), [source](../../crates/rustic-fuzz/src/targets.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
-- **in progress 66.66%** `html.elements` — Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading · size 8 · M9 · 1.08% of engine
-  - [x] details and summary: rendering, open and name, summary activation, toggle events and exclusive groups ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-bindings/tests/page.rs))
-  - [x] dialog: show, showModal, close, requestClose, returnValue, the top layer and :modal ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-dom/src/document/top_layer.rs), [test](../../crates/rustic-style/tests/computed.rs))
-  - [x] Popover API: the popover attribute, show/hide/toggle, invokers, :popover-open and the top layer ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html_state.rs), [test](../../crates/rustic-bindings/tests/page.rs))
-  - [x] picture, srcset and sizes: image source selection for layout and paint ([source](../../crates/rustic-cli/src/srcset.rs), [test](../../crates/rustic-cli/tests/cli.rs))
-  - [ ] iframes: srcdoc and sandbox, and lazy loading of images and iframes
-  - [ ] Form-control semantics and layout: select and option, fieldset and legend, meter, progress and the remaining input types
+- **complete** `html.elements` — Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading · size 8 · M9 · 1.08% of engine ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-bindings/tests/page.rs), [source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-dom/src/document/top_layer.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html_state.rs), [source](../../crates/rustic-cli/src/srcset.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-cli/src/images.rs), [source](../../crates/rustic-bindings/src/page/token_list.rs), [test](../../crates/rustic-cli/tests/cli.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-bindings/tests/page.rs), [source](../../crates/rustic-paint/src/controls.rs), [source](../../crates/rustic-layout/src/tree.rs), [source](../../crates/rustic-layout/src/tree.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-paint/src/controls.rs))
 
 ### CSS & style
 

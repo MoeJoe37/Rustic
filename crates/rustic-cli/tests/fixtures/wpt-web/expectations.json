@@ -601,13 +601,11 @@
     },
     {
       "name": "attributes Element.classList.add: single token addition mutation",
-      "status": "FAIL",
-      "message": "cannot access property add of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.add: multiple tokens addition mutation",
-      "status": "FAIL",
-      "message": "cannot access property add of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.add: syntax err/no mutation",
@@ -619,53 +617,43 @@
     },
     {
       "name": "attributes Element.classList.add: same value mutation",
-      "status": "FAIL",
-      "message": "cannot access property add of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.remove: single token removal mutation",
-      "status": "FAIL",
-      "message": "cannot access property remove of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.remove: multiple tokens removal mutation",
-      "status": "FAIL",
-      "message": "cannot access property remove of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.remove: missing token removal mutation",
-      "status": "FAIL",
-      "message": "cannot access property remove of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.toggle: token removal mutation",
-      "status": "FAIL",
-      "message": "cannot access property toggle of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.toggle: token addition mutation",
-      "status": "FAIL",
-      "message": "cannot access property toggle of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.toggle: forced token removal mutation",
-      "status": "FAIL",
-      "message": "cannot access property toggle of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.toggle: forced missing token removal no mutation",
-      "status": "FAIL",
-      "message": "cannot access property toggle of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.toggle: forced existing token addition no mutation",
-      "status": "FAIL",
-      "message": "cannot access property toggle of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.classList.toggle: forced token addition mutation",
-      "status": "FAIL",
-      "message": "cannot access property toggle of undefined or null"
+      "status": "PASS"
     },
     {
       "name": "attributes Element.attributes.value: update mutation",

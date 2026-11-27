@@ -14,6 +14,7 @@
 mod client_rects;
 mod clip;
 mod color;
+mod controls;
 mod display;
 mod matrix;
 mod rounded;

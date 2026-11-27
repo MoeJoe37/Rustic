@@ -211,7 +211,7 @@ pub(crate) fn intrinsic(ifc: &Ifc<'_>, work: &mut Work<'_>) -> Result<Intrinsic,
             lp(v, 0.0)?
         }
         _ => 0.0,
-    };
+    } - ifc.hang;
     let mut result = Intrinsic::default();
     for (available, slot) in [(0.0, 0), (f64::INFINITY, 1)] {
         // Atomic inlines contribute their outer min-/max-content sizes.
@@ -303,7 +303,7 @@ pub(crate) fn layout(
     let indent = match ifc.root.get(P::TextIndent) {
         V::LengthPercentage(v) => lp(v, area.width)?,
         _ => return Err(FlowError::InvalidSnapshot),
-    };
+    } - ifc.hang;
     let align = match ifc.root.get(P::TextAlign) {
         V::TextAlign(a) => *a,
         _ => return Err(FlowError::InvalidSnapshot),

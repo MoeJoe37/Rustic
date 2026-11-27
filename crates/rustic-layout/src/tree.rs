@@ -97,6 +97,9 @@ pub struct BoxSnapshot {
     /// rest of the row group), or `span` of a `col`/`colgroup` as the first
     /// value; (1, 1) for every other box.
     span: (u32, u32),
+    /// A generated `outside` list marker (CSS Lists 3 §3.3): hangs before
+    /// the first line of its list item.
+    outside_marker: bool,
 }
 
 /// HTML elements whose `overflow` can propagate to the viewport.
@@ -180,8 +183,14 @@ impl BoxSnapshot {
             copy.html_tag = HtmlTag::Other;
             copy.natural = None;
             copy.span = (1, 1);
+            copy.outside_marker = false;
         }
         copy
+    }
+
+    /// Whether this text box is a generated `outside` list marker.
+    pub(crate) const fn is_outside_marker(&self) -> bool {
+        self.outside_marker
     }
 
     /// The shared style, for copies that keep it.
@@ -266,6 +275,7 @@ impl BoxTree {
         let mut hidden = None;
         let mut text_units = 0usize;
         let mut languages: Vec<(usize, Option<Arc<str>>)> = Vec::new();
+        let mut ordinals = Ordinals::default();
         let mut initial_language = None;
         let mut ancestors = 0usize;
         let mut ancestor = document.node(root)?.parent();
@@ -300,6 +310,12 @@ impl BoxTree {
             let parent = parents.last().and_then(|&(_, parent, _)| parent);
             let inherited = parents.last().and_then(|(_, _, style)| style.clone());
             let node = document.node(id)?;
+            // A closed `details` renders only its first `summary` (HTML
+            // §15.5.3: the rest is in a slot that is not rendered).
+            if id != root && hidden_in_closed_details(document, id, node) {
+                hidden = Some(depth);
+                continue;
+            }
             while languages.last().is_some_and(|(d, _)| *d >= depth) {
                 languages.pop();
             }
@@ -323,19 +339,8 @@ impl BoxTree {
                                 | "embed"
                                 | "object"
                                 | "canvas"
-                                | "input"
-                                | "textarea"
-                                | "select"
-                                | "button"
-                                | "meter"
-                                | "progress"
                                 | "br"
                                 | "wbr"
-                                | "fieldset"
-                                | "legend"
-                                | "details"
-                                | "summary"
-                                | "dialog"
                                 | "slot"
                         )
                 }
@@ -443,8 +448,13 @@ impl BoxTree {
                     if boxes.len() >= limits.max_boxes {
                         return Err(LayoutError::BoxLimit);
                     }
+                    // A list item is a block box with a marker (CSS Lists 3).
+                    let display = match display {
+                        Display::ListItem => Display::Block,
+                        other => *other,
+                    };
                     (
-                        BoxKind::Element(*display),
+                        BoxKind::Element(display),
                         Arc::new(style.clone()),
                         Vec::new(),
                     )
@@ -474,18 +484,101 @@ impl BoxTree {
                 BoxKind::Element(_) => Some(Arc::clone(&style)),
                 BoxKind::Text => inherited,
             };
+            let control = match node.kind() {
+                NodeKind::Element(element) if matches!(kind, BoxKind::Element(_)) => {
+                    control_text(document, id, element)
+                }
+                _ => None,
+            };
             boxes.push(BoxSnapshot {
                 node: id,
-                language,
+                language: language.clone(),
                 parent,
                 kind,
-                style: Some(style),
+                style: Some(Arc::clone(&style)),
                 text,
                 special_layout,
                 html_tag,
                 natural: natural.filter(|_| matches!(kind, BoxKind::Element(_))),
                 span,
+                outside_marker: false,
             });
+            let item = matches!(
+                (node.kind(), style.get(PropertyId::Display)),
+                (
+                    NodeKind::Element(_),
+                    PropertyValue::Display(Display::ListItem)
+                )
+            );
+            if item {
+                let ordinal = ordinals.next(document, id);
+                if let Some((units, outside)) = marker_text(&style, ordinal) {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    text_units = text_units
+                        .checked_add(units.len())
+                        .filter(|&n| n <= limits.max_text_units)
+                        .ok_or(LayoutError::TextLimit)?;
+                    // The marker keeps its trailing space.
+                    let mut marker = (*style).clone();
+                    marker.set(
+                        PropertyId::WhiteSpace,
+                        PropertyValue::WhiteSpace(rustic_css::WhiteSpace::Pre),
+                    );
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language: language.clone(),
+                        parent: Some(current),
+                        kind: BoxKind::Text,
+                        style: Some(Arc::new(marker)),
+                        text: units,
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: outside,
+                    });
+                }
+            }
+            if let Some(control) = control {
+                // A control's rendering replaces its children: the value,
+                // label or selected option becomes one text run of its own.
+                hidden = Some(depth);
+                if let Some((units, placeholder)) = control {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    text_units = text_units
+                        .checked_add(units.len())
+                        .filter(|&n| n <= limits.max_text_units)
+                        .ok_or(LayoutError::TextLimit)?;
+                    let text_style = if placeholder {
+                        let mut muted = (*style).clone();
+                        muted.set(
+                            PropertyId::Color,
+                            PropertyValue::Color(rustic_css::Color::rgb(117, 117, 117)),
+                        );
+                        Arc::new(muted)
+                    } else {
+                        Arc::clone(&style)
+                    };
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language,
+                        parent: Some(current),
+                        kind: BoxKind::Text,
+                        style: Some(text_style),
+                        text: units,
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: false,
+                    });
+                }
+                continue;
+            }
             parents.push((depth, Some(current), shared));
         }
         Ok(Self { boxes })
@@ -600,6 +693,313 @@ impl fmt::Display for LayoutError {
 }
 impl Error for LayoutError {}
 
+/// Whether `node` is a child of a closed HTML `details` other than its
+/// first `summary` child.
+fn hidden_in_closed_details(document: &Document, id: NodeId, node: &rustic_dom::Node) -> bool {
+    let html = |n: &rustic_dom::Node, local: &str| {
+        matches!(n.kind(), NodeKind::Element(e)
+            if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && e.name().local() == local)
+    };
+    let Some(parent) = node.parent() else {
+        return false;
+    };
+    let Ok(details) = document.node(parent) else {
+        return false;
+    };
+    let closed = matches!(details.kind(), NodeKind::Element(e)
+        if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
+            && e.name().local() == "details"
+            && !e.attributes().iter().any(|a| a.name().namespace().is_none() && a.name().local() == "open"));
+    if !closed {
+        return false;
+    }
+    let first_summary = document.children(parent).ok().and_then(|mut children| {
+        children.find(|&child| document.node(child).is_ok_and(|n| html(n, "summary")))
+    });
+    first_summary != Some(id)
+}
+
+/// The ordinal values of list items (HTML §4.4.8, `ol` `start`,
+/// `reversed` and `li` `value`), counted per parent in tree order.
+#[derive(Default)]
+struct Ordinals {
+    /// Parent → (its next ordinal, the step).
+    next: HashMap<NodeId, (i64, i64)>,
+}
+
+impl Ordinals {
+    fn next(&mut self, document: &Document, item: NodeId) -> i64 {
+        let Some(parent) = document.node(item).ok().and_then(|n| n.parent()) else {
+            return 1;
+        };
+        let html_attribute = |id: NodeId, name: &str| match document.node(id).map(|n| n.kind()) {
+            Ok(NodeKind::Element(e))
+                if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
+            {
+                e.attributes()
+                    .iter()
+                    .find(|a| a.name().namespace().is_none() && a.name().local() == name)
+                    .map(|a| String::from_utf16_lossy(a.value().as_units()))
+            }
+            _ => None,
+        };
+        let is_ol = matches!(document.node(parent).map(|n| n.kind()),
+            Ok(NodeKind::Element(e)) if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
+                && e.name().local() == "ol");
+        let (next, step) = *self.next.entry(parent).or_insert_with(|| {
+            let reversed = is_ol && html_attribute(parent, "reversed").is_some();
+            let start = if is_ol {
+                html_attribute(parent, "start").as_deref().and_then(integer)
+            } else {
+                None
+            };
+            if reversed {
+                let items = document.children(parent).map_or(0, |children| {
+                    children
+                        .filter(|&child| {
+                            matches!(document.node(child).map(|n| n.kind()),
+                            Ok(NodeKind::Element(e)) if e.name().local() == "li")
+                        })
+                        .count()
+                });
+                (start.unwrap_or(items as i64), -1)
+            } else {
+                (start.unwrap_or(1), 1)
+            }
+        });
+        let value = html_attribute(item, "value")
+            .as_deref()
+            .and_then(integer)
+            .unwrap_or(next);
+        self.next.insert(parent, (value.saturating_add(step), step));
+        value
+    }
+}
+
+/// The HTML rules for parsing integers (leading whitespace, a sign, digits).
+fn integer(value: &str) -> Option<i64> {
+    let rest = value.trim_start_matches(['\t', '\n', '\x0c', '\r', ' ']);
+    let (negative, rest) = match rest.as_bytes().first() {
+        Some(b'-') => (true, &rest[1..]),
+        Some(b'+') => (false, &rest[1..]),
+        _ => (false, rest),
+    };
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() {
+        return None;
+    }
+    let n = digits
+        .parse::<i64>()
+        .unwrap_or(i64::from(i32::MAX))
+        .min(i64::from(i32::MAX));
+    Some(if negative { -n } else { n })
+}
+
+/// A list item's marker text and whether it hangs outside: the counter
+/// in the item's `list-style-type`, with its suffix (CSS Counter Styles 3
+/// §6). `None` for `list-style-type: none`.
+fn marker_text(style: &ComputedStyle, ordinal: i64) -> Option<(Vec<u16>, bool)> {
+    use rustic_css::{ListStylePosition, ListStyleType as T};
+    let PropertyValue::ListStyleType(kind) = style.get(PropertyId::ListStyleType) else {
+        return None;
+    };
+    let outside = matches!(
+        style.get(PropertyId::ListStylePosition),
+        PropertyValue::ListStylePosition(ListStylePosition::Outside)
+    );
+    let text = match kind {
+        T::None => return None,
+        T::Disc => "\u{2022} ".to_owned(),
+        T::Circle => "\u{25E6} ".to_owned(),
+        T::Square => "\u{25AA} ".to_owned(),
+        T::DisclosureOpen => "\u{25BE} ".to_owned(),
+        T::DisclosureClosed => "\u{25B8} ".to_owned(),
+        numeric => format!("{}. ", counter(*numeric, ordinal)),
+    };
+    Some((text.encode_utf16().collect(), outside))
+}
+
+/// `ordinal` in a numeric or alphabetic counter style, falling back to
+/// `decimal` outside the style's range.
+fn counter(kind: rustic_css::ListStyleType, ordinal: i64) -> String {
+    use rustic_css::ListStyleType as T;
+    let alphabetic = |letters: &[char]| {
+        if ordinal < 1 {
+            return ordinal.to_string();
+        }
+        let mut n = ordinal;
+        let mut out = Vec::new();
+        while n > 0 {
+            n -= 1;
+            out.push(letters[(n % letters.len() as i64) as usize]);
+            n /= letters.len() as i64;
+        }
+        out.iter().rev().collect()
+    };
+    let roman = |upper: bool| {
+        if !(1..=3999).contains(&ordinal) {
+            return ordinal.to_string();
+        }
+        const DIGITS: [(i64, &str); 13] = [
+            (1000, "m"),
+            (900, "cm"),
+            (500, "d"),
+            (400, "cd"),
+            (100, "c"),
+            (90, "xc"),
+            (50, "l"),
+            (40, "xl"),
+            (10, "x"),
+            (9, "ix"),
+            (5, "v"),
+            (4, "iv"),
+            (1, "i"),
+        ];
+        let mut n = ordinal;
+        let mut out = String::new();
+        for (value, digits) in DIGITS {
+            while n >= value {
+                out.push_str(digits);
+                n -= value;
+            }
+        }
+        if upper { out.to_ascii_uppercase() } else { out }
+    };
+    let latin: Vec<char> = ('a'..='z').collect();
+    match kind {
+        T::DecimalLeadingZero if (0..10).contains(&ordinal) => format!("0{ordinal}"),
+        T::DecimalLeadingZero if (-9..0).contains(&ordinal) => format!("-0{}", -ordinal),
+        T::LowerRoman => roman(false),
+        T::UpperRoman => roman(true),
+        T::LowerAlpha | T::LowerLatin => alphabetic(&latin),
+        T::UpperAlpha | T::UpperLatin => alphabetic(&latin).to_uppercase(),
+        T::LowerGreek => alphabetic(&[
+            'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ',
+            'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω',
+        ]),
+        _ => ordinal.to_string(),
+    }
+}
+
+/// A zero-width space: the text of an empty field, which keeps one line's
+/// height.
+const STRUT: [u16; 1] = [0x200B];
+
+/// For an HTML control whose rendering replaces its children (`input`,
+/// `select`, `meter`, `progress`), the text it shows, if any, and whether
+/// that text is a placeholder; `None` for every other element.
+#[allow(
+    clippy::option_option,
+    reason = "outer: a control at all; inner: whether it shows text"
+)]
+fn control_text(
+    document: &Document,
+    id: NodeId,
+    element: &rustic_dom::Element,
+) -> Option<Option<(Vec<u16>, bool)>> {
+    if element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE) {
+        return None;
+    }
+    let attribute = |e: &rustic_dom::Element, name: &str| {
+        e.attributes()
+            .iter()
+            .find(|a| a.name().namespace().is_none() && a.name().local() == name)
+            .map(|a| a.value().as_units().to_vec())
+    };
+    let text = |s: &str| Some((s.encode_utf16().collect::<Vec<u16>>(), false));
+    match element.name().local() {
+        "meter" | "progress" => Some(None),
+        "input" => {
+            let kind = attribute(element, "type")
+                .map(|t| String::from_utf16_lossy(&t).to_ascii_lowercase())
+                .unwrap_or_default();
+            let value = attribute(element, "value").filter(|v| !v.is_empty());
+            Some(match kind.as_str() {
+                "checkbox" | "radio" | "range" | "color" | "hidden" | "image" => None,
+                "submit" => value.map(|v| (v, false)).or_else(|| text("Submit")),
+                "reset" => value.map(|v| (v, false)).or_else(|| text("Reset")),
+                "button" => value.map(|v| (v, false)),
+                "file" => text("Choose File  No file chosen"),
+                "password" => match value {
+                    Some(v) => Some((vec![0x2022; v.len()], false)),
+                    None => attribute(element, "placeholder").map(|p| (p, true)),
+                },
+                _ => match value {
+                    // Line breaks are stripped from single-line values.
+                    Some(v) => Some((
+                        v.into_iter().filter(|&u| u != 0x0A && u != 0x0D).collect(),
+                        false,
+                    )),
+                    None => attribute(element, "placeholder")
+                        .filter(|p| !p.is_empty())
+                        .map(|p| (p, true))
+                        .or(Some((STRUT.to_vec(), false))),
+                },
+            })
+        }
+        "select" => {
+            // The first selected option, else the first option (a list box
+            // with `multiple` or `size` shows the same, TD-219).
+            let mut first = None;
+            let mut selected = None;
+            if let Ok(walk) = document.walk(id) {
+                for (option, _) in walk {
+                    let Ok(NodeKind::Element(e)) = document.node(option).map(|n| n.kind()) else {
+                        continue;
+                    };
+                    if e.name().namespace() != Some(rustic_dom::HTML_NAMESPACE)
+                        || e.name().local() != "option"
+                    {
+                        continue;
+                    }
+                    first.get_or_insert(option);
+                    if attribute(e, "selected").is_some() {
+                        selected = Some(option);
+                        break;
+                    }
+                }
+            }
+            let Some(option) = selected.or(first) else {
+                return Some(Some((STRUT.to_vec(), false)));
+            };
+            let label = match document.node(option).map(|n| n.kind()) {
+                Ok(NodeKind::Element(e)) => attribute(e, "label").filter(|l| !l.is_empty()),
+                _ => None,
+            };
+            let label = label.unwrap_or_else(|| option_text(document, option));
+            Some(Some((
+                if label.is_empty() {
+                    STRUT.to_vec()
+                } else {
+                    label
+                },
+                false,
+            )))
+        }
+        _ => None,
+    }
+}
+
+/// An `option`'s text: its descendant text with ASCII whitespace stripped
+/// and collapsed (HTML §4.10.10).
+fn option_text(document: &Document, option: NodeId) -> Vec<u16> {
+    let mut units = Vec::new();
+    if let Ok(walk) = document.walk(option) {
+        for (node, _) in walk {
+            if let Ok(NodeKind::Text(data)) = document.node(node).map(|n| n.kind()) {
+                units.extend_from_slice(data.as_units());
+            }
+        }
+    }
+    let text = String::from_utf16_lossy(&units);
+    text.split(['\t', '\n', '\x0c', '\r', ' '])
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .encode_utf16()
+        .collect()
+}
+
 fn explicit_language(kind: &NodeKind) -> Option<Option<Arc<str>>> {
     let NodeKind::Element(element) = kind else {
         return None;
@@ -623,4 +1023,30 @@ fn explicit_language(kind: &NodeKind) -> Option<Option<Arc<str>>> {
         return Some(None);
     }
     Some(Some(Arc::from(s.to_ascii_lowercase())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{counter, integer};
+    use rustic_css::ListStyleType as T;
+
+    #[test]
+    fn counter_styles_render_ordinals_with_decimal_fallbacks() {
+        assert_eq!(counter(T::Decimal, -3), "-3");
+        assert_eq!(counter(T::DecimalLeadingZero, 7), "07");
+        assert_eq!(counter(T::DecimalLeadingZero, 12), "12");
+        assert_eq!(counter(T::LowerRoman, 1994), "mcmxciv");
+        assert_eq!(counter(T::UpperRoman, 4000), "4000");
+        assert_eq!(counter(T::LowerAlpha, 1), "a");
+        assert_eq!(counter(T::UpperLatin, 28), "AB");
+        assert_eq!(counter(T::LowerAlpha, 0), "0");
+        assert_eq!(counter(T::LowerGreek, 25), "αα");
+    }
+
+    #[test]
+    fn list_values_parse_as_html_integers() {
+        assert_eq!(integer(" +12abc"), Some(12));
+        assert_eq!(integer("-4"), Some(-4));
+        assert_eq!(integer("x1"), None);
+    }
 }

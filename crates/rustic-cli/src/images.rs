@@ -53,11 +53,13 @@ impl Default for ImageLimits {
 /// How one document's images are read: the chunk size and the view that
 /// selects among `srcset` candidates.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct ImageRead {
+pub(crate) struct ImageRead<'a> {
     /// Bytes per file read.
     pub(crate) chunk_bytes: usize,
     /// The view source selection uses.
     pub(crate) view: crate::srcset::ViewInfo,
+    /// Lazy images not loaded yet (HTML §2.5.7).
+    pub(crate) deferred: &'a std::collections::HashSet<NodeId>,
 }
 
 /// Decoded images and the natural sizes layout needs, by element.
@@ -137,26 +139,31 @@ fn map_staged_image_error(error: StoreError) -> FetchError {
     }
 }
 
-/// Load the images of `document`, loaded from the canonical file `path`,
-/// for the replaced boxes in `tree`.
-pub fn load(
+/// How far outside the viewport a `loading=lazy` image or iframe still
+/// loads, in CSS pixels on every side (the HTML "lazy load root margin" is
+/// UA-defined; this is the margin Chromium uses on fast connections).
+pub(crate) const LAZY_LOAD_MARGIN: f64 = 1250.0;
+
+/// Whether `element` is in the Lazy loading state (HTML §2.5.7): its
+/// `loading` attribute is `lazy`, ASCII case-insensitively.
+pub(crate) fn is_lazy(element: DomElement<'_>) -> bool {
+    attribute(element, "loading").is_some_and(|value| value.eq_ignore_ascii_case("lazy"))
+}
+
+/// The `img` elements of `document` with a box in `tree` that load lazily.
+pub(crate) fn lazy_images(
     document: &Document,
     tree: &BoxTree,
-    path: &Path,
-    limits: ImageLimits,
-    chunk_bytes: usize,
-    cancellation: &CancellationToken,
-    view: crate::srcset::ViewInfo,
-) -> LoadedImages {
-    load_applied(
-        document,
-        tree,
-        path,
-        limits,
-        ImageRead { chunk_bytes, view },
-        cancellation,
-        None,
-    )
+) -> std::collections::HashSet<NodeId> {
+    tree.boxes()
+        .iter()
+        .filter(|b| b.natural_size().is_some())
+        .map(|b| b.node())
+        .filter(|&node| {
+            DomElement::new(document, node)
+                .is_some_and(|element| is_html(element, "img") && is_lazy(element))
+        })
+        .collect()
 }
 
 /// Load images against a scripted document's applied byte snapshot. Other
@@ -166,11 +173,15 @@ pub(crate) fn load_applied(
     tree: &BoxTree,
     path: &Path,
     limits: ImageLimits,
-    read: ImageRead,
+    read: ImageRead<'_>,
     cancellation: &CancellationToken,
     applied: Option<(&AppliedLocalFiles, Option<&dyn crate::network::Session>)>,
 ) -> LoadedImages {
-    let ImageRead { chunk_bytes, view } = read;
+    let ImageRead {
+        chunk_bytes,
+        view,
+        deferred,
+    } = read;
     // A network document always reads through its applied snapshot.
     let network = applied.and_then(|(_, network)| network);
     let applied = applied.map(|(applied, _)| applied);
@@ -199,7 +210,7 @@ pub(crate) fn load_applied(
             if let Some(href) = attribute(element, "href") {
                 base = Some(Url::parse(&href, document_url.as_ref()).ok());
             }
-        } else if is_html(element, "img") && replaced.contains_key(&id) {
+        } else if is_html(element, "img") && replaced.contains_key(&id) && !deferred.contains(&id) {
             // `srcset`, `sizes` and `picture` sources choose the URL.
             if let Some(chosen) = crate::srcset::img_source(document, id, view) {
                 sources.push((id, chosen.url, chosen.density));

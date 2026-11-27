@@ -386,8 +386,8 @@ fn unsupported_inline_content_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
     // `inline-table` is laid out since `layout.tables` (tests/tables.rs).
     for (html, reason) in [
-        ("<p>x<input>", UnsupportedFlow::SpecialElement),
-        ("<p>x<select></select>", UnsupportedFlow::SpecialElement),
+        ("<p>x<svg></svg>", UnsupportedFlow::SpecialElement),
+        ("<p>x<math></math>", UnsupportedFlow::SpecialElement),
     ] {
         match try_layout(html, "", 100.0) {
             Err(FlowError::Unsupported { reason: got, .. }) => assert_eq!(got, reason, "{html}"),
@@ -559,4 +559,59 @@ fn text_sizes_keywords_and_flex_items() {
     // Fallback content of a replaced element is not laid out.
     let l = layout("<canvas style='display:block'>xx</canvas>", "", 100.0);
     assert!(l.lines().is_empty() && l.texts().is_empty());
+}
+
+#[test]
+fn outside_list_markers_hang_before_the_first_line() {
+    // "•" is .notdef here (5px) and the marker keeps its space (2.5px).
+    let l = layout("<ul><li>x xx</ul>", "ul { padding-left: 40px }", 55.0);
+    let rows = texts(&l);
+    assert_eq!(rows[0].2, (32.5, 0.0, 7.5, 10.0), "{rows:?}");
+    assert_eq!(rows[1].2.0, 40.0, "{rows:?}");
+    // Wrapped lines start at the content edge.
+    assert_eq!(line_rects(&l)[1].0, 40.0);
+    // Inside markers are ordinary inline content.
+    let l = layout(
+        "<ul><li>x</ul>",
+        "ul { padding-left: 40px; list-style-position: inside }",
+        100.0,
+    );
+    assert_eq!(texts(&l)[0].2.0, 40.0);
+    assert_eq!(texts(&l)[1].2.0, 47.5);
+    // `none` generates no marker.
+    let l = layout("<ul style='list-style: none'><li>x</ul>", "", 100.0);
+    assert_eq!(texts(&l).len(), 1);
+}
+
+#[test]
+fn form_controls_lay_out_as_inline_blocks_with_their_value() {
+    // 20ch of 5.5px, 2px+2px padding, 1px+1px border; one 10px line plus
+    // 1px+1px padding and border.
+    let l = layout(
+        "<p><input value=xx><input><select><option>x<option selected>xxx</select>",
+        "",
+        400.0,
+    );
+    let sizes: Vec<(f64, f64)> = l
+        .fragments()
+        .iter()
+        .map(|f| {
+            let size = f.border().size();
+            (
+                (size.width().get() * 1e6).round() / 1e6,
+                size.height().get(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        sizes.iter().filter(|s| **s == (116.0, 14.0)).count(),
+        2,
+        "{sizes:?}"
+    );
+    // The select shows its selected option: 15px of text, 4px+4px padding.
+    assert!(sizes.contains(&(25.0, 14.0)), "{sizes:?}");
+    // Each field's text: the value and the selected option (the empty
+    // field's zero-width strut only holds its line).
+    let widths: Vec<f64> = texts(&l).iter().map(|t| t.2.2).collect();
+    assert_eq!(widths, [10.0, 15.0]);
 }

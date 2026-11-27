@@ -197,6 +197,8 @@ fn every_longhand_has_an_initial_value_that_reparses() {
             "border-spacing",
             "caption-side",
             "empty-cells",
+            "list-style-type",
+            "list-style-position",
             "direction",
             "text-align",
             "text-indent",

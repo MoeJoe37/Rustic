@@ -304,6 +304,14 @@ pixel is one CSS pixel of natural size, passed to layout through
 an image that is blocked, missing, over budget or not a decodable image is broken
 and keeps a zero natural size, and the load continues.
 
+**Lazy loading** (HTML §2.5.7). An `img` or `iframe` with `loading=lazy`
+loads only when its border box, at the page's scroll positions, comes
+within 1250 CSS pixels of the viewport. Layout runs first without the lazy
+images; those found near load, and layout runs again, for up to four
+rounds, since loaded images move what follows them. A lazy image that
+stays far keeps a zero natural size, and a far lazy iframe is not opened
+(it paints white). Limits: TD-218.
+
 ## Atomic inlines
 
 A non-positioned `inline-block`, `inline-flex` or inline replaced element

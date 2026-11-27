@@ -1193,3 +1193,17 @@ properties expands the pinned parsing scope by 42 cases to 1,609, with no expect
 failure changes; 1,241 pass (102/104 invalid selectors, 543/544 invalid values,
 108/199 valid selectors, 488/762 valid values). The full 2,916-case source corpus
 and the larger engine denominator are unchanged.
+
+## Lists and form controls
+
+`display: list-item` lays out as a block with a generated text marker
+(CSS Lists 3): `list-style-type` (the predefined counter styles `disc`,
+`circle`, `square`, `decimal`, `decimal-leading-zero`, roman, latin, alpha
+and greek, and the disclosure triangles), `list-style-position` (an
+`outside` marker hangs before the first line) and the `list-style`
+shorthand (images only as `none`). Ordinals follow HTML (`ol start` and
+`reversed`, `li value`). The UA sheet gives form controls their HTML §15.5
+rendering as inline-blocks; their value text and painted parts come from
+their attributes (`rustic-layout/src/tree.rs`, `rustic-paint/src/controls.rs`).
+A closed `details` renders only its first `summary`, whose marker is a
+disclosure triangle. Limits: TD-219.

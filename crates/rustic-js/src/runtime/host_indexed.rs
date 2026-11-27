@@ -119,6 +119,23 @@ impl Agent {
         data
     }
 
+    /// The traced source of a live indexed host object with this
+    /// interface's brand; `None` for another object or a snapshot.
+    pub fn indexed_host_source(&self, object: ObjectId, interface: &'static str) -> Option<Value> {
+        match self
+            .heap
+            .objects
+            .try_get(object.0)
+            .and_then(Object::internal)
+        {
+            Some(Internal::HostIndexed(IndexedHost {
+                interface: brand,
+                source: IndexSource::Live { source, .. },
+            })) if *brand == interface => Some(*source),
+            _ => None,
+        }
+    }
+
     /// The count of supported indices of a branded indexed host object.
     pub fn indexed_host_len(&mut self, object: ObjectId) -> JsResult<u32> {
         match self.indexed_host(object).source {

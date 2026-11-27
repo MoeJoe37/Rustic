@@ -2264,3 +2264,77 @@ fn form_controls_paint_their_state_and_fieldsets_frame_their_legend() {
     // A full meter in its optimum region.
     assert_eq!(surface.pixel(35, 15), Some(rgb(0x10, 0x7c, 0x10)));
 }
+
+#[test]
+fn mathml_fraction_rules_and_radical_overlines_paint() {
+    // Block-level and empty, so no text needs fonts: the rule is the
+    // numerator's bottom border (the radical's overline is tested with
+    // fonts in rustic-layout's inline tests).
+    let p = page(
+        "<math style='display:block;font-size:50px'><mfrac style='display:flex'>\
+         <mrow style='display:block;width:40px;height:20px'></mrow>\
+         <mrow style='display:block;height:20px'></mrow></mfrac></math>",
+        RESET,
+        200.0,
+        100.0,
+    );
+    let list = p.list().unwrap();
+    let black = rgb(0, 0, 0);
+    let borders: Vec<_> = list
+        .commands()
+        .iter()
+        .filter_map(|c| match c {
+            DisplayCommand::Fill(item) if item.role == ItemRole::Border && item.color == black => {
+                Some(p.id_name(item.node))
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(borders, ["mrow"], "{list:?}");
+    let surface = render(&p, 1.0);
+    // The 3px rule (0.06em) under the 20px numerator, which the flex
+    // column centers in the 200px line.
+    assert_eq!(surface.pixel(100, 21), Some(black));
+    assert_eq!(surface.pixel(100, 10), Some(rgb(255, 255, 255)));
+    assert_eq!(surface.pixel(20, 21), Some(rgb(255, 255, 255)));
+}
+
+#[test]
+fn svg_gradients_clips_fill_rules_dashes_and_group_opacity_paint() {
+    let p = page(
+        "<svg width=200 height=100 style='display:block'><defs>\
+         <linearGradient id=g><stop offset=0 stop-color=#000 /><stop offset=1 stop-color=#fff /></linearGradient>\
+         <clipPath id=c><rect x=60 y=0 width=10 height=100 /></clipPath></defs>\
+         <rect width=50 height=20 fill='url(#g)' />\
+         <g clip-path='url(#c)'><rect x=50 y=0 width=40 height=20 fill=red /></g>\
+         <path d='M100 0h40v40h-40z M110 10v20h20v-20z' fill=blue fill-rule=evenodd />\
+         <line x1=0 y1=50 x2=40 y2=50 stroke=black stroke-width=4 stroke-dasharray='10 10' />\
+         <g opacity=.5><rect x=150 y=0 width=20 height=20 fill=#f00 /><rect x=160 y=0 width=20 height=20 fill=#f00 /></g>\
+         </svg>",
+        RESET,
+        200.0,
+        100.0,
+    );
+    let surface = render(&p, 1.0);
+    let white = rgb(255, 255, 255);
+    // The gradient darkens toward its start.
+    let (left, right) = (
+        surface.pixel(5, 10).unwrap(),
+        surface.pixel(45, 10).unwrap(),
+    );
+    assert!(left.r < 40 && right.r > 215, "{left:?} {right:?}");
+    // Only the clip's strip of the red rect paints.
+    assert_eq!(surface.pixel(65, 10), Some(rgb(255, 0, 0)));
+    assert_eq!(surface.pixel(55, 10), Some(white));
+    assert_eq!(surface.pixel(80, 10), Some(white));
+    // The even-odd inner square is a hole.
+    assert_eq!(surface.pixel(105, 5), Some(rgb(0, 0, 255)));
+    assert_eq!(surface.pixel(120, 20), Some(white));
+    // Dash, gap, dash.
+    assert_eq!(surface.pixel(5, 50), Some(rgb(0, 0, 0)));
+    assert_eq!(surface.pixel(15, 50), Some(white));
+    assert_eq!(surface.pixel(25, 50), Some(rgb(0, 0, 0)));
+    // A group composites once: the overlap is no darker.
+    assert_eq!(surface.pixel(155, 10), surface.pixel(165, 10));
+    assert_eq!(surface.pixel(165, 10), Some(rgb(255, 128, 128)));
+}

@@ -105,17 +105,24 @@ pub struct Resources<'a> {
     pub images: HashMap<NodeId, Arc<Image>>,
 }
 
-/// Closed quadratic contours filled with the nonzero rule, such as the
-/// glyphs of one text fragment.
+/// Closed quadratic contours filled with the nonzero rule (or, for SVG
+/// `fill-rule: evenodd`, the even-odd rule), such as the glyphs of one
+/// text fragment.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Path {
     contours: Vec<Vec<PathPoint>>,
+    even_odd: bool,
 }
 
 impl Path {
     /// The contours, each implicitly closed.
     pub fn contours(&self) -> &[Vec<PathPoint>] {
         &self.contours
+    }
+
+    /// Whether the path fills with the even-odd rule.
+    pub fn even_odd(&self) -> bool {
+        self.even_odd
     }
 
     fn points(&self) -> usize {
@@ -1008,8 +1015,17 @@ impl Builder<'_> {
         Some(self.clips.len() - 1)
     }
 
-    /// Store `contours` (polygons in CSS pixels) as a path.
+    /// Store `contours` (polygons in CSS pixels) as a nonzero path.
     fn polygon_path(&mut self, contours: Vec<Vec<(f64, f64)>>) -> Result<usize, PaintError> {
+        self.polygon_path_with(contours, false)
+    }
+
+    /// Store `contours` as a path filled by the even-odd rule or not.
+    fn polygon_path_with(
+        &mut self,
+        contours: Vec<Vec<(f64, f64)>>,
+        even_odd: bool,
+    ) -> Result<usize, PaintError> {
         let points: usize = contours.iter().map(Vec::len).sum();
         self.path_points = self
             .path_points
@@ -1029,6 +1045,7 @@ impl Builder<'_> {
                         .collect()
                 })
                 .collect(),
+            even_odd,
         };
         self.paths.push(path);
         Ok(self.paths.len() - 1)
@@ -1151,17 +1168,54 @@ impl Builder<'_> {
             x: narrow(fragment.clip.x, x0, x1),
             y: narrow(fragment.clip.y, y0, y1),
         };
-        for shape in crate::svg::paint(document, fragment.node, content, current) {
-            let index = self.polygon_path(shape.contours)?;
-            self.push(DisplayItem {
-                source_box: source,
-                node: fragment.node,
-                role: ItemRole::Background,
-                shape: Shape::Path(index),
-                color: shape.color,
-                clip,
-                rounded_clip: fragment.rounded_clip,
-            })?;
+        // Layers the SVG opened, closed here if it left any open.
+        let mut open: Vec<DisplayCommand> = Vec::new();
+        for op in crate::svg::paint(document, fragment.node, content, current) {
+            match op {
+                crate::svg::Op::Fill {
+                    contours,
+                    color,
+                    even_odd,
+                } => {
+                    let index = self.polygon_path_with(contours, even_odd)?;
+                    self.push(DisplayItem {
+                        source_box: source,
+                        node: fragment.node,
+                        role: ItemRole::Background,
+                        shape: Shape::Path(index),
+                        color,
+                        clip,
+                        rounded_clip: fragment.rounded_clip,
+                    })?;
+                }
+                crate::svg::Op::BeginClip(contours) => {
+                    let index = self.polygon_path(contours)?;
+                    self.command(DisplayCommand::BeginClip {
+                        source_box: source,
+                        node: fragment.node,
+                        shape: Shape::Path(index),
+                    })?;
+                    open.push(DisplayCommand::EndClip);
+                }
+                crate::svg::Op::BeginGroup(opacity) => {
+                    self.command(DisplayCommand::BeginGroup {
+                        source_box: source,
+                        node: fragment.node,
+                        opacity,
+                        blend: BlendMode::Normal,
+                        filter: None,
+                    })?;
+                    open.push(DisplayCommand::EndGroup);
+                }
+                crate::svg::Op::EndClip | crate::svg::Op::EndGroup => {
+                    if let Some(end) = open.pop() {
+                        self.command(end)?;
+                    }
+                }
+            }
+        }
+        while let Some(end) = open.pop() {
+            self.command(end)?;
         }
         Ok(())
     }

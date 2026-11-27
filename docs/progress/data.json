@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "d77750dc6c3d46c8908e41535bf3a60203c99a4877403b3c916c91c87a973353",
-  "percent": "55.52",
+  "source_fingerprint": "744acae20fb9aba684214e81690f0ea14cffdea6dd401bd29b72aa4a9693323b",
+  "percent": "56.11",
   "verified_percent": "54.04",
-  "partial_percent": "1.48",
+  "partial_percent": "2.07",
   "completed": 124,
   "in_progress": 11,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 11,
       "total": 54,
-      "percent": "27.54",
+      "percent": "30.19",
       "verified_percent": "24.99",
-      "partial_percent": "2.55"
+      "partial_percent": "5.20"
     },
     {
       "id": "M10",
@@ -3912,8 +3912,34 @@
             },
             {
               "label": "SVG paint servers, clipping, masks, markers, dashes and fill rules",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/svg.rs",
+                  "marker": "fn gradient_fill"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/svg.rs",
+                  "marker": "fn clip_region"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/svg.rs",
+                  "marker": "fn dash("
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-raster/src/raster.rs",
+                  "marker": "fn coverage_with"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn svg_gradients_clips_fill_rules_dashes_and_group_opacity_paint"
+                }
+              ]
             },
             {
               "label": "SVG text, author style sheets for SVG content and SVG images",
@@ -3922,11 +3948,22 @@
             },
             {
               "label": "MathML painting",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-style/src/hints.rs",
+                  "marker": "fn mathml_position_hints"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn mathml_fraction_rules_and_radical_overlines_paint"
+                }
+              ]
             }
           ],
-          "credit": "25.00",
+          "credit": "75.00",
           "engine_share": "1.18"
         },
         {
@@ -3995,10 +4032,10 @@
       "completed": 6,
       "in_progress": 1,
       "total": 7,
-      "contribution": "3.11",
-      "percent": "77.77",
+      "contribution": "3.70",
+      "percent": "92.59",
       "verified_percent": "70.37",
-      "partial_percent": "7.40"
+      "partial_percent": "22.22"
     },
     {
       "id": "js",

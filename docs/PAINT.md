@@ -529,5 +529,9 @@ clipped to it, after the box's background (`rustic-paint/src/svg.rs`):
 curves and arcs are flattened in user space, and strokes are built there
 from positively wound quads, joins (miter with the miter limit, round,
 bevel) and caps, so that the rasterizer's clamped nonzero coverage unions
-them without seams and transforms scale them as SVG requires. Limits:
-TD-220.
+them without seams and transforms scale them as SVG requires. Gradients
+paint as bands of one color, each the shape clipped to a slab (linear) or
+a disc (radial), opaque bands reaching two pixels under the next; a
+`clipPath` (or a mask's shapes) becomes a clip layer and group `opacity`
+an opacity group in the display list; paths may fill with the even-odd
+rule. Limits: TD-220.

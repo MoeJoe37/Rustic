@@ -1188,9 +1188,22 @@ pub(crate) fn chain(
 /// the `bw`×`bh` pixel window at `(bx, by)`, row-major.
 fn coverage(
     contours: &[Vec<Point>],
+    origin: (f64, f64),
+    size: (usize, usize),
+    work: &mut Work<'_>,
+) -> Result<Vec<f64>, RasterError> {
+    coverage_with(contours, origin, size, work, false)
+}
+
+/// [`coverage`], or with `even_odd` the even-odd rule: the accumulated
+/// winding folded into a triangle wave (exact where a pixel is wholly
+/// inside or outside each edge, a close approximation on edges).
+fn coverage_with(
+    contours: &[Vec<Point>],
     (bx, by): (f64, f64),
     (bw, bh): (usize, usize),
     work: &mut Work<'_>,
+    even_odd: bool,
 ) -> Result<Vec<f64>, RasterError> {
     work.charge((bw as u64 + 2) * bh as u64)?;
     let stride = bw + 2;
@@ -1218,7 +1231,12 @@ fn coverage(
         let mut sum = 0.0;
         for col in 0..bw {
             sum += acc[row * stride + col];
-            out[row * bw + col] = sum.abs().min(1.0);
+            out[row * bw + col] = if even_odd {
+                let t = sum.abs() % 2.0;
+                if t > 1.0 { 2.0 - t } else { t }
+            } else {
+                sum.abs().min(1.0)
+            };
         }
     }
     Ok(out)
@@ -1416,7 +1434,11 @@ fn fill(
     let by = bounds.1.floor();
     let bw = (bounds.2.ceil() - bx) as usize;
     let bh = (bounds.3.ceil() - by) as usize;
-    let cover = coverage(&clipped, (bx, by), (bw, bh), work)?;
+    let even_odd = match item.shape {
+        Shape::Path(index) => list.paths().get(index).is_some_and(Path::even_odd),
+        _ => false,
+    };
+    let cover = coverage_with(&clipped, (bx, by), (bw, bh), work, even_odd)?;
     let mask = clip_mask(&nodes, (bx, by), (bw, bh), scale, work)?;
     blend_color(
         pixels,

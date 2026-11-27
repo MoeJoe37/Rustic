@@ -2338,3 +2338,45 @@ fn svg_gradients_clips_fill_rules_dashes_and_group_opacity_paint() {
     assert_eq!(surface.pixel(155, 10), surface.pixel(165, 10));
     assert_eq!(surface.pixel(165, 10), Some(rgb(255, 128, 128)));
 }
+
+#[test]
+fn svg_text_shapes_glyphs_along_the_baseline_and_anchors_chunks() {
+    // "Rustic Test" glyphs: `x` advances 500 units, so 5px at 10px.
+    let list = text_list(
+        "<svg width=100 height=60 style='display:block'>\
+         <text x=10 y=20 font-size=10 fill=#f00>xx</text>\
+         <text x=90 y=50 font-size=10 fill=#00f text-anchor=end>x<tspan fill=#0f0>x</tspan></text></svg>",
+        RESET,
+        100.0,
+        60.0,
+    );
+    let extent = |color: Srgba| {
+        let mut out = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+        for c in list.commands() {
+            if let DisplayCommand::Fill(item) = c {
+                if let (Shape::Path(i), true) = (item.shape, item.color == color) {
+                    for p in list.paths()[i].contours().iter().flatten() {
+                        out = (
+                            out.0.min(p.x),
+                            out.1.min(p.y),
+                            out.2.max(p.x),
+                            out.3.max(p.y),
+                        );
+                    }
+                }
+            }
+        }
+        out
+    };
+    let red = extent(rgb(255, 0, 0));
+    // Two glyphs from x = 10, standing on the baseline at y = 20.
+    assert!(red.0 >= 10.0 && red.2 <= 20.0 + 1e-9, "{red:?}");
+    assert!(red.3 <= 20.0 + 1e-9 && red.1 < 20.0, "{red:?}");
+    // Anchored at the end: the chunk ends at x = 90, the tspan's glyph last.
+    let (blue, green) = (extent(rgb(0, 0, 255)), extent(rgb(0, 255, 0)));
+    assert!(
+        green.2 <= 90.0 + 1e-9 && green.0 >= 85.0 - 1e-9,
+        "{green:?}"
+    );
+    assert!(blue.2 <= green.0 + 1e-9, "{blue:?} {green:?}");
+}

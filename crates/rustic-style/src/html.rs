@@ -204,6 +204,12 @@ fn attribute(element: DomElement<'_>, name: &str) -> Option<String> {
         .map(|a| String::from_utf16_lossy(a.value))
 }
 
+/// An HTML `style` element or an SVG one (SVG 2 §6.4): both own a sheet.
+fn is_style_element(element: DomElement<'_>) -> bool {
+    is_html(element, "style")
+        || (element.namespace() == Some(SVG_NAMESPACE) && element.local_name() == "style")
+}
+
 fn trim_ascii_whitespace(s: &str) -> &str {
     s.trim_matches(|c: char| matches!(c, '\t' | '\n' | '\x0c' | '\r' | ' '))
 }
@@ -233,7 +239,7 @@ pub fn document_style_owners(document: &Document) -> Vec<(NodeId, bool, String)>
         let Some(element) = DomElement::new(document, id) else {
             continue;
         };
-        if is_html(element, "style") {
+        if is_style_element(element) {
             let css = attribute(element, "type").is_none_or(|t| {
                 t.is_empty() || trim_ascii_whitespace(&t).eq_ignore_ascii_case("text/css")
             });
@@ -365,7 +371,7 @@ pub fn document_cascade_with(
             Some(media) => parser.media_query_list(&media).map(|m| Some(m.value)),
             None => Ok(None),
         };
-        let loaded = if is_html(element, "style") {
+        let loaded = if is_style_element(element) {
             let text = child_text(document, id);
             let nonce = attribute(element, "nonce");
             if !css_type {

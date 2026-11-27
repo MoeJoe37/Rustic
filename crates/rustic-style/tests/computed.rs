@@ -299,7 +299,7 @@ fn style_elements_are_attached_in_tree_order() {
                 <style media=print>p { color: lime }</style>\
                 <style media='screen, print'>p { width: 5px }</style>\
                 <template><style>p { color: lime }</style></template>\
-                <svg><style>p { color: lime }</style></svg>\
+                <svg><style>p { min-width: 3px }</style></svg>\
                 <p id=p>text</p><style TYPE=' TEXT/CSS '>p { height: 2px }</style>";
     let page = document(html);
     let doc = page.document();
@@ -314,12 +314,14 @@ fn style_elements_are_attached_in_tree_order() {
             StyleElementStatus::Applied,
             StyleElementStatus::Applied,
             StyleElementStatus::Applied,
+            StyleElementStatus::Applied,
         ]
     );
     assert_eq!(reports[0].diagnostics.len(), 1);
-    // The user-agent sheet plus four author sheets; the print one is
-    // attached but its media query does not match a screen.
-    assert_eq!(cascade.sheets().len(), 5);
+    // The user-agent sheet plus five author sheets (an SVG `style` is one
+    // too, SVG 2 §6.4); the print one is attached but its media query
+    // does not match a screen.
+    assert_eq!(cascade.sheets().len(), 6);
     let styles = style_tree(
         doc,
         doc.root(),
@@ -338,7 +340,7 @@ fn style_elements_are_attached_in_tree_order() {
         "display: block\ncolor: rgb(255, 0, 0)\nmargin-top: 16px\nmargin-bottom: 16px\n\
          border-top-color: rgb(255, 0, 0)\nborder-right-color: rgb(255, 0, 0)\n\
          border-bottom-color: rgb(255, 0, 0)\nborder-left-color: rgb(255, 0, 0)\n\
-         width: 5px\nheight: 2px\ntext-decoration-color: rgb(255, 0, 0)\n\
+         width: 5px\nheight: 2px\nmin-width: 3px\ntext-decoration-color: rgb(255, 0, 0)\n\
          outline-color: rgb(255, 0, 0)\n"
     );
 }

@@ -276,7 +276,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-216 | Deliberate | HTML | Dialogs and popovers without `::backdrop` or real top-layer painting (a maximal `z-index`); Escape is the only close request (no close-watcher grouping or history-gesture protection); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks | Partly paid 2026-11-28 (focus steps, inertness, light dismiss, Escape, attribute change steps); rest with CSS generated content (M9) |
 | TD-217 | Deliberate | HTML | Image source selection at layout only: no reselection on resize without a new layout, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Partly paid 2026-11-28 (`currentSrc`); open, M9 CSS/layout |
 | TD-221 | Deliberate | CSS, MathML | Multi-column without `column-span`, column rules, nested multi-column containers or fragmented box decorations; ruby as paired inline flex columns (no `ruby-position`, `ruby-align`, `rtc`, overhang or line-height adjustment); MathML Core approximated with CSS boxes (no operator dictionary, stretchy operators, `math-depth`, script shifts from the MATH table or `mspace`/`mpadded` attributes) | Open, `layout.formats` (M9) |
-| TD-220 | Deliberate | SVG | Inline SVG without text, patterns (their fallback paints), filters, author style sheets or SVG images (`<img src=x.svg>`, CSS); masks clip to their shapes (no luminance); gradients without `spreadMethod` repeat/reflect or a focal point, banded in 96 steps; even-odd coverage is approximate on edges; `use` by id in the same document only | Open, `paint.formats` (M9) |
+| TD-220 | Deliberate | SVG | Inline and image SVG without patterns (their fallback paints), filters, luminance masks (a mask clips to its shapes), `textPath`, per-glyph `x`/`y` lists, vertical or bidi SVG text, gradient `spreadMethod` repeat/reflect and focal points (gradients are 96 bands), SVG DOM interfaces or SVG in CSS `background-image`; SVG files parse with the HTML parser's foreign-content rules (no XML well-formedness errors); author CSS reaches SVG properties only where the computed value differs from the parent's | Open, `paint.formats` (M9) |
 | TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: text fields and checkable inputs paint their live value and checkedness (since 2026-11-28), but there is no selectedness (no `HTMLSelectElement`/`HTMLOptionElement`), no caret and no text scrolling in fields, `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
 | TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; images without a box are not requested; `decode()` settles at once (rejecting unrequested images); no `iframe.contentWindow`/`contentDocument`, URL decomposition on `a`/`area`, or token lists besides `classList`, `sandbox` and `relList` | Partly paid 2026-11-28 (image request state, rendered size, CORS settings, `a`/`area`/`link` with `relList`); open, M9 |
 | TD-215 | Deliberate | DOM | Ranges without `Selection`, `getElementsByName` or `Range` geometry; live-range nodes stay roots one collection after their object dies; six heavy range WPT pages exceed the script turn budget | Open, `dom.ranges` (M9) |
@@ -3656,18 +3656,21 @@ text marker (CSS Lists 3, HTML ordinals with `start`, `reversed` and
 **Pay:** select and option interfaces with selectedness, `::marker` and
 counters, and the remaining border styles.
 
-### TD-220 — Inline SVG subset
-An outermost `<svg>` is a replaced element whose shapes paint into its
-content box (`rustic-paint/src/svg.rs`): `g`, nested `svg`, `use`, the basic
-shapes and `path`, with `viewBox`, `preserveAspectRatio`, `transform`,
-fills and strokes (dashes, joins, caps, `fill-rule`), linear and radial
-gradients, `clipPath`, markers and group `opacity`, from presentation
-attributes or `style` declarations. Missing: `text`, patterns (a pattern
-paints its fallback), filters, masks by luminance (a mask clips to its
-shapes), gradient `spreadMethod` other than `pad` and focal points,
-selectors from author style sheets matching SVG elements, SVG as an image
-format and SVG DOM interfaces. Gradients paint as 96 bands; the even-odd
-rule folds coverage, which is approximate on antialiased edges.
+### TD-220 — SVG subset
+Inline `<svg>` and SVG images (`<img src=x.svg>`, `rustic-cli/src/svg_image.rs`)
+paint through `rustic-paint/src/svg.rs`: shapes and paths, `use`/`symbol`,
+`viewBox`, transforms, fills and strokes (dashes, joins, caps,
+`fill-rule`), linear and radial gradients, `clipPath`, markers, group
+`opacity` and `text`/`tspan` (shaped, one line per chunk, `text-anchor`,
+first `x`/`y`/`dx`/`dy` values). Author style sheets (HTML and SVG `style`
+elements) reach the painting properties through the cascade; a property
+counts as authored on an element when its computed value differs from its
+parent's, so an inherited presentation attribute is not overridden by an
+inherited initial value. Missing: patterns, filters, luminance masks,
+`textPath`, per-glyph position lists, vertical and bidi SVG text,
+`spreadMethod` other than `pad`, focal points, SVG DOM interfaces and SVG
+in CSS images. SVG files are parsed with the HTML parser's foreign-content
+rules after their prolog, so malformed XML may still render.
 **Pay:** with `paint.formats` steps 2–3.
 
 ### TD-221 — Multi-column, ruby and MathML approximations

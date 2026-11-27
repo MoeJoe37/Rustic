@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 56.11%** = 54.04% verified complete + 2.07% partial credit. 124/228 capabilities complete, 11 in progress.
+**Overall completion: 56.41%** = 55.23% verified complete + 1.18% partial credit. 125/228 capabilities complete, 10 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `744acae20fb9aba684214e81690f0ea14cffdea6dd401bd29b72aa4a9693323b`.
+Catalog: `engine-v4`. Source fingerprint: `555225ec38bd838de63875fa02311b761e7601620dfd8169c9aab060f29be326`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `744acae20fb9aba684214e81690f0ea14cffd
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 11/54 | 30.19% | 24.99% | 22.35% |
+| M9 Compatibility expansion | 12/54 | 31.52% | 30.29% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -36,7 +36,7 @@ Catalog: `engine-v4`. Source fingerprint: `744acae20fb9aba684214e81690f0ea14cffd
 | CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
 | Text & fonts | 5/7 | 0 | 76.00% | 76.00% | 3% | 2.28 |
 | Layout | 9/11 | 0 | 80.39% | 80.39% | 6% | 4.82 |
-| Paint & raster | 6/7 | 1 | 92.59% | 70.37% | 4% | 3.70 |
+| Paint & raster | 7/7 | 0 | 100.00% | 100.00% | 4% | 4.00 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 6 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 9/12 | 0 | 70.45% | 70.45% | 5% | 3.52 |
@@ -156,11 +156,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `paint.raster` — Deterministic CPU reference rasterizer · size 5 · M3 · 0.74% of engine ([source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/raster.rs), [source](../../crates/rustic-paint/src/display.rs), [test](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/raster.rs), [source](../../crates/rustic-cli/src/images.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/damage.rs), [source](../../crates/rustic-raster/examples/frame_budget.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs))
 - **complete** `paint.images` — Bounded images, color/alpha and resource lifecycle · size 3 · M3 · 0.44% of engine ([source](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-codecs/src/png.rs), [source](../../crates/rustic-codecs/src/inflate.rs), [test](../../crates/rustic-codecs/tests/pngsuite.rs), [test](../../crates/rustic-codecs/src/inflate.rs), [source](../../crates/rustic-codecs/src/jpeg.rs), [source](../../crates/rustic-codecs/src/gif.rs), [source](../../crates/rustic-codecs/src/webp.rs), [test](../../crates/rustic-codecs/tests/images.rs), [test](../../crates/rustic-codecs/tests/images.rs), [test](../../crates/rustic-codecs/tests/images.rs), [test](../../crates/rustic-codecs/tests/images.rs), [source](../../crates/rustic-codecs/src/store.rs), [source](../../crates/rustic-cli/src/images.rs), [test](../../crates/rustic-codecs/src/store.rs), [test](../../crates/rustic-codecs/src/store.rs), [test](../../crates/rustic-codecs/tests/images.rs))
 - **complete** `paint.hit` — Hit testing and resize/zoom geometry · size 2 · M3 · 0.29% of engine ([source](../../crates/rustic-paint/src/display.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-layout/src/geometry.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs))
-- **in progress 75.00%** `paint.formats` — SVG and MathML painting integration · size 8 · M9 · 1.18% of engine
-  - [x] SVG shapes and paths: fills, strokes, transforms, viewBox and presentation attributes ([source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-paint/src/svg.rs), [test](../../crates/rustic-raster/tests/paint.rs))
-  - [x] SVG paint servers, clipping, masks, markers, dashes and fill rules ([source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs))
-  - [ ] SVG text, author style sheets for SVG content and SVG images
-  - [x] MathML painting ([source](../../crates/rustic-style/src/hints.rs), [test](../../crates/rustic-raster/tests/paint.rs))
+- **complete** `paint.formats` — SVG and MathML painting integration · size 8 · M9 · 1.18% of engine ([source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-paint/src/svg.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-style/src/hints.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-paint/src/svg.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-paint/src/svg.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-cli/src/svg_image.rs), [test](../../crates/rustic-cli/src/svg_image.rs))
 - **complete** `paint.conformance` — Reftest output, damage and paint conformance · size 3 · M3 · 0.44% of engine ([source](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-cli/src/reftest.rs), [source](../../crates/rustic-raster/src/compare.rs), [test](../../crates/rustic-cli/tests/reftests.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-raster/src/damage.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs))
 
 ### JavaScript & GC

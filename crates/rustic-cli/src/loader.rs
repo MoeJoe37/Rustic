@@ -2916,6 +2916,14 @@ fn block_layout(input: LayoutInput<'_>) -> Result<Laidout, LoadError> {
         images = load(&tree, &deferred);
     }
     let layout = layout.expect("at least one round");
+    images.svg_styles = styles
+        .iter()
+        .filter(|style| {
+            matches!(document.node(style.node).map(|n| n.kind()),
+                Ok(rustic_dom::NodeKind::Element(e)) if e.name().namespace() == Some(rustic_dom::SVG_NAMESPACE))
+        })
+        .map(|style| (style.node, std::sync::Arc::new(style.computed.clone())))
+        .collect();
     Ok((tree, layout, viewport, images, styles, fonts))
 }
 
@@ -3124,6 +3132,7 @@ fn scene_lists(
     layout: &rustic_layout::BlockLayout,
     viewport: rustic_layout::CssSize,
     images: &HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>,
+    svg_styles: &HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_style::ComputedStyle>>,
     fonts: &rustic_text::FontDatabase,
 ) -> Result<Option<SceneLists>, LoadError> {
     use rustic_layout::PositionScheme;
@@ -3207,6 +3216,7 @@ fn scene_lists(
     let resources = rustic_paint::Resources {
         fonts: Some(fonts),
         images: images.clone(),
+        svg_styles: svg_styles.clone(),
     };
     let build = |layout: &rustic_layout::BlockLayout, area: rustic_layout::CssSize| {
         rustic_paint::DisplayList::build_with(
@@ -3400,7 +3410,16 @@ fn render_scene(
     if !scrolled_viewport && !fixed {
         return Ok(None);
     }
-    let Some(lists) = scene_lists(input, &tree, &layout, viewport, &images.images, &fonts)? else {
+    let Some(lists) = scene_lists(
+        input,
+        &tree,
+        &layout,
+        viewport,
+        &images.images,
+        &images.svg_styles,
+        &fonts,
+    )?
+    else {
         return Ok(None);
     };
     scene
@@ -3415,6 +3434,7 @@ fn display_list(input: LayoutInput<'_>) -> Result<rustic_paint::DisplayList, Loa
     let resources = rustic_paint::Resources {
         fonts: Some(&fonts),
         images: images.images,
+        svg_styles: images.svg_styles,
     };
     rustic_paint::DisplayList::build_with(
         input.document,
@@ -3718,10 +3738,12 @@ fn render_unmarked_layers(
             });
         }
     }
+    let svg_styles = images.svg_styles.clone();
     let build = |images: HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>| {
         let resources = rustic_paint::Resources {
             fonts: Some(&fonts),
             images,
+            svg_styles: svg_styles.clone(),
         };
         rustic_paint::DisplayList::build_with(
             input.document,

@@ -535,3 +535,10 @@ a disc (radial), opaque bands reaching two pixels under the next; a
 `clipPath` (or a mask's shapes) becomes a clip layer and group `opacity`
 an opacity group in the display list; paths may fill with the even-odd
 rule. Limits: TD-220.
+
+SVG `text` and `tspan` shape with the document's fonts along one baseline
+per chunk (an absolutely positioned `tspan` starts a chunk, aligned by
+`text-anchor`). SVG files used as images (`<img src=x.svg>`) are parsed,
+styled (UA sheet and their own `style` elements, no scripts, no loads),
+laid out alone at their natural size and rasterized over a transparent
+canvas when the document's images load.

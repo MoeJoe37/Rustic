@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "744acae20fb9aba684214e81690f0ea14cffdea6dd401bd29b72aa4a9693323b",
-  "percent": "56.11",
-  "verified_percent": "54.04",
-  "partial_percent": "2.07",
-  "completed": 124,
-  "in_progress": 11,
+  "source_fingerprint": "555225ec38bd838de63875fa02311b761e7601620dfd8169c9aab060f29be326",
+  "percent": "56.41",
+  "verified_percent": "55.23",
+  "partial_percent": "1.18",
+  "completed": 125,
+  "in_progress": 10,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -95,11 +95,11 @@
       "id": "M9",
       "label": "Compatibility expansion",
       "share": "22.35",
-      "completed": 11,
+      "completed": 12,
       "total": 54,
-      "percent": "30.19",
-      "verified_percent": "24.99",
-      "partial_percent": "5.20"
+      "percent": "31.52",
+      "verified_percent": "30.29",
+      "partial_percent": "1.23"
     },
     {
       "id": "M10",
@@ -3886,84 +3886,90 @@
           "label": "SVG and MathML painting integration",
           "size": 8,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "SVG shapes and paths: fills, strokes, transforms, viewBox and presentation attributes",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/svg.rs",
-                  "marker": "fn parse_path"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/svg.rs",
-                  "marker": "fn stroke"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn inline_svg_paints_shapes_strokes_and_transforms_in_its_viewport"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/svg.rs",
+              "marker": "fn parse_path"
             },
             {
-              "label": "SVG paint servers, clipping, masks, markers, dashes and fill rules",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/svg.rs",
-                  "marker": "fn gradient_fill"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/svg.rs",
-                  "marker": "fn clip_region"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-paint/src/svg.rs",
-                  "marker": "fn dash("
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-raster/src/raster.rs",
-                  "marker": "fn coverage_with"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn svg_gradients_clips_fill_rules_dashes_and_group_opacity_paint"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/svg.rs",
+              "marker": "fn stroke"
             },
             {
-              "label": "SVG text, author style sheets for SVG content and SVG images",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn inline_svg_paints_shapes_strokes_and_transforms_in_its_viewport"
             },
             {
-              "label": "MathML painting",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/hints.rs",
-                  "marker": "fn mathml_position_hints"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn mathml_fraction_rules_and_radical_overlines_paint"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-paint/src/svg.rs",
+              "marker": "fn gradient_fill"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/svg.rs",
+              "marker": "fn clip_region"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/svg.rs",
+              "marker": "fn dash("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-raster/src/raster.rs",
+              "marker": "fn coverage_with"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn svg_gradients_clips_fill_rules_dashes_and_group_opacity_paint"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/hints.rs",
+              "marker": "fn mathml_position_hints"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn mathml_fraction_rules_and_radical_overlines_paint"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/svg.rs",
+              "marker": "fn shape_text"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn svg_text_shapes_glyphs_along_the_baseline_and_anchors_chunks"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/svg.rs",
+              "marker": "fn authored("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn author_style_sheets_style_inline_svg_over_presentation_attributes"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/svg_image.rs",
+              "marker": "pub(crate) fn render"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/src/svg_image.rs",
+              "marker": "fn svg_images_render_with_transparency_at_their_natural_size"
             }
           ],
-          "credit": "75.00",
+          "credit": "100.00",
           "engine_share": "1.18"
         },
         {
@@ -4029,13 +4035,13 @@
         }
       ],
       "points": 27,
-      "completed": 6,
-      "in_progress": 1,
+      "completed": 7,
+      "in_progress": 0,
       "total": 7,
-      "contribution": "3.70",
-      "percent": "92.59",
-      "verified_percent": "70.37",
-      "partial_percent": "22.22"
+      "contribution": "4.00",
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "js",

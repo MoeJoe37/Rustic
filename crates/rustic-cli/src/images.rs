@@ -72,6 +72,8 @@ pub struct LoadedImages {
     /// Each requested `img` element's selected absolute URL, decoded or
     /// not (`currentSrc`).
     pub sources: HashMap<NodeId, String>,
+    /// Computed styles of SVG content for paint.
+    pub svg_styles: HashMap<NodeId, Arc<rustic_style::ComputedStyle>>,
 }
 
 /// Read at most `max` bytes of `path` in `chunk`-sized reads; `None` if the
@@ -229,6 +231,7 @@ pub(crate) fn load_applied(
     });
     let mut decoded: HashMap<rustic_codecs::ImageId, Option<Arc<Image>>> = HashMap::new();
     let mut decoded_bytes = 0usize;
+    let mut svg_images: HashMap<String, Option<Arc<Image>>> = HashMap::new();
     for (node, src, density) in sources {
         if cancellation.check().is_err() {
             break;
@@ -252,6 +255,21 @@ pub(crate) fn load_applied(
             || url.serialize(),
             |file| file.to_string_lossy().into_owned(),
         );
+        if let Some(image) = svg_images.get(&key) {
+            if let Some(image) = image.clone() {
+                let density = if density > 0.0 { density } else { 1.0 };
+                if let (Ok(w), Ok(h)) = (
+                    CssPx::new(f64::from(image.width()) / density),
+                    CssPx::new(f64::from(image.height()) / density),
+                ) {
+                    loaded
+                        .sizes
+                        .push((node, NaturalSize::from_dimensions(w, h)));
+                    loaded.images.insert(node, image);
+                }
+            }
+            continue;
+        }
         let id = match store.lookup(&key) {
             Some(id) => id,
             None => {
@@ -283,6 +301,35 @@ pub(crate) fn load_applied(
                 let Some(bytes) = bytes else {
                     continue;
                 };
+                if crate::svg_image::sniff(&bytes) {
+                    // SVG images are rendered here, once per URL.
+                    let image = svg_images.entry(key.clone()).or_insert_with(|| {
+                        let image = crate::svg_image::render(
+                            &bytes,
+                            crate::fonts::database(),
+                            cancellation,
+                        )?;
+                        let size = image.width() as usize * image.height() as usize * 4;
+                        if size > limits.max_decoded_bytes - decoded_bytes {
+                            return None;
+                        }
+                        decoded_bytes += size;
+                        Some(Arc::new(image))
+                    });
+                    if let Some(image) = image.clone() {
+                        let density = if density > 0.0 { density } else { 1.0 };
+                        if let (Ok(w), Ok(h)) = (
+                            CssPx::new(f64::from(image.width()) / density),
+                            CssPx::new(f64::from(image.height()) / density),
+                        ) {
+                            loaded
+                                .sizes
+                                .push((node, NaturalSize::from_dimensions(w, h)));
+                            loaded.images.insert(node, image);
+                        }
+                    }
+                    continue;
+                }
                 let Ok(id) = store.insert(&key, bytes) else {
                     continue;
                 };

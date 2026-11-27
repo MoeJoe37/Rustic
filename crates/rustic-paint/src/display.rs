@@ -103,6 +103,9 @@ pub struct Resources<'a> {
     /// Decoded content of replaced elements, by element. Elements without
     /// an entry paint no content (only their background and border).
     pub images: HashMap<NodeId, Arc<Image>>,
+    /// Computed styles of SVG elements inside outermost `svg` elements
+    /// (which have no boxes), for author style sheets to reach them.
+    pub svg_styles: HashMap<NodeId, Arc<ComputedStyle>>,
 }
 
 /// Closed quadratic contours filled with the nonzero rule (or, for SVG
@@ -829,6 +832,7 @@ struct Builder<'a> {
     limits: PaintLimits,
     cancellation: &'a CancellationToken,
     fonts: Fonts<'a>,
+    svg_styles: &'a HashMap<NodeId, Arc<ComputedStyle>>,
     paths: Vec<Path>,
     path_points: usize,
     /// Outlines by (face, glyph), each read once.
@@ -1170,7 +1174,38 @@ impl Builder<'_> {
         };
         // Layers the SVG opened, closed here if it left any open.
         let mut open: Vec<DisplayCommand> = Vec::new();
-        for op in crate::svg::paint(document, fragment.node, content, current) {
+        let font = crate::svg::Font {
+            size: style.font_size_px(),
+            families: match style.get(P::FontFamily) {
+                V::FontFamily(families) => families
+                    .iter()
+                    .map(|f| match f {
+                        rustic_css::FamilyName::Named(n) => n.clone(),
+                        rustic_css::FamilyName::Generic(g) => g.name().to_owned(),
+                    })
+                    .collect::<Vec<_>>()
+                    .into(),
+                _ => crate::svg::Font::default().families,
+            },
+            weight: match style.get(P::FontWeight) {
+                V::FontWeight(rustic_css::FontWeight::Number(n)) => *n,
+                V::FontWeight(rustic_css::FontWeight::Bold) => 700.0,
+                _ => 400.0,
+            },
+            italic: !matches!(
+                style.get(P::FontStyle),
+                V::FontStyle(rustic_css::FontStyle::Normal)
+            ),
+        };
+        for op in crate::svg::paint(
+            document,
+            fragment.node,
+            content,
+            current,
+            self.fonts,
+            font,
+            self.svg_styles,
+        ) {
             match op {
                 crate::svg::Op::Fill {
                     contours,
@@ -1847,6 +1882,7 @@ impl DisplayList {
         let resources = Resources {
             fonts,
             images: HashMap::new(),
+            svg_styles: HashMap::new(),
         };
         Self::build_with(
             document,
@@ -1879,6 +1915,7 @@ impl DisplayList {
             limits,
             cancellation,
             fonts,
+            svg_styles: &resources.svg_styles,
             paths: Vec::new(),
             path_points: 0,
             outlines: HashMap::new(),

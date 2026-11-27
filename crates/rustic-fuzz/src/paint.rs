@@ -168,6 +168,7 @@ impl Target for PaintTarget {
                 .iter()
                 .map(|&node| (node, std::sync::Arc::clone(&image)))
                 .collect(),
+            svg_styles: std::collections::HashMap::new(),
         };
         let Ok(layout) = BlockLayout::compute_with_fonts(
             &tree,

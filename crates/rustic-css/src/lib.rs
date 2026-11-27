@@ -95,15 +95,15 @@ pub use media::{
 pub use parser::{CssLimits, CssParser, Parsed, Stylesheet, parse_block_contents};
 pub use properties::{
     BorderCollapse, BorderStyle, BorderWidth, BoxSizing, CaptionSide, Clear, ContainerType,
-    CornerRadius, CssWideKeyword, DeclaredValue, Direction, Display, EmptyCells, FamilyName, Float,
-    FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle, FontVariantCaps,
-    FontWeight, GenericFamily, Hyphens, LengthPercentageOrAuto, LineBreak, LineHeight,
-    ListStylePosition, ListStyleType, MaxSize, OutlineStyle, Overflow, OverflowWrap, Position,
-    PropertyDeclaration, PropertyError, PropertyId, PropertyName, PropertyValue, Spacing,
-    TableLayout, TextAlign, TextCase, TextCombineUpright, TextDecorationLine, TextDecorationStyle,
-    TextOrientation, TextTransform, UnicodeBidi, VerticalAlign, VerticalAlignKeyword, Visibility,
-    WhiteSpace, WordBreak, WritingMode, ZIndex, longhands_of, parse_declaration,
-    serialize_four_sided_shorthand,
+    CornerRadius, CssWideKeyword, DeclaredValue, Direction, Display, EmptyCells, FamilyName,
+    FillRule, Float, FontSize, FontSizeKeyword, FontStretch, FontStretchKeyword, FontStyle,
+    FontVariantCaps, FontWeight, GenericFamily, Hyphens, LengthPercentageOrAuto, LineBreak,
+    LineHeight, ListStylePosition, ListStyleType, MaxSize, OutlineStyle, Overflow, OverflowWrap,
+    Position, PropertyDeclaration, PropertyError, PropertyId, PropertyName, PropertyValue, Spacing,
+    StrokeLinecap, StrokeLinejoin, SvgPaint, TableLayout, TextAlign, TextAnchor, TextCase,
+    TextCombineUpright, TextDecorationLine, TextDecorationStyle, TextOrientation, TextTransform,
+    UnicodeBidi, VerticalAlign, VerticalAlignKeyword, Visibility, WhiteSpace, WordBreak,
+    WritingMode, ZIndex, longhands_of, parse_declaration, serialize_four_sided_shorthand,
 };
 pub use registered::{
     PropertySyntax, RegisteredItem, RegisteredValue, SyntaxComponent, SyntaxMultiplier, SyntaxType,

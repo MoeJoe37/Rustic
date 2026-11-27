@@ -408,6 +408,71 @@ keywords! {
 }
 
 keywords! {
+    /// `fill-rule` values (SVG 2 §13.4.2).
+    FillRule {
+        Nonzero => "nonzero",
+        Evenodd => "evenodd",
+    }
+}
+
+keywords! {
+    /// `stroke-linecap` values (SVG 2 §13.5.3).
+    StrokeLinecap {
+        Butt => "butt",
+        Round => "round",
+        Square => "square",
+    }
+}
+
+keywords! {
+    /// `stroke-linejoin` values (SVG 2 §13.5.4; `miter-clip` and `arcs`
+    /// are not supported).
+    StrokeLinejoin {
+        Miter => "miter",
+        Round => "round",
+        Bevel => "bevel",
+    }
+}
+
+keywords! {
+    /// `text-anchor` values (SVG 2 §11.10.1).
+    TextAnchor {
+        Start => "start",
+        Middle => "middle",
+        End => "end",
+    }
+}
+
+/// An SVG `<paint>` (SVG 2 §13.2): `fill` and `stroke`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SvgPaint {
+    /// `none`.
+    None,
+    /// A color (`currentcolor` included).
+    Color(Color),
+    /// `url(#id)` with an optional fallback color (`None` paints nothing).
+    Url(String, Option<Color>),
+}
+
+impl fmt::Display for SvgPaint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::None => f.write_str("none"),
+            Self::Color(c) => write!(f, "{c}"),
+            Self::Url(url, fallback) => {
+                write!(f, "url(")?;
+                crate::serialize::serialize_string(f, url)?;
+                write!(f, ")")?;
+                match fallback {
+                    Some(c) => write!(f, " {c}"),
+                    None => Ok(()),
+                }
+            }
+        }
+    }
+}
+
+keywords! {
     /// `list-style-position` values (CSS Lists 3 §3.3).
     ListStylePosition {
         Outside => "outside",
@@ -832,6 +897,16 @@ pub enum PropertyValue {
     CaptionSide(CaptionSide),
     /// `empty-cells`.
     EmptyCells(EmptyCells),
+    /// `fill` and `stroke`.
+    SvgPaint(SvgPaint),
+    /// `fill-rule`.
+    FillRule(FillRule),
+    /// `stroke-linecap`.
+    StrokeLinecap(StrokeLinecap),
+    /// `stroke-linejoin`.
+    StrokeLinejoin(StrokeLinejoin),
+    /// `text-anchor`.
+    TextAnchor(TextAnchor),
     /// `list-style-type`.
     ListStyleType(ListStyleType),
     /// `list-style-position`.
@@ -1017,6 +1092,15 @@ property_ids! {
     CaptionSide => "caption-side", true;
     EmptyCells => "empty-cells", true;
     ListStyleType => "list-style-type", true;
+    Fill => "fill", true;
+    Stroke => "stroke", true;
+    StrokeWidth => "stroke-width", true;
+    FillOpacity => "fill-opacity", true;
+    StrokeOpacity => "stroke-opacity", true;
+    FillRule => "fill-rule", true;
+    StrokeLinecap => "stroke-linecap", true;
+    StrokeLinejoin => "stroke-linejoin", true;
+    TextAnchor => "text-anchor", true;
     ListStylePosition => "list-style-position", true;
     Opacity => "opacity", false;
     VerticalAlign => "vertical-align", false;
@@ -1218,6 +1302,16 @@ impl PropertyId {
             P::CaptionSide => PropertyValue::CaptionSide(CaptionSide::Top),
             P::EmptyCells => PropertyValue::EmptyCells(EmptyCells::Show),
             P::ListStyleType => PropertyValue::ListStyleType(ListStyleType::Disc),
+            P::Fill => PropertyValue::SvgPaint(SvgPaint::Color(Color::rgb(0, 0, 0))),
+            P::Stroke => PropertyValue::SvgPaint(SvgPaint::None),
+            P::StrokeWidth => {
+                PropertyValue::LengthPercentage(LengthPercentage::Length(Length::px(1.0)))
+            }
+            P::FillOpacity | P::StrokeOpacity => PropertyValue::Opacity(1.0),
+            P::FillRule => PropertyValue::FillRule(FillRule::Nonzero),
+            P::StrokeLinecap => PropertyValue::StrokeLinecap(StrokeLinecap::Butt),
+            P::StrokeLinejoin => PropertyValue::StrokeLinejoin(StrokeLinejoin::Miter),
+            P::TextAnchor => PropertyValue::TextAnchor(TextAnchor::Start),
             P::ListStylePosition => PropertyValue::ListStylePosition(ListStylePosition::Outside),
             P::Opacity => PropertyValue::Opacity(1.0),
             P::AnimationTimingFunction | P::TransitionTimingFunction => {
@@ -2575,6 +2669,21 @@ pub(crate) fn longhand(property: PropertyId, parts: &[&Value]) -> Option<Propert
         P::CaptionSide => PropertyValue::CaptionSide(CaptionSide::from_name(name()?)?),
         P::EmptyCells => PropertyValue::EmptyCells(EmptyCells::from_name(name()?)?),
         P::ListStyleType => PropertyValue::ListStyleType(ListStyleType::from_name(name()?)?),
+        P::Fill | P::Stroke => PropertyValue::SvgPaint(svg_paint(std::slice::from_ref(value))?),
+        P::StrokeWidth => PropertyValue::LengthPercentage(match value.token() {
+            // SVG also takes a plain number of user units.
+            Some(Token::Number(n)) if n.value >= 0.0 => {
+                LengthPercentage::Length(Length::px(n.value))
+            }
+            _ => nonnegative(value)?,
+        }),
+        P::FillOpacity | P::StrokeOpacity => {
+            PropertyValue::Opacity(opacity(value)?.clamp(0.0, 1.0))
+        }
+        P::FillRule => PropertyValue::FillRule(FillRule::from_name(name()?)?),
+        P::StrokeLinecap => PropertyValue::StrokeLinecap(StrokeLinecap::from_name(name()?)?),
+        P::StrokeLinejoin => PropertyValue::StrokeLinejoin(StrokeLinejoin::from_name(name()?)?),
+        P::TextAnchor => PropertyValue::TextAnchor(TextAnchor::from_name(name()?)?),
         P::ListStylePosition => {
             PropertyValue::ListStylePosition(ListStylePosition::from_name(name()?)?)
         }
@@ -2725,6 +2834,34 @@ fn four<T: Clone>(items: Vec<T>) -> Option<Vec<T>> {
         _ => return None,
     }
     Some(items)
+}
+
+/// An SVG `<paint>`: `none`, a color, or `url()` with an optional
+/// fallback color.
+pub(crate) fn svg_paint(parts: &[&Value]) -> Option<SvgPaint> {
+    match parts {
+        [one] if keyword(one, "none") => Some(SvgPaint::None),
+        [one] => match Color::parse(one) {
+            Some(c) => Some(SvgPaint::Color(c)),
+            None => url_function(one).map(|u| SvgPaint::Url(u, None)),
+        },
+        [url, fallback] => {
+            let url = url_function(url)?;
+            if keyword(fallback, "none") {
+                return Some(SvgPaint::Url(url, None));
+            }
+            Some(SvgPaint::Url(url, Some(Color::parse(fallback)?)))
+        }
+        _ => None,
+    }
+}
+
+/// The URL of a `url()` value.
+fn url_function(value: &Value) -> Option<String> {
+    match crate::background::image(value)? {
+        crate::background::Image::Url(url) => Some(url),
+        crate::background::Image::None => None,
+    }
 }
 
 /// `list-style` (CSS Lists 3 §3.4): a type, a position and an image in any
@@ -2989,6 +3126,11 @@ impl fmt::Display for PropertyValue {
             Self::CaptionSide(v) => write!(f, "{v}"),
             Self::EmptyCells(v) => write!(f, "{v}"),
             Self::ListStyleType(v) => write!(f, "{v}"),
+            Self::SvgPaint(v) => write!(f, "{v}"),
+            Self::FillRule(v) => write!(f, "{v}"),
+            Self::StrokeLinecap(v) => write!(f, "{v}"),
+            Self::StrokeLinejoin(v) => write!(f, "{v}"),
+            Self::TextAnchor(v) => write!(f, "{v}"),
             Self::ListStylePosition(v) => write!(f, "{v}"),
             Self::WritingMode(v) => write!(f, "{v}"),
             Self::TextOrientation(v) => write!(f, "{v}"),

@@ -142,6 +142,36 @@ struct Style {
     markers: [Option<String>; 3],
     color: Srgba,
     visible: bool,
+    font: Font,
+    anchor: Anchor,
+}
+
+/// The font properties text uses.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Font {
+    pub(crate) size: f64,
+    /// Family names; generic families are lowercase keywords.
+    pub(crate) families: Arc<[String]>,
+    pub(crate) weight: f64,
+    pub(crate) italic: bool,
+}
+
+impl Default for Font {
+    fn default() -> Self {
+        Self {
+            size: 16.0,
+            families: Arc::from(vec!["serif".to_owned()]),
+            weight: 400.0,
+            italic: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Anchor {
+    Start,
+    Middle,
+    End,
 }
 
 /// An element's own (not inherited) properties.
@@ -161,6 +191,10 @@ const BLACK: Srgba = Srgba {
 
 impl Style {
     fn initial(color: Srgba) -> Self {
+        Self::with_font(color, Font::default())
+    }
+
+    fn with_font(color: Srgba, font: Font) -> Self {
         Self {
             fill: Paint::Color(BLACK),
             stroke: Paint::None,
@@ -176,12 +210,19 @@ impl Style {
             markers: [None, None, None],
             color,
             visible: true,
+            font,
+            anchor: Anchor::Start,
         }
     }
 }
 
 struct Painter<'a> {
     document: &'a Document,
+    fonts: Option<&'a rustic_text::FontDatabase>,
+    /// Author-styled declarations by element address: the SVG properties
+    /// a style sheet set on the element (computed values that differ from
+    /// the parent's), serialized.
+    authored: Arc<std::collections::HashMap<usize, Vec<(String, String)>>>,
     parser: CssParser,
     out: Vec<Op>,
     elements: usize,
@@ -195,15 +236,25 @@ struct Painter<'a> {
 
 /// The painting operations of the `svg` element `root`, mapped into
 /// `content` (its content box), with `color` as its `currentColor`.
-pub(crate) fn paint(document: &Document, root: NodeId, content: CssRect, color: Srgba) -> Vec<Op> {
+pub(crate) fn paint(
+    document: &Document,
+    root: NodeId,
+    content: CssRect,
+    color: Srgba,
+    fonts: Option<&rustic_text::FontDatabase>,
+    font: Font,
+    styles: &std::collections::HashMap<NodeId, Arc<rustic_style::ComputedStyle>>,
+) -> Vec<Op> {
     let Some(element) = svg_element(document, root) else {
         return Vec::new();
     };
     let (x, y) = (content.origin().x.get(), content.origin().y.get());
     let (w, h) = (content.size().width().get(), content.size().height().get());
     let mut painter = Painter::new(document, (w, h), false);
+    painter.fonts = fonts;
+    painter.authored = Arc::new(authored(document, root, styles));
     let base = Affine::translate(x, y);
-    if let Some((style, own)) = painter.style(element, Style::initial(color)) {
+    if let Some((style, own)) = painter.style(element, Style::with_font(color, font)) {
         let (inner, size) = viewport_transform(element, (w, h));
         painter.viewport = size;
         let transform = base.then(inner);
@@ -320,6 +371,8 @@ impl<'a> Painter<'a> {
     fn new(document: &'a Document, viewport: (f64, f64), geometry: bool) -> Self {
         Self {
             document,
+            fonts: None,
+            authored: Arc::default(),
             parser: CssParser::default(),
             out: Vec::new(),
             elements: 0,
@@ -399,6 +452,8 @@ impl<'a> Painter<'a> {
             space = space.then(parse_transform(&t));
         }
         let mut collector = Painter::new(self.document, self.viewport, true);
+        collector.fonts = self.fonts;
+        collector.authored = Arc::clone(&self.authored);
         collector.use_depth = self.use_depth + 1;
         let style = Style::initial(BLACK);
         collector.children(node, space, &style);
@@ -574,6 +629,73 @@ impl<'a> Painter<'a> {
                 Some(d) => parse_path(&d, transform.scale()),
                 None => return,
             },
+            "text" => {
+                let (x, y) = (
+                    first_length(element, "x", Axis::X, vp).unwrap_or(0.0),
+                    first_length(element, "y", Axis::Y, vp).unwrap_or(0.0),
+                );
+                let pieces = self.text(id, &style, (x, y));
+                if pieces.is_empty() {
+                    return;
+                }
+                let closers = self.open(&own, transform, None, 1.0);
+                for (contours, piece_style) in pieces {
+                    if !piece_style.visible && !self.geometry {
+                        continue;
+                    }
+                    let mapped: Vec<Vec<(f64, f64)>> = contours
+                        .iter()
+                        .map(|c| c.iter().map(|&p| transform.apply(p)).collect())
+                        .collect();
+                    if self.geometry {
+                        self.emit(mapped, BLACK, false);
+                        continue;
+                    }
+                    let bbox = bounds(
+                        &contours
+                            .iter()
+                            .map(|c| Subpath::shape(c.clone()))
+                            .collect::<Vec<_>>(),
+                    );
+                    let fill = piece_style.fill.clone();
+                    self.paint_area(
+                        mapped,
+                        &fill,
+                        &piece_style,
+                        piece_style.fill_opacity,
+                        bbox,
+                        transform,
+                        false,
+                    );
+                    if piece_style.stroke != Paint::None && piece_style.stroke_width > 0.0 {
+                        let mut outline = Vec::new();
+                        for c in &contours {
+                            stroke(
+                                &Subpath::shape(c.clone()),
+                                &piece_style,
+                                transform.scale(),
+                                &mut outline,
+                            );
+                        }
+                        let outline = outline
+                            .into_iter()
+                            .map(|c| positive(c.into_iter().map(|p| transform.apply(p)).collect()))
+                            .collect();
+                        let paint = piece_style.stroke.clone();
+                        self.paint_area(
+                            outline,
+                            &paint,
+                            &piece_style,
+                            piece_style.stroke_opacity,
+                            bbox,
+                            transform,
+                            false,
+                        );
+                    }
+                }
+                self.close(closers);
+                return;
+            }
             _ => return,
         };
         if !style.visible && !self.geometry {
@@ -744,6 +866,9 @@ impl<'a> Painter<'a> {
                 }
             }
         }
+        if let Some(sheet) = self.authored.get(&(std::ptr::from_ref(element) as usize)) {
+            declarations.extend(sheet.iter().cloned());
+        }
         // `color` first: `currentColor` in the others refers to it.
         if let Some((_, value)) = declarations.iter().rev().find(|(name, _)| name == "color") {
             if let Some(color) = self.color(value, style.color) {
@@ -821,6 +946,52 @@ impl<'a> Painter<'a> {
                     let id = marker(value);
                     style.markers = [id.clone(), id.clone(), id];
                 }
+                "font-size" => {
+                    let parent = style.font.size;
+                    let size = match value.strip_suffix('%') {
+                        Some(p) => p.trim().parse::<f64>().ok().map(|p| parent * p / 100.0),
+                        None => match value.strip_suffix("em") {
+                            Some(e) if !value.ends_with("rem") => {
+                                e.trim().parse::<f64>().ok().map(|e| parent * e)
+                            }
+                            _ => length(value, Axis::Other, self.viewport),
+                        },
+                    };
+                    if let Some(size) = size.filter(|s| s.is_finite() && *s >= 0.0) {
+                        style.font.size = size.min(10_000.0);
+                    }
+                }
+                "font-family" => {
+                    let families: Vec<String> = value
+                        .split(',')
+                        .map(|f| f.trim().trim_matches(['"', '\'']).to_owned())
+                        .filter(|f| !f.is_empty())
+                        .collect();
+                    if !families.is_empty() {
+                        style.font.families = families.into();
+                    }
+                }
+                "font-weight" => {
+                    style.font.weight = match value {
+                        "normal" => 400.0,
+                        "bold" => 700.0,
+                        "bolder" => (style.font.weight + 300.0).min(900.0),
+                        "lighter" => (style.font.weight - 300.0).max(100.0),
+                        n => n
+                            .parse::<f64>()
+                            .ok()
+                            .filter(|w| (1.0..=1000.0).contains(w))
+                            .unwrap_or(style.font.weight),
+                    };
+                }
+                "font-style" => style.font.italic = matches!(value, "italic" | "oblique"),
+                "text-anchor" => {
+                    style.anchor = match value {
+                        "middle" => Anchor::Middle,
+                        "end" => Anchor::End,
+                        _ => Anchor::Start,
+                    };
+                }
                 "marker-start" => style.markers[0] = marker(value),
                 "marker-mid" => style.markers[1] = marker(value),
                 "marker-end" => style.markers[2] = marker(value),
@@ -865,6 +1036,320 @@ impl<'a> Painter<'a> {
         }
         self.color(value, BLACK).map(Paint::Color)
     }
+}
+
+/// Glyph outlines of one piece of text in user space, with its style.
+type TextPiece = (Vec<Vec<(f64, f64)>>, Style);
+
+/// The SVG properties author style sheets set on each element of `root`'s
+/// subtree: computed values that differ from the parent element's (an
+/// inherited or initial value says nothing about the element's own rules,
+/// and must not override presentation attributes inherited from above).
+fn authored(
+    document: &Document,
+    root: NodeId,
+    styles: &std::collections::HashMap<NodeId, Arc<rustic_style::ComputedStyle>>,
+) -> std::collections::HashMap<usize, Vec<(String, String)>> {
+    use rustic_css::PropertyId as P;
+    const PROPERTIES: [P; 13] = [
+        P::Fill,
+        P::Stroke,
+        P::StrokeWidth,
+        P::FillOpacity,
+        P::StrokeOpacity,
+        P::FillRule,
+        P::StrokeLinecap,
+        P::StrokeLinejoin,
+        P::TextAnchor,
+        P::Opacity,
+        P::Visibility,
+        P::Color,
+        P::FontSize,
+    ];
+    let mut out = std::collections::HashMap::new();
+    if styles.is_empty() {
+        return out;
+    }
+    let initial = rustic_style::ComputedStyle::initial();
+    let Ok(walk) = document.walk(root) else {
+        return out;
+    };
+    for (node, _) in walk {
+        let (Some(style), Ok(n)) = (styles.get(&node), document.node(node)) else {
+            continue;
+        };
+        let NodeKind::Element(element) = n.kind() else {
+            continue;
+        };
+        let parent = n
+            .parent()
+            .and_then(|p| styles.get(&p))
+            .map_or(&initial, |p| &**p);
+        let mut set = Vec::new();
+        for property in PROPERTIES {
+            let value = style.get(property);
+            if value != parent.get(property) {
+                set.push((property.name().to_owned(), value.to_string()));
+            }
+        }
+        if !set.is_empty() {
+            out.insert(std::ptr::from_ref(element) as usize, set);
+        }
+    }
+    out
+}
+
+/// The first length of an attribute's list (`x`, `y`, `dx`, `dy`).
+fn first_length(element: &Element, name: &str, axis: Axis, viewport: (f64, f64)) -> Option<f64> {
+    let value = attribute(element, name)?;
+    let first = value
+        .split(|c: char| c.is_ascii_whitespace() || c == ',')
+        .find(|t| !t.is_empty())?;
+    length(first, axis, viewport)
+}
+
+impl Painter<'_> {
+    /// Lay out a `text` element (SVG 2 §11): its text and `tspan`s in
+    /// order along one line from `start`, each absolutely positioned
+    /// `tspan` starting a new chunk, chunks aligned by `text-anchor`;
+    /// whitespace collapses (`xml:space` default). Returns glyph outlines
+    /// per piece, in user space.
+    fn text(&mut self, root: NodeId, style: &Style, start: (f64, f64)) -> Vec<TextPiece> {
+        let Some(fonts) = self.fonts else {
+            return Vec::new();
+        };
+        let mut pieces: Vec<TextPiece> = Vec::new();
+        // (first piece index, chunk start x, anchor) of each chunk.
+        let mut chunks: Vec<(usize, f64, Anchor)> = vec![(0, start.0, style.anchor)];
+        let mut pen = start;
+        let mut space_before = true;
+        let mut stack: Vec<(NodeId, Style)> = vec![(root, style.clone())];
+        let mut order: Vec<(NodeId, Style)> = Vec::new();
+        // Preorder over text nodes and rendered tspans.
+        while let Some((node, node_style)) = stack.pop() {
+            order.push((node, node_style.clone()));
+            let Ok(children) = self.document.children(node) else {
+                continue;
+            };
+            let children: Vec<NodeId> = children.collect();
+            for &child in children.iter().rev() {
+                match self.document.node(child).map(|n| n.kind()) {
+                    Ok(NodeKind::Text(_)) => stack.push((child, node_style.clone())),
+                    Ok(NodeKind::Element(e))
+                        if e.name().namespace() == Some(SVG_NAMESPACE)
+                            && matches!(e.name().local(), "tspan" | "a") =>
+                    {
+                        if let Some((child_style, _)) = self.declared(e, node_style.clone()) {
+                            stack.push((child, child_style));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let vp = self.viewport;
+        for (node, node_style) in order {
+            match self.document.node(node).map(|n| n.kind()) {
+                Ok(NodeKind::Element(e)) if node != root => {
+                    let x = first_length(e, "x", Axis::X, vp);
+                    let y = first_length(e, "y", Axis::Y, vp);
+                    let dx = first_length(e, "dx", Axis::X, vp).unwrap_or(0.0);
+                    let dy = first_length(e, "dy", Axis::Y, vp).unwrap_or(0.0);
+                    if let Some(x) = x {
+                        pen.0 = x;
+                        chunks.push((pieces.len(), x, node_style.anchor));
+                    }
+                    if let Some(y) = y {
+                        pen.1 = y;
+                    }
+                    pen = (pen.0 + dx, pen.1 + dy);
+                }
+                Ok(NodeKind::Text(data)) => {
+                    let raw = String::from_utf16_lossy(data.as_units());
+                    let mut text = String::with_capacity(raw.len());
+                    for c in raw.chars().filter(|c| *c != '\n' && *c != '\r') {
+                        let c = if c == '\t' { ' ' } else { c };
+                        if c == ' ' && space_before {
+                            continue;
+                        }
+                        space_before = c == ' ';
+                        text.push(c);
+                    }
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let (contours, advance) = shape_text(fonts, &node_style.font, &text, pen);
+                    pen.0 += advance;
+                    self.points += contours.iter().map(Vec::len).sum::<usize>();
+                    if self.points > MAX_POINTS {
+                        break;
+                    }
+                    pieces.push((contours, node_style));
+                }
+                _ => {}
+            }
+        }
+        // A trailing space does not count toward the anchor's width.
+        let end = pen.0;
+        for (k, &(first, x, anchor)) in chunks.iter().enumerate() {
+            let last = chunks.get(k + 1).map_or(pieces.len(), |c| c.0);
+            let right = chunks.get(k + 1).map_or(end, |_| {
+                pieces[first..last]
+                    .iter()
+                    .flat_map(|p| p.0.iter().flatten())
+                    .map(|p| p.0)
+                    .fold(x, f64::max)
+            });
+            let shift = match anchor {
+                Anchor::Start => 0.0,
+                Anchor::Middle => -(right - x) / 2.0,
+                Anchor::End => -(right - x),
+            };
+            if shift != 0.0 {
+                for piece in &mut pieces[first..last] {
+                    for contour in &mut piece.0 {
+                        for p in contour {
+                            p.0 += shift;
+                        }
+                    }
+                }
+            }
+        }
+        pieces
+    }
+}
+
+/// Shape `text` in `font` at `pen` (the baseline start): glyph outlines
+/// flattened into polygons in user space, and the advance.
+fn shape_text(
+    fonts: &rustic_text::FontDatabase,
+    font: &Font,
+    text: &str,
+    pen: (f64, f64),
+) -> (Vec<Vec<(f64, f64)>>, f64) {
+    use rustic_text::{FaceQuery, FaceStyle, FamilyRef};
+    let query = FaceQuery {
+        weight: font.weight,
+        style: if font.italic {
+            FaceStyle::Italic
+        } else {
+            FaceStyle::Normal
+        },
+        stretch: 100.0,
+    };
+    let generic = [
+        "serif",
+        "sans-serif",
+        "monospace",
+        "cursive",
+        "fantasy",
+        "system-ui",
+    ];
+    let chain = fonts.fallback_chain(
+        font.families.iter().map(|f| {
+            if generic.contains(&f.as_str()) {
+                FamilyRef::Generic(f)
+            } else {
+                FamilyRef::Named(f)
+            }
+        }),
+        &query,
+    );
+    let chars: Vec<char> = text.chars().collect();
+    let options = rustic_text::shape::ShapeOptions {
+        size: font.size,
+        rtl: false,
+        letter_spacing: 0.0,
+        word_spacing: 0.0,
+        vertical: false,
+    };
+    let Ok(clusters) = rustic_text::shape::shape(fonts, &chain, &chars, &options) else {
+        return (Vec::new(), 0.0);
+    };
+    let mut x = pen.0;
+    let mut out = Vec::new();
+    for cluster in clusters {
+        let Some(face) = fonts.face(cluster.face) else {
+            x += cluster.advance;
+            continue;
+        };
+        let scale = font.size / f64::from(face.units_per_em());
+        let mut gx = x;
+        for glyph in &cluster.glyphs {
+            if let Ok(outline) = face.outline(glyph.glyph) {
+                let origin = (gx + glyph.x_offset, pen.1 - glyph.y_offset);
+                for contour in outline.contours() {
+                    let flat = flatten_glyph(contour, scale, origin);
+                    if flat.len() >= 3 {
+                        out.push(flat);
+                    }
+                }
+            }
+            gx += glyph.advance;
+        }
+        x += cluster.advance;
+    }
+    (out, x - pen.0)
+}
+
+/// A TrueType-style quadratic contour (font units, y up) as a polygon in
+/// user space (y down) around `origin`.
+fn flatten_glyph(
+    contour: &[rustic_text::OutlinePoint],
+    scale: f64,
+    origin: (f64, f64),
+) -> Vec<(f64, f64)> {
+    let map = |p: &rustic_text::OutlinePoint| (origin.0 + p.x * scale, origin.1 - p.y * scale);
+    let n = contour.len();
+    if n == 0 {
+        return Vec::new();
+    }
+    let mid = |a: (f64, f64), b: (f64, f64)| ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0);
+    let start_index = contour.iter().position(|p| p.on_curve);
+    let start = match start_index {
+        Some(i) => map(&contour[i]),
+        None => mid(map(&contour[0]), map(&contour[n - 1])),
+    };
+    let first = start_index.map_or(0, |i| i + 1);
+    let mut out = vec![start];
+    let mut current = start;
+    let mut control: Option<(f64, f64)> = None;
+    let quad = |out: &mut Vec<(f64, f64)>, a: (f64, f64), c: (f64, f64), b: (f64, f64)| {
+        for k in 1..=6 {
+            let t = f64::from(k) / 6.0;
+            let u = 1.0 - t;
+            out.push((
+                u * u * a.0 + 2.0 * u * t * c.0 + t * t * b.0,
+                u * u * a.1 + 2.0 * u * t * c.1 + t * t * b.1,
+            ));
+        }
+    };
+    for k in 0..n {
+        let point = &contour[(first + k) % n];
+        let p = map(point);
+        match (point.on_curve, control) {
+            (true, None) => {
+                out.push(p);
+                current = p;
+            }
+            (true, Some(c)) => {
+                quad(&mut out, current, c, p);
+                current = p;
+                control = None;
+            }
+            (false, None) => control = Some(p),
+            (false, Some(c)) => {
+                let m = mid(c, p);
+                quad(&mut out, current, c, m);
+                current = m;
+                control = Some(p);
+            }
+        }
+    }
+    if let Some(c) = control {
+        quad(&mut out, current, c, start);
+    }
+    out
 }
 
 /// A marker position with its incoming and outgoing directions (degrees).

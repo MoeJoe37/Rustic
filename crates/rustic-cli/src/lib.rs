@@ -29,6 +29,7 @@ mod renderer;
 mod srcset;
 mod storage;
 mod stylesheets;
+mod svg_image;
 #[cfg(feature = "window")]
 mod view;
 mod web_fonts;

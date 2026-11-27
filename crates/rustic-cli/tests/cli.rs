@@ -1147,3 +1147,35 @@ fn srcset_sizes_and_picture_sources_choose_the_image_and_its_density() {
     );
     fs::remove_dir_all(base).unwrap();
 }
+
+#[test]
+fn author_style_sheets_style_inline_svg_over_presentation_attributes() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-svg-css-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    let path = base.join("page.html");
+    fs::write(
+        &path,
+        "<style>.hot { fill: red } #g rect { fill: lime } .line { stroke: blue }</style>\
+         <svg width=200 height=60 fill=orange><rect width=40 height=40 class=hot />\
+         <rect x=50 width=40 height=40 class=line /><g id=g><rect x=150 width=40 height=40 fill=black /></g>\
+         <text x=0 y=55 font-size=10 style='fill: #123456'>x</text></svg>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-paint", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let colors: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.contains(" path="))
+        .filter_map(|l| l.split("color=#").nth(1))
+        .map(|c| &c[..8])
+        .collect();
+    // Rule over nothing, inherited attribute, rule over attribute, and the
+    // stroke rule; the text glyphs take the inline style.
+    assert_eq!(
+        colors,
+        ["ff0000ff", "ffa500ff", "0000ffff", "00ff00ff", "123456ff"],
+        "{stdout}"
+    );
+    fs::remove_dir_all(base).unwrap();
+}

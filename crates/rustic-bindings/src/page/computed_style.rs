@@ -234,6 +234,15 @@ const LONGHAND_GETTERS: [NativeFn; PropertyId::ALL.len()] = [
     get_longhand::<189> as NativeFn,
     get_longhand::<190> as NativeFn,
     get_longhand::<191> as NativeFn,
+    get_longhand::<192> as NativeFn,
+    get_longhand::<193> as NativeFn,
+    get_longhand::<194> as NativeFn,
+    get_longhand::<195> as NativeFn,
+    get_longhand::<196> as NativeFn,
+    get_longhand::<197> as NativeFn,
+    get_longhand::<198> as NativeFn,
+    get_longhand::<199> as NativeFn,
+    get_longhand::<200> as NativeFn,
 ];
 
 const LONGHAND_SETTERS: [NativeFn; PropertyId::ALL.len()] = [
@@ -429,6 +438,15 @@ const LONGHAND_SETTERS: [NativeFn; PropertyId::ALL.len()] = [
     set_longhand::<189> as NativeFn,
     set_longhand::<190> as NativeFn,
     set_longhand::<191> as NativeFn,
+    set_longhand::<192> as NativeFn,
+    set_longhand::<193> as NativeFn,
+    set_longhand::<194> as NativeFn,
+    set_longhand::<195> as NativeFn,
+    set_longhand::<196> as NativeFn,
+    set_longhand::<197> as NativeFn,
+    set_longhand::<198> as NativeFn,
+    set_longhand::<199> as NativeFn,
+    set_longhand::<200> as NativeFn,
 ];
 
 /// The inline declarations' setter for one longhand; computed declarations

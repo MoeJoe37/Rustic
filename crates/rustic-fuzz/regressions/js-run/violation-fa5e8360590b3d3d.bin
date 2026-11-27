@@ -1,0 +1,1 @@
+s=new Set([3]);s.forEach(function(v){if(v)1<s.add(v+1).delete(v-1)});[...([].v?n:s)]

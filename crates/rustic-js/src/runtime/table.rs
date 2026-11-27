@@ -32,8 +32,11 @@ pub(crate) struct OrderedTable {
     /// The first entry of each hash's bucket.
     buckets: HashMap<u64, u32>,
     live: u32,
-    /// Iterators (and `forEach` loops) that hold a position.
+    /// Iterator objects that hold a position; the collector recounts them.
     pub(crate) iterators: u32,
+    /// Native loops (`forEach`) that hold a position. They are not heap
+    /// objects, so the collector leaves this count alone.
+    pub(crate) loops: u32,
 }
 
 /// Budget charge per entry.
@@ -143,7 +146,7 @@ impl OrderedTable {
 
     /// Removes every entry. Open iterators see no more entries.
     pub(crate) fn clear(&mut self) {
-        if self.iterators == 0 {
+        if self.iterators == 0 && self.loops == 0 {
             self.entries = Vec::new();
         } else {
             for e in &mut self.entries {
@@ -160,7 +163,7 @@ impl OrderedTable {
     /// holds a position.
     pub(crate) fn compact_if_sparse(&mut self, agent: &Agent) {
         let holes = self.entries.len() - self.live as usize;
-        if self.iterators > 0 || holes <= 8 || holes <= self.live as usize {
+        if self.iterators > 0 || self.loops > 0 || holes <= 8 || holes <= self.live as usize {
             return;
         }
         let old = std::mem::take(&mut self.entries);

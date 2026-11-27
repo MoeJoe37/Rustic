@@ -13,7 +13,8 @@
 //! [`SelectorErrorKind`] instead of being accepted and silently never
 //! matching. Matching lives in `rustic-style`.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::Arc;
 
@@ -678,13 +679,57 @@ impl ComplexSelector {
 }
 
 /// A comma-separated list of complex selectors.
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct SelectorList {
     selectors: Vec<ComplexSelector>,
     /// How many nested selector lists (pseudo-class arguments and `&`
     /// parents) deep this list goes; bounds matching recursion.
     height: usize,
 }
+
+/// Comparison results keyed by the two lists' addresses.
+type ListMemo = HashMap<(usize, usize), bool>;
+
+thread_local! {
+    /// Results of the list comparisons inside the outermost
+    /// [`SelectorList::eq`] call, keyed by the two lists' addresses, plus that
+    /// call's depth. Nested rules share their parent's list through `&`, so a
+    /// sheet's selectors form a graph; comparing it as a tree costs
+    /// exponential time in the nesting depth. The memo lives for one
+    /// top-level comparison only, while every keyed list is borrowed.
+    static LIST_EQ: RefCell<(usize, ListMemo)> =
+        RefCell::new((0, HashMap::new()));
+}
+
+impl PartialEq for SelectorList {
+    fn eq(&self, other: &Self) -> bool {
+        if std::ptr::eq(self, other) {
+            return true;
+        }
+        if self.height != other.height || self.selectors.len() != other.selectors.len() {
+            return false;
+        }
+        let key = (self as *const Self as usize, other as *const Self as usize);
+        let known = LIST_EQ.with(|memo| {
+            let mut memo = memo.borrow_mut();
+            memo.0 += 1;
+            memo.1.get(&key).copied()
+        });
+        let result = known.unwrap_or_else(|| self.selectors == other.selectors);
+        LIST_EQ.with(|memo| {
+            let mut memo = memo.borrow_mut();
+            memo.0 -= 1;
+            if memo.0 == 0 {
+                memo.1.clear();
+            } else {
+                memo.1.insert(key, result);
+            }
+        });
+        result
+    }
+}
+
+impl Eq for SelectorList {}
 
 impl SelectorList {
     /// The selectors in source order. Empty only for a forgiving list such as

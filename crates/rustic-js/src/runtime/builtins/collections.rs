@@ -454,7 +454,7 @@ fn table_for_each(
         return agent.type_error(&format!("{name}: callback is not a function"));
     }
     let this_arg = arg(args, 1);
-    adjust_iterators(agent, o, 1);
+    adjust_loops(agent, o, 1);
     let mut position = 0;
     let result = loop {
         let step = with_table(agent, this, class, name, |_, t| {
@@ -473,13 +473,22 @@ fn table_for_each(
             break Err(e);
         }
     };
-    adjust_iterators(agent, o, -1);
+    adjust_loops(agent, o, -1);
     result
 }
 
+/// Count an iterator object's hold on its table (the collector recounts
+/// these from live iterators).
 fn adjust_iterators(agent: &mut Agent, o: ObjectId, by: i32) {
     if let Some(Internal::Table(t)) = agent.heap.object_mut(o).internal_mut() {
         t.iterators = t.iterators.saturating_add_signed(by);
+    }
+}
+
+/// Count a native loop's hold on its table (the collector leaves these).
+fn adjust_loops(agent: &mut Agent, o: ObjectId, by: i32) {
+    if let Some(Internal::Table(t)) = agent.heap.object_mut(o).internal_mut() {
+        t.loops = t.loops.saturating_add_signed(by);
     }
 }
 
@@ -797,7 +806,7 @@ fn walk_this(
     mut each: impl FnMut(&mut Agent, Value) -> JsResult<bool>,
 ) -> JsResult<()> {
     let o = this.as_object().expect("a set was checked");
-    adjust_iterators(agent, o, 1);
+    adjust_loops(agent, o, 1);
     let mut position = 0;
     let result = loop {
         let step = with_table(agent, this, Class::Set, "Set method", |_, t| {
@@ -816,7 +825,7 @@ fn walk_this(
             Err(e) => break Err(e),
         }
     };
-    adjust_iterators(agent, o, -1);
+    adjust_loops(agent, o, -1);
     result
 }
 

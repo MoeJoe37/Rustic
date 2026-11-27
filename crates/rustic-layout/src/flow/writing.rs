@@ -265,8 +265,10 @@ const RADII: [P; 4] = [
 
 /// `style` in the logical space of a run in `mode`.
 fn transpose(style: &ComputedStyle, mode: WritingMode) -> ComputedStyle {
+    // The horizontal engine ignores `writing-mode`; it keeps the run's mode
+    // so inline layout knows which text is set upright.
     let mut out = style.clone();
-    out.set(P::WritingMode, V::WritingMode(WritingMode::HorizontalTb));
+    out.set(P::WritingMode, V::WritingMode(mode));
     if mode.is_horizontal() {
         return out;
     }
@@ -903,7 +905,11 @@ fn untranspose(
         } else {
             bx
         })?;
-        text.rotation = rotation;
+        text.rotation = if text.upright {
+            GlyphRotation::None
+        } else {
+            rotation
+        };
         if vertical_lr {
             let r = text.rect;
             let x = mirror(line, r.origin().x.get() + r.size().width().get());

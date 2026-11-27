@@ -15,7 +15,8 @@ itself is blocked from Rustic's cloud sandboxes; the GitHub mirror is
 identical). Inputs: `UnicodeData.txt`, `LineBreak.txt`, `EastAsianWidth.txt`,
 `emoji/emoji-data.txt`, `auxiliary/GraphemeBreakProperty.txt`,
 `DerivedCoreProperties.txt` (InCB), `extracted/DerivedBidiClass.txt`,
-`BidiBrackets.txt`, `BidiMirroring.txt` and the four conformance test files.
+`BidiBrackets.txt`, `BidiMirroring.txt`, `VerticalOrientation.txt` (UAX #50,
+for upright vertical text) and the four conformance test files.
 Every input's SHA-256 and every output's digest are pinned in
 `crates/rustic-text/tests/fixtures/text_data_manifest.json`;
 `tools/check_repository.py` rejects hand-edited outputs. The generator fails
@@ -97,7 +98,12 @@ controls participate in shaping before default ignorables are removed. Fallback
 tries the best face of requested families, then configured and additional loaded
 families. No duplicate weights of an already selected family are appended.
 
-`ShapedGlyph` retains advance and horizontal/vertical offsets. Layout carries
+`ShapedGlyph` retains advance and horizontal/vertical offsets. With
+`ShapeOptions::vertical` a run is shaped top to bottom: advances come from
+`vmtx` (else the ascent plus descent), offsets lead from the glyph's
+vertical origin (its top center; without `vmtx`/`VORG`, HarfBuzz's
+ink-centered fallback) to its horizontal origin, and `vert`/`vrt2` apply.
+Layout carries
 absolute glyph origins to paint; mark and cursive positioning reaches the
 rasterizer. Nonzero letter spacing disables optional ligatures. Word spacing
 is applied to separators and letter spacing after visible clusters.

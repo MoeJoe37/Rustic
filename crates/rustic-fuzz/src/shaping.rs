@@ -69,6 +69,7 @@ impl Target for ShapingTarget {
             rtl: bits & 1 != 0,
             letter_spacing: if bits & 2 != 0 { 1.0 } else { 0.0 },
             word_spacing: if bits & 4 != 0 { 2.0 } else { 0.0 },
+            vertical: bits & 8 != 0,
         };
         let out = shape(db, &chain, &text, &options).map_err(|e| e.to_string())?;
         let mut next = 0;

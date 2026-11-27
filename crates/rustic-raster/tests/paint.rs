@@ -2147,3 +2147,70 @@ fn sideways_glyphs_turn_with_vertical_lines() {
     }
     assert!(column[17..].iter().all(|c| *c == empty), "{column:#?}");
 }
+
+#[test]
+fn upright_glyphs_stand_on_vertical_lines() {
+    let fonts = rustic_text::bundled::test_database();
+    let (doc, styles) = common::page(
+        "<div id=v>xx</div>",
+        &format!(
+            "{RESET} html {{ writing-mode: vertical-rl; text-orientation: upright }}
+             #v {{ font: 10px/10px 'Rustic Test'; color: blue; text-decoration: underline }}"
+        ),
+    );
+    let tree = BoxTree::build(
+        &doc,
+        doc.root(),
+        &styles,
+        LayoutLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let viewport = CssSize::new(20.0, 30.0).unwrap();
+    let layout = BlockLayout::compute_with_fonts(
+        &tree,
+        viewport,
+        LayoutLimits::default(),
+        &fonts,
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let list = DisplayList::build_with_fonts(
+        &doc,
+        &tree,
+        &layout,
+        viewport,
+        Some(&fonts),
+        PaintLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let surface = rasterize(
+        &list,
+        DeviceScale::new(1.0).unwrap(),
+        RasterLimits::default(),
+        &CancellationToken::default(),
+    )
+    .unwrap();
+    let column: Vec<String> = (0..20)
+        .map(|x| {
+            (0..30)
+                .map(|y| match surface.pixel(x, y) {
+                    Some(c) if c == rgb(255, 255, 255) => '.',
+                    Some(c) if c == rgb(0, 0, 255) => 'b',
+                    _ => '?',
+                })
+                .collect()
+        })
+        .collect();
+    // The glyphs are not turned: each one is a horizontal glyph centered
+    // on the line (x 10..20) and stacked one em apart down it, and the
+    // underline stays on the line's left (under) side.
+    let empty = ".".repeat(30);
+    assert!(column[..10].iter().all(|c| *c == empty), "{column:#?}");
+    assert_eq!(column[10], format!("{}{}", "?".repeat(20), ".".repeat(10)));
+    for (x, c) in column.iter().enumerate().take(17).skip(13) {
+        assert_eq!(*c, format!("..?bbbb?....?bbbb?{}", ".".repeat(12)), "{x}");
+    }
+    assert!(column[17..].iter().all(|c| *c == empty), "{column:#?}");
+}

@@ -24,6 +24,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         rtl: args[1] == "rtl",
         letter_spacing: 0.0,
         word_spacing: 0.0,
+        vertical: false,
     };
     let mut clusters = shape(&db, &[0], &args[2].chars().collect::<Vec<_>>(), &options)?;
     if options.rtl {

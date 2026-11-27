@@ -151,6 +151,9 @@ pub(crate) enum Piece {
         space: Space,
         /// A U+0020 that can absorb justification.
         justifiable: bool,
+        /// Set upright on a vertical line: shaped top to bottom and not
+        /// turned (CSS Writing Modes 4 §5.1).
+        upright: bool,
     },
     Edge {
         ibox: usize,
@@ -837,16 +840,19 @@ fn shape_events(
                 let size = ifc.texts[item].font.size;
                 let letter = spacing(style, P::LetterSpacing, size)?;
                 let word = spacing(style, P::WordSpacing, size)?;
+                let upright = upright_chars(style, &ifc.chars[chars.clone()]);
                 let mut start = chars.start;
                 while start < chars.end {
                     // A run of one level and one kind class (spaces/tabs/breaks
                     // are shaped one by one so their kind stays exact).
                     let special = kinds[start] != Kind::Normal;
                     let mut end = start + 1;
+                    let up = upright[start - chars.start];
                     while !special
                         && end < chars.end
                         && levels[end] == levels[start]
                         && kinds[end] == Kind::Normal
+                        && upright[end - chars.start] == up
                     {
                         end += 1;
                     }
@@ -856,6 +862,7 @@ fn shape_events(
                         rtl: levels[start].is_rtl(),
                         letter_spacing: letter,
                         word_spacing: word,
+                        vertical: up,
                     };
                     let chain = &ifc.texts[item].chain;
                     let clusters = shape_with_context(
@@ -906,6 +913,7 @@ fn shape_events(
                             glyphs,
                             width,
                             space,
+                            upright: up,
                         });
                     }
                     start = end;
@@ -922,6 +930,36 @@ fn shape_events(
         }
     }
     Ok(())
+}
+
+/// Which characters of a text run are set upright (CSS Writing Modes 4
+/// §5.1): none on a horizontal or `sideways-*` line; with `text-orientation:
+/// mixed`, each grapheme cluster whose first character has UAX #50
+/// `Vertical_Orientation` U or Tu; all with `upright`.
+fn upright_chars(style: &ComputedStyle, chars: &[char]) -> Vec<bool> {
+    use rustic_css::{TextOrientation, WritingMode};
+    if !matches!(
+        style.writing_mode(),
+        WritingMode::VerticalRl | WritingMode::VerticalLr
+    ) {
+        return vec![false; chars.len()];
+    }
+    match style.get(P::TextOrientation) {
+        V::TextOrientation(TextOrientation::Upright) => vec![true; chars.len()],
+        V::TextOrientation(TextOrientation::Mixed) => {
+            let boundaries = rustic_text::segment::grapheme_boundaries(chars);
+            let mut out = Vec::with_capacity(chars.len());
+            let mut current = false;
+            for (i, &c) in chars.iter().enumerate() {
+                if boundaries[i] {
+                    current = rustic_text::unicode::vertical_orientation(c).is_upright();
+                }
+                out.push(current);
+            }
+            out
+        }
+        _ => vec![false; chars.len()],
+    }
 }
 
 /// The nearest common inline ancestor's `white-space` decides soft wraps

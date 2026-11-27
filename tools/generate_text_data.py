@@ -15,7 +15,8 @@ directory, then run for example:
 
 Outputs:
 - crates/rustic-text/src/unicode/tables.rs: range tables for UAX #14 line
-  breaking, UAX #29 grapheme clusters and UAX #9 bidi.
+  breaking, UAX #29 grapheme clusters, UAX #9 bidi and UAX #50 vertical
+  orientation.
 - crates/rustic-text/tests/fixtures/*.txt: compact conformance cases. The
   line break and grapheme tests are complete; the two bidi tests are large,
   so a deterministic sample is committed and the full files can be run with
@@ -57,6 +58,7 @@ SOURCES = {
     "DerivedBidiClass.txt": f"{UCD}/extracted/DerivedBidiClass.txt",
     "BidiBrackets.txt": f"{UCD}/BidiBrackets.txt",
     "BidiMirroring.txt": f"{UCD}/BidiMirroring.txt",
+    "VerticalOrientation.txt": f"{UCD}/VerticalOrientation.txt",
     "LineBreakTest.txt": f"{UCD}/auxiliary/LineBreakTest.txt",
     "GraphemeBreakTest.txt": f"{UCD}/auxiliary/GraphemeBreakTest.txt",
     "BidiTest.txt": f"{UCD}/BidiTest.txt",
@@ -149,6 +151,11 @@ def generate_tables(text: dict[str, str]) -> tuple[str, dict]:
     if unknown:
         raise ValueError(f"new Bidi_Class values {unknown}; review UAX #9")
 
+    vertical = property_values(text["VerticalOrientation.txt"], "R")
+    unknown = sorted(set(vertical) - {"U", "R", "Tu", "Tr"})
+    if unknown:
+        raise ValueError(f"new Vertical_Orientation values {unknown}; review UAX #50")
+
     def gc(code: int) -> str:
         return category.get(code, "Cn")
 
@@ -168,6 +175,7 @@ def generate_tables(text: dict[str, str]) -> tuple[str, dict]:
     grapheme_runs = idna.ranges(grapheme, lambda value: value != "Other")
     incb_runs = idna.ranges(incb, lambda value: value != "None")
     bidi_runs = idna.ranges(bidi, lambda value: value != "L")
+    vertical_runs = idna.ranges(vertical, lambda value: value != "R")
 
     brackets = []
     for fields in idna.data_lines(text["BidiBrackets.txt"]):
@@ -189,6 +197,7 @@ def generate_tables(text: dict[str, str]) -> tuple[str, dict]:
         "use super::GraphemeClass as Gc;",
         "use super::IndicConjunctBreak as Incb;",
         "use super::LineBreakClass as Lb;",
+        "use super::VerticalOrientation as Vo;",
         "",
         f'pub(crate) const UNICODE_VERSION: &str = "{UNICODE_VERSION}";',
         "",
@@ -211,12 +220,15 @@ def generate_tables(text: dict[str, str]) -> tuple[str, dict]:
     out += range_table("BIDI_BRACKETS", "(u32, u32, bool)", brackets,
                        lambda b: f"(0x{b[0]:X}, 0x{b[1]:X}, {b[2]})")
     out += range_table("BIDI_MIRRORING", "(u32, u32)", mirrors, span)
+    out += range_table("VERTICAL_ORIENTATION", "(u32, u32, Vo)", vertical_runs,
+                       lambda r: f"(0x{r[0]:X}, 0x{r[1]:X}, Vo::{variant(r[2])})")
     stats = {
         "line_break_runs": len(lb_runs),
         "grapheme_runs": len(grapheme_runs),
         "bidi_class_runs": len(bidi_runs),
         "bidi_brackets": len(brackets),
         "bidi_mirrors": len(mirrors),
+        "vertical_orientation_runs": len(vertical_runs),
     }
     return "\n".join(out), stats
 

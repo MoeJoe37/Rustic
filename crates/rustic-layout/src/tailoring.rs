@@ -256,6 +256,7 @@ pub(crate) fn apply(
                 rtl: ifc.bidi.levels()[end - 1].is_rtl(),
                 letter_spacing: 0.0,
                 word_spacing: 0.0,
+                vertical: false,
             };
             let shaped = shape(fonts, &item.chain, &[hyphen], &options)
                 .map_err(|_| FlowError::InvalidSnapshot)?;

@@ -1,5 +1,6 @@
-//! Bounded OpenType shaping: grapheme clusters, per-cluster font fallback, horizontal
-//! advances, bidi mirroring and CSS letter/word spacing.
+//! Bounded OpenType shaping: grapheme clusters, per-cluster font fallback,
+//! horizontal or vertical (top-to-bottom) advances, bidi mirroring and CSS
+//! letter/word spacing.
 //!
 //! HarfRust provides GSUB/GPOS and complex-script algorithms behind an
 //! adapter. Rustic owns Unicode 17 grapheme boundaries, fallback, source
@@ -15,15 +16,20 @@ use crate::unicode::mirrored;
 use rustic_base::CancellationToken;
 
 /// One glyph of a cluster, with its advance in CSS pixels.
+///
+/// In a vertical run ([`ShapeOptions::vertical`]) the pen moves down the
+/// line and sits on the glyph's vertical origin (the center of its top);
+/// the offsets then lead from that origin to the glyph's horizontal origin
+/// (usually minus half the horizontal advance and minus the ascent).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ShapedGlyph {
     /// Glyph index in the cluster's face (0 is `.notdef`).
     pub glyph: GlyphId,
-    /// Horizontal advance in CSS pixels.
+    /// Advance along the line in CSS pixels (downward in a vertical run).
     pub advance: f64,
     /// Horizontal offset from the pen, in CSS pixels.
     pub x_offset: f64,
-    /// Vertical offset above the baseline, in CSS pixels.
+    /// Vertical offset upward from the pen, in CSS pixels.
     pub y_offset: f64,
 }
 
@@ -52,6 +58,10 @@ pub struct ShapeOptions {
     pub letter_spacing: f64,
     /// CSS `word-spacing` in pixels, added to each word separator.
     pub word_spacing: f64,
+    /// Shape top to bottom for upright vertical text: vertical advances
+    /// (`vmtx`, else the ascent plus descent) and the `vert`/`vrt2`
+    /// alternates. `rtl` is ignored.
+    pub vertical: bool,
 }
 
 /// Default-ignorable and control characters that draw nothing.
@@ -336,7 +346,9 @@ pub fn shape_with_context(
             };
             buffer.push(u32::from(c), i as u32);
         }
-        buffer.set_direction(if options.rtl {
+        buffer.set_direction(if options.vertical {
+            harfrust::Direction::TopToBottom
+        } else if options.rtl {
             harfrust::Direction::RightToLeft
         } else {
             harfrust::Direction::LeftToRight
@@ -406,7 +418,11 @@ pub fn shape_with_context(
                     .unwrap_or(source);
             }
             let source = owner[source];
-            let mut advance = f64::from(pos.x_advance) * scale;
+            let mut advance = if options.vertical {
+                -f64::from(pos.y_advance) * scale
+            } else {
+                f64::from(pos.x_advance) * scale
+            };
             if is_word_separator(text[source]) {
                 advance += options.word_spacing;
             }

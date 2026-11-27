@@ -17,7 +17,7 @@
     "cases": 19338
   },
   "outputs": {
-    "crates/rustic-text/src/unicode/tables.rs": "8964afbd7f5334429de32235d3ff89168dd85291a4a17f31e2ae45ff1acb2ba1",
+    "crates/rustic-text/src/unicode/tables.rs": "19d0dece7a3bb1defe85847502561f874ed775ea6a1314e846002b0446ce7b48",
     "crates/rustic-text/tests/fixtures/bidi_character_cases.txt": "a5ea8b1890ac722772819ba58f278004cea43d16135b1ee73d4625d8eba4581c",
     "crates/rustic-text/tests/fixtures/bidi_class_cases.txt": "ff1751a8ba855ee8cf5deca1cb502efb5fb85582746b2eb296c0d9b6fceb4393",
     "crates/rustic-text/tests/fixtures/grapheme_cases.txt": "e0b4117ffa00a2d6c76486fe12ac7ad68683dde2fc23b18c9e17200c0ccb1133",
@@ -72,6 +72,10 @@
       "sha256": "2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c",
       "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/UnicodeData.txt"
     },
+    "VerticalOrientation.txt": {
+      "sha256": "dcef09c3fb24d356b042569c328ec341efc5b53447700d799f2fb4834c3cd3cd",
+      "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/VerticalOrientation.txt"
+    },
     "emoji-data.txt": {
       "sha256": "2cb2bb9455cda83e8481541ecf5b6dfda66a3bb89efa3fa7c5297eccf607b72b",
       "url": "https://raw.githubusercontent.com/unicode-org/unicodetools/63aff0ca8dea894a057d04e7aef7ae1241757680/unicodetools/data/ucd/17.0.0/emoji/emoji-data.txt"
@@ -82,7 +86,8 @@
     "bidi_class_runs": 763,
     "bidi_mirrors": 428,
     "grapheme_runs": 1386,
-    "line_break_runs": 2917
+    "line_break_runs": 2917,
+    "vertical_orientation_runs": 189
   },
   "unicode_version": "17.0.0",
   "unicodetools_revision": "63aff0ca8dea894a057d04e7aef7ae1241757680"

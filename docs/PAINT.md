@@ -244,6 +244,8 @@ fragment's baseline, filled in the text's `color`. On a vertical line
 quarter turn about its glyph's origin: clockwise in `vertical-rl`,
 `vertical-lr` and `sideways-rl`, counterclockwise in `sideways-lr`, and the
 fragment's decorations become vertical bands on the line's under side.
+Upright fragments (`TextFragment::upright`) are not turned, but their
+decorations follow the line.
 Inline content is clipped
 by its block's own overflow as well as its ancestors'. Outlines are read once
 per face and glyph; `PaintLimits::max_path_points` bounds the total points, and

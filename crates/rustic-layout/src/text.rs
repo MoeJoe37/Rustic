@@ -68,6 +68,9 @@ pub struct TextFragment {
     pub(crate) glyphs: Vec<PositionedGlyph>,
     pub(crate) parent: Option<usize>,
     pub(crate) rotation: GlyphRotation,
+    /// Upright on a vertical line: [`GlyphRotation::None`] once the run is
+    /// turned back to physical coordinates.
+    pub(crate) upright: bool,
 }
 
 /// How a text fragment's glyphs are turned (CSS Writing Modes 4 §5.1):
@@ -129,6 +132,13 @@ impl TextFragment {
     /// How the glyphs are turned about their origins.
     pub const fn rotation(&self) -> GlyphRotation {
         self.rotation
+    }
+    /// Whether the glyphs stand upright on a vertical (`vertical-rl` or
+    /// `vertical-lr`) line: their rotation is [`GlyphRotation::None`] while
+    /// the line runs top to bottom, and each glyph origin is its
+    /// horizontal origin, centered on the line.
+    pub const fn upright(&self) -> bool {
+        self.upright
     }
     /// The enclosing inline box fragment on the same line (an index into
     /// [`crate::BlockLayout::inlines`]); `None` when the text sits directly
@@ -282,6 +292,7 @@ pub(crate) fn convert(
             glyphs,
             parent: item.parent.and_then(|p| index.get(&(t.line, p)).copied()),
             rotation: GlyphRotation::None,
+            upright: t.upright,
         });
     }
     Ok(index)

@@ -1,4 +1,5 @@
-//! Unicode character properties for segmentation and bidi, generated from
+//! Unicode character properties for segmentation, bidi and vertical
+//! orientation, generated from
 //! the Unicode Character Database by `tools/generate_text_data.py`.
 
 mod tables;
@@ -244,6 +245,39 @@ pub fn strong_direction(c: char) -> Option<StrongDirection> {
         BidiClass::R | BidiClass::Al => Some(StrongDirection::Rtl),
         _ => None,
     }
+}
+
+/// UAX #50 `Vertical_Orientation` property values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum VerticalOrientation {
+    /// Upright in vertical text.
+    U,
+    /// Turned 90° clockwise (sideways) in vertical text.
+    R,
+    /// Transformed (a vertical alternate glyph), else upright.
+    Tu,
+    /// Transformed (a vertical alternate glyph), else sideways.
+    Tr,
+}
+
+impl VerticalOrientation {
+    /// Whether the character is set upright when the font has no vertical
+    /// alternate for it (`U` and `Tu`).
+    pub const fn is_upright(self) -> bool {
+        matches!(self, Self::U | Self::Tu)
+    }
+}
+
+/// The `Vertical_Orientation` of `c` (`R` when unlisted).
+///
+/// ```
+/// use rustic_text::unicode::{VerticalOrientation, vertical_orientation};
+/// assert_eq!(vertical_orientation('a'), VerticalOrientation::R);
+/// assert_eq!(vertical_orientation('\u{6C34}'), VerticalOrientation::U);
+/// assert_eq!(vertical_orientation('\u{3002}'), VerticalOrientation::Tu);
+/// ```
+pub fn vertical_orientation(c: char) -> VerticalOrientation {
+    lookup(&tables::VERTICAL_ORIENTATION, c).unwrap_or(VerticalOrientation::R)
 }
 
 /// `Bidi_Paired_Bracket` and whether `c` is an opening bracket.

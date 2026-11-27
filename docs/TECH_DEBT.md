@@ -269,7 +269,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
 | TD-210 | Deliberate | Layout | css-grid WPT comparison: 71 of 168 static pages fail, every one reviewed (masonry, baselines across writing modes and subgrids, Ahem text) | Open, `layout.grid` (M9) |
 | TD-211 | Deliberate | Layout | Table subset: collapsed borders place cells by whole rather than half borders; column boxes get no geometry and table parts are not relatively positioned; css-tables WPT 20 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
-| TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition with sideways text only; no upright typesetting, opposite-direction parallel children, cross-mode baselines or orthogonal relayout after stretching | Open, `text.writing` (M9) |
+| TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition; no central dominant baseline, `text-combine-upright`, opposite-direction parallel children, cross-mode baselines or orthogonal relayout after stretching | Open, `text.writing` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3493,10 +3493,13 @@ relatively positioned table parts, then shrink the list.
 
 ### TD-212 — Vertical writing modes subset
 `text.writing` lays out vertical writing modes by transposing each run of
-boxes into the `horizontal-tb` engine (LAYOUT.md, Writing modes). Text is
-always set sideways: `text-orientation`, upright CJK typesetting, vertical
-font metrics (`vhea`/`vmtx`) and `text-combine-upright` are not
-implemented. A child with the same axis but the opposite block direction
+boxes into the `horizontal-tb` engine (LAYOUT.md, Writing modes). Upright
+text is centered on the em box, but the alignment baseline stays the
+alphabetic one (no central dominant baseline for `vertical-align` across
+font sizes), `Tr` characters are always turned rather than taking a
+`vert` alternate when the font has one, `text-orientation: upright` does
+not force a left-to-right bidi direction, and `text-combine-upright` is
+not implemented. A child with the same axis but the opposite block direction
 (`vertical-lr` inside `vertical-rl`) flows in its parent's direction. An
 absolutely positioned box inside an orthogonal box, whose containing block
 is outside it, is placed against the orthogonal box. Baselines are not
@@ -3507,6 +3510,5 @@ percentages against the viewport rather than their grid area. Each run
 gets its own `max_flow_work` budget. Transitions on a logical longhand and
 on its physical counterpart are tracked separately, and `writing-mode` on
 the root does not change the scrolling origin.
-**Pay:** the remaining `text.writing` steps (vertical text, vertical
-flex/grid/table fixes and `text-combine-upright`), then shrink the WPT
-lists.
+**Pay:** the remaining `text.writing` steps (vertical flex/grid/table
+fixes and `text-combine-upright`), then shrink the WPT lists.

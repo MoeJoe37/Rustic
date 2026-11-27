@@ -219,3 +219,49 @@ fn vertical_lr_and_sideways_lr_lines_face_their_over_sides() {
     assert!(glyphs[1].y < glyphs[0].y);
     assert!(text.baseline().get() > 10.0, "{}", text.baseline().get());
 }
+
+#[test]
+fn upright_text_stands_on_the_line_center() {
+    let (_, layout) = layout_of(&format!(
+        "{STYLE}<style>html {{ writing-mode: vertical-rl; text-orientation: upright; \
+         font: 16px/20px serif }}</style><div>ab</div>"
+    ));
+    let text = &layout.texts()[0];
+    assert!(text.upright());
+    assert_eq!(text.rotation(), GlyphRotation::None);
+    let g = text.glyphs();
+    // The 20px line spans x 780..800; each glyph (8px advance) is centered
+    // on x 790 and hangs 13.6px below its vertical origin (the font has no
+    // `vmtx`, so its ink is centered in a 1em vertical advance).
+    assert_eq!((g[0].x, g[0].y), (786.0, 13.6));
+    assert_eq!((g[1].x, g[1].y), (786.0, 29.6));
+    assert_eq!(text.rect().size().height().get(), 32.0);
+    // In vertical-lr the line sits at the left edge.
+    let (_, layout) = layout_of(&format!(
+        "{STYLE}<style>html {{ writing-mode: vertical-lr; text-orientation: upright; \
+         font: 16px/20px serif }}</style><div>ab</div>"
+    ));
+    assert_eq!(layout.texts()[0].glyphs()[0].x, 6.0);
+}
+
+#[test]
+fn mixed_orientation_turns_only_sideways_characters() {
+    let (_, layout) = layout_of(&format!(
+        "{STYLE}<style>html {{ writing-mode: vertical-rl; font: 16px/20px serif }}\
+         </style><div>ab\u{6C34}\u{3002}</div>"
+    ));
+    let texts = layout.texts();
+    assert_eq!(texts.len(), 2);
+    assert!(!texts[0].upright());
+    assert_eq!(texts[0].rotation(), GlyphRotation::Clockwise);
+    // 水 (U) and 。 (Tu) stand upright after the sideways Latin letters.
+    assert!(texts[1].upright());
+    assert_eq!(texts[1].glyphs().len(), 2);
+    assert!(texts[1].rect().origin().y.get() >= texts[0].rect().size().height().get());
+    // sideways-rl turns everything, whatever text-orientation says.
+    let (_, layout) = layout_of(&format!(
+        "{STYLE}<style>html {{ writing-mode: sideways-rl; text-orientation: upright; \
+         font: 16px/20px serif }}</style><div>ab\u{6C34}</div>"
+    ));
+    assert!(layout.texts().iter().all(|t| !t.upright()));
+}

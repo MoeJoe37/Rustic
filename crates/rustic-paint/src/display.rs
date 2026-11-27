@@ -1307,7 +1307,13 @@ impl Builder<'_> {
             let (w, h) = (rect.size().width().get(), rect.size().height().get());
             // A sideways line's "below" is its left (clockwise) or right
             // (counterclockwise) side.
-            let (x, y, w, h) = match text.rotation() {
+            // Upright text keeps its line's (clockwise) orientation.
+            let along = if text.upright() {
+                GlyphRotation::Clockwise
+            } else {
+                text.rotation()
+            };
+            let (x, y, w, h) = match along {
                 GlyphRotation::None => (x, baseline + offset, w, thickness),
                 GlyphRotation::Clockwise => (baseline - offset - thickness, y, thickness, h),
                 GlyphRotation::Counterclockwise => (baseline + offset, y, thickness, h),

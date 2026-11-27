@@ -29,6 +29,7 @@ fn native_harfbuzz_glyphs_advances_and_offsets_match() {
             rtl: parts[1] == "rtl",
             letter_spacing: 0.0,
             word_spacing: 0.0,
+            vertical: false,
         };
         let mut clusters = shape(&db, &[0], &text, &options).unwrap();
         if options.rtl {

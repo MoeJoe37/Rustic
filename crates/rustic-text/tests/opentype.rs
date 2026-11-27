@@ -19,6 +19,7 @@ fn options(rtl: bool) -> ShapeOptions {
         rtl,
         letter_spacing: 0.0,
         word_spacing: 0.0,
+        vertical: false,
     }
 }
 fn database(data: &[u8]) -> FontDatabase {

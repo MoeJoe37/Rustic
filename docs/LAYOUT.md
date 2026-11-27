@@ -860,7 +860,14 @@ changed size. Runs are processed deepest first from an explicit list.
 
 Lines in a vertical run are columns: they stack in the block direction and
 text runs down (`sideways-lr`: up) with its glyphs turned sideways
-(`GlyphRotation`). The line's over side is the right one in `vertical-rl`,
+(`GlyphRotation`). In `vertical-rl` and `vertical-lr`, `text-orientation`
+sets characters upright instead (CSS Writing Modes 4 §5.1): all of them
+with `upright`, and with `mixed` each grapheme cluster whose first
+character has UAX #50 `Vertical_Orientation` `U` or `Tu`. Upright runs are
+shaped top to bottom (vertical advances from `vmtx`, else one em, and the
+`vert`/`vrt2` alternates), become their own text fragments
+(`TextFragment::upright`, rotation `None`), and are centered on the em
+box with each glyph hanging from its vertical origin. The line's over side is the right one in `vertical-rl`,
 `vertical-lr` and `sideways-rl` and the left one in `sideways-lr`; in
 `vertical-lr`, where that is not the block-start side, each line's
 contents are mirrored within the line so glyph tops face right. Line and

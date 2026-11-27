@@ -121,6 +121,7 @@ impl Target for SfntTarget {
                 rtl: false,
                 letter_spacing: 0.0,
                 word_spacing: 0.0,
+                vertical: false,
             };
             let _ = rustic_text::shape::shape(
                 &database,

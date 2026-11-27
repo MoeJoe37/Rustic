@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "b9a8b378583e50300f87c8095cb9b8b4d18bfd617fb8a39e0098784d1e4930fc",
-  "percent": "52.40",
+  "source_fingerprint": "6260dc91647e2633571fba993f0809b3da207e48692a5f5b01934385d4a728d6",
+  "percent": "52.52",
   "verified_percent": "50.83",
-  "partial_percent": "1.57",
+  "partial_percent": "1.69",
   "completed": 119,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 6,
       "total": 54,
-      "percent": "13.58",
+      "percent": "14.12",
       "verified_percent": "10.63",
-      "partial_percent": "2.95"
+      "partial_percent": "3.49"
     },
     {
       "id": "M10",
@@ -2478,8 +2478,29 @@
             },
             {
               "label": "Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/inline.rs",
+                  "marker": "fn upright_chars"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-text/src/shape.rs",
+                  "marker": "harfrust::Direction::TopToBottom"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/writing.rs",
+                  "marker": "fn mixed_orientation_turns_only_sideways_characters"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn upright_glyphs_stand_on_vertical_lines"
+                }
+              ]
             },
             {
               "label": "Vertical flex, grid and table layout, and text-combine-upright",
@@ -2492,7 +2513,7 @@
               "evidence": []
             }
           ],
-          "credit": "40.00",
+          "credit": "60.00",
           "engine_share": "0.60"
         },
         {
@@ -2520,10 +2541,10 @@
       "completed": 4,
       "in_progress": 1,
       "total": 7,
-      "contribution": "1.92",
-      "percent": "64.00",
+      "contribution": "2.04",
+      "percent": "68.00",
       "verified_percent": "56.00",
-      "partial_percent": "8.00"
+      "partial_percent": "12.00"
     },
     {
       "id": "layout",

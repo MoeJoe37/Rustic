@@ -15,6 +15,7 @@ fn options() -> ShapeOptions {
         rtl: false,
         letter_spacing: 0.0,
         word_spacing: 0.0,
+        vertical: false,
     }
 }
 
@@ -125,6 +126,7 @@ fn letter_and_word_spacing_follow_css_text() {
     let spaced = ShapeOptions {
         letter_spacing: 1.0,
         word_spacing: 2.0,
+        vertical: false,
         ..options()
     };
     let clusters = shape(&db, &[REGULAR], &chars("x x\u{200B}"), &spaced).unwrap();
@@ -170,4 +172,37 @@ fn invisible_controls_never_become_visible_notdef_glyphs() {
             u32::from(c)
         );
     }
+}
+
+#[test]
+fn vertical_runs_advance_down_from_the_vertical_origin() {
+    let db = test_database();
+    let face = db.face(REGULAR).expect("face");
+    let m = face.metrics();
+    let em = f64::from(face.units_per_em());
+    let out = shape(
+        &db,
+        &[REGULAR],
+        &chars("xx"),
+        &ShapeOptions {
+            vertical: true,
+            ..options()
+        },
+    )
+    .unwrap();
+    assert_eq!(out.len(), 2);
+    let g = out[0].glyphs[0];
+    // Without `vmtx` the advance is the ascent plus descent (1em here), the
+    // vertical origin is the top center, and the ink is centered in the
+    // advance (HarfBuzz's fallback origin): yMax + (advance - height) / 2.
+    let height = f64::from(i32::from(m.ascent) - i32::from(m.descent)) * 10.0 / em;
+    assert!((g.advance - height).abs() < 1e-9, "{g:?}");
+    assert!(
+        (g.x_offset + advance(&db, REGULAR, 'x') / 2.0).abs() < 1e-9,
+        "{g:?}"
+    );
+    let ink = face.outline(g.glyph).unwrap().bounds().unwrap();
+    let (top, bottom) = (ink.y_max * 10.0 / em, ink.y_min * 10.0 / em);
+    let origin = top + (height - (top - bottom)) / 2.0;
+    assert!((g.y_offset + origin).abs() < 1e-6, "{g:?} {origin}");
 }

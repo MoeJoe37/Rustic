@@ -46,6 +46,8 @@ pub(crate) struct RawText {
     pub face: usize,
     pub size: f64,
     pub glyphs: Vec<(GlyphId, f64, f64)>,
+    /// Upright glyphs on a vertical line (see [`Piece::Cluster`]).
+    pub upright: bool,
 }
 
 /// One inline box's fragment on one line.
@@ -700,6 +702,7 @@ fn place(
                 text,
                 face,
                 glyphs,
+                upright,
                 ..
             } => {
                 let item = &ifc.texts[*text];
@@ -719,12 +722,21 @@ fn place(
                 let text_width = w - hyphen_width;
                 let mut pen = x + dx + if level.is_rtl() { hyphen_width } else { 0.0 };
                 let mut placed: Vec<(GlyphId, f64, f64)> = Vec::with_capacity(glyphs.len());
+                // Upright glyphs hang from their vertical origin, centered
+                // on the em box (the central baseline); their position is
+                // the glyph origin as seen after the run is turned back.
+                let center = baseline - (item.font.ascent - item.font.descent) / 2.0;
                 for g in glyphs {
-                    placed.push((g.glyph, pen + g.x_offset, baseline - g.y_offset));
+                    placed.push(if *upright {
+                        (g.glyph, pen - g.y_offset, center - g.x_offset)
+                    } else {
+                        (g.glyph, pen + g.x_offset, baseline - g.y_offset)
+                    });
                     pen += g.advance;
                 }
                 let joins = texts.last().is_some_and(|t: &RawText| {
                     t.text == *text
+                        && t.upright == *upright
                         && t.face == *face
                         && t.level == level.number()
                         && (t.x + t.width - (x + dx)).abs() < EPSILON
@@ -749,6 +761,7 @@ fn place(
                         face: *face,
                         size: item.font.size,
                         glyphs: placed,
+                        upright: *upright,
                     });
                 }
             }
@@ -793,6 +806,7 @@ fn place(
                     face: h.face,
                     size: item.font.size,
                     glyphs,
+                    upright: false,
                 });
             }
         }

@@ -149,6 +149,11 @@ struct Item {
     /// the latest layout (`None`: synthesized from the border box).
     first_baseline: Option<f64>,
     last_baseline: Option<f64>,
+    /// The item's baselines are synthesized at its center (the central
+    /// dominant baseline of vertical typography) rather than its bottom.
+    central: bool,
+    /// A scroll container: its baselines are clamped to its border box.
+    scroll: bool,
     /// A subgrid in the (column, row) axis.
     subgrid: (bool, bool),
 }
@@ -1474,15 +1479,28 @@ fn self_alignment(a: Alignment, replaced: bool, block: bool) -> Alignment {
 
 /// The distance from an item's margin-box top to its first (or last)
 /// baseline, given its content height; without a line box the baseline is
-/// synthesized from the border box's bottom edge.
+/// synthesized from the border box's bottom edge (its center for the
+/// central baseline of vertical typography).
 fn ascent(item: &Item, height: f64, last: bool) -> f64 {
     let top = item.margin.top.get() + item.border.top.get() + item.padding.top.get();
-    match if last {
+    let baseline = if last {
         item.last_baseline
     } else {
         item.first_baseline
-    } {
+    };
+    // A scroll container's baselines are clamped to its border box (CSS
+    // Box Alignment 3 §9.1, csswg-drafts#7660).
+    let clamp = |b: f64| {
+        if !item.scroll {
+            return b;
+        }
+        let above = item.border.top.get() + item.padding.top.get();
+        let below = item.padding.bottom.get() + item.border.bottom.get();
+        b.clamp(-above, (height + below).max(-above))
+    };
+    match baseline.map(clamp) {
         Some(b) => top + b,
+        None if item.central => item.margin.top.get() + (item.vertical_extras() + height) / 2.0,
         None => item.margin.top.get() + item.vertical_extras() + height,
     }
 }
@@ -1519,9 +1537,9 @@ fn baseline_shims(items: &[Item], heights: &[f64]) -> Vec<f64> {
 }
 
 /// A grid container's first (or last) baseline below its content-box top
-/// (CSS Grid 2 §10.8): from the first (last) row with items, the item
-/// taking part in baseline alignment there, else the first (last) in grid
-/// order; `None` without items.
+/// (CSS Grid 2 §10.8): from the first (last) row with items, an item
+/// taking part in baseline alignment there (the shared baseline of its
+/// group), else the first (last) in grid order; `None` without items.
 fn container_baseline(items: &[Item], last: bool) -> Option<f64> {
     let row = |i: &Item| if last { i.rows.1 } else { i.rows.0 };
     let edge = if last {
@@ -1529,17 +1547,29 @@ fn container_baseline(items: &[Item], last: bool) -> Option<f64> {
     } else {
         items.iter().map(row).min()?
     };
-    let keyword = if last { K::LastBaseline } else { K::Baseline };
+    let (keyword, other) = if last {
+        (K::LastBaseline, K::Baseline)
+    } else {
+        (K::Baseline, K::LastBaseline)
+    };
     let mut in_row: Vec<&Item> = items.iter().filter(|i| row(i) == edge).collect();
     in_row.sort_by_key(|i| i.columns.0);
     if last {
         in_row.reverse();
     }
+    // An item in the row's baseline-sharing group gives the shared
+    // baseline, preferring the same kind (first or last) of group.
     let chosen = in_row
         .iter()
         .find(|i| i.align.keyword == keyword)
+        .or_else(|| in_row.iter().find(|i| i.align.keyword == other))
         .or_else(|| in_row.first())?;
-    Some(chosen.y + ascent(chosen, chosen.height, last))
+    let uses_last = match chosen.align.keyword {
+        K::Baseline => false,
+        K::LastBaseline => true,
+        _ => last,
+    };
+    Some(chosen.y + ascent(chosen, chosen.height, uses_last))
 }
 
 /// Offset of a box in its area for a self-alignment value.
@@ -1820,6 +1850,8 @@ impl Engine<'_, '_> {
                     area: (0.0, 0.0),
                     first_baseline: None,
                     last_baseline: None,
+                    central: false,
+                    scroll: false,
                     subgrid,
                 },
             ));
@@ -2506,9 +2538,13 @@ impl Engine<'_, '_> {
         run.items[item].natural = natural;
         let first = self.content_baseline(node, false)?;
         let last = self.content_baseline(node, true)?;
+        let central = crate::inline::central_baseline(self.nodes[node].style);
+        let scroll = super::scroll_container(self.nodes[node].overflow);
         let entry = &mut self.grids[k].items[item];
         entry.first_baseline = first;
         entry.last_baseline = last;
+        entry.central = central;
+        entry.scroll = scroll;
         Ok(())
     }
 

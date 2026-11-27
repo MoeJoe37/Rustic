@@ -496,3 +496,16 @@ fn an_ltr_subgrid_in_an_rtl_grid_reverses_the_adopted_tracks() {
     assert_eq!((b["a"].0, b["a"].2), (0.0, 250.0));
     assert_eq!((b["b"].0, b["b"].2), (350.0, 50.0));
 }
+
+#[test]
+fn scroll_container_baselines_clamp_to_the_border_box() {
+    // The scroll container's only line is 200px below its content box, so
+    // its baseline is clamped to its bottom border edge (csswg-drafts#7660).
+    let b = boxes(&page(
+        "#g { display: grid; grid-auto-flow: column; align-items: baseline; font: 10px/10px serif }",
+        "<div id=g><div id=a>x</div>\
+         <div id=s style='overflow: hidden; height: 50px'><div style='margin-top: 200px'>x</div></div></div>",
+    ));
+    assert_eq!(b["s"].1, 0.0);
+    assert_eq!(b["a"].1 + 8.0, 50.0, "{:?}", b["a"]);
+}

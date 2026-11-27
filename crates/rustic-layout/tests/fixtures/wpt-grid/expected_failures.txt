@@ -4,23 +4,17 @@ css/css-grid/alignment/grid-align-baseline-fieldset-001.html	a fieldset grid ite
 css/css-grid/alignment/grid-align-baseline-fieldset-002.html	fieldset item (unsupported SpecialElement)
 css/css-grid/alignment/grid-align-baseline-fieldset-003.html	fieldset item (unsupported SpecialElement)
 css/css-grid/alignment/grid-align-baseline-flex-001.html	baseline alignment of a nested flex container differs: <div> data-offset-y: expected 35, got 15
-css/css-grid/alignment/grid-align-baseline-flex-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 40, got 45
+css/css-grid/alignment/grid-align-baseline-flex-002.html	baseline alignment of a nested flex container differs (its baselines come from its items in order, not their physical positions): <div> data-offset-x: expected 30, got 40
 css/css-grid/alignment/grid-align-baseline-flex-003.html	baseline alignment of a nested flex container differs: <div> data-offset-y: expected 45, got 15
 css/css-grid/alignment/grid-align-baseline-flex-004.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 110, got 135
-css/css-grid/alignment/grid-align-baseline-grid-001.html	baseline alignment of a nested grid differs: <div> data-offset-y: expected 100, got 90
-css/css-grid/alignment/grid-align-baseline-grid-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 110, got 105
-css/css-grid/alignment/grid-align-baseline-grid-003.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 30, got 35
 css/css-grid/alignment/grid-align-baseline-multicol-001.html	multi-column layout not implemented
 css/css-grid/alignment/grid-align-baseline-multicol-002.html	multi-column layout is not implemented
 css/css-grid/alignment/grid-align-baseline-multicol-003.html	multi-column layout is not implemented
 css/css-grid/alignment/grid-align-baseline-nested-intrinsic-sizing-001.html	form control item (unsupported SpecialElement)
-css/css-grid/alignment/grid-align-baseline-overflow-001.html	baseline of a scroll container item differs: <div> data-offset-y: expected 30, got 185
-css/css-grid/alignment/grid-align-baseline-overflow-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 70, got 65
-css/css-grid/alignment/grid-align-baseline-overflow-003.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 40, got 45
 css/css-grid/alignment/grid-align-baseline-single-item-001.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-expected-height: expected 75, got 100
 css/css-grid/alignment/grid-align-baseline-table-001.html	baseline alignment of a nested table differs: <div> data-offset-y: expected 45, got 152
-css/css-grid/alignment/grid-align-baseline-table-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 115, got 0
-css/css-grid/alignment/grid-align-baseline-table-003.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 45, got 152
+css/css-grid/alignment/grid-align-baseline-table-002.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 115, got 76
+css/css-grid/alignment/grid-align-baseline-table-003.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 45, got 76
 css/css-grid/alignment/grid-container-baseline-001.html	baselines across writing modes (orthogonal items, synthesized baselines) differ (TD-212): <div> data-offset-x: expected 0, got 75
 css/css-grid/alignment/grid-content-alignment-overflow-002.html	checks scroll sizes, which the comparison does not read
 css/css-grid/alignment/grid-item-aspect-ratio-justify-self-001.html	aspect-ratio on non-replaced boxes is not implemented: <div> data-expected-width: expected 16, got 0

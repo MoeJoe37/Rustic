@@ -265,3 +265,63 @@ fn mixed_orientation_turns_only_sideways_characters() {
     ));
     assert!(layout.texts().iter().all(|t| !t.upright()));
 }
+
+#[test]
+fn vertical_lines_align_on_the_central_baseline() {
+    // Inline-blocks without lines synthesize a central baseline halfway
+    // across their margin boxes, so their centers line up.
+    let b = boxes(&format!(
+        "{STYLE}<style>html {{ writing-mode: vertical-rl; line-height: 0 }} \
+         span {{ display: inline-block; height: 10px }}</style>\
+         <div><span id=a style='width: 10px'></span><span id=b style='width: 30px'></span></div>"
+    ));
+    let center = |r: (f64, f64, f64, f64)| r.0 + r.2 / 2.0;
+    assert_eq!(center(b["a"]), center(b["b"]));
+    assert_eq!(b["b"].0, 770.0);
+    // sideways-rl keeps the alphabetic baseline: line-under (left) edges
+    // line up.
+    let b = boxes(&format!(
+        "{STYLE}<style>html {{ writing-mode: sideways-rl; line-height: 0 }} \
+         span {{ display: inline-block; height: 10px }}</style>\
+         <div><span id=a style='width: 10px'></span><span id=b style='width: 30px'></span></div>"
+    ));
+    assert_eq!(b["a"].0, b["b"].0);
+}
+
+#[test]
+fn vertical_grid_items_share_a_central_baseline() {
+    let b = boxes(&format!(
+        "{STYLE}<style>html {{ writing-mode: vertical-rl }} \
+         #g {{ display: grid; grid-auto-flow: column; align-items: baseline }}</style>\
+         <div id=g><div id=a style='width: 10px; height: 5px'></div>\
+         <div id=b style='width: 30px; height: 5px'></div></div>"
+    ));
+    let center = |r: (f64, f64, f64, f64)| r.0 + r.2 / 2.0;
+    assert_eq!(center(b["a"]), center(b["b"]));
+}
+
+#[test]
+fn combined_text_sets_horizontally_in_one_em() {
+    let (_, layout) = layout_of(&format!(
+        "{STYLE}<style>html {{ writing-mode: vertical-rl; font: 16px/20px 'Rustic Test' }}\
+         span {{ text-combine-upright: all }}</style><div>x<span>xx</span>x</div>"
+    ));
+    let texts = layout.texts();
+    assert_eq!(texts.len(), 3, "{texts:#?}");
+    let c = &texts[1];
+    assert!(c.upright());
+    assert_eq!(c.rotation(), GlyphRotation::None);
+    let g = c.glyphs();
+    // The two glyphs run left to right on one baseline, centered on the
+    // line (x 780..800) and one em long along it.
+    assert_eq!(g.len(), 2);
+    assert_eq!(g[0].y, g[1].y);
+    assert!(g[1].x > g[0].x);
+    let advance = g[1].x - g[0].x;
+    assert!((g[0].x + advance - 790.0).abs() < 1e-9, "{g:?}");
+    assert_eq!(c.rect().size().height().get(), 16.0);
+    assert_eq!(
+        texts[2].rect().origin().y.get(),
+        c.rect().origin().y.get() + 16.0
+    );
+}

@@ -36,6 +36,11 @@ pub(crate) struct FontBox {
     pub line_height: f64,
     pub x_height: f64,
     pub size: f64,
+    /// How far the alphabetic baseline lies below the dominant one: half
+    /// the ascent minus the descent when the dominant baseline is central
+    /// (vertical typography), else 0. `ascent` and `descent` are measured
+    /// from the dominant baseline.
+    pub shift: f64,
 }
 
 impl FontBox {
@@ -319,11 +324,18 @@ pub(crate) fn font_of(
         V::LineHeight(rustic_css::LineHeight::LengthPercentage(v)) => lp(v, size)?,
         _ => return Err(FlowError::InvalidSnapshot),
     };
+    // With a central dominant baseline the em box is centered on it.
+    let shift = if central_baseline(style) {
+        (ascent - descent) / 2.0
+    } else {
+        0.0
+    };
     Ok((
         chain,
         FontBox {
-            ascent,
-            descent,
+            ascent: ascent - shift,
+            descent: descent + shift,
+            shift,
             line_height: line_height.max(0.0),
             x_height: style.font_metrics().x_height * size,
             size,
@@ -840,6 +852,11 @@ fn shape_events(
                 let size = ifc.texts[item].font.size;
                 let letter = spacing(style, P::LetterSpacing, size)?;
                 let word = spacing(style, P::WordSpacing, size)?;
+                if let Some(piece) = combined(ifc, item, chars.clone(), kinds, fonts, letter, work)?
+                {
+                    ifc.pieces.push(piece);
+                    continue;
+                }
                 let upright = upright_chars(style, &ifc.chars[chars.clone()]);
                 let mut start = chars.start;
                 while start < chars.end {
@@ -930,6 +947,105 @@ fn shape_events(
         }
     }
     Ok(())
+}
+
+/// `text-combine-upright: all` on a `vertical-rl` or `vertical-lr` line
+/// (CSS Writing Modes 4 §9.1): the text box's characters are shaped
+/// horizontally and set as one upright cluster one em long, centered on
+/// the line. Wider compositions are not compressed. `None` when the text
+/// is not combined (other modes, preserved white space or breaks, or more
+/// than one face).
+fn combined(
+    ifc: &Ifc<'_>,
+    item: usize,
+    chars: Range<usize>,
+    kinds: &[Kind],
+    fonts: &FontDatabase,
+    letter: f64,
+    work: &mut Work<'_>,
+) -> Result<Option<Piece>, FlowError> {
+    use rustic_css::{TextCombineUpright, WritingMode};
+    let text = &ifc.texts[item];
+    if !matches!(
+        text.style.get(P::TextCombineUpright),
+        V::TextCombineUpright(TextCombineUpright::All)
+    ) || !matches!(
+        text.style.writing_mode(),
+        WritingMode::VerticalRl | WritingMode::VerticalLr
+    ) || chars.is_empty()
+        || kinds[chars.clone()].iter().any(|&k| k != Kind::Normal)
+    {
+        return Ok(None);
+    }
+    work.charge(chars.len())?;
+    let font = text.font;
+    let options = ShapeOptions {
+        size: font.size,
+        rtl: false,
+        letter_spacing: letter,
+        word_spacing: 0.0,
+        vertical: false,
+    };
+    let clusters =
+        shape(fonts, &text.chain, &ifc.chars[chars.clone()], &options).map_err(|_| {
+            FlowError::Unsupported {
+                node: text.node,
+                reason: UnsupportedFlow::TextLayout,
+            }
+        })?;
+    let Some(face) = clusters.first().map(|c| c.face) else {
+        return Ok(None);
+    };
+    if clusters.iter().any(|c| c.face != face) {
+        return Ok(None);
+    }
+    let width: f64 = clusters.iter().map(|c| c.advance).sum();
+    // The horizontal em box is centered in the one-em upright advance;
+    // offsets lead from the line-center pen to each glyph's origin, as for
+    // vertically shaped glyphs.
+    let (ascent, descent) = (font.ascent + font.shift, font.descent - font.shift);
+    let drop = (font.size - (ascent + descent)) / 2.0 + ascent;
+    let mut glyphs = Vec::new();
+    let mut pen = 0.0;
+    for cluster in &clusters {
+        for g in &cluster.glyphs {
+            glyphs.push(ShapedGlyph {
+                glyph: g.glyph,
+                advance: 0.0,
+                x_offset: pen + g.x_offset - width / 2.0,
+                y_offset: g.y_offset - drop,
+            });
+            pen += g.advance;
+        }
+        pen += cluster.advance - cluster.glyphs.iter().map(|g| g.advance).sum::<f64>();
+    }
+    if let Some(last) = glyphs.last_mut() {
+        last.advance = font.size;
+    }
+    Ok(Some(Piece::Cluster {
+        chars,
+        text: item,
+        face,
+        glyphs,
+        width: font.size,
+        space: Space::None,
+        justifiable: false,
+        upright: true,
+    }))
+}
+
+/// Whether the dominant baseline is the central one (CSS Inline 3 §4.1:
+/// `vertical-rl` and `vertical-lr` with `text-orientation` other than
+/// `sideways`); otherwise it is the alphabetic one.
+pub(crate) fn central_baseline(style: &ComputedStyle) -> bool {
+    use rustic_css::{TextOrientation, WritingMode};
+    matches!(
+        style.writing_mode(),
+        WritingMode::VerticalRl | WritingMode::VerticalLr
+    ) && !matches!(
+        style.get(P::TextOrientation),
+        V::TextOrientation(TextOrientation::Sideways)
+    )
 }
 
 /// Which characters of a text run are set upright (CSS Writing Modes 4

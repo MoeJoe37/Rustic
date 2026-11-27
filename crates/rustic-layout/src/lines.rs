@@ -726,11 +726,13 @@ fn place(
                 // on the em box (the central baseline); their position is
                 // the glyph origin as seen after the run is turned back.
                 let center = baseline - (item.font.ascent - item.font.descent) / 2.0;
+                // Sideways glyphs sit on the alphabetic baseline.
+                let alphabetic = baseline + item.font.shift;
                 for g in glyphs {
                     placed.push(if *upright {
                         (g.glyph, pen - g.y_offset, center - g.x_offset)
                     } else {
-                        (g.glyph, pen + g.x_offset, baseline - g.y_offset)
+                        (g.glyph, pen + g.x_offset, alphabetic - g.y_offset)
                     });
                     pen += g.advance;
                 }
@@ -756,7 +758,7 @@ fn place(
                         width: text_width,
                         top: baseline - font.ascent,
                         height: font.ascent + font.descent,
-                        baseline,
+                        baseline: alphabetic,
                         level: level.number(),
                         face: *face,
                         size: item.font.size,
@@ -779,8 +781,9 @@ fn place(
                     x + w - h.width + dx
                 };
                 let mut glyphs = Vec::new();
+                let alphabetic = baseline + item.font.shift;
                 for g in &h.glyphs {
-                    glyphs.push((g.glyph, pen + g.x_offset, baseline - g.y_offset));
+                    glyphs.push((g.glyph, pen + g.x_offset, alphabetic - g.y_offset));
                     pen += g.advance;
                 }
                 let source = ifc.sources[h.at];
@@ -801,7 +804,7 @@ fn place(
                     width: h.width,
                     top: baseline - font.ascent,
                     height: font.ascent + font.descent,
-                    baseline,
+                    baseline: alphabetic,
                     level: level.number(),
                     face: h.face,
                     size: item.font.size,

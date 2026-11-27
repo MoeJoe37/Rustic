@@ -267,9 +267,9 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-200 | Deliberate | WebAssembly | The progressive decoder pulls response chunks and compiles in an agent promise reaction | Partly paid by ADR 0094, M9 |
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
-| TD-210 | Deliberate | Layout | css-grid WPT comparison: 71 of 168 static pages fail, every one reviewed (masonry, baselines across writing modes and subgrids, Ahem text) | Open, `layout.grid` (M9) |
+| TD-210 | Deliberate | Layout | css-grid WPT comparison: 65 of 168 static pages fail, every one reviewed (masonry, baselines across writing modes and subgrids, Ahem text) | Open, `layout.grid` (M9) |
 | TD-211 | Deliberate | Layout | Table subset: collapsed borders place cells by whole rather than half borders; column boxes get no geometry and table parts are not relatively positioned; css-tables WPT 20 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
-| TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition; no central dominant baseline, `text-combine-upright`, opposite-direction parallel children, cross-mode baselines or orthogonal relayout after stretching | Open, `text.writing` (M9) |
+| TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition; no opposite-direction parallel children, cross-mode baselines, compressed `text-combine-upright` or orthogonal relayout after stretching | Open, `text.writing` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3456,12 +3456,12 @@ subgrid baselines.
 
 `tests/wpt_grid.rs` lays out the 168 static `checkLayout` pages that
 `tools/import_wpt_grid_tests.py` extracts from the pinned css-grid directory
-and compares every element's expectations. 97 pass (18 since
-`text.writing`). Each of the other 71 is listed in
-`fixtures/wpt-grid/expected_failures.txt` with its reason: 20 masonry, 13
+and compares every element's expectations. 103 pass (24 since
+`text.writing`). Each of the other 65 is listed in
+`fixtures/wpt-grid/expected_failures.txt` with its reason: 20 masonry, 8
 baselines across writing modes (orthogonal items and synthesized
 baselines, TD-212), 9 subgrid baselines (most with Ahem text), 4 baselines
-of nested flex, grid, table and scroll-container items, and single causes
+of nested flex and table items, and single causes
 (Ahem `::first-letter`/`::first-line` text, form-control and `fieldset`
 items, multi-column layout, generated content, `aspect-ratio`, orthogonal
 percentages, unread expectation attributes and the TD-209 edge cases). Rustic's bundled test fonts have no Ahem. The list
@@ -3494,21 +3494,22 @@ relatively positioned table parts, then shrink the list.
 ### TD-212 — Vertical writing modes subset
 `text.writing` lays out vertical writing modes by transposing each run of
 boxes into the `horizontal-tb` engine (LAYOUT.md, Writing modes). Upright
-text is centered on the em box, but the alignment baseline stays the
-alphabetic one (no central dominant baseline for `vertical-align` across
-font sizes), `Tr` characters are always turned rather than taking a
-`vert` alternate when the font has one, `text-orientation: upright` does
-not force a left-to-right bidi direction, and `text-combine-upright` is
-not implemented. A child with the same axis but the opposite block direction
+and sideways text align on the central baseline, but `vertical-align:
+middle` still uses half the x-height, `Tr` characters are always turned
+rather than taking a `vert` alternate when the font has one,
+`text-orientation: upright` does not force a left-to-right bidi
+direction, and `text-combine-upright` neither compresses compositions
+wider than one em nor applies in `sideways-*` modes. A child with the same axis but the opposite block direction
 (`vertical-lr` inside `vertical-rl`) flows in its parent's direction. An
 absolutely positioned box inside an orthogonal box, whose containing block
-is outside it, is placed against the orthogonal box. Baselines are not
-synthesized across writing modes (13 css-grid pages). A flex or grid
+is outside it, is placed against the orthogonal box. Baselines of orthogonal items and
+nested containers in vertical grids are not synthesized as browsers do
+(8 css-grid pages). A flex or grid
 container that stretches or shrinks an orthogonal item keeps the item's
 contents at their first size, and orthogonal grid items resolve
 percentages against the viewport rather than their grid area. Each run
 gets its own `max_flow_work` budget. Transitions on a logical longhand and
 on its physical counterpart are tracked separately, and `writing-mode` on
 the root does not change the scrolling origin.
-**Pay:** the remaining `text.writing` steps (vertical flex/grid/table
-fixes and `text-combine-upright`), then shrink the WPT lists.
+**Pay:** shrink the WPT lists with cross-mode baseline synthesis and
+orthogonal relayout after stretching.

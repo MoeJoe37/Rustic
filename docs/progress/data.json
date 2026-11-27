@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "6260dc91647e2633571fba993f0809b3da207e48692a5f5b01934385d4a728d6",
-  "percent": "52.52",
+  "source_fingerprint": "6550d3496fe17f6914f7a6c31c635ec5d31ef3e0ff9f9fae88e1cbc24c56e6e0",
+  "percent": "52.64",
   "verified_percent": "50.83",
-  "partial_percent": "1.69",
+  "partial_percent": "1.81",
   "completed": 119,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 6,
       "total": 54,
-      "percent": "14.12",
+      "percent": "14.66",
       "verified_percent": "10.63",
-      "partial_percent": "3.49"
+      "partial_percent": "4.03"
     },
     {
       "id": "M10",
@@ -2504,8 +2504,29 @@
             },
             {
               "label": "Vertical flex, grid and table layout, and text-combine-upright",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/inline.rs",
+                  "marker": "fn central_baseline"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/inline.rs",
+                  "marker": "fn combined"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/writing.rs",
+                  "marker": "fn vertical_grid_items_share_a_central_baseline"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/writing.rs",
+                  "marker": "fn combined_text_sets_horizontally_in_one_em"
+                }
+              ]
             },
             {
               "label": "Web fonts: @font-face rules, font loading and the FontFace API",
@@ -2513,7 +2534,7 @@
               "evidence": []
             }
           ],
-          "credit": "60.00",
+          "credit": "80.00",
           "engine_share": "0.60"
         },
         {
@@ -2541,10 +2562,10 @@
       "completed": 4,
       "in_progress": 1,
       "total": 7,
-      "contribution": "2.04",
-      "percent": "68.00",
+      "contribution": "2.16",
+      "percent": "72.00",
       "verified_percent": "56.00",
-      "partial_percent": "12.00"
+      "partial_percent": "16.00"
     },
     {
       "id": "layout",

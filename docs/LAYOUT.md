@@ -877,13 +877,25 @@ Absolutely positioned tables are re-solved at their content height, so
 `bottom` (and, in vertical runs, `right`) offsets account for a table
 taller than its specified height.
 
-Limits (TD-212): text is always set sideways (no upright typesetting,
-`text-orientation`, vertical font metrics or `text-combine-upright`); a
-child with the same axis but the opposite block direction (`vertical-lr`
+In `vertical-rl` and `vertical-lr` (unless `text-orientation` is
+`sideways`) the dominant baseline is the central one (CSS Inline 3 §4.1):
+each font box is centered on it and sideways glyphs sit on the alphabetic
+baseline below it, inline-blocks without lines synthesize it halfway
+across their margin boxes, and flex and grid items without lines halfway
+across their border boxes. A grid container's baseline comes from an item
+in its first (last) row that takes part in baseline alignment of either
+kind, else the first (last) item in grid order; a scroll container
+item's baselines are clamped to its border box (csswg-drafts#7660).
+`text-combine-upright: all` sets a text box's characters horizontally as
+one upright cluster one em long, centered on the line.
+
+Limits (TD-212): `vertical-align: middle` ignores the central baseline;
+`text-combine-upright` does not compress wider compositions or apply in
+`sideways-*` modes; a child with the same axis but the opposite block direction (`vertical-lr`
 in `vertical-rl`) flows in its parent's direction; an absolutely positioned
 box inside an orthogonal box whose containing block is outside it is
-placed against the nested run's root; baselines across writing modes are
-not synthesized; and a flex or grid container that stretches an orthogonal
+placed against the nested run's root; baselines of orthogonal items are
+synthesized from their border boxes only; and a flex or grid container that stretches an orthogonal
 item does not lay its contents out again.
 
 ### Evidence
@@ -893,9 +905,11 @@ item does not lay its contents out again.
 percentages and positioning against an orthogonal box's containing block,
 and text direction, rotation and baselines in `vertical-rl`, `vertical-lr`
 and `sideways-lr`. `crates/rustic-raster/tests/paint.rs` rasterizes
-sideways glyphs and their underline. The pinned WPT comparisons gained
+sideways and upright glyphs and their underlines. Upright, mixed and
+combined text and central and clamped baselines have exact-geometry tests
+in `writing.rs` and `grid.rs`. The pinned WPT comparisons gained
 pages that need vertical writing modes: css-flexbox 49 of 91 (was 40),
-css-grid 97 of 168 (was 79) and css-tables 20 of 35 (was 18).
+css-grid 103 of 168 (was 79) and css-tables 20 of 35 (was 18).
 
 Specification basis, reviewed 2026-11-27: CSS Writing Modes 4
 [§6–8](https://drafts.csswg.org/css-writing-modes-4/#abstract-box) and CSS

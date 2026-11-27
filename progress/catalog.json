@@ -2262,8 +2262,29 @@
             },
             {
               "label": "Vertical flex, grid and table layout, and text-combine-upright",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/inline.rs",
+                  "marker": "fn central_baseline"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/inline.rs",
+                  "marker": "fn combined"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/writing.rs",
+                  "marker": "fn vertical_grid_items_share_a_central_baseline"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/writing.rs",
+                  "marker": "fn combined_text_sets_horizontally_in_one_em"
+                }
+              ]
             },
             {
               "label": "Web fonts: @font-face rules, font loading and the FontFace API",

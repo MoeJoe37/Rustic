@@ -89,6 +89,11 @@ struct Item {
     /// the latest layout (`None`: synthesized from the border box).
     first_baseline: Option<f64>,
     last_baseline: Option<f64>,
+    /// The item's baselines are synthesized at its center (the central
+    /// dominant baseline of vertical typography) rather than its bottom.
+    central: bool,
+    /// A scroll container: its baselines are clamped to its border box.
+    scroll: bool,
 }
 
 impl Item {
@@ -124,18 +129,34 @@ impl Item {
     fn content_top(&self) -> f64 {
         self.margin.top.get() + self.border.top.get() + self.padding.top.get()
     }
+    /// A baseline below the content-box top, clamped to the border box for
+    /// a scroll container (CSS Box Alignment 3 §9.1, csswg-drafts#7660).
+    fn clamped(&self, b: f64) -> f64 {
+        if !self.scroll {
+            return b;
+        }
+        let above = self.border.top.get() + self.padding.top.get();
+        let below = self.padding.bottom.get() + self.border.bottom.get();
+        b.clamp(-above, (self.cross + below).max(-above))
+    }
     /// The first baseline below the margin-box top (CSS Flexbox 1 §8.5):
     /// the first line box, else synthesized from the border-box bottom.
     fn baseline_above(&self) -> f64 {
-        match self.first_baseline {
+        match self.first_baseline.map(|b| self.clamped(b)) {
             Some(b) => self.content_top() + b,
+            None if self.central => {
+                self.margin.top.get() + (self.cross + self.vertical_extras()) / 2.0
+            }
             None => self.margin.top.get() + self.cross + self.vertical_extras(),
         }
     }
     /// The last baseline above the margin-box bottom.
     fn baseline_below(&self, row: bool) -> f64 {
-        match self.last_baseline {
+        match self.last_baseline.map(|b| self.clamped(b)) {
             Some(b) => self.cross + self.cross_outer(row) - (self.content_top() + b),
+            None if self.central => {
+                self.margin.bottom.get() + (self.cross + self.vertical_extras()) / 2.0
+            }
             None => self.margin.bottom.get(),
         }
     }
@@ -451,6 +472,8 @@ impl Engine<'_, '_> {
                         cross_pos: 0.0,
                         first_baseline: None,
                         last_baseline: None,
+                        central: false,
+                        scroll: false,
                     });
                 }
             }
@@ -564,6 +587,8 @@ impl Engine<'_, '_> {
     ) -> Result<(), FlowError> {
         let first = self.content_baseline(node, false)?;
         let last = self.content_baseline(node, true)?;
+        let central = crate::inline::central_baseline(self.nodes[node].style);
+        let scroll = super::scroll_container(self.nodes[node].overflow);
         let run = &mut self.flexes[k];
         let item = run.current.take().ok_or(FlowError::InvalidSnapshot)?;
         if run.items[item].node != node {
@@ -573,6 +598,8 @@ impl Engine<'_, '_> {
         entry.natural = natural;
         entry.first_baseline = first;
         entry.last_baseline = last;
+        entry.central = central;
+        entry.scroll = scroll;
         Ok(())
     }
 
@@ -1197,6 +1224,8 @@ mod tests {
             cross_pos: 0.0,
             first_baseline: None,
             last_baseline: None,
+            central: false,
+            scroll: false,
         }
     }
 

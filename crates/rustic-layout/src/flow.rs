@@ -1945,13 +1945,20 @@ impl<'a, 'c> Engine<'a, 'c> {
             true => self.content_baseline(i, last)?,
             false => None,
         };
+        // The central baseline of vertical typography is synthesized
+        // halfway between the margin edges (CSS Inline 3 §4.2).
+        let synthesized = if crate::inline::central_baseline(self.nodes[i].style) {
+            height / 2.0
+        } else {
+            height
+        };
         let item = self
             .ifcs
             .get_mut(k)
             .and_then(|ifc| ifc.atomics.get_mut(a))
             .ok_or(FlowError::InvalidSnapshot)?;
         item.size = (width, height);
-        item.baseline = baseline.map_or(height, |b| content_top + b);
+        item.baseline = baseline.map_or(synthesized, |b| content_top + b);
         Ok(())
     }
 

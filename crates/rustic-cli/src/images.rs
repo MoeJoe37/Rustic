@@ -61,7 +61,7 @@ pub struct LoadedImages {
 
 /// Read at most `max` bytes of `path` in `chunk`-sized reads; `None` if the
 /// file is unreadable, not a regular file or longer than `max`.
-fn read_bounded(path: &Path, max: usize, chunk: usize) -> Option<Vec<u8>> {
+pub(crate) fn read_bounded(path: &Path, max: usize, chunk: usize) -> Option<Vec<u8>> {
     let mut file = File::open(path).ok()?;
     let metadata = file.metadata().ok()?;
     if !metadata.is_file() || metadata.len() > max as u64 {

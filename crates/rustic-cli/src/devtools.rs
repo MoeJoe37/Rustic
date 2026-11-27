@@ -1431,6 +1431,7 @@ fn kind_name(kind: &ResourceKind) -> &'static str {
     match kind {
         ResourceKind::Stylesheet { .. } => "stylesheet",
         ResourceKind::Image => "image",
+        ResourceKind::Font => "font",
         ResourceKind::Script { module: true, .. } => "module",
         ResourceKind::Script { .. } => "script",
     }

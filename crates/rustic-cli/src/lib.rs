@@ -30,6 +30,7 @@ mod storage;
 mod stylesheets;
 #[cfg(feature = "window")]
 mod view;
+mod web_fonts;
 
 use loader::{LoadError, LoadedDocument, LoaderLimits};
 

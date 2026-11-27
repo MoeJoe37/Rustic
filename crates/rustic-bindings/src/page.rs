@@ -31,6 +31,7 @@ mod dom_rect;
 mod encoding;
 mod events;
 mod fetch;
+mod fonts;
 mod html_collections;
 mod mutation_observer;
 mod node_tree;
@@ -310,6 +311,8 @@ struct Page {
     /// CSSOM objects.
     cssom: cssom::Cssom,
     view_transitions: view_transitions::ViewTransitions,
+    /// `FontFace` and `document.fonts` state.
+    fonts: fonts::Fonts,
 }
 
 impl ExecutionHost for Page {
@@ -671,6 +674,8 @@ fn install_page(
     let cssom = cssom::Cssom::new(agent)?;
     view_transitions::install(agent)?;
     let view_transitions = view_transitions::ViewTransitions::new(agent)?;
+    fonts::install(agent)?;
+    let fonts = fonts::Fonts::new(agent)?;
     let mut animations = animations::Animations::new(agent, tree.animations())?;
     let document_timeline = animations::create_document_timeline(agent)?;
     animations.set_document_timeline(document_timeline);
@@ -707,6 +712,7 @@ fn install_page(
         animations,
         cssom,
         view_transitions,
+        fonts,
     }))?;
     animations::register_document_timeline(agent, document_timeline)
 }

@@ -993,6 +993,7 @@ fn ipc_kind(kind: &ResourceKind) -> rustic_ipc::protocol::ResourceKind {
             rustic_ipc::protocol::ResourceKind::Stylesheet { quirks: *quirks }
         }
         ResourceKind::Image => rustic_ipc::protocol::ResourceKind::Image,
+        ResourceKind::Font => rustic_ipc::protocol::ResourceKind::Font,
         ResourceKind::Script {
             nonce,
             parser_inserted,

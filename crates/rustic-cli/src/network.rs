@@ -315,6 +315,9 @@ pub(crate) enum ResourceKind {
     Stylesheet { quirks: bool },
     /// An `<img>`.
     Image,
+    /// An `@font-face` source: CORS mode with same-origin credentials
+    /// (CSS Fonts 4 §4.8.2).
+    Font,
     /// A classic or module script.
     Script {
         nonce: Option<String>,
@@ -1086,6 +1089,7 @@ impl NetworkSession {
         let (destination, directive) = match kind {
             ResourceKind::Stylesheet { .. } => (Destination::Style, FetchDirective::StyleElement),
             ResourceKind::Image => (Destination::Image, FetchDirective::Image),
+            ResourceKind::Font => (Destination::Font, FetchDirective::Font),
             ResourceKind::Script { .. } => (Destination::Script, FetchDirective::ScriptElement),
         };
         let (nonce, parser_inserted) = match kind {
@@ -1109,7 +1113,10 @@ impl NetworkSession {
         };
         // HTML: classic elements without `crossorigin` are no-cors with
         // credentials; module scripts are CORS, same-origin credentials.
-        let module = matches!(kind, ResourceKind::Script { module: true, .. });
+        let module = matches!(
+            kind,
+            ResourceKind::Script { module: true, .. } | ResourceKind::Font
+        );
         let request = FetchRequest {
             mode: if module {
                 RequestMode::Cors
@@ -1171,9 +1178,14 @@ impl NetworkSession {
         let destination = match kind {
             ResourceKind::Stylesheet { .. } => Destination::Style,
             ResourceKind::Image => Destination::Image,
+            ResourceKind::Font => Destination::Font,
             ResourceKind::Script { .. } => Destination::Script,
         };
-        let module = matches!(kind, ResourceKind::Script { module: true, .. });
+        // CORS-mode requests: no opaque bodies, so no ORB or CORP checks.
+        let module = matches!(
+            kind,
+            ResourceKind::Script { module: true, .. } | ResourceKind::Font
+        );
         let response = result.map_err(|error| match error {
             NetworkError::BlockedByClientPolicy
             | NetworkError::BlockedByResourcePolicy
@@ -1287,6 +1299,7 @@ fn resource_key(url: &Url, kind: &ResourceKind) -> String {
     let kind = match kind {
         ResourceKind::Stylesheet { .. } => "style".to_owned(),
         ResourceKind::Image => "image".to_owned(),
+        ResourceKind::Font => "font".to_owned(),
         ResourceKind::Script {
             nonce,
             parser_inserted,
@@ -1328,7 +1341,7 @@ fn check_mime(
                 return Err(FetchError::Blocked);
             }
         }
-        ResourceKind::Image => {}
+        ResourceKind::Image | ResourceKind::Font => {}
     }
     Ok(())
 }

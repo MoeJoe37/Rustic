@@ -2189,107 +2189,107 @@
           "label": "Writing modes, vertical text and font loading",
           "size": 5,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "writing-mode, text-orientation and text-combine-upright values and the flow-relative (logical) properties",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/logical.rs",
-                  "marker": "fn to_physical"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/cascade.rs",
-                  "marker": "A physical longhand competes with the logical declarations"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn the_later_of_a_logical_and_a_physical_declaration_wins"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/logical.rs",
+              "marker": "fn to_physical"
             },
             {
-              "label": "Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/writing.rs",
-                  "marker": "fn transpose"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/writing.rs",
-                  "marker": "fn graft"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn an_orthogonal_box_is_sized_in_its_own_inline_axis"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/cascade.rs",
+              "marker": "A physical longhand competes with the logical declarations"
             },
             {
-              "label": "Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "fn upright_chars"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/shape.rs",
-                  "marker": "harfrust::Direction::TopToBottom"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn mixed_orientation_turns_only_sideways_characters"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn upright_glyphs_stand_on_vertical_lines"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn the_later_of_a_logical_and_a_physical_declaration_wins"
             },
             {
-              "label": "Vertical flex, grid and table layout, and text-combine-upright",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "fn central_baseline"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "fn combined"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn vertical_grid_items_share_a_central_baseline"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn combined_text_sets_horizontally_in_one_em"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/writing.rs",
+              "marker": "fn transpose"
             },
             {
-              "label": "Web fonts: @font-face rules, font loading and the FontFace API",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/writing.rs",
+              "marker": "fn graft"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn an_orthogonal_box_is_sized_in_its_own_inline_axis"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "fn upright_chars"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/shape.rs",
+              "marker": "harfrust::Direction::TopToBottom"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn mixed_orientation_turns_only_sideways_characters"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn upright_glyphs_stand_on_vertical_lines"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "fn central_baseline"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "fn combined"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn vertical_grid_items_share_a_central_baseline"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn combined_text_sets_horizontally_in_one_em"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/font_face.rs",
+              "marker": "pub(crate) fn font_face_rule"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/web_fonts.rs",
+              "marker": "pub(crate) fn database"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/fonts.rs",
+              "marker": "fn construct"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn font_face_rules_load_local_fonts_for_their_family_and_unicode_range"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/fonts.rs",
+              "marker": "fn web_faces_hide_installed_families_and_match_by_their_descriptors"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn font_faces_settle_from_binary_data_and_the_document_set_tracks_them"
             }
           ]
         },

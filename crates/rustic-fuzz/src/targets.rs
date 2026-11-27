@@ -1471,6 +1471,7 @@ impl Target for CssCascadeTarget {
                 layers: sheet.layers.clone(),
                 properties: sheet.properties.clone(),
                 keyframes: sheet.keyframes.clone(),
+                font_faces: sheet.font_faces.clone(),
                 base_url: sheet.base_url.clone(),
             });
             split.push(StyleSheet {
@@ -1481,6 +1482,7 @@ impl Target for CssCascadeTarget {
                 layers: sheet.layers.clone(),
                 properties: sheet.properties.clone(),
                 keyframes: sheet.keyframes.clone(),
+                font_faces: sheet.font_faces.clone(),
                 base_url: sheet.base_url.clone(),
             });
             if cascade_styles(&split) != reference {

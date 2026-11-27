@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "6550d3496fe17f6914f7a6c31c635ec5d31ef3e0ff9f9fae88e1cbc24c56e6e0",
-  "percent": "52.64",
-  "verified_percent": "50.83",
-  "partial_percent": "1.81",
-  "completed": 119,
-  "in_progress": 12,
+  "source_fingerprint": "b5e23bf560f56cc1c50e1d6ed8892154fe68b6e7d6f10df7c4db3124e51186c1",
+  "percent": "52.76",
+  "verified_percent": "51.43",
+  "partial_percent": "1.33",
+  "completed": 120,
+  "in_progress": 11,
   "total": 228,
   "fully_complete": false,
   "meaning": "100% requires the complete original engine with feature parity against Blink, Gecko and WebKit, measured performance leadership over all three, GPU/Wasm, Rustic MV2 extensions and uBO port, security/comparison gates and five-platform acceptance; weighted delivery progress is not web compatibility or time remaining.",
@@ -95,11 +95,11 @@
       "id": "M9",
       "label": "Compatibility expansion",
       "share": "22.35",
-      "completed": 6,
+      "completed": 7,
       "total": 54,
-      "percent": "14.66",
-      "verified_percent": "10.63",
-      "partial_percent": "4.03"
+      "percent": "15.20",
+      "verified_percent": "13.31",
+      "partial_percent": "1.89"
     },
     {
       "id": "M10",
@@ -2431,110 +2431,110 @@
           "label": "Writing modes, vertical text and font loading",
           "size": 5,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "writing-mode, text-orientation and text-combine-upright values and the flow-relative (logical) properties",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/logical.rs",
-                  "marker": "fn to_physical"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/cascade.rs",
-                  "marker": "A physical longhand competes with the logical declarations"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn the_later_of_a_logical_and_a_physical_declaration_wins"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/logical.rs",
+              "marker": "fn to_physical"
             },
             {
-              "label": "Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/writing.rs",
-                  "marker": "fn transpose"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/writing.rs",
-                  "marker": "fn graft"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn an_orthogonal_box_is_sized_in_its_own_inline_axis"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/cascade.rs",
+              "marker": "A physical longhand competes with the logical declarations"
             },
             {
-              "label": "Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "fn upright_chars"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-text/src/shape.rs",
-                  "marker": "harfrust::Direction::TopToBottom"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn mixed_orientation_turns_only_sideways_characters"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-raster/tests/paint.rs",
-                  "marker": "fn upright_glyphs_stand_on_vertical_lines"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn the_later_of_a_logical_and_a_physical_declaration_wins"
             },
             {
-              "label": "Vertical flex, grid and table layout, and text-combine-upright",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "fn central_baseline"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/inline.rs",
-                  "marker": "fn combined"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn vertical_grid_items_share_a_central_baseline"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/writing.rs",
-                  "marker": "fn combined_text_sets_horizontally_in_one_em"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/writing.rs",
+              "marker": "fn transpose"
             },
             {
-              "label": "Web fonts: @font-face rules, font loading and the FontFace API",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/writing.rs",
+              "marker": "fn graft"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn an_orthogonal_box_is_sized_in_its_own_inline_axis"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "fn upright_chars"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-text/src/shape.rs",
+              "marker": "harfrust::Direction::TopToBottom"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn mixed_orientation_turns_only_sideways_characters"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn upright_glyphs_stand_on_vertical_lines"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "fn central_baseline"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/inline.rs",
+              "marker": "fn combined"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn vertical_grid_items_share_a_central_baseline"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/writing.rs",
+              "marker": "fn combined_text_sets_horizontally_in_one_em"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/font_face.rs",
+              "marker": "pub(crate) fn font_face_rule"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/web_fonts.rs",
+              "marker": "pub(crate) fn database"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/fonts.rs",
+              "marker": "fn construct"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn font_face_rules_load_local_fonts_for_their_family_and_unicode_range"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-text/tests/fonts.rs",
+              "marker": "fn web_faces_hide_installed_families_and_match_by_their_descriptors"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn font_faces_settle_from_binary_data_and_the_document_set_tracks_them"
             }
           ],
-          "credit": "80.00",
+          "credit": "100.00",
           "engine_share": "0.60"
         },
         {
@@ -2559,13 +2559,13 @@
         }
       ],
       "points": 25,
-      "completed": 4,
-      "in_progress": 1,
+      "completed": 5,
+      "in_progress": 0,
       "total": 7,
-      "contribution": "2.16",
-      "percent": "72.00",
-      "verified_percent": "56.00",
-      "partial_percent": "16.00"
+      "contribution": "2.28",
+      "percent": "76.00",
+      "verified_percent": "76.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "layout",

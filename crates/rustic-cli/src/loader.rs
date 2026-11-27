@@ -2069,7 +2069,7 @@ pub fn dump_style(
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
     let document = parsed.parsed().document();
-    let (styles, sheets) = compute_styles(parsed.layout_input(path, limits, default_view()))?;
+    let (styles, sheets, _) = compute_styles(parsed.layout_input(path, limits, default_view()))?;
     let mut out = String::new();
     for (index, sheet) in sheets.iter().enumerate() {
         let status = status_text(sheet.status);
@@ -2105,16 +2105,15 @@ pub fn dump_style(
     Ok(out)
 }
 
+/// Computed styles, the document's sheets and its applicable `@font-face` rules.
+type Styles = (
+    Vec<rustic_style::ElementStyle>,
+    Vec<rustic_style::StyleElementSheet>,
+    Vec<std::sync::Arc<rustic_style::FontFaceRule>>,
+);
+
 /// Share the same local stylesheet policy and M2 reference cascade in all dumps.
-fn compute_styles(
-    input: LayoutInput<'_>,
-) -> Result<
-    (
-        Vec<rustic_style::ElementStyle>,
-        Vec<rustic_style::StyleElementSheet>,
-    ),
-    LoadError,
-> {
+fn compute_styles(input: LayoutInput<'_>) -> Result<Styles, LoadError> {
     let LayoutInput {
         document,
         mode,
@@ -2211,7 +2210,8 @@ fn compute_styles(
     }
     .map_err(node_error)?;
     check_cancelled(cancellation)?;
-    Ok((styles, sheets))
+    let font_faces = cascade.font_faces().into_iter().cloned().collect();
+    Ok((styles, sheets, font_faces))
 }
 
 /// Dump an initial principal-box snapshot, before anonymous/line box construction.
@@ -2239,13 +2239,17 @@ pub fn dump_formatting(
 }
 
 fn box_tree(input: LayoutInput<'_>) -> Result<rustic_layout::BoxTree, LoadError> {
-    box_tree_with_styles(input).map(|(tree, _)| tree)
+    box_tree_with_styles(input).map(|(tree, ..)| tree)
 }
 
-fn box_tree_with_styles(
-    input: LayoutInput<'_>,
-) -> Result<(rustic_layout::BoxTree, Vec<rustic_style::ElementStyle>), LoadError> {
-    let (styles, _) = compute_styles(input)?;
+type StyledTree = (
+    rustic_layout::BoxTree,
+    Vec<rustic_style::ElementStyle>,
+    Vec<std::sync::Arc<rustic_style::FontFaceRule>>,
+);
+
+fn box_tree_with_styles(input: LayoutInput<'_>) -> Result<StyledTree, LoadError> {
+    let (styles, _, font_faces) = compute_styles(input)?;
     let tree = rustic_layout::BoxTree::build(
         input.document,
         input.document.root(),
@@ -2254,7 +2258,7 @@ fn box_tree_with_styles(
         input.cancellation,
     )
     .map_err(LoadError::Layout)?;
-    Ok((tree, styles))
+    Ok((tree, styles, font_faces))
 }
 
 /// The view every dump command uses: a 1280×720 window at ratio 1 and
@@ -2278,7 +2282,7 @@ pub fn dump_layout(
     path: &Path,
     limits: LoaderLimits,
 ) -> Result<String, LoadError> {
-    let (_, layout, _, _, _) = block_layout(parsed.layout_input(path, limits, default_view()))?;
+    let (_, layout, ..) = block_layout(parsed.layout_input(path, limits, default_view()))?;
     layout.dump(limits.max_dump_bytes).map_err(LoadError::Flow)
 }
 
@@ -2299,7 +2303,7 @@ fn tree_of(
     live: &rustic_a11y::LiveState,
 ) -> Result<rustic_a11y::AxTree, LoadError> {
     let rendering = match block_layout(input) {
-        Ok((tree, layout, viewport, _, _)) => {
+        Ok((tree, layout, viewport, ..)) => {
             let layout = scrolled(layout, viewport, input.limits, input.scroll)?;
             rendering_of(&tree, Some(&layout))?
         }
@@ -2307,7 +2311,7 @@ fn tree_of(
         // are special elements): what generated boxes still decides what
         // is hidden, without bounds.
         Err(LoadError::Flow(_) | LoadError::Formatting(_)) => {
-            let (tree, _) = box_tree_with_styles(input)?;
+            let (tree, ..) = box_tree_with_styles(input)?;
             rendering_of(&tree, None)?
         }
         Err(error) => return Err(error),
@@ -2400,6 +2404,56 @@ pub fn dump_a11y(
 /// fonts are read.
 fn fonts() -> &'static rustic_text::FontDatabase {
     crate::fonts::database()
+}
+
+/// The fonts one document lays out and paints with: [`fonts`], plus the
+/// faces its `@font-face` rules load ([`crate::web_fonts`]).
+type DocumentFonts = std::borrow::Cow<'static, rustic_text::FontDatabase>;
+
+/// Load the `@font-face` sources of a document under the image policy:
+/// through the applied snapshot (and network session) when there is one,
+/// else as local files in the document's directory.
+fn document_fonts(
+    rules: &[std::sync::Arc<rustic_style::FontFaceRule>],
+    path: &Path,
+    limits: LoaderLimits,
+    cancellation: &CancellationToken,
+    applied: Option<(&AppliedLocalFiles, Option<&dyn crate::network::Session>)>,
+) -> DocumentFonts {
+    use std::borrow::Cow;
+    if rules.is_empty() {
+        return Cow::Borrowed(fonts());
+    }
+    let root = path.parent();
+    let chunk = limits.read_chunk_bytes;
+    let read_local = |url: &rustic_url::Url, max: usize| -> Result<Vec<u8>, FetchError> {
+        let file = crate::reftest::resolve(&url.serialize(), None, root)
+            .map_err(|_| FetchError::Blocked)?;
+        crate::images::read_bounded(&file, max, chunk).ok_or(FetchError::Failed)
+    };
+    let loaded = crate::web_fonts::database(
+        rules,
+        fonts(),
+        crate::web_fonts::WebFontLimits::default(),
+        |url, max| {
+            if cancellation.check().is_err() {
+                return None;
+            }
+            match applied {
+                Some((applied, network)) => applied
+                    .read(url, max, || match network {
+                        Some(session) => {
+                            session.fetch(url, &crate::network::ResourceKind::Font, max)
+                        }
+                        None => read_local(url, max),
+                    })
+                    .ok()
+                    .map(|bytes| bytes.to_vec()),
+                None => read_local(url, max).ok(),
+            }
+        },
+    );
+    loaded.map_or(Cow::Borrowed(fonts()), Cow::Owned)
 }
 
 #[derive(Clone, Copy)]
@@ -2555,7 +2609,7 @@ impl LocalLayout {
         mode: DocumentMode,
         animations: Option<&RefCell<rustic_style::AnimationController>>,
     ) -> Result<LayoutGeometry, LayoutReadError> {
-        let (tree, layout, viewport, _, styles) = block_layout(LayoutInput {
+        let (tree, layout, viewport, _, styles, _) = block_layout(LayoutInput {
             document,
             mode,
             encoding: self.encoding,
@@ -2696,19 +2750,18 @@ fn scroll_geometry(
     )
 }
 
-fn block_layout(
-    input: LayoutInput<'_>,
-) -> Result<
-    (
-        rustic_layout::BoxTree,
-        rustic_layout::BlockLayout,
-        rustic_layout::CssSize,
-        crate::images::LoadedImages,
-        Vec<rustic_style::ElementStyle>,
-    ),
-    LoadError,
-> {
-    let (mut tree, styles) = box_tree_with_styles(input)?;
+/// A laid-out document and what painting it needs.
+type Laidout = (
+    rustic_layout::BoxTree,
+    rustic_layout::BlockLayout,
+    rustic_layout::CssSize,
+    crate::images::LoadedImages,
+    Vec<rustic_style::ElementStyle>,
+    DocumentFonts,
+);
+
+fn block_layout(input: LayoutInput<'_>) -> Result<Laidout, LoadError> {
+    let (mut tree, styles, font_faces) = box_tree_with_styles(input)?;
     let LayoutInput {
         document,
         path,
@@ -2747,16 +2800,23 @@ fn block_layout(
         tree.set_natural_sizes(&images.sizes)
             .map_err(LoadError::Layout)?;
     }
+    let fonts = document_fonts(
+        &font_faces,
+        &canonical,
+        limits,
+        cancellation,
+        applied_files.map(|applied| (applied, network.map(|session| &**session))),
+    );
     let viewport = view.viewport();
     let layout = rustic_layout::BlockLayout::compute_with_fonts(
         &tree,
         viewport,
         layout_limits(limits),
-        fonts(),
+        &fonts,
         cancellation,
     )
     .map_err(LoadError::Flow)?;
-    Ok((tree, layout, viewport, images, styles))
+    Ok((tree, layout, viewport, images, styles, fonts))
 }
 
 /// The layout with the command's `--scroll` and `--scroll-box` positions
@@ -2916,6 +2976,7 @@ fn scene_lists(
     layout: &rustic_layout::BlockLayout,
     viewport: rustic_layout::CssSize,
     images: &HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>,
+    fonts: &rustic_text::FontDatabase,
 ) -> Result<Option<SceneLists>, LoadError> {
     use rustic_layout::PositionScheme;
     use rustic_raster::LayerKind;
@@ -2996,7 +3057,7 @@ fn scene_lists(
         };
     }
     let resources = rustic_paint::Resources {
-        fonts: Some(fonts()),
+        fonts: Some(fonts),
         images: images.clone(),
     };
     let build = |layout: &rustic_layout::BlockLayout, area: rustic_layout::CssSize| {
@@ -3182,7 +3243,7 @@ fn render_scene(
     input: LayoutInput<'_>,
     scene: &mut rustic_raster::Scene,
 ) -> Result<Option<(rustic_raster::Surface, rustic_raster::SceneStats)>, LoadError> {
-    let (tree, layout, viewport, images, _) = block_layout(input)?;
+    let (tree, layout, viewport, images, _, fonts) = block_layout(input)?;
     let scrolled_viewport = scroll_positions(&layout, input.limits, input.scroll).is_some();
     let fixed = layout.fragments().iter().any(|f| {
         f.scheme() == rustic_layout::PositionScheme::Fixed
@@ -3191,7 +3252,7 @@ fn render_scene(
     if !scrolled_viewport && !fixed {
         return Ok(None);
     }
-    let Some(lists) = scene_lists(input, &tree, &layout, viewport, &images.images)? else {
+    let Some(lists) = scene_lists(input, &tree, &layout, viewport, &images.images, &fonts)? else {
         return Ok(None);
     };
     scene
@@ -3201,10 +3262,10 @@ fn render_scene(
 }
 
 fn display_list(input: LayoutInput<'_>) -> Result<rustic_paint::DisplayList, LoadError> {
-    let (tree, layout, viewport, images, _) = block_layout(input)?;
+    let (tree, layout, viewport, images, _, fonts) = block_layout(input)?;
     let layout = scrolled(layout, viewport, input.limits, input.scroll)?;
     let resources = rustic_paint::Resources {
-        fonts: Some(fonts()),
+        fonts: Some(&fonts),
         images: images.images,
     };
     rustic_paint::DisplayList::build_with(
@@ -3455,7 +3516,7 @@ fn render_unmarked_layers(
     use rustic_paint::{DisplayCommand, ItemRole, Shape};
     let input = parsed.layout_input(path, limits, view);
     let cancellation = input.cancellation;
-    let (tree, layout, viewport, images, _) = block_layout(input)?;
+    let (tree, layout, viewport, images, _, fonts) = block_layout(input)?;
     // The position the scene paints: clamped, snapped to device pixels.
     let range = layout.viewport_scroll_range(viewport);
     let at = scroll_positions(&layout, limits, input.scroll)
@@ -3507,7 +3568,7 @@ fn render_unmarked_layers(
     }
     let build = |images: HashMap<rustic_dom::NodeId, std::sync::Arc<rustic_paint::Image>>| {
         let resources = rustic_paint::Resources {
-            fonts: Some(fonts()),
+            fonts: Some(&fonts),
             images,
         };
         rustic_paint::DisplayList::build_with(

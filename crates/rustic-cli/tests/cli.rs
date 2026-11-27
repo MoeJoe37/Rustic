@@ -928,3 +928,47 @@ fn stylesheets_decode_with_their_charset_rule() {
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(!String::from_utf8_lossy(&output.stdout).contains("content=(0,0,100,15)"));
 }
+
+#[test]
+fn font_face_rules_load_local_fonts_for_their_family_and_unicode_range() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-font-face-{}", std::process::id()));
+    let doc = base.join("doc");
+    fs::create_dir_all(&doc).unwrap();
+    let font = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rustic-text/fonts/RusticTestCondensed-Regular.ttf");
+    fs::copy(&font, doc.join("narrow.ttf")).unwrap();
+    fs::copy(&font, base.join("narrow.ttf")).unwrap();
+    let path = doc.join("page.html");
+    fs::write(
+        &path,
+        "<style>* {margin:0}
+        @font-face { font-family: Narrow;
+          src: url(missing.woff2) format('woff2'), url(narrow.ttf) format('truetype') }
+        @font-face { font-family: Ranged; src: url(narrow.ttf); unicode-range: U+30-39 }
+        @font-face { font-family: Outside; src: url(../narrow.ttf) }
+        </style><p style='font-family: Narrow'>xxxx</p><p>xxxx</p>
+        <p style='font-family: Ranged'>xx00</p><p style='font-family: Outside'>xxxx</p>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let texts: Vec<&str> = stdout.lines().filter(|l| l.starts_with("text ")).collect();
+    let field = |line: &str, name: &str| {
+        line.split(' ')
+            .find_map(|f| f.strip_prefix(name))
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(texts.len(), 5, "{stdout}");
+    // The web face is narrower than the fallback face.
+    assert_ne!(field(texts[0], "face="), field(texts[1], "face="));
+    assert_ne!(field(texts[0], "rect="), field(texts[1], "rect="));
+    // Outside its unicode-range the family falls back: two runs.
+    assert_eq!(field(texts[2], "face="), field(texts[1], "face="));
+    assert_eq!(field(texts[2], "utf16="), "0..2");
+    assert_ne!(field(texts[3], "face="), field(texts[1], "face="));
+    // A source outside the document's directory is not read.
+    assert_eq!(field(texts[4], "face="), field(texts[1], "face="));
+    fs::remove_dir_all(base).unwrap();
+}

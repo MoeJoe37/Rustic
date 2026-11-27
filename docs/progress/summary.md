@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 52.64%** = 50.83% verified complete + 1.81% partial credit. 119/228 capabilities complete, 12 in progress.
+**Overall completion: 52.76%** = 51.43% verified complete + 1.33% partial credit. 120/228 capabilities complete, 11 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `6550d3496fe17f6914f7a6c31c635ec5d31ef3e0ff9f9fae88e1cbc24c56e6e0`.
+Catalog: `engine-v4`. Source fingerprint: `b5e23bf560f56cc1c50e1d6ed8892154fe68b6e7d6f10df7c4db3124e51186c1`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `6550d3496fe17f6914f7a6c31c635ec5d31ef
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 6/54 | 14.66% | 10.63% | 22.35% |
+| M9 Compatibility expansion | 7/54 | 15.20% | 13.31% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -34,7 +34,7 @@ Catalog: `engine-v4`. Source fingerprint: `6550d3496fe17f6914f7a6c31c635ec5d31ef
 | DOM | 8/10 | 1 | 80.14% | 76.47% | 4% | 3.20 |
 | HTML | 10/11 | 0 | 78.37% | 78.37% | 5% | 3.91 |
 | CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
-| Text & fonts | 4/7 | 1 | 72.00% | 56.00% | 3% | 2.16 |
+| Text & fonts | 5/7 | 0 | 76.00% | 76.00% | 3% | 2.28 |
 | Layout | 8/11 | 0 | 70.58% | 70.58% | 6% | 4.23 |
 | Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
@@ -135,12 +135,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `text.shaping` — Shaping, fallback and glyph clusters · size 5 · M3 · 0.60% of engine ([source](../../crates/rustic-text/src/shape.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-text/tests/shape.rs), [test](../../crates/rustic-text/tests/shape.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/opentype.rs), [test](../../crates/rustic-text/tests/shaping_reference.rs))
 - **complete** `text.bidi` — Bidi and mixed-direction text · size 3 · M3 · 0.36% of engine ([source](../../crates/rustic-text/src/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [test](../../crates/rustic-text/tests/bidi.rs), [source](../../crates/rustic-layout/src/lines.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-text/src/bidi.rs), [source](../../crates/rustic-layout/src/inline.rs), [test](../../crates/rustic-text/tests/scopes.rs), [test](../../crates/rustic-layout/tests/text_policies.rs))
 - **complete** `text.breaking` — Line breaking and grapheme navigation · size 3 · M3 · 0.36% of engine ([source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs), [source](../../crates/rustic-text/src/segment.rs), [test](../../crates/rustic-text/tests/segment.rs), [source](../../crates/rustic-layout/src/tailoring.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-text/src/hyphen.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs), [test](../../crates/rustic-layout/tests/text_policies.rs))
-- **in progress 80.00%** `text.writing` — Writing modes, vertical text and font loading · size 5 · M9 · 0.60% of engine
-  - [x] writing-mode, text-orientation and text-combine-upright values and the flow-relative (logical) properties ([source](../../crates/rustic-css/src/logical.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/computed.rs))
-  - [x] Vertical block flow: block, inline-level and positioned boxes in vertical writing modes and orthogonal flows ([source](../../crates/rustic-layout/src/flow/writing.rs), [source](../../crates/rustic-layout/src/flow/writing.rs), [test](../../crates/rustic-layout/tests/writing.rs))
-  - [x] Vertical text: line layout in vertical modes, glyph orientation, vertical metrics and painting ([source](../../crates/rustic-layout/src/inline.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-layout/tests/writing.rs), [test](../../crates/rustic-raster/tests/paint.rs))
-  - [x] Vertical flex, grid and table layout, and text-combine-upright ([source](../../crates/rustic-layout/src/inline.rs), [source](../../crates/rustic-layout/src/inline.rs), [test](../../crates/rustic-layout/tests/writing.rs), [test](../../crates/rustic-layout/tests/writing.rs))
-  - [ ] Web fonts: @font-face rules, font loading and the FontFace API
+- **complete** `text.writing` — Writing modes, vertical text and font loading · size 5 · M9 · 0.60% of engine ([source](../../crates/rustic-css/src/logical.rs), [source](../../crates/rustic-style/src/cascade.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-layout/src/flow/writing.rs), [source](../../crates/rustic-layout/src/flow/writing.rs), [test](../../crates/rustic-layout/tests/writing.rs), [source](../../crates/rustic-layout/src/inline.rs), [source](../../crates/rustic-text/src/shape.rs), [test](../../crates/rustic-layout/tests/writing.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-layout/src/inline.rs), [source](../../crates/rustic-layout/src/inline.rs), [test](../../crates/rustic-layout/tests/writing.rs), [test](../../crates/rustic-layout/tests/writing.rs), [source](../../crates/rustic-style/src/font_face.rs), [source](../../crates/rustic-cli/src/web_fonts.rs), [source](../../crates/rustic-bindings/src/page/fonts.rs), [test](../../crates/rustic-cli/tests/cli.rs), [test](../../crates/rustic-text/tests/fonts.rs), [test](../../crates/rustic-bindings/tests/page.rs))
 - **planned** `text.conformance` — Text/font conformance and platform parity · size 3 · M9 · 0.36% of engine
 - **planned** `text.color` — Variable and color fonts (COLRv1, SVG-in-OpenType), palettes and the Font Loading API · size 3 · M9 · 0.36% of engine
 

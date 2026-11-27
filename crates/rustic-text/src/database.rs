@@ -37,7 +37,7 @@ impl Default for FaceQuery {
 ///
 /// The embedder loads faces explicitly or grants roots to the bounded
 /// discovery API. Native font services remain platform work (TD-85).
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FontDatabase {
     faces: Vec<Face>,
     generics: Vec<(String, String)>,
@@ -79,6 +79,15 @@ impl FontDatabase {
         Ok((first..self.faces.len()).collect())
     }
 
+    /// Add a face from an `@font-face` rule (see [`Face::with_descriptors`]).
+    /// Web faces hide installed faces of the same family name, and among
+    /// web faces that match a request equally the one added first wins, so
+    /// add them latest rule first (CSS Fonts 4 §4.1).
+    pub fn add_web_face(&mut self, face: Face) -> usize {
+        self.faces.push(face);
+        self.faces.len() - 1
+    }
+
     pub(crate) fn append_faces(&mut self, faces: Vec<Face>) {
         self.faces.extend(faces);
     }
@@ -111,15 +120,45 @@ impl FontDatabase {
         self.fallback.as_deref()
     }
 
+    /// The faces of `family`: its web faces if it has any, else its
+    /// installed faces.
     pub(crate) fn family_faces(&self, family: &str) -> Vec<&Face> {
-        self.faces
+        let faces: Vec<&Face> = self
+            .faces
             .iter()
             .filter(|face| {
                 face.families()
                     .iter()
                     .any(|name| name.eq_ignore_ascii_case(family))
             })
-            .collect()
+            .collect();
+        if faces.iter().any(|f| f.is_web()) {
+            faces.into_iter().filter(|f| f.is_web()).collect()
+        } else {
+            faces
+        }
+    }
+
+    /// The faces to use for `family`: its best face, and for a web family
+    /// every other web face with the same descriptors (a family split by
+    /// `unicode-range` acts as one composite face, CSS Fonts 4 §4.5).
+    pub(crate) fn family_chain(&self, family: &str, query: &FaceQuery) -> Vec<&Face> {
+        let faces = self.family_faces(family);
+        let Some(best) = best_face(faces.iter().copied(), query) else {
+            return Vec::new();
+        };
+        if !best.is_web() {
+            return vec![best];
+        }
+        let key = |f: &Face| {
+            (
+                f.stretch_toward(query.stretch),
+                f.style(),
+                f.weight_toward(query.weight),
+            )
+        };
+        let wanted = key(best);
+        faces.into_iter().filter(|f| key(f) == wanted).collect()
     }
 
     /// The face CSS would use as the *first available font* for this family
@@ -152,17 +191,21 @@ impl FontDatabase {
 }
 
 /// CSS Fonts 4 §5.2 step 4: narrow by `font-stretch`, then `font-style`,
-/// then `font-weight`. Equal candidates keep load order.
+/// then `font-weight`. A web face's ranges offer the value nearest the
+/// request. Equal candidates keep load order.
 pub fn best_face<'f>(
     faces: impl IntoIterator<Item = &'f Face>,
     query: &FaceQuery,
 ) -> Option<&'f Face> {
     let candidates: Vec<&Face> = faces.into_iter().collect();
-    let stretches: Vec<f64> = candidates.iter().map(|f| f.stretch()).collect();
+    let stretches: Vec<f64> = candidates
+        .iter()
+        .map(|f| f.stretch_toward(query.stretch))
+        .collect();
     let stretch = nearest(&stretches, query.stretch, 100.0, 100.0)?;
     let candidates: Vec<&Face> = candidates
         .into_iter()
-        .filter(|f| f.stretch() == stretch)
+        .filter(|f| f.stretch_toward(query.stretch) == stretch)
         .collect();
     let order: [FaceStyle; 3] = match query.style {
         FaceStyle::Italic => [FaceStyle::Italic, FaceStyle::Oblique, FaceStyle::Normal],
@@ -176,9 +219,14 @@ pub fn best_face<'f>(
         .into_iter()
         .filter(|f| f.style() == style)
         .collect();
-    let weights: Vec<f64> = candidates.iter().map(|f| f.weight()).collect();
+    let weights: Vec<f64> = candidates
+        .iter()
+        .map(|f| f.weight_toward(query.weight))
+        .collect();
     let weight = nearest(&weights, query.weight, 400.0, 500.0)?;
-    candidates.into_iter().find(|f| f.weight() == weight)
+    candidates
+        .into_iter()
+        .find(|f| f.weight_toward(query.weight) == weight)
 }
 
 /// The shared shape of the stretch and weight rules. With `desired` inside

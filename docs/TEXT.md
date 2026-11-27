@@ -46,6 +46,26 @@ limits when it loads fonts identified by the platform service.
 Directory races, backend caching and advanced font support are tracked in TD-85.
 Layout and shaping consume the admitted font data.
 
+## Web fonts
+
+`rustic-style` keeps valid `@font-face` rules in `StyleSheet::font_faces`
+(CSS Fonts 4 §4): `font-family`, `src` (`url()` with a supported `format()`,
+or `local()`; entries with other formats or any `tech()` are dropped), the
+`font-weight` and `font-stretch` ranges, `font-style` and `unicode-range`.
+`Cascade::font_faces` lists the document-tree rules whose `@media`
+conditions match. `rustic-cli` fetches each rule's first usable source
+under the image policy (a file in the document's directory or below, or a
+CORS-mode `font` request through the network session, checked against CSP
+`font-src`) within 64 fonts and 32 MiB per document, and adds the face to
+a per-document copy of the font database with `Face::with_descriptors`.
+A web face answers only to its rule's family, hides installed faces of the
+same name, offers the point of its weight and width ranges nearest the
+request, and maps only the code points of its `unicode-range`, so a family
+split into subsets acts as one composite face. Web faces never join the
+fallback chain of other families. `FontFace` and `document.fonts`
+(CSS Font Loading 3) are in `rustic-bindings` (`page/fonts.rs`). Limits are
+TD-213.
+
 ## Segmentation and CSS wrapping
 
 `segment::grapheme_boundaries` implements UAX #29 GB3–GB999, including Indic

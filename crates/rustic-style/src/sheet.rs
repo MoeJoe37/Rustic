@@ -164,6 +164,8 @@ pub struct StyleSheet {
     /// Valid `@keyframes` rules in source order, each with its cascade
     /// layer (an index into [`StyleSheet::layers`]).
     pub keyframes: Vec<Arc<KeyframesRule>>,
+    /// Valid `@font-face` rules in source order.
+    pub font_faces: Vec<Arc<crate::FontFaceRule>>,
     /// The URL that relative `url()` values resolve against: the sheet's
     /// own URL for an external or imported sheet, the document base URL
     /// for a `<style>` element. Set it with [`StyleSheet::set_base_url`].
@@ -209,6 +211,9 @@ pub enum StyleDiagnosticKind {
     /// `syntax`, `inherits` or `initial-value`, or an unsupported syntax),
     /// or that is inside a conditional rule or a style rule.
     InvalidPropertyRule,
+    /// An `@font-face` rule without a valid `font-family` or `src`, or with
+    /// a prelude.
+    InvalidFontFaceRule,
 }
 
 /// A dropped construct and its byte range in the stylesheet source.
@@ -1014,6 +1019,13 @@ impl StyleSheet {
                     let media = frame.media.clone();
                     builder.keyframes_rule(at, layer, media);
                 }
+                Rule::At(at) if at.name.eq_ignore_ascii_case("font-face") => {
+                    builder.namespaces_allowed = false;
+                    match crate::font_face::font_face_rule(&at, frame.media.clone()) {
+                        Some(rule) => builder.sheet.font_faces.push(Arc::new(rule)),
+                        None => builder.diagnose(StyleDiagnosticKind::InvalidFontFaceRule, at.span),
+                    }
+                }
                 Rule::At(at) if at.name.eq_ignore_ascii_case("property") => {
                     builder.namespaces_allowed = false;
                     // Top level or in `@layer` blocks only: a registration
@@ -1069,6 +1081,9 @@ impl StyleSheet {
                     resolve_declaration_urls(&mut keyframe.declarations, base);
                 }
             }
+        }
+        for rule in &mut self.font_faces {
+            Arc::make_mut(rule).resolve(base.as_ref());
         }
         self.base_url = base;
     }

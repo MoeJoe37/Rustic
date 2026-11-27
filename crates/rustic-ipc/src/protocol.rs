@@ -270,6 +270,8 @@ pub enum ResourceKind {
     },
     /// An image.
     Image,
+    /// An `@font-face` source (CORS mode).
+    Font,
     /// A script, with the element's nonce and parser state.
     Script {
         /// The `nonce` attribute.
@@ -1180,6 +1182,7 @@ fn put_resource_kind(writer: &mut Writer, kind: &ResourceKind) {
             writer.bool(*quirks);
         }
         ResourceKind::Image => writer.u8(1),
+        ResourceKind::Font => writer.u8(3),
         ResourceKind::Script {
             nonce,
             parser_inserted,
@@ -1199,6 +1202,7 @@ fn get_resource_kind(reader: &mut Reader<'_>) -> Result<ResourceKind, DecodeErro
             quirks: reader.bool()?,
         },
         1 => ResourceKind::Image,
+        3 => ResourceKind::Font,
         2 => ResourceKind::Script {
             nonce: reader.opt_string()?,
             parser_inserted: reader.bool()?,

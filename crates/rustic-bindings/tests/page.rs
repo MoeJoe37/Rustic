@@ -2765,3 +2765,52 @@ fn wasm_reference_globals_share_cells_and_keep_current_values_alive() {
     }
     assert_eq!(outcome.unwrap(), Value::TRUE);
 }
+
+#[test]
+fn font_faces_settle_from_binary_data_and_the_document_set_tracks_them() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    agent.evaluate(r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        var log = [];
+        const font = new FontFace('Web Sans', Uint8Array.of(0, 1, 0, 0, 9), {weight: '300 700', style: 'italic'});
+        assert(Object.prototype.toString.call(font) === '[object FontFace]', 'tag');
+        assert(font.family === 'Web Sans' && font.weight === '300 700' && font.style === 'italic', 'descriptors');
+        assert(font.stretch === 'normal' && font.unicodeRange === 'U+0-10FFFF' && font.display === 'auto', 'defaults');
+        assert(font.status === 'loaded' && font.load() === font.loaded, 'binary data loads at once');
+        font.loaded.then(f => log.push('loaded ' + (f === font)));
+        const junk = new FontFace('Junk', new ArrayBuffer(8));
+        assert(junk.status === 'error', 'not a font');
+        junk.loaded.catch(e => log.push(e.name));
+        const remote = new FontFace('Remote', 'url(remote.woff2)');
+        assert(remote.status === 'unloaded', 'a src string waits for load()');
+        remote.load().catch(e => log.push(e.name + ' ' + remote.status));
+        const fonts = document.fonts;
+        assert(fonts === document.fonts && fonts instanceof FontFaceSet, 'one set per document');
+        assert(fonts.status === 'loaded' && fonts.size === 0 && fonts.check('12px Web Sans'), 'empty set');
+        assert(fonts.add(font) === fonts && fonts.add(font).size === 1 && fonts.has(font), 'add once');
+        fonts.add(junk);
+        const seen = [];
+        fonts.forEach((value, key, set) => seen.push(value === key && set === fonts));
+        assert(seen.join() === 'true,true', 'forEach');
+        assert(fonts.delete(junk) && !fonts.delete(junk) && fonts.size === 1, 'delete');
+        fonts.load('bold 16px "Web Sans", serif').then(list => log.push('matched ' + list.length));
+        fonts.ready.then(set => log.push('ready ' + (set === fonts)));
+        fonts.clear();
+        assert(fonts.size === 0, 'clear');
+        let threw = false;
+        try { fonts.add({}); } catch (e) { threw = e instanceof TypeError; }
+        assert(threw, 'only FontFace objects join the set');
+    "#).unwrap();
+    agent.run_jobs().unwrap();
+    let log = agent.evaluate("log.join('; ')").unwrap();
+    let log = agent.to_string(log).unwrap();
+    let log = String::from_utf16_lossy(&agent.heap.string(log).units().collect::<Vec<_>>());
+    assert_eq!(
+        log,
+        "loaded true; SyntaxError; NetworkError error; matched 1; ready true"
+    );
+}

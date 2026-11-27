@@ -489,6 +489,33 @@ impl Cascade {
         None
     }
 
+    /// The `@font-face` rules that apply to the document, in cascade
+    /// order: author sheets of the document tree, then user and user-agent
+    /// sheets, each in source order. Rules inside an `@media` that does not
+    /// match are left out; shadow-tree sheets do not define fonts
+    /// (CSS Scoping 1 §3.5 leaves them document-global; Rustic ignores them).
+    pub fn font_faces(&self) -> Vec<&std::sync::Arc<crate::FontFaceRule>> {
+        let mut out = Vec::new();
+        for origin in [Origin::Author, Origin::User, Origin::UserAgent] {
+            for ((sheet, placement), media) in self
+                .sheets
+                .iter()
+                .zip(&self.placements)
+                .zip(&self.media_results)
+            {
+                if sheet.origin != origin || placement.context != TreeContext::DOCUMENT {
+                    continue;
+                }
+                out.extend(sheet.font_faces.iter().filter(|rule| {
+                    rule.media
+                        .iter()
+                        .all(|&i| media.get(i).copied().unwrap_or(false))
+                }));
+            }
+        }
+        out
+    }
+
     /// Whether any sheet has `@keyframes` rules.
     pub fn has_keyframes(&self) -> bool {
         self.sheets.iter().any(|s| !s.keyframes.is_empty())

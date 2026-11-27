@@ -689,3 +689,44 @@ fn errors_render_fixed_text() {
         "font table cmap is truncated"
     );
 }
+
+#[test]
+fn web_faces_hide_installed_families_and_match_by_their_descriptors() {
+    use rustic_text::FaceDescriptors;
+    let mut db = test_database();
+    let web = |index: usize, family: &str, weight: (f64, f64), range: Vec<(u32, u32)>| {
+        face(index).with_descriptors(&FaceDescriptors {
+            family: family.to_owned(),
+            weight,
+            style: FaceStyle::Normal,
+            stretch: (100.0, 100.0),
+            unicode_range: range,
+        })
+    };
+    let all = vec![(0, 0x10_FFFF)];
+    let variable = db.add_web_face(web(CONDENSED, "Rustic Test", (100.0, 900.0), all.clone()));
+    let digits = db.add_web_face(web(BOLD, "Digits", (400.0, 400.0), vec![(0x30, 0x39)]));
+    let letters = db.add_web_face(web(REGULAR, "Digits", (400.0, 400.0), vec![(0x41, 0x7A)]));
+    let query = |weight| FaceQuery {
+        weight,
+        ..FaceQuery::default()
+    };
+    // The web face replaces the installed "Rustic Test" faces, and its
+    // weight range serves every requested weight.
+    for weight in [100.0, 400.0, 700.0] {
+        let chain = db.fallback_chain([FamilyRef::Named("rustic test")], &query(weight));
+        assert_eq!(chain.first(), Some(&variable));
+    }
+    assert!(db.face(variable).unwrap().is_web());
+    assert_eq!(db.face(variable).unwrap().weight_toward(950.0), 900.0);
+    // A family split by unicode-range is one composite face, and each part
+    // maps only its own code points.
+    let chain = db.fallback_chain([FamilyRef::Named("Digits")], &query(400.0));
+    assert_eq!(&chain[..2], &[digits, letters]);
+    assert!(db.face(digits).unwrap().glyph_index('0').is_some());
+    assert!(db.face(digits).unwrap().glyph_index('x').is_none());
+    assert!(db.face(letters).unwrap().glyph_index('x').is_some());
+    // Web fonts are not used for families that do not name them.
+    let chain = db.fallback_chain([FamilyRef::Named("Nope")], &query(400.0));
+    assert!(!chain.contains(&digits) && !chain.contains(&letters));
+}

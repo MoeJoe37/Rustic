@@ -41,6 +41,6 @@ pub mod unicode;
 
 pub use database::{FaceQuery, FamilyRef, FontDatabase, best_face};
 pub use error::{FontError, Tag};
-pub use face::{Face, FaceStyle, FontLimits, GlyphId};
+pub use face::{Face, FaceDescriptors, FaceStyle, FontLimits, GlyphId};
 pub use glyf::{Bounds, Outline, OutlinePoint};
 pub use metrics::{EmRatios, FontMetrics};

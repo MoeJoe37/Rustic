@@ -59,10 +59,12 @@ pub enum FaceStyle {
 pub struct GlyphId(pub u16);
 
 /// One parsed TrueType face. It owns its bytes; every table it uses was
-/// bounds-checked and validated when it was created.
+/// bounds-checked and validated when it was created. Clones share the
+/// bytes and the shaping font.
+#[derive(Clone)]
 pub struct Face {
     data: Arc<Vec<u8>>,
-    shaping: OnceLock<Option<harfrust::Font>>,
+    shaping: Arc<OnceLock<Option<harfrust::Font>>>,
     tables: Tables,
     units_per_em: u16,
     glyph_count: u16,
@@ -75,6 +77,32 @@ pub struct Face {
     stretch: f64,
     metrics: FontMetrics,
     limits: FontLimits,
+    /// `@font-face` descriptors replacing the face's own, if any.
+    web: Option<Arc<WebFace>>,
+}
+
+/// What an `@font-face` rule says about a face (CSS Fonts 4 §4): the
+/// family it serves, the style ranges it matches and the code points it
+/// may be used for. They replace what the font's own tables say.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FaceDescriptors {
+    /// The `font-family` descriptor.
+    pub family: String,
+    /// The `font-weight` range.
+    pub weight: (f64, f64),
+    /// The `font-style` descriptor.
+    pub style: FaceStyle,
+    /// The `font-stretch` range in percent.
+    pub stretch: (f64, f64),
+    /// Inclusive code point ranges (`unicode-range`).
+    pub unicode_range: Vec<(u32, u32)>,
+}
+
+#[derive(Debug)]
+struct WebFace {
+    weight: (f64, f64),
+    stretch: (f64, f64),
+    unicode_range: Vec<(u32, u32)>,
 }
 
 impl fmt::Debug for Face {
@@ -455,7 +483,7 @@ impl Face {
 
         let mut face = Self {
             data: Arc::new(data),
-            shaping: OnceLock::new(),
+            shaping: Arc::new(OnceLock::new()),
             tables,
             units_per_em: head.units_per_em,
             glyph_count,
@@ -468,6 +496,7 @@ impl Face {
             stretch,
             metrics: FontMetrics::default(),
             limits: *limits,
+            web: None,
         };
         // USE_TYPO_METRICS (fsSelection bit 7) selects the OS/2 values.
         let (ascent, descent, line_gap) = match &os2 {
@@ -504,8 +533,47 @@ impl Face {
     }
 
     /// The weight, 1–1000 (`usWeightClass`, or 400/700 from `macStyle`).
+    /// For a web face, the low end of its `font-weight` range.
     pub fn weight(&self) -> f64 {
         self.weight
+    }
+
+    /// This face used as an `@font-face` rule describes it: it answers to
+    /// `descriptors.family` only, matches with the rule's style ranges and
+    /// maps only the code points of its `unicode-range`.
+    pub fn with_descriptors(mut self, descriptors: &FaceDescriptors) -> Self {
+        self.families = vec![descriptors.family.clone()];
+        self.weight = descriptors.weight.0;
+        self.style = descriptors.style;
+        self.stretch = descriptors.stretch.0;
+        self.web = Some(Arc::new(WebFace {
+            weight: descriptors.weight,
+            stretch: descriptors.stretch,
+            unicode_range: descriptors.unicode_range.clone(),
+        }));
+        self
+    }
+
+    /// Whether the face comes from an `@font-face` rule.
+    pub fn is_web(&self) -> bool {
+        self.web.is_some()
+    }
+
+    /// The weight this face offers for a request of `desired`: the nearest
+    /// point of its weight range (CSS Fonts 4 §5.2 step 4).
+    pub fn weight_toward(&self, desired: f64) -> f64 {
+        match &self.web {
+            Some(web) => desired.clamp(web.weight.0, web.weight.1),
+            None => self.weight,
+        }
+    }
+
+    /// The width this face offers for a request of `desired` percent.
+    pub fn stretch_toward(&self, desired: f64) -> f64 {
+        match &self.web {
+            Some(web) => desired.clamp(web.stretch.0, web.stretch.1),
+            None => self.stretch,
+        }
     }
 
     /// The slope.
@@ -535,7 +603,14 @@ impl Face {
 
     /// The glyph for `c`, or `None` when the font does not map it. A
     /// mapping to a glyph id beyond the glyph count counts as unmapped.
+    /// A web face maps only the code points of its `unicode-range`.
     pub fn glyph_index(&self, c: char) -> Option<GlyphId> {
+        if let Some(web) = &self.web {
+            let c = u32::from(c);
+            if !web.unicode_range.iter().any(|&(l, h)| l <= c && c <= h) {
+                return None;
+            }
+        }
         let g = self
             .cmap
             .glyph(&self.data[self.tables.cmap.clone()], u32::from(c));

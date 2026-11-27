@@ -44,6 +44,7 @@ mod computed;
 mod containers;
 mod cssom;
 mod dom;
+mod font_face;
 mod fonts;
 mod hints;
 mod html;
@@ -74,6 +75,7 @@ pub use dom::{
     DomElement, ElementStyle, ScopedSelector, SelectorQueryError, SelectorWork, query_selector_all,
     shadow_tree_context, style_tree, style_tree_animated, style_tree_with_sizes,
 };
+pub use font_face::{FontFaceRule, FontFaceSource, FontFaceStyle};
 pub use fonts::{FontMetricsSource, FontQuery};
 pub use html::{
     HTML_USER_AGENT_STYLESHEET, StyleElementSheet, StyleElementStatus, document_cascade,

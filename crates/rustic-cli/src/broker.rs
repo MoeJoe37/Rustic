@@ -2368,6 +2368,7 @@ fn resource_kind(kind: rustic_ipc::protocol::ResourceKind) -> ResourceKind {
             ResourceKind::Stylesheet { quirks }
         }
         rustic_ipc::protocol::ResourceKind::Image => ResourceKind::Image,
+        rustic_ipc::protocol::ResourceKind::Font => ResourceKind::Font,
         rustic_ipc::protocol::ResourceKind::Script {
             nonce,
             parser_inserted,

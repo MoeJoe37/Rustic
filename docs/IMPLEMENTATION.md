@@ -45,6 +45,25 @@ pinned Window WPT run collects detached documents earlier, so one more
 `Node-replaceChild` subtest stays under the 16-document cap and passes. The
 full Window selection now has 1,290 passes and 78 expected failures.
 
+## M9 CSS/layout — Writing modes, vertical text and web fonts (`text.writing`)
+
+`writing-mode`, `text-orientation`, `text-combine-upright` and the
+flow-relative properties compute and cascade with their physical
+counterparts. Vertical runs lay out by transposition into the
+`horizontal-tb` engine (orthogonal flows included); text in vertical modes
+is set upright per `VerticalOrientation.txt` with vertical shaping, aligns
+on the central baseline, and combines with `text-combine-upright: all`.
+Flex, grid and inline-block baselines follow the central baseline, and
+scroll-container baselines clamp to the border box. `@font-face` rules load
+their `url()` or `local()` sources before layout and serve their family by
+weight and width range and `unicode-range`; `FontFace` and `document.fonts`
+are scriptable. Evidence: `rustic-layout/tests/writing.rs`,
+`rustic-raster/tests/paint.rs`, `rustic-style/tests/font_face.rs`, the
+web-face test in `rustic-text/tests/fonts.rs`, the `@font-face` CLI test and
+the `FontFace` page test. Limits: TD-212 (vertical layout) and TD-213 (web
+fonts). Guides: [layout](LAYOUT.md#writing-modes-textwriting-m9),
+[text](TEXT.md#web-fonts).
+
 ## CSS-09 — Animations and modern CSS
 
 `rustic_style::AnimationController` holds a document's animations and

@@ -131,14 +131,20 @@ impl FontDatabase {
                 FamilyRef::Generic(generic) => self.generic_family(generic),
             };
             if let Some(name) = name {
-                push(best_face(self.family_faces(name), query), &mut chain);
+                for face in self.family_chain(name, query) {
+                    push(Some(face), &mut chain);
+                }
             }
         }
         if let Some(fallback) = self.fallback_family() {
             push(best_face(self.family_faces(fallback), query), &mut chain);
         }
-        // Additional loaded families participate in cluster fallback.
+        // Additional installed families participate in cluster fallback;
+        // web fonts serve only the families that name them.
         for face in self.faces() {
+            if face.is_web() {
+                continue;
+            }
             if chain
                 .iter()
                 .any(|&i| self.faces()[i].family().eq_ignore_ascii_case(face.family()))

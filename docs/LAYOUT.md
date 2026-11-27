@@ -786,6 +786,20 @@ every one reported its height. No recursion: nested tables are more frames.
   children they wrap; like anonymous blocks they have no fragment of
   their own. `inline-table` boxes are atomic inlines sized like a table,
   with the first line's baseline.
+- Collapsing borders (CSS 2.2 §17.6.2): the table's border and padding
+  move into its outer cells and the spacing is dropped. Each grid line's
+  winner is resolved among the cells beside it, the rows and row groups
+  along it and the table at its edges (`hidden` suppresses, then width,
+  then style order, then cell over row over group over table). A cell
+  owns its top and left lines, and its bottom and right ones only at the
+  table's edges, so every line is painted once; the cell's used border is
+  the winner's width, and its fragment names the winning box and side
+  (`BlockFragment::collapsed_borders`) so painting uses that style and
+  color. This keeps lines crisp but places cells by whole borders rather
+  than the specification's half borders (TD-211).
+- `visibility: collapse` rows and columns take no space (with their
+  spacing); `empty-cells: hide` cells without content paint no background
+  or border in the separated model.
 - HTML attributes (`border`, `cellpadding`, `cellspacing`, `width`,
   `bgcolor`, `align`, `valign`, ...) become presentational hints
   ([CSS guide](CSS.md#presentational-hints)); the sheet centres `th` and

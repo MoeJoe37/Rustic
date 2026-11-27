@@ -1010,11 +1010,15 @@ impl Builder<'_> {
         })
     }
 
+    /// Paint `style`'s border on `fragment`. For a cell of a table with
+    /// collapsing borders, `collapsed` gives per side the style and side
+    /// whose border wins that grid line (`None`: no border there).
     fn border(
         &mut self,
         fragment: Geometry,
         source: usize,
         style: &ComputedStyle,
+        collapsed: Option<[Option<(&ComputedStyle, u8)>; 4]>,
     ) -> Result<(), PaintError> {
         let sides = [
             (P::BorderTopStyle, P::BorderTopColor),
@@ -1026,7 +1030,22 @@ impl Builder<'_> {
         let (ix0, iy0, ix1, iy1) = edges(fragment.padding);
         let widths = [iy0 - y0, x1 - ix1, y1 - iy1, ix0 - x0];
         let mut colors = [Srgba::WHITE; 4];
-        for (i, &(style_property, color_property)) in sides.iter().enumerate() {
+        for i in 0..4 {
+            let (style, (style_property, color_property)) = match collapsed {
+                Some(list) => match list[i] {
+                    Some((winner, side)) => (winner, sides[usize::from(side) % 4]),
+                    None => {
+                        colors[i] = Srgba {
+                            r: 0,
+                            g: 0,
+                            b: 0,
+                            a: 0,
+                        };
+                        continue;
+                    }
+                },
+                None => (style, sides[i]),
+            };
             colors[i] = color(style, color_property)?;
             // `inset` and `outset` are solid with the top and left sides
             // darker (inset) or the bottom and right ones (outset); CSS
@@ -2033,7 +2052,7 @@ impl DisplayList {
                                     builder.shadows(geometry, source, style, false)?;
                                     builder.background(geometry, source, style)?;
                                     builder.shadows(geometry, source, style, true)?;
-                                    builder.border(geometry, source, style)?;
+                                    builder.border(geometry, source, style, None)?;
                                 }
                             }
                             // Atomic inlines paint after their line, each
@@ -2093,12 +2112,27 @@ impl DisplayList {
                         let geometry =
                             Geometry::block(fragment, local_clip[i], rounded[i], outer_clip[i]);
                         let source = fragment.source_box();
+                        if fragment.hides_background_and_border() {
+                            continue;
+                        }
                         builder.shadows(geometry, source, style, false)?;
                         if canvas_source != Some(i) {
                             builder.background(geometry, source, style)?;
                         }
                         builder.shadows(geometry, source, style, true)?;
-                        builder.border(geometry, fragment.source_box(), style)?;
+                        let collapsed = match fragment.collapsed_borders() {
+                            Some(list) => {
+                                let mut out = [None; 4];
+                                for (slot, side) in out.iter_mut().zip(list) {
+                                    if let Some((b, s)) = side {
+                                        *slot = Some((box_style(b)?, s));
+                                    }
+                                }
+                                Some(out)
+                            }
+                            None => None,
+                        };
+                        builder.border(geometry, fragment.source_box(), style, collapsed)?;
                     }
                 }
                 Task::Layer(i, muted) => {

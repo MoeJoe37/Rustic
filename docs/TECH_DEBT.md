@@ -268,7 +268,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-208 | Deliberate | WebAssembly | Table imports and independently linked function references needed shared allocations and traced function owners | Paid by ADR 0091 and ADR 0092 |
 | TD-209 | Deliberate | Layout | Grid subset: no masonry, `horizontal-tb` only (inline-axis baseline alignment falls back to `start`), no baseline sharing across subgrids, and auto repetitions in intrinsic sizing ignore percentage min/max sizes | Open, `layout.grid` (M9) |
 | TD-210 | Deliberate | Layout | css-grid WPT comparison: 89 of 168 static pages fail, every one reviewed (writing modes, masonry, subgrid baselines, logical properties, Ahem text) | Open, `layout.grid` (M9) |
-| TD-211 | Deliberate | Layout | Table subset: separated borders only; `visibility: collapse`, `empty-cells`, column boxes' own geometry and relative positioning of table parts ignored; css-tables WPT 18 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
+| TD-211 | Deliberate | Layout | Table subset: collapsed borders place cells by whole rather than half borders; column boxes get no geometry and table parts are not relatively positioned; css-tables WPT 18 of 35 static pages pass, the rest reviewed | Open, `layout.tables` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3465,11 +3465,14 @@ is a ratchet: a listed page that passes fails the test.
 ### TD-211 — Table layout subset
 `layout.tables` lays out tables with anonymous table boxes (CSS Tables 3
 §3.9.1) when fonts are available; the block-only reference without fonts
-still refuses misparented table parts. Only the separated borders model
-exists: `border-collapse: collapse` drops the spacing and keeps every cell
-border. Column and column group boxes give widths but get no geometry (column
+still refuses misparented table parts. Collapsed borders are
+resolved per grid line and painted once, but a cell's geometry uses the
+whole winning border on the lines it owns (top and left, plus the table's
+edges) instead of half of every line, so offsets differ from other engines
+by half a border, and a collapsed table's width includes its whole outer
+borders. Column and column group boxes give widths but get no geometry (column
 backgrounds are not painted), `min-width`/`max-width` on columns are
-ignored, `visibility: collapse` and `empty-cells: hide` change nothing, and table parts are not relatively positioned. Anonymous
+ignored, a collapsed column does not shrink the table, and table parts are not relatively positioned. Anonymous
 table boxes inherit from the box whose children they wrap rather than from
 each other, and an inline table's baseline is its first line in preorder
 (a top caption's, if any). Extra height of spanning cells and of a taller

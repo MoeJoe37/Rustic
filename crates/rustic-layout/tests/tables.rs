@@ -338,3 +338,49 @@ fn column_and_percentage_widths_share_the_table_width() {
     assert_eq!(m["b"], (30.0, 0.0, 100.0, 5.0));
     assert_eq!(m["c"], (130.0, 0.0, 70.0, 5.0));
 }
+
+#[test]
+fn collapsed_borders_are_shared_once_and_the_table_border_moves_to_the_cells() {
+    let html = page(
+        "table { border-collapse: collapse; border: 3px solid; border-spacing: 9px } \
+         td { border: 1px solid; padding: 0 }",
+        &format!(
+            "<table id=t><tr><td id=a>{}</td><td id=b>{}</td></tr></table>",
+            b("ia", 10, 10),
+            b("ib", 10, 10)
+        ),
+    );
+    let m = boxes(&html);
+    // No spacing; the outer cells take the table's 3px border on its edges
+    // and the shared line (1px) belongs to the second cell.
+    assert_eq!(m["a"].0, m["t"].0);
+    assert_eq!(m["b"].0, m["a"].0 + m["a"].2);
+    assert_eq!(m["t"].3, m["a"].3);
+    assert_eq!(m["a"].3, 16.0);
+    assert_eq!(m["ia"], (3.0, 3.0, 10.0, 10.0));
+    assert_eq!(m["ib"].0 - m["b"].0, 1.0);
+}
+
+#[test]
+fn collapsed_rows_and_columns_take_no_space() {
+    let html = page(
+        "table { border-spacing: 2px } td { padding: 0 }",
+        &format!(
+            "<table><colgroup><col><col style='visibility:collapse'><col></colgroup>\
+             <tr><td id=a>{}</td><td>{}</td><td id=c>{}</td></tr>\
+             <tr style='visibility:collapse'><td>{}</td><td></td><td></td></tr>\
+             <tr><td id=d>{}</td><td></td><td></td></tr></table>",
+            b("ia", 10, 10),
+            b("ib", 20, 10),
+            b("ic", 10, 10),
+            b("hidden", 10, 30),
+            b("id", 10, 10)
+        ),
+    );
+    let m = boxes(&html);
+    // The collapsed column's spacing goes too; the third column follows
+    // the first directly.
+    assert_eq!(m["c"].0, m["a"].0 + m["a"].2 + 2.0);
+    // The collapsed row is not between the first and last rows.
+    assert_eq!(m["d"].1, m["a"].1 + m["a"].3 + 2.0);
+}

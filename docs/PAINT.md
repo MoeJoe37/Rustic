@@ -40,7 +40,11 @@ beyond checking element names.
   `background-clip` layer (border, padding or content box).
 - **Borders.** Solid borders, and `inset`/`outset` as solid sides with the
   top and left (inset) or bottom and right (outset) at two thirds of each
-  color channel; other styles fail. When all four sides share a color the
+  color channel; other styles fail. Cells of collapsing-border tables
+  paint each side with the style and color of the border that won that
+  grid line (named by the layout fragment); empty cells with
+  `empty-cells: hide` paint neither background nor border. When all four
+  sides share a color the
   border is one ring, so no seam appears at the corners. Otherwise each side is
   a quadrilateral mitred along the corner diagonal.
 - **Colors.** Computed colors (`rgb`, `lab`, `lch`, `oklab`, `oklch` and every

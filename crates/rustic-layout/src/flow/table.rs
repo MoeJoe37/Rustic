@@ -20,8 +20,8 @@
 //! `visibility: collapse` and `empty-cells` are later steps (TD-211).
 
 use rustic_css::{
-    BorderCollapse, CaptionSide, Direction, LengthPercentage, PropertyId as P, PropertyValue as V,
-    TableLayout, VerticalAlign, VerticalAlignKeyword,
+    BorderCollapse, BorderStyle, CaptionSide, Direction, LengthPercentage, PropertyId as P,
+    PropertyValue as V, TableLayout, VerticalAlign, VerticalAlignKeyword,
 };
 use rustic_style::ComputedStyle;
 
@@ -293,6 +293,8 @@ enum Target {
 struct Structure {
     /// Widths of the columns `<col>`/`<colgroup>` boxes define, in order.
     column_widths: Vec<Option<ColumnWidth>>,
+    /// Those columns' `visibility: collapse`.
+    column_collapsed: Vec<bool>,
     groups: Vec<Group>,
     rows: Vec<Row>,
     cells: Vec<Cell>,
@@ -334,6 +336,94 @@ fn fixed_layout(style: &ComputedStyle) -> Result<bool, FlowError> {
         style.get(P::TableLayout),
         V::TableLayout(TableLayout::Fixed)
     ) && !matches!(Sizing::read(style, P::Width)?, Sizing::Initial))
+}
+
+/// `visibility: collapse` on a row or column.
+fn is_collapsed(style: &ComputedStyle) -> bool {
+    matches!(
+        style.get(P::Visibility),
+        V::Visibility(rustic_css::Visibility::Collapse)
+    )
+}
+
+/// `border-collapse: collapse`.
+fn collapses(style: &ComputedStyle) -> bool {
+    matches!(
+        style.get(P::BorderCollapse),
+        V::BorderCollapse(BorderCollapse::Collapse)
+    )
+}
+
+/// One border competing for a grid line (CSS 2.2 §17.6.2.1).
+#[derive(Clone, Copy, Debug)]
+struct Candidate {
+    width: f64,
+    style: BorderStyle,
+    /// The box (flow node) and its side (top, right, bottom, left) that
+    /// supply the style and color.
+    node: usize,
+    side: u8,
+}
+
+const SIDES: [(P, P); 4] = [
+    (P::BorderTopWidth, P::BorderTopStyle),
+    (P::BorderRightWidth, P::BorderRightStyle),
+    (P::BorderBottomWidth, P::BorderBottomStyle),
+    (P::BorderLeftWidth, P::BorderLeftStyle),
+];
+
+fn candidate(style: &ComputedStyle, node: usize, side: u8) -> Result<Candidate, FlowError> {
+    let (w, st) = SIDES[side as usize];
+    let style_value = match style.get(st) {
+        V::BorderStyle(b) => *b,
+        _ => return Err(FlowError::InvalidSnapshot),
+    };
+    Ok(Candidate {
+        width: crate::sizing::border(style, w)?.get(),
+        style: style_value,
+        node,
+        side,
+    })
+}
+
+fn style_rank(s: BorderStyle) -> u8 {
+    match s {
+        BorderStyle::Double => 8,
+        BorderStyle::Solid => 7,
+        BorderStyle::Dashed => 6,
+        BorderStyle::Dotted => 5,
+        BorderStyle::Ridge => 4,
+        BorderStyle::Outset => 3,
+        BorderStyle::Groove => 2,
+        BorderStyle::Inset => 1,
+        BorderStyle::None | BorderStyle::Hidden => 0,
+    }
+}
+
+/// The winning border among `list` (earlier entries win ties: cells, then
+/// rows, row groups and the table): `hidden` suppresses the line, `none`
+/// loses, then the wider border, then the style order (§17.6.2.1).
+fn resolve(list: &[Candidate]) -> Option<Candidate> {
+    if list.iter().any(|c| c.style == BorderStyle::Hidden) {
+        return None;
+    }
+    let mut best: Option<Candidate> = None;
+    for &c in list {
+        if c.style == BorderStyle::None || c.width <= 0.0 {
+            continue;
+        }
+        let better = match best {
+            None => true,
+            Some(b) => {
+                c.width > b.width
+                    || (c.width == b.width && style_rank(c.style) > style_rank(b.style))
+            }
+        };
+        if better {
+            best = Some(c);
+        }
+    }
+    best
 }
 
 /// Total spacing around `count` columns or rows.
@@ -576,6 +666,7 @@ impl Engine<'_, '_> {
         let end = self.nodes[t].end;
         let mut captions = Vec::new();
         let mut column_widths: Vec<Option<ColumnWidth>> = Vec::new();
+        let mut column_collapsed: Vec<bool> = Vec::new();
         // Groups in source order; direct rows join one implicit group per run.
         let mut source: Vec<(TablePart, Option<usize>, Vec<usize>)> = Vec::new();
         let mut c = t + 1;
@@ -603,6 +694,8 @@ impl Engine<'_, '_> {
                         self.work.charge(span)?;
                         if column_widths.len() + span <= MAX_COLUMNS {
                             column_widths.extend(std::iter::repeat_n(w, span));
+                            let hidden = is_collapsed(self.nodes[k].style);
+                            column_collapsed.extend(std::iter::repeat_n(hidden, span));
                         }
                     }
                 }
@@ -734,6 +827,7 @@ impl Engine<'_, '_> {
         let columns = busy.len().max(column_widths.len());
         Ok(Structure {
             column_widths,
+            column_collapsed,
             groups,
             rows,
             cells,
@@ -870,20 +964,44 @@ impl Engine<'_, '_> {
     /// Start laying out table `t`, whose width is already set. Returns its
     /// index in `self.tables`.
     pub(super) fn start_table(&mut self, t: usize) -> Result<usize, FlowError> {
+        let collapse = collapses(self.nodes[t].style);
+        if collapse {
+            // The table's border moves into its outer cells and its padding
+            // does not apply (CSS 2.2 §17.6.2): the grid fills the border box.
+            let n = &mut self.nodes[t];
+            let m = &mut n.measure;
+            m.content_width = m
+                .content_width
+                .checked_add(m.padding.left)?
+                .checked_add(m.padding.right)?
+                .checked_add(m.border.left)?
+                .checked_add(m.border.right)?;
+            m.padding = Edges::default();
+            m.border = Edges::default();
+        }
         let width = self.nodes[t].measure.content_width.get();
         let direction = self.nodes[t].direction;
         let space = spacing(self.nodes[t].style)?;
         let mut s = self.table_structure(t)?;
-        let widths = self.column_widths(t, &s, width, space.0)?;
+        let mut widths = self.column_widths(t, &s, width, space.0)?;
+        // `visibility: collapse` columns take no space (CSS 2.2 §17.5.5).
+        let hidden = |i: usize| s.column_collapsed.get(i).copied().unwrap_or(false);
+        for (i, w) in widths.iter_mut().enumerate() {
+            if hidden(i) {
+                *w = 0.0;
+            }
+        }
         // Left edges from the inline start, mirrored in RTL.
         let mut lefts = Vec::with_capacity(widths.len());
         let mut x = space.0;
-        for &w in &widths {
+        for (i, &w) in widths.iter().enumerate() {
             lefts.push(match direction {
                 Direction::Ltr => x,
                 Direction::Rtl => width - x - w,
             });
-            x += w + space.0;
+            if !hidden(i) {
+                x += w + space.0;
+            }
         }
         let mut queue = Vec::with_capacity(s.cells.len() + s.captions.len());
         for (i, caption) in s.captions.iter_mut().enumerate() {
@@ -916,6 +1034,9 @@ impl Engine<'_, '_> {
                 + space.0 * (cell.columns as f64 - 1.0);
             cell.measure.content_width = CssPx::new((span - cell.horizontal_extras()).max(0.0))?;
             queue.push(Target::Cell(i));
+        }
+        if collapse {
+            self.collapse_borders(t, &mut s, &widths, space.0)?;
         }
         queue.reverse();
         self.tables.push(TableRun {
@@ -1005,6 +1126,7 @@ impl Engine<'_, '_> {
             &mut self.tables[k].structure,
             Structure {
                 column_widths: Vec::new(),
+                column_collapsed: Vec::new(),
                 groups: Vec::new(),
                 rows: Vec::new(),
                 cells: Vec::new(),
@@ -1091,12 +1213,25 @@ impl Engine<'_, '_> {
             y = self.place_caption(caption, y)?;
         }
         let grid_top = y;
+        // `visibility: collapse` rows take no space (CSS 2.2 §17.5.5).
+        let collapsed: Vec<bool> = s
+            .rows
+            .iter()
+            .map(|r| is_collapsed(self.nodes[r.node].style))
+            .collect();
+        for (h, &c) in row_h.iter_mut().zip(&collapsed) {
+            if c {
+                *h = 0.0;
+            }
+        }
         let mut tops = Vec::with_capacity(count);
         if count > 0 {
             y += v_space;
-            for &h in &row_h {
+            for (&h, &c) in row_h.iter().zip(&collapsed) {
                 tops.push(y);
-                y += h + v_space;
+                if !c {
+                    y += h + v_space;
+                }
             }
         }
         for caption in s.captions.iter_mut().filter(|c| c.bottom) {
@@ -1141,7 +1276,20 @@ impl Engine<'_, '_> {
                 Direction::Ltr => self.tables[k].lefts[cell.column],
                 Direction::Rtl => self.tables[k].lefts[cell.column + cell.columns - 1],
             };
+            // `empty-cells: hide` in the separated model: an empty cell
+            // paints no background or border (CSS 2.2 §17.6.1.1).
+            let empty = self.nodes[cell.node].end == cell.node + 1
+                && self.nodes[cell.node]
+                    .inline
+                    .is_none_or(|k| !self.ifcs[k].has_content);
+            let hide = empty
+                && !collapses(self.nodes[t].style)
+                && matches!(
+                    self.nodes[cell.node].style.get(P::EmptyCells),
+                    V::EmptyCells(rustic_css::EmptyCells::Hide)
+                );
             let n = &mut self.nodes[cell.node];
+            n.hide_box = hide;
             let mut measure = cell.measure;
             measure.padding.top = CssPx::new(measure.padding.top.get() + offset)?;
             n.measure = measure;
@@ -1170,6 +1318,128 @@ impl Engine<'_, '_> {
         // The table's height is at least its content (CSS 2.2 §17.5.3).
         self.nodes[t].height = Some(HeightConstraint::solved(None));
         Ok(y)
+    }
+
+    /// Resolve collapsed borders (CSS 2.2 §17.6.2) for `s`'s cells. Each
+    /// grid line is painted once: a cell owns its top and left lines, and
+    /// its bottom and right ones only at the table's edges, using the
+    /// winning border's width (as its used border) and, through the node's
+    /// `collapsed` sources, its style and color. Rows, row groups and the
+    /// table compete on the lines along their edges.
+    fn collapse_borders(
+        &mut self,
+        t: usize,
+        s: &mut Structure,
+        widths: &[f64],
+        space: f64,
+    ) -> Result<(), FlowError> {
+        let rows = s.rows.len();
+        let columns = s.columns;
+        // Slot owners, for neighbors.
+        let mut slots: std::collections::HashMap<(usize, usize), usize> =
+            std::collections::HashMap::new();
+        for (i, c) in s.cells.iter().enumerate() {
+            self.work.charge(c.rows * c.columns)?;
+            for r in c.row..c.row + c.rows {
+                for k in c.column..c.column + c.columns {
+                    slots.insert((r, k), i);
+                }
+            }
+        }
+        let group_of = |r: usize| {
+            s.groups
+                .iter()
+                .position(|g| (g.rows.0..g.rows.1).contains(&r))
+        };
+        let mut results = Vec::with_capacity(s.cells.len());
+        for c in &s.cells {
+            self.work.charge(1)?;
+            let style = |n: usize| self.nodes[n].style;
+            let own = |side: u8| candidate(style(c.node), c.node, side);
+            let row_node = |r: usize| s.rows[r].node;
+            let group_node = |r: usize| group_of(r).and_then(|g| s.groups[g].node);
+            let last_row = c.row + c.rows;
+            let last_column = c.column + c.columns;
+            let mut sides: [Option<Candidate>; 4] = [None; 4];
+            // Top: this cell, the cell above, rows and groups on the line.
+            let mut list = vec![own(0)?];
+            if c.row == 0 {
+                list.push(candidate(style(row_node(0)), row_node(0), 0)?);
+                if let Some(g) = group_node(0) {
+                    list.push(candidate(style(g), g, 0)?);
+                }
+                list.push(candidate(style(t), t, 0)?);
+            } else {
+                if let Some(&above) = slots.get(&(c.row - 1, c.column)) {
+                    let n = s.cells[above].node;
+                    list.push(candidate(style(n), n, 2)?);
+                }
+                list.push(candidate(style(row_node(c.row)), row_node(c.row), 0)?);
+                list.push(candidate(
+                    style(row_node(c.row - 1)),
+                    row_node(c.row - 1),
+                    2,
+                )?);
+                if group_of(c.row) != group_of(c.row - 1) {
+                    if let Some(g) = group_node(c.row) {
+                        list.push(candidate(style(g), g, 0)?);
+                    }
+                    if let Some(g) = group_node(c.row - 1) {
+                        list.push(candidate(style(g), g, 2)?);
+                    }
+                }
+            }
+            sides[0] = resolve(&list);
+            // Left: this cell, the cell before, or the table's edge.
+            let mut list = vec![own(3)?];
+            if c.column == 0 {
+                list.push(candidate(style(row_node(c.row)), row_node(c.row), 3)?);
+                if let Some(g) = group_node(c.row) {
+                    list.push(candidate(style(g), g, 3)?);
+                }
+                list.push(candidate(style(t), t, 3)?);
+            } else if let Some(&before) = slots.get(&(c.row, c.column - 1)) {
+                let n = s.cells[before].node;
+                list.push(candidate(style(n), n, 1)?);
+            }
+            sides[3] = resolve(&list);
+            if last_column >= columns {
+                let mut list = vec![own(1)?];
+                list.push(candidate(style(row_node(c.row)), row_node(c.row), 1)?);
+                if let Some(g) = group_node(c.row) {
+                    list.push(candidate(style(g), g, 1)?);
+                }
+                list.push(candidate(style(t), t, 1)?);
+                sides[1] = resolve(&list);
+            }
+            if last_row >= rows {
+                let mut list = vec![own(2)?];
+                list.push(candidate(style(row_node(rows - 1)), row_node(rows - 1), 2)?);
+                if let Some(g) = group_node(rows - 1) {
+                    list.push(candidate(style(g), g, 2)?);
+                }
+                list.push(candidate(style(t), t, 2)?);
+                sides[2] = resolve(&list);
+            }
+            results.push(sides);
+        }
+        for (cell, sides) in s.cells.iter_mut().zip(results) {
+            let px = |c: Option<Candidate>| CssPx::new(c.map_or(0.0, |c| c.width));
+            cell.measure.border = Edges {
+                top: px(sides[0])?,
+                right: px(sides[1])?,
+                bottom: px(sides[2])?,
+                left: px(sides[3])?,
+            };
+            let span = widths[cell.column..cell.column + cell.columns]
+                .iter()
+                .sum::<f64>()
+                + space * (cell.columns as f64 - 1.0);
+            cell.measure.content_width = CssPx::new((span - cell.horizontal_extras()).max(0.0))?;
+            let sources = sides.map(|c| c.map(|c| (self.nodes[c.node].source, c.side)));
+            self.nodes[cell.node].collapsed = Some(sources);
+        }
+        Ok(())
     }
 
     /// Place a caption at `y` in the table's content box; returns the next y.

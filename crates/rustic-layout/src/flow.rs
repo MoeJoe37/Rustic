@@ -106,6 +106,8 @@ pub struct BlockFragment {
     sticky: Option<StickyConstraint>,
     /// For an atomic inline, its enclosing inline fragment on the line.
     pub(crate) inline_parent: Option<usize>,
+    collapsed: Option<[Option<(usize, u8)>; 4]>,
+    hide_box: bool,
 }
 
 impl BlockFragment {
@@ -126,6 +128,19 @@ impl BlockFragment {
     /// Parent fragment index in this result; `None` for a top-level block.
     pub const fn parent(self) -> Option<usize> {
         self.parent
+    }
+    /// For a cell of a table with collapsing borders, per side (top, right,
+    /// bottom, left): the principal box and side (0–3, same order) whose
+    /// border style and color this fragment's border paints, or `None` for
+    /// no border on that side. `None` for every other fragment, whose
+    /// borders come from its own style.
+    pub const fn collapsed_borders(self) -> Option<[Option<(usize, u8)>; 4]> {
+        self.collapsed
+    }
+    /// An empty table cell with `empty-cells: hide` (separated borders):
+    /// its background and border are not painted.
+    pub const fn hides_background_and_border(self) -> bool {
+        self.hide_box
     }
     /// Used content rectangle in CSS pixels, after relative offsets.
     pub const fn content(self) -> CssRect {
@@ -292,6 +307,11 @@ struct Node<'a> {
     table: Option<table::TablePart>,
     /// HTML `colspan`/`rowspan` of a table cell.
     span: (u32, u32),
+    /// A cell in a collapsing-borders table: per side (top, right, bottom,
+    /// left), the box and side whose border style and color it paints.
+    collapsed: Option<[Option<(usize, u8)>; 4]>,
+    /// An empty cell with `empty-cells: hide`: no background or border.
+    hide_box: bool,
     /// Already in [`Engine::absolute`] (flex items can be laid out twice).
     queued: bool,
     // Results of the current layout attempt.
@@ -719,6 +739,8 @@ fn new_node<'a>(
             BoxKind::Text => None,
         },
         span: b.table_span(),
+        collapsed: None,
+        hide_box: false,
         queued: false,
         measure: BlockMeasure {
             content_width: CssPx::ZERO,
@@ -3170,6 +3192,8 @@ fn fragment(
         line: None,
         sticky: None,
         inline_parent: None,
+        collapsed: node.collapsed,
+        hide_box: node.hide_box,
     })
 }
 

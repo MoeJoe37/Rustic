@@ -2698,113 +2698,102 @@
           "label": "Tables",
           "size": 5,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Table properties (border-collapse, border-spacing, table-layout, caption-side, empty-cells) parse, serialize and compute (pinned css-tables parsing cases)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-css/src/properties.rs",
-                  "marker": "BorderSpacing(LengthPercentage, LengthPercentage)"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-css/tests/tables.rs",
-                  "marker": "fn table_values_parse_and_serialize"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "Border spacing computes to absolute lengths"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-css/src/properties.rs",
+              "marker": "BorderSpacing(LengthPercentage, LengthPercentage)"
             },
             {
-              "label": "Table layout for well-formed tables: slots with colspan/rowspan, automatic and fixed column widths, row heights, vertical-align, captions, header and footer groups, RTL",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/table.rs",
-                  "marker": "fn column_bounds("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/tables.rs",
-                  "marker": "fn colspan_and_rowspan_take_slots_and_grow_columns_and_rows"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/tables.rs",
-                  "marker": "fn fixed_layout_uses_the_first_row_widths"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-css/tests/tables.rs",
+              "marker": "fn table_values_parse_and_serialize"
             },
             {
-              "label": "Anonymous table boxes (CSS Tables 3 §3.9) for misparented parts and text, and inline tables",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/flow/table.rs",
-                  "marker": "pub(super) fn fixup("
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/tables.rs",
-                  "marker": "fn misparented_cells_get_an_anonymous_table_and_row"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/tables.rs",
-                  "marker": "fn inline_tables_sit_on_the_line"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "Border spacing computes to absolute lengths"
             },
             {
-              "label": "Collapsing borders, column boxes and widths, percentage widths, empty-cells and visibility: collapse",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/table.rs",
+              "marker": "fn column_bounds("
             },
             {
-              "label": "HTML table presentational hints (width, height, border, cellspacing, cellpadding, align, valign, bgcolor, nowrap)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/hints.rs",
-                  "marker": "pub(crate) fn presentational_hints"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn table_presentational_hints_map_to_css_below_author_rules"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/tables.rs",
-                  "marker": "fn legacy_table_attributes_size_and_space_the_table"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/tables.rs",
+              "marker": "fn colspan_and_rowspan_take_slots_and_grow_columns_and_rows"
             },
             {
-              "label": "Pinned css-tables layout pages compared like css-grid (importer, reviewed expected failures)",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/wpt_tables.rs",
-                  "marker": "fn table_layout_matches_the_reviewed_wpt_expectations"
-                },
-                {
-                  "kind": "source",
-                  "path": "tools/import_wpt_tables_tests.py",
-                  "marker": "DIRECTORY = \"css/css-tables\""
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/tables.rs",
+              "marker": "fn fixed_layout_uses_the_first_row_widths"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/table.rs",
+              "marker": "pub(super) fn fixup("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/tables.rs",
+              "marker": "fn misparented_cells_get_an_anonymous_table_and_row"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/tables.rs",
+              "marker": "fn inline_tables_sit_on_the_line"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/table.rs",
+              "marker": "fn collapse_borders("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn collapsed_table_borders_paint_each_line_once_in_the_winning_color"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/tables.rs",
+              "marker": "fn column_and_percentage_widths_share_the_table_width"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/tables.rs",
+              "marker": "fn collapsed_rows_and_columns_take_no_space"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn hidden_empty_cells_paint_no_background_or_border"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/hints.rs",
+              "marker": "pub(crate) fn presentational_hints"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn table_presentational_hints_map_to_css_below_author_rules"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/tables.rs",
+              "marker": "fn legacy_table_attributes_size_and_space_the_table"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/wpt_tables.rs",
+              "marker": "fn table_layout_matches_the_reviewed_wpt_expectations"
+            },
+            {
+              "kind": "source",
+              "path": "tools/import_wpt_tables_tests.py",
+              "marker": "DIRECTORY = \"css/css-tables\""
             }
           ]
         },

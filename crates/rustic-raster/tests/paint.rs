@@ -304,6 +304,45 @@ fn hidden_boxes_paint_nothing_of_their_own_but_children_may_paint() {
 }
 
 #[test]
+fn collapsed_table_borders_paint_each_line_once_in_the_winning_color() {
+    let p = page(
+        "<div class=t><div class=r><div class=c></div><div class=c></div></div></div>",
+        &format!(
+            "{RESET} .t {{ display: table; border-collapse: collapse; border: 2px solid blue }} \
+             .r {{ display: table-row }} \
+             .c {{ display: table-cell; border: 1px solid red; width: 4px; height: 4px }}"
+        ),
+        20.0,
+        10.0,
+    );
+    let surface = render(&p, 1.0);
+    // The table's wider blue border wins its edges; the shared 1px line
+    // between the cells is red, painted once (by the second cell).
+    assert_eq!(surface.pixel(0, 4), Some(rgb(0, 0, 255)));
+    assert_eq!(surface.pixel(4, 0), Some(rgb(0, 0, 255)));
+    assert_eq!(surface.pixel(8, 4), Some(rgb(255, 0, 0)));
+    assert_eq!(surface.pixel(7, 4), Some(rgb(255, 255, 255)));
+    assert_eq!(surface.pixel(9, 4), Some(rgb(255, 255, 255)));
+    assert_eq!(surface.pixel(15, 4), Some(rgb(0, 0, 255)));
+}
+
+#[test]
+fn hidden_empty_cells_paint_no_background_or_border() {
+    let p = page(
+        "<div class=t><div class=r><div class=c></div><div class=c><div></div></div></div></div>",
+        &format!(
+            "{RESET} .t {{ display: table; empty-cells: hide }} .r {{ display: table-row }} \
+             .c {{ display: table-cell; background: red; width: 6px; height: 6px }}"
+        ),
+        20.0,
+        10.0,
+    );
+    let surface = render(&p, 1.0);
+    assert_eq!(surface.pixel(2, 2), Some(rgb(255, 255, 255)));
+    assert_eq!(surface.pixel(8, 1), Some(rgb(255, 0, 0)));
+}
+
+#[test]
 fn inset_and_outset_borders_shade_opposite_sides() {
     for (style, top_left, bottom_right) in [
         ("inset", rgb(0, 0, 170), rgb(0, 0, 255)),

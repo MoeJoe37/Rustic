@@ -593,6 +593,20 @@ fn element_is(document: &Document, node: NodeId, local: &str) -> bool {
     )
 }
 
+/// Whether `node` is an outermost SVG `svg` element.
+fn element_is_svg_root(document: &Document, node: NodeId) -> bool {
+    let Ok(n) = document.node(node) else {
+        return false;
+    };
+    let svg = |kind: &NodeKind| matches!(kind, NodeKind::Element(e) if e.name().namespace() == Some(rustic_dom::SVG_NAMESPACE));
+    matches!(n.kind(), NodeKind::Element(e) if e.name().local() == "svg")
+        && svg(n.kind())
+        && !n
+            .parent()
+            .and_then(|p| document.node(p).ok())
+            .is_some_and(|p| svg(p.kind()))
+}
+
 /// A fieldset's rendered legend: its first child that is an HTML
 /// `legend` (HTML §15.3.13; floated and positioned legends are not told
 /// apart yet, TD-219).
@@ -1099,6 +1113,52 @@ impl Builder<'_> {
                 shape,
                 color,
                 clip: fragment.clip,
+                rounded_clip: fragment.rounded_clip,
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Paint an outermost `svg` element's content (`crate::svg`) in
+    /// `fragment`'s content box, clipped to it.
+    fn svg(
+        &mut self,
+        document: &Document,
+        fragment: Geometry,
+        source: usize,
+        style: &ComputedStyle,
+    ) -> Result<(), PaintError> {
+        if !element_is_svg_root(document, fragment.node) {
+            return Ok(());
+        }
+        let current = color(style, P::Color)?;
+        let content = fragment.content;
+        // The viewport clips (`overflow: hidden` is the UA default).
+        let (x0, y0, x1, y1) = edges(content);
+        let narrow = |outer: Option<rustic_layout::AxisRange>, start: f64, end: f64| {
+            let (mut start, mut end) = (start, end);
+            if let Some(o) = outer {
+                start = start.max(o.start.get());
+                end = end.min(o.end.get());
+            }
+            Some(rustic_layout::AxisRange {
+                start: CssPx::new(start).ok()?,
+                end: CssPx::new(end.max(start)).ok()?,
+            })
+        };
+        let clip = rustic_layout::Clip {
+            x: narrow(fragment.clip.x, x0, x1),
+            y: narrow(fragment.clip.y, y0, y1),
+        };
+        for shape in crate::svg::paint(document, fragment.node, content, current) {
+            let index = self.polygon_path(shape.contours)?;
+            self.push(DisplayItem {
+                source_box: source,
+                node: fragment.node,
+                role: ItemRole::Background,
+                shape: Shape::Path(index),
+                color: shape.color,
+                clip,
                 rounded_clip: fragment.rounded_clip,
             })?;
         }
@@ -2281,6 +2341,7 @@ impl DisplayList {
                         }
                         if visible(style) {
                             builder.control(document, geometry, source)?;
+                            builder.svg(document, geometry, source, style)?;
                         }
                         builder.shadows(geometry, source, style, true)?;
                         let collapsed = match fragment.collapsed_borders() {

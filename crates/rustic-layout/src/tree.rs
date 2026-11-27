@@ -367,6 +367,17 @@ impl BoxTree {
                         _ => None,
                     }
                 }
+                // An outermost `svg` is a replaced element (SVG 2 §5.1.2).
+                NodeKind::Element(element)
+                    if element.name().namespace() == Some(rustic_dom::SVG_NAMESPACE)
+                        && element.name().local() == "svg"
+                        && !node.parent().is_some_and(|p| {
+                            matches!(document.node(p).map(|n| n.kind()),
+                                Ok(NodeKind::Element(e)) if e.name().namespace() == Some(rustic_dom::SVG_NAMESPACE))
+                        }) =>
+                {
+                    Some(svg_natural_size(element))
+                }
                 _ => None,
             };
             let span = match node.kind() {
@@ -540,6 +551,13 @@ impl BoxTree {
                         outside_marker: outside,
                     });
                 }
+            }
+            if natural.is_some()
+                && matches!(node.kind(), NodeKind::Element(e) if e.name().namespace() == Some(rustic_dom::SVG_NAMESPACE))
+            {
+                // Paint draws the SVG content; it makes no CSS boxes.
+                hidden = Some(depth);
+                continue;
             }
             if let Some(control) = control {
                 // A control's rendering replaces its children: the value,
@@ -879,6 +897,45 @@ fn counter(kind: rustic_css::ListStyleType, ordinal: i64) -> String {
         ]),
         _ => ordinal.to_string(),
     }
+}
+
+/// An outermost `svg`'s natural size: its `width` and `height` attributes
+/// when they are absolute lengths, and the ratio of its `viewBox` (or of
+/// those dimensions).
+fn svg_natural_size(element: &rustic_dom::Element) -> NaturalSize {
+    let attribute = |name: &str| {
+        element
+            .attributes()
+            .iter()
+            .find(|a| a.name().namespace().is_none() && a.name().local() == name)
+            .map(|a| String::from_utf16_lossy(a.value().as_units()))
+    };
+    let length = |name: &str| {
+        let value = attribute(name)?;
+        let value = value.trim();
+        let number = value.strip_suffix("px").unwrap_or(value).trim();
+        number
+            .parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite() && *n >= 0.0)
+            .and_then(|n| CssPx::new(n).ok())
+    };
+    let view_box = attribute("viewBox").and_then(|v| {
+        let n: Vec<f64> = v
+            .split(|c: char| c.is_ascii_whitespace() || c == ',')
+            .filter(|t| !t.is_empty())
+            .map(str::parse::<f64>)
+            .collect::<Result<_, _>>()
+            .ok()?;
+        (n.len() == 4 && n[2] > 0.0 && n[3] > 0.0 && n.iter().all(|x| x.is_finite()))
+            .then(|| n[2] / n[3])
+    });
+    let (width, height) = (length("width"), length("height"));
+    let ratio = view_box.or_else(|| match (width, height) {
+        (Some(w), Some(h)) if w.get() > 0.0 && h.get() > 0.0 => Some(w.get() / h.get()),
+        _ => None,
+    });
+    NaturalSize::new(width, height, ratio).unwrap_or(NaturalSize::NONE)
 }
 
 /// A zero-width space: the text of an empty field, which keeps one line's

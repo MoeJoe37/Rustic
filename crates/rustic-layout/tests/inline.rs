@@ -386,7 +386,10 @@ fn unsupported_inline_content_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
     // `inline-table` is laid out since `layout.tables` (tests/tables.rs).
     for (html, reason) in [
-        ("<p>x<svg></svg>", UnsupportedFlow::SpecialElement),
+        (
+            "<p>x<math><mi>x</mi></math>",
+            UnsupportedFlow::SpecialElement,
+        ),
         ("<p>x<math></math>", UnsupportedFlow::SpecialElement),
     ] {
         match try_layout(html, "", 100.0) {

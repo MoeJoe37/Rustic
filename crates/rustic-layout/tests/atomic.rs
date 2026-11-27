@@ -310,8 +310,8 @@ fn unsupported_atomic_content_still_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
     // `inline-grid` and `inline-table` are laid out since `layout.grid`
     // and `layout.tables` (tests/grid.rs, tests/tables.rs), and controls
-    // since `html.elements` (tests/inline.rs); SVG is not.
-    let html = "<p>x<svg style='display:inline-block'></svg>";
+    // since `html.elements` (tests/inline.rs); MathML is not.
+    let html = "<p>x<math style='display:inline-block'></math>";
     match try_layout(html, "", 100.0) {
         Err(FlowError::Unsupported { reason, .. }) => {
             assert_eq!(reason, UnsupportedFlow::SpecialElement, "{html}");

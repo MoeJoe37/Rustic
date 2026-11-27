@@ -222,7 +222,7 @@ fn unsupported_contexts_and_controls_return_typed_errors() {
         );
     }
     // Block-level replaced elements are laid out since REN-02c (tests/sizing.rs).
-    for html in ["<svg></svg>", "<math></math>", "<br>"] {
+    for html in ["<math></math>", "<br>"] {
         unsupported(html, "* {display:block}", UnsupportedFlow::SpecialElement);
     }
 }

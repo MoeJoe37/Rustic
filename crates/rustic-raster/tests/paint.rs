@@ -365,29 +365,29 @@ fn inset_and_outset_borders_shade_opposite_sides() {
 
 #[test]
 fn unsupported_paint_features_fail_atomically_with_their_node() {
-    for (css, reason) in [
-        ("border: 2px dashed red", UnsupportedPaint::BorderStyle),
-        ("border-left: 1px double red", UnsupportedPaint::BorderStyle),
-        (
-            "background-image: url(x.png)",
-            UnsupportedPaint::BackgroundImage,
-        ),
-    ] {
+    // Dashed, dotted and double borders paint as solid (TD-219).
+    for css in ["border: 2px dashed red", "border-left: 1px double red"] {
         let p = page(
-            "<div id=x></div>",
+            "<div></div>",
             &format!("{RESET} div {{ height: 2px; {css} }}"),
             4.0,
             4.0,
         );
-        assert_eq!(
-            p.list(),
-            Err(PaintError::Unsupported {
-                node: p.id("x"),
-                reason
-            }),
-            "{css}"
-        );
+        assert!(p.list().is_ok(), "{css}");
     }
+    let p = page(
+        "<div id=x></div>",
+        &format!("{RESET} div {{ height: 2px; background-image: url(x.png) }}"),
+        4.0,
+        4.0,
+    );
+    assert_eq!(
+        p.list(),
+        Err(PaintError::Unsupported {
+            node: p.id("x"),
+            reason: UnsupportedPaint::BackgroundImage
+        })
+    );
     // The propagated canvas background image is unsupported too.
     let p = page(
         "",
@@ -2213,4 +2213,54 @@ fn upright_glyphs_stand_on_vertical_lines() {
         assert_eq!(*c, format!("..?bbbb?....?bbbb?{}", ".".repeat(12)), "{x}");
     }
     assert!(column[17..].iter().all(|c| *c == empty), "{column:#?}");
+}
+
+#[test]
+fn inline_svg_paints_shapes_strokes_and_transforms_in_its_viewport() {
+    let p = page(
+        "<svg width=40 height=40 viewBox='0 0 20 20' style='display:block;color:#00f'>\
+         <rect width=10 height=10 fill=red />\
+         <g transform='translate(10 0)'><rect width=10 height=10 fill=currentColor /></g>\
+         <path d='M0 10h10v10H0z' style='fill: lime' />\
+         <line x1=10 y1=15 x2=20 y2=15 stroke=black stroke-width=2 />\
+         <circle cx=100 cy=100 r=50 fill=red /></svg>",
+        RESET,
+        60.0,
+        60.0,
+    );
+    let surface = render(&p, 1.0);
+    // The viewBox doubles everything.
+    assert_eq!(surface.pixel(10, 10), Some(rgb(255, 0, 0)));
+    assert_eq!(surface.pixel(30, 10), Some(rgb(0, 0, 255)), "currentColor");
+    assert_eq!(
+        surface.pixel(10, 30),
+        Some(rgb(0, 255, 0)),
+        "style attribute"
+    );
+    assert_eq!(
+        surface.pixel(30, 30),
+        Some(rgb(0, 0, 0)),
+        "stroke, 4px wide"
+    );
+    assert_eq!(surface.pixel(30, 26), Some(rgb(255, 255, 255)));
+    // Content outside the viewport is clipped.
+    assert_eq!(surface.pixel(50, 50), Some(rgb(255, 255, 255)));
+}
+
+#[test]
+fn form_controls_paint_their_state_and_fieldsets_frame_their_legend() {
+    let p = page(
+        "<progress value=1 max=4></progress><meter value=1></meter>",
+        &format!(
+            "{RESET} progress, meter {{ display: block; width: 40px; height: 10px; border-radius: 0 }}"
+        ),
+        60.0,
+        30.0,
+    );
+    let surface = render(&p, 1.0);
+    // A quarter of the progress bar is filled, the rest is the track.
+    assert_eq!(surface.pixel(5, 5), Some(rgb(0x00, 0x75, 0xff)));
+    assert_eq!(surface.pixel(15, 5), Some(rgb(0xef, 0xef, 0xef)));
+    // A full meter in its optimum region.
+    assert_eq!(surface.pixel(35, 15), Some(rgb(0x10, 0x7c, 0x10)));
 }

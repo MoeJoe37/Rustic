@@ -437,6 +437,29 @@ fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_par
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(String::from_utf8_lossy(&output.stdout).contains("\ntext 0 line=0 "));
+    // A slot with an authored box lays out its fallback content.
+    fs::write(
+        &path,
+        "<style>* {margin:0}</style><main><template shadowrootmode=open><slot style='display:block;width:80px;height:10px'>fallback</slot></template></main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("content=(0,0,80,10)"));
+    // A block-level forced line break remains unsupported.
+    fs::write(
+        &path,
+        "<style>* {margin:0} br {display:block}</style><main>a<br></main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        stderr(&output).contains("SpecialElement"),
+        "{}",
+        stderr(&output)
+    );
+    assert!(output.stdout.is_empty());
     fs::remove_dir_all(base).unwrap();
 }
 

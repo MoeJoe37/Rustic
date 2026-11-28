@@ -310,8 +310,8 @@ fn unsupported_atomic_content_still_fails_atomically() {
     use rustic_layout::UnsupportedFlow;
     // `inline-grid` and `inline-table` are laid out since `layout.grid`
     // and `layout.tables` (tests/grid.rs, tests/tables.rs), and controls
-    // since `html.elements` (tests/inline.rs); slots are not.
-    let html = "<p>x<slot style='display:inline-block'></slot>";
+    // since `html.elements` (tests/inline.rs). Audio still needs its own layout.
+    let html = "<p>x<audio controls style='display:inline-block'></audio>";
     match try_layout(html, "", 100.0) {
         Err(FlowError::Unsupported { reason, .. }) => {
             assert_eq!(reason, UnsupportedFlow::SpecialElement, "{html}");

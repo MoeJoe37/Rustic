@@ -267,8 +267,8 @@ impl BoxTree {
     /// `display:none` suppresses a subtree, `display:contents` promotes its
     /// children, and templates are inert. Text is copied as UTF-16. Styles must
     /// be unique, live element IDs in this document; each visible element needs
-    /// one. No selectors or cascade run here. Visible shadow hosts fail until
-    /// flattened-tree/slot assignment exists (TD-37). Anonymous flow boxes are
+    /// one. The flat tree determines the children of shadow hosts and slots.
+    /// Anonymous flow boxes are
     /// derived separately by `FormattingTree`; pseudo boxes and other
     /// formatting-context fixups remain pending.
     pub fn build(
@@ -392,7 +392,6 @@ impl BoxTree {
                             | "canvas"
                             | "br"
                             | "wbr"
-                            | "slot"
                     )
                 }
                 _ => false,

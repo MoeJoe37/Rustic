@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "cbb14e2c734ad4e96be95cfc053a945ae28b9a926f3f6caf41d697d462aa9acf",
-  "percent": "55.08",
+  "source_fingerprint": "ee0d9c83122a7f94b8c6a80ea1197862dcc53c25633d30b323e0cbbaa3bd3fa2",
+  "percent": "55.37",
   "verified_percent": "53.45",
-  "partial_percent": "1.63",
+  "partial_percent": "1.92",
   "completed": 123,
   "in_progress": 12,
   "total": 228,
@@ -97,9 +97,9 @@
       "share": "22.35",
       "completed": 10,
       "total": 54,
-      "percent": "25.57",
+      "percent": "26.88",
       "verified_percent": "22.36",
-      "partial_percent": "3.21"
+      "partial_percent": "4.52"
     },
     {
       "id": "M10",
@@ -1040,13 +1040,55 @@
             },
             {
               "label": "Slot assignment, the flat tree and slotchange",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-dom/src/document/slots.rs",
+                  "marker": "pub fn slot_map"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/tree.rs",
+                  "marker": "slots.flat_walk(root)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/reference.rs",
+                  "marker": "fn shadow_hosts_render_assigned_nodes_and_omit_unassigned_light_children"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/shadow.rs",
+                  "marker": "fn slotted_elements_inherit_from_the_slot_and_match_their_own_tree"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+                  "marker": "fn shadow_slots_update_and_signal_after_observers_in_the_same_checkpoint"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+                  "marker": "fn manual_slot_assignment_is_ordered_unique_and_closed_roots_hide_the_slot"
+                }
+              ]
             },
             {
               "label": "Declarative shadow DOM in the HTML parser",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-html/src/parser/tree/insert.rs",
+                  "marker": "fn insert_declarative_shadow"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/document.rs",
+                  "marker": "fn declarative_shadow_templates_create_owned_trees_at_every_input_split"
+                }
+              ]
             },
             {
               "label": "Custom element registry, upgrades and lifecycle callbacks",
@@ -1054,7 +1096,7 @@
               "evidence": []
             }
           ],
-          "credit": "25.00",
+          "credit": "75.00",
           "engine_share": "0.58"
         },
         {
@@ -1098,10 +1140,10 @@
       "completed": 9,
       "in_progress": 1,
       "total": 10,
-      "contribution": "3.55",
-      "percent": "88.97",
+      "contribution": "3.85",
+      "percent": "96.32",
       "verified_percent": "85.29",
-      "partial_percent": "3.68"
+      "partial_percent": "11.03"
     },
     {
       "id": "html",

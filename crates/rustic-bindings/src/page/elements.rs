@@ -117,7 +117,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     define_method(agent, html, "togglePopover", toggle_popover, 0)
 }
 
-fn accessor(
+pub(super) fn accessor(
     agent: &mut Agent,
     proto: ObjectId,
     name: &str,

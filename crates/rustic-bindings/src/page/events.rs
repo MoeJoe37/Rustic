@@ -171,7 +171,7 @@ pub(super) fn define_method(
 
 /// Arrays used as native records have no prototype, so reads and writes
 /// cannot invoke page code. The records themselves are never exposed.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct PrivateArray(ObjectId);
 
 impl PrivateArray {
@@ -647,6 +647,18 @@ fn event_path(agent: &mut Agent, target: Target, event_type: Value) -> JsResult<
             },
         )
     })
+}
+
+pub(super) fn fire_slot_change(agent: &mut Agent, target: Value) -> JsResult<()> {
+    let event = state::trusted_event(
+        agent,
+        "Event",
+        "slotchange",
+        Event::BUBBLES,
+        Value::UNDEFINED,
+        Value::NULL,
+    )?;
+    fire_at(agent, target, event).map(|_| ())
 }
 
 fn dispatch_event(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {

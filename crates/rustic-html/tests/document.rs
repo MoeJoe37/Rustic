@@ -703,3 +703,35 @@ fn depth_cap_places_nodes_like_chromium() {
     }
     assert_eq!(cases, 5);
 }
+
+#[test]
+fn declarative_shadow_templates_create_owned_trees_at_every_input_split() {
+    let source = b"<div><template shadowrootmode=OpEn shadowrootclonable shadowrootdelegatesfocus shadowrootserializable><section><template shadowrootmode=closed><slot>fallback</slot></template></section></template><span>light</span><template shadowrootmode=closed>duplicate</template></div>";
+    for split in 0..=source.len() {
+        let mut parser = HtmlDocumentParser::default();
+        parser.feed(&source[..split]).unwrap();
+        parser.feed(&source[split..]).unwrap();
+        let result = parser.finish().unwrap();
+        let doc = result.document();
+        doc.check_invariants().unwrap();
+        let host = elements(doc, "div")[0];
+        let NodeKind::Element(host_data) = doc.node(host).unwrap().kind() else {
+            unreachable!()
+        };
+        let root = host_data.shadow_root().unwrap();
+        let opts = host_data.shadow_root_options().unwrap();
+        assert_eq!(opts.mode, rustic_dom::ShadowRootMode::Open);
+        assert!(opts.declarative && opts.clonable && opts.delegates_focus && opts.serializable);
+        let section = doc.children(root).unwrap().next().unwrap();
+        let NodeKind::Element(section) = doc.node(section).unwrap().kind() else {
+            unreachable!()
+        };
+        assert_eq!(
+            section.shadow_root_mode(),
+            Some(rustic_dom::ShadowRootMode::Closed)
+        );
+        assert_eq!(doc.children(host).unwrap().count(), 2);
+        assert_eq!(elements(doc, "template").len(), 1);
+        assert_eq!(elements(doc, "section").len(), 0);
+    }
+}

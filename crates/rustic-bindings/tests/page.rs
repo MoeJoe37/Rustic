@@ -2088,7 +2088,8 @@ fn wasm_standalone_table64_checks_full_indices_and_growth_after_reentry() {
 #[test]
 fn wasm_standalone_table_growth_respects_the_heap_budget() {
     let document = Document::new(DocumentLimits::default()).unwrap();
-    let mut agent = Agent::with_heap_limit(512 * 1024).unwrap();
+    // Leave room to install the Window interfaces and compile the test script.
+    let mut agent = Agent::with_heap_limit(640 * 1024).unwrap();
     page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
     let outcome = agent.evaluate(
         r#"

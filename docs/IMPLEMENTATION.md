@@ -64,6 +64,21 @@ the `FontFace` page test. Limits: TD-212 (vertical layout) and TD-213 (web
 fonts). Guides: [layout](LAYOUT.md#writing-modes-textwriting-m9),
 [text](TEXT.md#web-fonts).
 
+## M9 DOM — Shadow parsing, slot distribution and autonomous custom elements
+
+Document parsing attaches open and closed declarative shadow roots, including
+nested roots and roots with clonable, delegates-focus and serializable metadata.
+Named and manual assignments drive flat-tree inheritance and box construction.
+The slot APIs preserve light-tree links and share the mutation observer
+notification checkpoint. Focused fixtures exercise every input split, fallback
+and reassignment, closed-root visibility, style scope and rendered text.
+
+The global Window registry upgrades autonomous elements and delivers lifecycle
+callbacks through the DOM mutation boundary. Remaining registry and integration
+work is recorded in [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration).
+See [DOM](DOM.md#shadow-roots-and-slots) and
+[scripted documents](SCRIPTING.md#shadow-dom-and-custom-elements).
+
 ## M9 DOM — Ranges, traversal and inline style (`dom.ranges`)
 
 `NodeIterator`, `TreeWalker` and `NodeFilter`, and `AbstractRange`,

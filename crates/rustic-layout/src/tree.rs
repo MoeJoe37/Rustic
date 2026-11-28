@@ -336,7 +336,8 @@ impl BoxTree {
             }
             ancestor = node.parent();
         }
-        for (visited, (id, depth)) in document.walk(root)?.enumerate() {
+        let slots = document.slot_map()?;
+        for (visited, (id, depth)) in slots.flat_walk(root)?.enumerate() {
             cancellation.check().map_err(|_| LayoutError::Cancelled)?;
             if visited >= limits.max_nodes.saturating_sub(ancestors) {
                 return Err(LayoutError::NodeLimit);
@@ -490,7 +491,7 @@ impl BoxTree {
                 _ => HtmlTag::Other,
             };
             let (kind, style, text) = match node.kind() {
-                NodeKind::Element(element) => {
+                NodeKind::Element(_) => {
                     let style = *index.get(&id).ok_or(LayoutError::MissingStyle(id))?;
                     let PropertyValue::Display(display) = style.get(PropertyId::Display) else {
                         return Err(LayoutError::InvalidStyles);
@@ -498,9 +499,6 @@ impl BoxTree {
                     if *display == Display::None {
                         hidden = Some(depth);
                         continue;
-                    }
-                    if element.shadow_root().is_some() {
-                        return Err(LayoutError::ShadowTree);
                     }
                     if *display == Display::Contents {
                         parents.push((depth, parent, Some(Arc::new(style.clone()))));
@@ -877,8 +875,6 @@ pub enum LayoutError {
     InvalidStyles,
     /// A visible element has no style in the supplied snapshot.
     MissingStyle(NodeId),
-    /// Visible shadow content needs a flattened tree and slot assignment.
-    ShadowTree,
     /// Dump would exceed its byte limit.
     OutputLimit,
     /// A natural size was supplied for a node that is not a replaced box.

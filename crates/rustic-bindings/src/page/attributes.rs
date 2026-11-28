@@ -1,7 +1,7 @@
 //! Content attributes on the live Element.
 
 use rustic_dom::{Attribute, DomString, Element, HTML_NAMESPACE, NodeId, NodeKind, QualifiedName};
-use rustic_js::runtime::{Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
+use rustic_js::runtime::{Agent, JsResult, NativeFn, ObjectId, Value};
 
 use crate::dom_exception;
 use crate::webidl::{DomStringConversion, from_dom_string, to_dom_string, to_nullable_dom_string};
@@ -23,42 +23,35 @@ pub(super) fn install(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
         let key = agent.heap.key(name)?;
         agent.define_method(prototype, key, operation, name, length)?;
     }
-    // DOM `id` and `className` reflect the null-namespace `id` and `class`.
-    for (name, get, set) in [
+    let reflected: [(&str, NativeFn, NativeFn); 3] = [
         (
             "id",
-            reflect_get::<false> as NativeFn,
-            reflect_set::<false> as NativeFn,
+            |agent, receiver, _| reflect_get(agent, receiver, "id"),
+            |agent, receiver, args| reflect_set(agent, receiver, args, "id"),
         ),
-        ("className", reflect_get::<true>, reflect_set::<true>),
-    ] {
-        let get = Value::object(agent.new_native_function(get, &format!("get {name}"), 0)?);
-        let set = Value::object(agent.new_native_function(set, &format!("set {name}"), 1)?);
-        let key = agent.heap.key(name)?;
-        agent.define_property_or_throw(
-            prototype,
-            key,
-            PropertyDescriptor::accessor(get, set, true, true),
-        )?;
+        (
+            "className",
+            |agent, receiver, _| reflect_get(agent, receiver, "class"),
+            |agent, receiver, args| reflect_set(agent, receiver, args, "class"),
+        ),
+        (
+            "slot",
+            |agent, receiver, _| reflect_get(agent, receiver, "slot"),
+            |agent, receiver, args| reflect_set(agent, receiver, args, "slot"),
+        ),
+    ];
+    for (name, get, set) in reflected {
+        elements::accessor(agent, prototype, name, get, Some(set))?;
     }
     Ok(())
 }
 
-fn reflected(class: bool) -> &'static str {
-    if class { "class" } else { "id" }
-}
-
-fn reflect_get<const CLASS: bool>(
-    agent: &mut Agent,
-    receiver: Value,
-    _: &[Value],
-) -> JsResult<Value> {
+fn reflect_get(agent: &mut Agent, receiver: Value, local: &str) -> JsResult<Value> {
     element_receiver(agent, receiver)?;
     read_node(agent, receiver, |agent, _, _, _, node| {
         let NodeKind::Element(element) = node.kind() else {
             return agent.type_error("expected an Element receiver");
         };
-        let local = reflected(CLASS);
         match element.attributes().iter().find(|attribute| {
             attribute.name().namespace().is_none() && attribute.name().local() == local
         }) {
@@ -68,16 +61,12 @@ fn reflect_get<const CLASS: bool>(
     })
 }
 
-fn reflect_set<const CLASS: bool>(
-    agent: &mut Agent,
-    receiver: Value,
-    args: &[Value],
-) -> JsResult<Value> {
+fn reflect_set(agent: &mut Agent, receiver: Value, args: &[Value], local: &str) -> JsResult<Value> {
     element_receiver(agent, receiver)?;
     let value = args.first().copied().unwrap_or(Value::UNDEFINED);
     let value = to_dom_string(agent, value, DomStringConversion::Default)?;
     with_mut_tree(agent, receiver, |agent, document, _, id| {
-        let name = QualifiedName::from_parsed(None, None, reflected(CLASS))
+        let name = QualifiedName::from_parsed(None, None, local)
             .map_err(|error| dom_exception::from_dom_error(agent, error))?;
         document
             .set_attribute(id, name, value)

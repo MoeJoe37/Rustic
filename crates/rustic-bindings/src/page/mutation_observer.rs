@@ -62,6 +62,7 @@ const COMPACT_MIN: u32 = 64;
 
 /// Storage slots, rooted for the page's lifetime.
 const STORE_PENDING: u32 = 0;
+const STORE_SLOTS: u32 = 6;
 
 /// The members of a `MutationRecord`, in getter order.
 const RECORD_MEMBERS: [&str; 9] = [
@@ -102,6 +103,7 @@ impl Observers {
         let registrations = agent.new_weak_map()?;
         let records = agent.new_weak_map()?;
         let pending = PrivateArray::new(agent, &[])?;
+        let slots = PrivateArray::new(agent, &[])?;
         let notify = Value::object(agent.new_native_function(notify, "notify", 0)?);
         let invoke = Value::object(agent.new_native_function(invoke, "invoke", 1)?);
         let storage = PrivateArray::new(
@@ -113,6 +115,7 @@ impl Observers {
                 Value::object(records),
                 notify,
                 invoke,
+                slots.value(),
             ],
         )?;
         agent.root(storage.value())?;
@@ -603,7 +606,7 @@ fn activate(agent: &mut Agent, page: &Page) -> JsResult<()> {
     enable_journals(agent, page)
 }
 
-fn enable_journals(agent: &mut Agent, page: &Page) -> JsResult<()> {
+pub(super) fn enable_journals(agent: &mut Agent, page: &Page) -> JsResult<()> {
     let Some(mut main) = page.tree.write() else {
         return agent.type_error("document is busy");
     };
@@ -624,7 +627,9 @@ fn enable_journals(agent: &mut Agent, page: &Page) -> JsResult<()> {
 /// Turn journal entries into queued records. A no-op while another binding
 /// operation holds the page; that operation flushes when it finishes.
 pub(super) fn flush(agent: &mut Agent, page: &Page) -> JsResult<()> {
-    if !page.observers.active.get() || page.observers.flushing.get() {
+    if (!page.observers.active.get() && !page.custom_elements.active())
+        || page.observers.flushing.get()
+    {
         return Ok(());
     }
     let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
@@ -638,14 +643,18 @@ pub(super) fn flush(agent: &mut Agent, page: &Page) -> JsResult<()> {
     }
     page.observers.flushing.set(true);
     let mut result = Ok(());
-    for entry in entries {
-        result = queue_entry(agent, page, &mut wrappers, &entry);
-        if result.is_err() {
-            break;
+    if page.observers.active.get() {
+        for entry in &entries {
+            result = queue_entry(agent, page, &mut wrappers, entry);
+            if result.is_err() {
+                break;
+            }
         }
     }
     page.observers.flushing.set(false);
-    result
+    drop(wrappers);
+    result?;
+    super::custom_elements::react(agent, page, &entries)
 }
 
 /// Every document's entries, main document first, or `None` while any
@@ -916,6 +925,18 @@ fn enqueue(agent: &mut Agent, page: &Page, observer: Value, record: Value) -> Js
     if !values(agent, pending)?.contains(&observer) {
         push(agent, pending, observer)?;
     }
+    queue_notification(agent, page)
+}
+
+pub(super) fn signal_slot(agent: &mut Agent, page: &Page, slot: Value) -> JsResult<()> {
+    let slots = array_at(agent, page.observers.storage(), STORE_SLOTS)?;
+    if !values(agent, slots)?.contains(&slot) {
+        push(agent, slots, slot)?;
+    }
+    queue_notification(agent, page)
+}
+
+fn queue_notification(agent: &mut Agent, page: &Page) -> JsResult<()> {
     if !page.observers.queued.get() {
         agent.enqueue_microtask(page.observers.notify, Value::UNDEFINED)?;
         page.observers.queued.set(true);
@@ -925,16 +946,22 @@ fn enqueue(agent: &mut Agent, page: &Page, observer: Value, record: Value) -> Js
 
 /// DOM "notify mutation observers", run as a microtask.
 fn notify(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
-    let pending = with_page(agent, |agent, page| {
+    let (pending, slots) = with_page(agent, |agent, page| {
         page.observers.queued.set(false);
         let pending = array_at(agent, page.observers.storage(), STORE_PENDING)?;
         let empty = PrivateArray::new(agent, &[])?;
         page.observers
             .storage()
             .set(agent, STORE_PENDING, empty.value())?;
-        Ok(pending)
+        let slots = array_at(agent, page.observers.storage(), STORE_SLOTS)?;
+        let empty = PrivateArray::new(agent, &[])?;
+        page.observers
+            .storage()
+            .set(agent, STORE_SLOTS, empty.value())?;
+        Ok((pending, slots))
     })?;
-    with_root(agent, pending.value(), |agent| {
+    let roots = PrivateArray::new(agent, &[pending.value(), slots.value()])?;
+    with_root(agent, roots.value(), |agent| {
         let mut observers = Vec::new();
         for observer in values(agent, pending)? {
             let serial = with_page(agent, |agent, page| {
@@ -971,6 +998,10 @@ fn notify(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
                 Err(Abrupt::Throw(error)) => super::events::report_callback_error(agent, error)?,
                 Err(error) => return Err(error),
             }
+        }
+        for index in 0..slots.len(agent)? {
+            let slot = slots.get(agent, index)?;
+            super::events::fire_slot_change(agent, slot)?;
         }
         Ok(Value::UNDEFINED)
     })

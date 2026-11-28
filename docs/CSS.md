@@ -667,11 +667,11 @@ every tree; an author sheet styles the elements of its own tree and, through
 is featureless: it matches only `:host` forms (also within `:is()` and
 `:where()`), combinators reach it from the tree's top-level elements, and
 nothing beyond it. `document_cascade` puts each `<style>` inside a shadow tree
-in that tree's context, and `style_tree` styles in shadow-including tree order:
-a shadow tree right after its host, its top-level elements inheriting from the
-host. Slots are not assigned, so the host's light children inherit from the
-host rather than from a slot (TD-23); `::slotted()`, `::part()` and
-`:host-context()` are rejected. Each tree has its own layer order.
+in that tree's context. Style follows the flat tree for inheritance. A slotted
+element inherits from its slot, and top-level shadow elements inherit from
+their host. Author selector matching still uses the original DOM tree.
+`::slotted()`, `::part()` and `:host-context()` remain open. Each tree has its
+own layer order.
 
 ### Presentational hints
 

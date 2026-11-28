@@ -229,6 +229,20 @@ layout snapshot as other script reads. [ADR 0050](adr/0050-resize-observer.md)
 
 Unimplemented Web APIs are absent from the exposed interface.
 
+## Shadow DOM and custom elements
+
+`Element.attachShadow`, `Element.shadowRoot`, `ShadowRoot` and
+`HTMLSlotElement` expose shadow ownership and slot distribution. `slotchange`
+shares the mutation observer notification microtask. See
+[DOM shadow roots and slots](DOM.md#shadow-roots-and-slots).
+
+The Window's global `customElements` registry supports autonomous custom
+elements with `define`, `get`, `getName`, `whenDefined` and `upgrade`.
+Construction through `HTMLElement` preserves an upgraded node's existing
+wrapper. Registered callbacks can observe connection, disconnection, adoption
+and observed attribute changes. [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration)
+tracks the remaining lifecycle and registry work.
+
 ## Window encoding, URL, Fetch and WebAssembly
 
 | Area | Implemented Window surface | Scope and evidence |

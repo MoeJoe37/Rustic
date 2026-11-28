@@ -9,7 +9,7 @@
 use rustic_base::NodeId;
 
 use super::{Document, MutationEntry};
-use crate::{DomError, Element, NodeKind, ShadowRootMode};
+use crate::{DomError, Element, NodeKind, ShadowRootOptions};
 
 /// The result of [`Document::adopt_node`]: the new root plus an ID map.
 ///
@@ -42,7 +42,7 @@ enum Link {
     /// Template contents of an earlier planned template element.
     ContentsOf(usize),
     /// Shadow root of an earlier planned host element.
-    ShadowOf(usize, ShadowRootMode),
+    ShadowOf(usize, ShadowRootOptions),
 }
 
 impl Document {
@@ -52,8 +52,7 @@ impl Document {
     /// data, and new IDs. Following the HTML cloning steps, a `template` copy gets
     /// its own contents fragment, which a deep clone fills with a copy of the
     /// original contents. Cloning template contents or a shadow root yields a
-    /// free-standing fragment, and shadow roots are not cloned with their
-    /// hosts (none is clonable). The document root cannot be cloned here; use
+    /// free-standing fragment. A clonable shadow root is copied with its host. The document root cannot be cloned here; use
     /// [`Self::clone_document`]. Limit or allocation failure creates nothing.
     pub fn clone_node(&mut self, node: NodeId, deep: bool) -> Result<NodeId, DomError> {
         if node == self.root {
@@ -198,6 +197,10 @@ impl Document {
         for (pair, &new) in ids.iter_mut().zip(&created) {
             pair.1 = new;
         }
+        if let Err(error) = self.adopt_manual_slots(source, &ids) {
+            self.destroy_materialized(&created);
+            return Err(error);
+        }
         let root = ids[0].1;
         if fragment {
             roots.extend(
@@ -253,6 +256,33 @@ impl Document {
         }
         source.destroy_unchecked(node);
         Ok(Adopted { root, ids })
+    }
+
+    fn adopt_manual_slots(
+        &mut self,
+        source: &Document,
+        ids: &[(NodeId, NodeId)],
+    ) -> Result<(), DomError> {
+        if source.manual_slots.is_empty() {
+            return Ok(());
+        }
+        let mut renames = std::collections::HashMap::new();
+        renames
+            .try_reserve(ids.len())
+            .map_err(|_| DomError::AllocationFailed)?;
+        renames.extend(ids.iter().copied());
+        for &(old, new) in ids {
+            let Some(assigned) = source.manual_slots.get(&old) else {
+                continue;
+            };
+            let mut moved = Vec::new();
+            moved
+                .try_reserve(assigned.len())
+                .map_err(|_| DomError::AllocationFailed)?;
+            moved.extend(assigned.iter().filter_map(|id| renames.get(id).copied()));
+            self.assign_slot(new, &moved)?;
+        }
+        Ok(())
     }
 
     fn insert_forest(
@@ -353,6 +383,7 @@ impl Document {
                     let host = created[host];
                     self.live_mut(id).shadow_host = Some(host);
                     self.element_mut(host).shadow_root = Some((id, mode));
+                    self.shadow_roots += 1;
                 }
             }
             created.push(id);
@@ -413,18 +444,18 @@ impl Document {
 }
 
 /// Plan a copy of `root`, its descendants when `deep`, template contents, and
-/// with `shadow` (adoption, which moves rather than clones) shadow roots.
+/// clonable shadow roots. Adoption also copies non-clonable shadow roots.
 fn snapshot(
     document: &Document,
     root: NodeId,
     deep: bool,
-    shadow: bool,
+    adopting: bool,
 ) -> Result<Vec<Planned>, DomError> {
     document.node(root)?;
     let mut plan: Vec<Planned> = Vec::new();
     // Pending tree roots: (source root, link of that root).
-    let mut pending = vec![(root, Link::Root)];
-    while let Some((tree, link)) = pending.pop() {
+    let mut pending = vec![(root, Link::Root, deep)];
+    while let Some((tree, link, deep)) = pending.pop() {
         // parents[d] is the plan index of the current ancestor at depth d.
         let mut parents: Vec<usize> = Vec::new();
         for (id, depth) in document.walk(tree)? {
@@ -447,12 +478,15 @@ fn snapshot(
             });
             parents.push(index);
             if let NodeKind::Element(element) = node.kind() {
-                if let Some((shadow_root, mode)) = element.shadow_root.filter(|_| shadow) {
-                    pending.push((shadow_root, Link::ShadowOf(index, mode)));
+                if let Some((shadow_root, mode)) = element
+                    .shadow_root
+                    .filter(|(_, options)| adopting || options.clonable)
+                {
+                    pending.push((shadow_root, Link::ShadowOf(index, mode), true));
                 }
                 if let Some(contents) = element.template_contents() {
                     if deep {
-                        pending.push((contents, Link::ContentsOf(index)));
+                        pending.push((contents, Link::ContentsOf(index), true));
                     } else {
                         plan.try_reserve(1)
                             .map_err(|_| DomError::AllocationFailed)?;

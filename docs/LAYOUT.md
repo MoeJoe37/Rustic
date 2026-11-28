@@ -46,7 +46,8 @@ This is an initial principal-box snapshot, **not** the final CSS box/fragment
 tree: anonymous boxes, whitespace processing, generated pseudo boxes and
 formatting-context fixups are pending (TD-37). The display value identifies a
 future formatting context; retaining `flex` or `table` does not implement it.
-Visible shadow hosts fail explicitly until flattened-tree/slot assignment exists.
+Shadow hosts contribute their shadow children. Slot assignment determines
+whether the box walk reaches assigned light children or fallback content.
 
 ## Horizontal block measurement
 
@@ -275,7 +276,7 @@ CSS Display 3 [anonymous boxes](https://www.w3.org/TR/css-display-3/#anonymous)
 and CSS Text 3 [white-space processing](https://www.w3.org/TR/css-text-3/#white-space-phase-1).
 These are focused structural fixtures/model checks, not layout-WPT or browser
 comparison results. List markers, tables, flex/grid, floats/out-of-flow boxes,
-replaced/control/foreign elements, pseudo boxes and flattened shadow trees
+replaced/control/foreign elements and pseudo boxes
 remain separate work and fail explicitly where required (TD-37/TD-39).
 
 ## Font adapter (REN-03a)

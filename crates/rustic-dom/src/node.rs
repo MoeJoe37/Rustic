@@ -34,7 +34,7 @@ pub struct Element {
     pub(crate) name: QualifiedName,
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) template_contents: Option<NodeId>,
-    pub(crate) shadow_root: Option<(NodeId, ShadowRootMode)>,
+    pub(crate) shadow_root: Option<(NodeId, ShadowRootOptions)>,
 }
 
 /// Whether script outside a shadow tree may reach it (`attachShadow`'s mode).
@@ -44,6 +44,47 @@ pub enum ShadowRootMode {
     Open,
     /// Hidden from the host's `shadowRoot`.
     Closed,
+}
+
+/// Distribution mode of a shadow root.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum SlotAssignment {
+    /// Assign light children to the first slot with their name.
+    #[default]
+    Named,
+    /// Assign light children explicitly.
+    Manual,
+}
+
+/// Options stored on a shadow host with its root identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ShadowRootOptions {
+    /// Visibility of the root from the host.
+    pub mode: ShadowRootMode,
+    /// Whether host focus delegates into the shadow tree.
+    pub delegates_focus: bool,
+    /// Whether cloning the host also clones the shadow tree.
+    pub clonable: bool,
+    /// Whether HTML serialization may include this shadow tree.
+    pub serializable: bool,
+    /// How light children are distributed into slots.
+    pub slot_assignment: SlotAssignment,
+    /// Whether the parser attached the root declaratively.
+    pub declarative: bool,
+}
+
+impl ShadowRootOptions {
+    /// The defaults of a shadow-root initialization dictionary.
+    pub const fn new(mode: ShadowRootMode) -> Self {
+        Self {
+            mode,
+            delegates_focus: false,
+            clonable: false,
+            serializable: false,
+            slot_assignment: SlotAssignment::Named,
+            declarative: false,
+        }
+    }
 }
 
 impl Element {
@@ -69,7 +110,12 @@ impl Element {
 
     /// The mode the shadow root was attached with.
     pub fn shadow_root_mode(&self) -> Option<ShadowRootMode> {
-        self.shadow_root.map(|(_, mode)| mode)
+        self.shadow_root_options().map(|options| options.mode)
+    }
+
+    /// Options associated with the attached shadow root.
+    pub fn shadow_root_options(&self) -> Option<ShadowRootOptions> {
+        self.shadow_root.map(|(_, options)| options)
     }
 
     /// The separate trees this element owns: template contents and its

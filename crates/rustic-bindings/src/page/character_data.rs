@@ -108,7 +108,14 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         parent(TEXT),
         construct_text,
         0,
-        &[("wholeText", "get wholeText", whole_text)],
+        &[
+            ("wholeText", "get wholeText", whole_text),
+            (
+                "assignedSlot",
+                "get assignedSlot",
+                super::slots::assigned_slot,
+            ),
+        ],
         |agent, prototype| install_operation(agent, prototype, TEXT, "splitText", split_text),
     )?;
     install_interface(

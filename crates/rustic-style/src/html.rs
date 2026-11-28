@@ -47,6 +47,7 @@ m|menclose { display: inline-block; border: 0.06em solid; padding: 0.1em }
 m|merror { border: 1px solid red; background-color: lightyellow }
 m|mphantom { visibility: hidden }
 
+slot { display: contents }
 [hidden], area, base, basefont, datalist, head, link, meta, noembed,
 noframes, param, rp, script, style, template, title { display: none }
 

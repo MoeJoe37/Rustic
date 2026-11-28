@@ -57,7 +57,8 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-214, TD-215, TD-216, TD-217, TD-218, TD-219, TD-220, TD-221, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, DOM and HTML | TD-222 | Shadow DOM and custom element conformance |
+| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-214, TD-215, TD-216, TD-217, TD-218, TD-219, TD-220, TD-221, TD-201, TD-202, TD-204, TD-190, TD-23, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
@@ -103,8 +104,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Paid |
 | TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Paid |
 | TD-22 | Watch | CI | Emulated tests run serially to dodge a rare QEMU crash | Open |
-| TD-23 | Deliberate | Style | Light children of a shadow host inherit from the host, not a slot | Open, pay with slot assignment |
-| TD-24 | Watch | DOM | Custom element names approximate HTML's `PCENChar` ranges | Open, pay with the custom element registry |
+| TD-23 | Deliberate | Style | Slotted inheritance and author styling through the slot | Flat-tree inheritance paid. The CSS selector remains open. |
+| TD-24 | Watch | DOM | Custom element names approximate HTML's `PCENChar` ranges | Paid |
 | TD-25 | Deliberate | Style | Layers declared in a non-matching `@media` still take a place in the layer order | Open, pay before media-dependent layer tests |
 | TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Paid |
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
@@ -279,6 +280,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: text fields and checkable inputs paint their live value and checkedness (since 2026-11-28), but there is no selectedness (no `HTMLSelectElement`/`HTMLOptionElement`), no caret and no text scrolling in fields, `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
 | TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; images without a box are not requested; `decode()` settles at once (rejecting unrequested images); no `iframe.contentWindow`/`contentDocument`, URL decomposition on `a`/`area`, or token lists besides `classList`, `sandbox` and `relList` | Partly paid 2026-11-28 (image request state, rendered size, CORS settings, `a`/`area`/`link` with `relList`); open, M9 |
 | TD-215 | Deliberate | DOM | Ranges without `Selection`, `getElementsByName` or `Range` geometry; live-range nodes stay roots one collection after their object dies; six heavy range WPT pages exceed the script turn budget | Open, `dom.ranges` (M9) |
+| TD-222 | Deliberate | DOM | Shadow DOM and custom element integration | Open, `dom.shadow` and web parity |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -580,26 +582,17 @@ once a newer QEMU on the runner image passes repeated parallel runs, or move
 the target to native hardware. **Trigger:** any emulated-job flake, or a runner
 image QEMU upgrade.
 
-### TD-23 — Light children of a shadow host inherit from the host
+### TD-23 — Slotted inheritance and styling
 
-CSS-07b styles shadow trees, but `rustic-dom` does not assign slots, so there
-is no flat tree. `style_tree` styles a host's light children as ordinary
-children of the host: they inherit from it and match document-tree rules. In a
-browser, a slotted child inherits from its `<slot>`, and an unslotted one is not
-rendered. `::slotted()` is rejected rather than matching nothing silently.
-**Pay:** with slot assignment (`dom.shadow` step 2), inherit along the flat
-tree and add `::slotted()` with the slot's tree as its context. **Trigger:**
-slot assignment, or layout consuming styles of shadow hosts' children.
+Flat-tree inheritance is paid. Slotted children inherit from their slots, and
+layout omits unassigned light children. The CSS `::slotted()` selector and its
+encapsulation-cascade rules remain open. **Pay:** match and cascade slotted
+selectors in the slot's stylesheet context.
 
-### TD-24 — Custom element names approximate `PCENChar`
+### TD-24 — Custom element name grammar
 
-`Document::attach_shadow` accepts valid custom element names as hosts. The
-check requires a leading ASCII lowercase letter, a hyphen, no ASCII uppercase
-or whitespace and no ASCII punctuation other than `-`, `.` and `_`, and rejects
-the reserved names; it accepts every non-ASCII character, while HTML's
-`PCENChar` excludes a few ranges (such as U+037E and U+2000–U+200B). **Pay:**
-implement the exact production when the custom element registry needs it.
-**Trigger:** `dom.shadow` step 4, or a public `attachShadow` binding.
+**Paid:** `is_custom_element_name` checks the exact `PCENChar` ranges and the
+reserved names for both registry definitions and shadow host eligibility.
 
 ### TD-25 — Layers in non-matching `@media` still join the layer order
 
@@ -3696,3 +3689,25 @@ other than 0).
 **Pay:** fragmentation-aware column layout with spanners and rules (with
 `layout.fragmentation`), CSS Ruby layout, and MathML Core layout with the
 MATH table.
+
+
+### TD-222 — Shadow DOM and custom element integration
+
+The global registry covers autonomous elements. Customized built-ins, scoped
+registries, `ElementInternals` and form-associated lifecycle callbacks remain
+open. Reactions use the flushed DOM journal, which cannot replay intermediate
+tree connectivity or attribute values from batched edits. The parser upgrades
+at script checkpoints. Exact reaction-stack order and synchronous parser
+construction still need conformance coverage. Adoption follows document
+ownership changes for upgraded elements.
+
+Shadow initialization stores focus and serialization flags. Focus delegation,
+HTML serialization and the opt-in fragment parsing entry points remain open.
+The event path still needs shadow retargeting, closed-tree `composedPath()`
+filtering and slot-aware propagation. Slot notifications compare distributions
+across binding and parser boundaries, so intermediate changes within one batch
+can coalesce without a notification. Manual assignments survive adoption when
+both endpoints move together.
+
+**Pay:** implement the remaining algorithms and verify them with pinned shadow
+DOM and custom element Web Platform Tests.

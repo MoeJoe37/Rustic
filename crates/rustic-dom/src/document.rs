@@ -11,6 +11,9 @@ mod character_data;
 mod invariants;
 mod journal;
 mod live;
+mod slots;
+
+pub use slots::{FlatWalk, SlotMap};
 pub(crate) mod marking;
 mod top_layer;
 
@@ -110,6 +113,9 @@ pub struct Document {
     live_set: live::LiveSet,
     /// Modal dialogs and showing popovers, bottom first.
     top_layer: Vec<(NodeId, TopLayer)>,
+    shadow_roots: usize,
+    manual_slots: std::collections::HashMap<NodeId, Vec<NodeId>>,
+    manual_owners: std::collections::HashMap<NodeId, NodeId>,
 }
 
 impl Document {
@@ -160,6 +166,9 @@ impl Document {
             form_associations: Vec::new(),
             live_set: live::LiveSet::default(),
             top_layer: Vec::new(),
+            shadow_roots: 0,
+            manual_slots: std::collections::HashMap::new(),
+            manual_owners: std::collections::HashMap::new(),
         })
     }
 
@@ -224,12 +233,20 @@ impl Document {
     /// most one shadow root (`InvalidHierarchy`). Like template contents, the
     /// shadow root is a separate tree root: not a child, skipped by
     /// [`Self::walk`] of the host, never inserted, detached or destroyed on
-    /// its own, and destroyed with its host. Declarative shadow roots and slot
-    /// assignment are not implemented.
+    /// its own, and destroyed with its host.
     pub fn attach_shadow(
         &mut self,
         host: NodeId,
         mode: crate::ShadowRootMode,
+    ) -> Result<NodeId, DomError> {
+        self.attach_shadow_with_options(host, crate::ShadowRootOptions::new(mode))
+    }
+
+    /// Attach a shadow root, or claim and clear a same-mode declarative root.
+    pub fn attach_shadow_with_options(
+        &mut self,
+        host: NodeId,
+        options: crate::ShadowRootOptions,
     ) -> Result<NodeId, DomError> {
         let element = self.element(host)?;
         if element.name.namespace() != Some(crate::HTML_NAMESPACE)
@@ -237,12 +254,25 @@ impl Document {
         {
             return Err(DomError::WrongNodeKind);
         }
-        if element.shadow_root.is_some() {
-            return Err(DomError::InvalidHierarchy);
+        if let Some((root, existing)) = element.shadow_root {
+            if !existing.declarative || options.declarative || existing.mode != options.mode {
+                return Err(DomError::InvalidHierarchy);
+            }
+            self.replace_children_with_text(root, DomString::from(""))?;
+            self.element_mut(host).shadow_root = Some((
+                root,
+                crate::ShadowRootOptions {
+                    declarative: false,
+                    ..existing
+                },
+            ));
+            self.note_mutation();
+            return Ok(root);
         }
         let root = self.arena.insert(NodeKind::DocumentFragment)?;
         self.live_mut(root).shadow_host = Some(host);
-        self.element_mut(host).shadow_root = Some((root, mode));
+        self.element_mut(host).shadow_root = Some((root, options));
+        self.shadow_roots += 1;
         self.note_mutation();
         Ok(root)
     }
@@ -904,6 +934,7 @@ impl Document {
                 ],
                 _ => [None, None],
             };
+            self.shadow_roots -= usize::from(owned[1].is_some());
             for fragment in owned.into_iter().flatten() {
                 self.link_last_child(current, fragment);
             }
@@ -913,6 +944,8 @@ impl Document {
             }
             let parent = self.live(current).parent();
             self.unlink(current);
+            self.forget_manual_slot(current);
+            self.forget_manual_assignee(current);
             self.arena.remove_detached_leaf(current);
             if current == root {
                 break;
@@ -1167,6 +1200,11 @@ fn can_host_shadow(local: &str) -> bool {
         "section",
         "span",
     ];
+    HOSTS.contains(&local) || is_custom_element_name(local)
+}
+
+/// Whether a string is a valid HTML custom element name.
+pub fn is_custom_element_name(local: &str) -> bool {
     const RESERVED: &[&str] = &[
         "annotation-xml",
         "color-profile",
@@ -1177,19 +1215,19 @@ fn can_host_shadow(local: &str) -> bool {
         "font-face-name",
         "missing-glyph",
     ];
-    if HOSTS.contains(&local) {
-        return true;
-    }
-    // A valid custom element name: a lowercase ASCII letter first, a hyphen
-    // somewhere, no ASCII uppercase, and not a reserved name. The PCEN
-    // character set is otherwise approximated by "not ASCII uppercase or
-    // whitespace, and not a few ASCII punctuation characters".
     local.starts_with(|c: char| c.is_ascii_lowercase())
         && local.contains('-')
-        && !local.chars().any(|c| {
-            c.is_ascii_uppercase()
-                || c.is_ascii_whitespace()
-                || (c.is_ascii() && !c.is_ascii_alphanumeric() && !matches!(c, '-' | '.' | '_'))
-        })
         && !RESERVED.contains(&local)
+        && local.chars().all(|c| {
+            matches!(
+                c,
+                '-' | '.' | '_' | '0'..='9' | 'a'..='z' | '\u{b7}'
+                    | '\u{c0}'..='\u{d6}' | '\u{d8}'..='\u{f6}' | '\u{f8}'..='\u{37d}'
+                    | '\u{37f}'..='\u{1fff}' | '\u{200c}'..='\u{200d}'
+                    | '\u{203f}'..='\u{2040}' | '\u{2070}'..='\u{218f}'
+                    | '\u{2c00}'..='\u{2fef}' | '\u{3001}'..='\u{d7ff}'
+                    | '\u{f900}'..='\u{fdcf}' | '\u{fdf0}'..='\u{fffd}'
+                    | '\u{10000}'..='\u{effff}'
+            )
+        })
 }

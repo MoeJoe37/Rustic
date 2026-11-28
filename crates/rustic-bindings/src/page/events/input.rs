@@ -100,7 +100,7 @@ pub(in crate::page) fn reaches_root(
         if id == document.root() {
             return Ok(true);
         }
-        current = node.parent();
+        current = node.parent().or_else(|| node.shadow_host());
     }
     Ok(false)
 }

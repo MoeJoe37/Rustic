@@ -22,7 +22,7 @@ use super::ImageState;
 
 use super::token_list;
 use super::traversal::{node_of, read_doc};
-use super::{illegal_constructor, install_interface, with_mut_tree, with_page};
+use super::{install_interface, with_mut_tree, with_page};
 
 pub(super) const IMAGE: &str = "HTMLImageElement";
 pub(super) const IFRAME: &str = "HTMLIFrameElement";
@@ -130,7 +130,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         IMAGE,
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor(IMAGE),
         0,
         &[],
         |agent, proto| {
@@ -158,7 +158,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
             agent,
             interface,
             Some("HTMLElement"),
-            illegal_constructor,
+            crate::page::custom_elements::builtins::constructor(interface),
             0,
             &[],
             |agent, proto| {
@@ -171,7 +171,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         IFRAME,
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor(IFRAME),
         0,
         &[],
         |agent, proto| {

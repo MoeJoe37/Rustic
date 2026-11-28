@@ -22,9 +22,11 @@ fn child_list(
     removed: &[NodeId],
     previous: Option<NodeId>,
     next: Option<NodeId>,
+    connected: bool,
 ) -> MutationEntry {
     MutationEntry::ChildList {
         target,
+        connected,
         added: added.to_vec(),
         removed: removed.to_vec(),
         previous,
@@ -55,9 +57,9 @@ fn insertion_and_moves_record_removal_then_insertion() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(root, &[html], &[], None, None),
-            child_list(html, &[a], &[], None, None),
-            child_list(html, &[b], &[], Some(a), None),
+            child_list(root, &[html], &[], None, None, true),
+            child_list(html, &[a], &[], None, None, true),
+            child_list(html, &[b], &[], Some(a), None, true),
         ]
     );
     // Moving `a` after `b` removes it first, so `b` is the previous sibling.
@@ -65,8 +67,8 @@ fn insertion_and_moves_record_removal_then_insertion() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(html, &[], &[a], None, Some(b)),
-            child_list(html, &[a], &[], Some(b), None),
+            child_list(html, &[], &[a], None, Some(b), true),
+            child_list(html, &[a], &[], Some(b), None, true),
         ]
     );
     // Appending the last child again still queues both records.
@@ -74,8 +76,8 @@ fn insertion_and_moves_record_removal_then_insertion() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(html, &[], &[a], Some(b), None),
-            child_list(html, &[a], &[], Some(b), None),
+            child_list(html, &[], &[a], Some(b), None, true),
+            child_list(html, &[a], &[], Some(b), None, true),
         ]
     );
     // Inserting a node before itself uses its next sibling as the reference.
@@ -83,8 +85,8 @@ fn insertion_and_moves_record_removal_then_insertion() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(html, &[], &[b], None, Some(a)),
-            child_list(html, &[b], &[], None, Some(a)),
+            child_list(html, &[], &[b], None, Some(a), true),
+            child_list(html, &[b], &[], None, Some(a), true),
         ]
     );
 }
@@ -107,8 +109,8 @@ fn fragments_record_their_emptying_and_one_insertion() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(fragment, &[], &[a, b], None, None),
-            child_list(parent, &[a, b], &[], None, Some(existing)),
+            child_list(fragment, &[], &[a, b], None, None, false),
+            child_list(parent, &[a, b], &[], None, Some(existing), false),
         ]
     );
     // An empty fragment changes nothing and records nothing.
@@ -148,7 +150,7 @@ fn detach_and_replace_all_record_removed_children() {
     document.detach(b).unwrap();
     assert_eq!(
         document.take_mutation_entries(),
-        [child_list(parent, &[], &[b], Some(a), Some(c))]
+        [child_list(parent, &[], &[b], Some(a), Some(c), false)]
     );
     document
         .replace_children_with_text(parent, DomString::from("hi"))
@@ -181,18 +183,19 @@ fn attribute_changes_keep_previous_values() {
     document.remove_attribute(div, None, "id").unwrap();
     // Removing a missing attribute is not.
     document.remove_attribute(div, None, "id").unwrap();
-    let attribute = |old: Option<&str>| MutationEntry::Attribute {
+    let attribute = |old: Option<&str>, new: Option<&str>| MutationEntry::Attribute {
         target: div,
         name: name.clone(),
         old_value: old.map(DomString::from),
+        new_value: new.map(DomString::from),
     };
     assert_eq!(
         document.take_mutation_entries(),
         [
-            attribute(None),
-            attribute(Some("one")),
-            attribute(Some("two")),
-            attribute(Some("two")),
+            attribute(None, Some("one")),
+            attribute(Some("one"), Some("two")),
+            attribute(Some("two"), Some("two")),
+            attribute(Some("two"), None),
         ]
     );
 }
@@ -240,7 +243,7 @@ fn split_text_inserts_before_replacing_data() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(parent, &[new], &[], Some(text), Some(after)),
+            child_list(parent, &[new], &[], Some(text), Some(after), false),
             MutationEntry::CharacterData {
                 target: text,
                 old_value: DomString::from("hello"),
@@ -280,8 +283,8 @@ fn cross_document_moves_record_new_identities_in_the_destination() {
     assert_eq!(
         target.take_mutation_entries(),
         [
-            child_list(old_parent, &[], &[adopted.root], None, Some(sibling)),
-            child_list(new_parent, &[adopted.root], &[], None, None),
+            child_list(old_parent, &[], &[adopted.root], None, Some(sibling), false),
+            child_list(new_parent, &[adopted.root], &[], None, None, false),
         ]
     );
     // Without a destination journal the source records the removal.
@@ -289,7 +292,14 @@ fn cross_document_moves_record_new_identities_in_the_destination() {
     let adopted = quiet.adopt_node(&mut source, sibling).unwrap();
     assert_eq!(
         source.take_mutation_entries(),
-        [child_list(old_parent, &[], &[adopted.root], None, None)]
+        [child_list(
+            old_parent,
+            &[],
+            &[adopted.root],
+            None,
+            None,
+            false
+        )]
     );
     // A fragment from another document records its emptying first.
     let fragment = source.create_document_fragment().unwrap();
@@ -303,13 +313,14 @@ fn cross_document_moves_record_new_identities_in_the_destination() {
     assert_eq!(
         target.take_mutation_entries(),
         [
-            child_list(fragment, &[], &[new_a], None, None),
+            child_list(fragment, &[], &[new_a], None, None, false),
             child_list(
                 new_parent,
                 &[new_a],
                 &[],
                 Some(target_last(&target, new_parent, new_a)),
-                None
+                None,
+                false
             ),
         ]
     );
@@ -345,8 +356,8 @@ fn replace_child_records_adoption_then_one_combined_entry() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(parent, &[], &[c], Some(b), None),
-            child_list(parent, &[c], &[a], None, Some(b)),
+            child_list(parent, &[], &[c], Some(b), None, false),
+            child_list(parent, &[c], &[a], None, Some(b), false),
         ]
     );
     assert_eq!(document.node(parent).unwrap().first_child(), Some(c));
@@ -355,8 +366,8 @@ fn replace_child_records_adoption_then_one_combined_entry() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(parent, &[], &[b], Some(c), None),
-            child_list(parent, &[b], &[], Some(c), None),
+            child_list(parent, &[], &[b], Some(c), None, false),
+            child_list(parent, &[b], &[], Some(c), None, false),
         ]
     );
     // A fragment records its emptying, and a detached node only the
@@ -370,15 +381,15 @@ fn replace_child_records_adoption_then_one_combined_entry() {
     assert_eq!(
         document.take_mutation_entries(),
         [
-            child_list(fragment, &[], &[x, y], None, None),
-            child_list(parent, &[x, y], &[b], Some(c), None),
+            child_list(fragment, &[], &[x, y], None, None, false),
+            child_list(parent, &[x, y], &[b], Some(c), None, false),
         ]
     );
     let lone = element(&mut document, "z");
     document.replace_child(parent, lone, c).unwrap();
     assert_eq!(
         document.take_mutation_entries(),
-        [child_list(parent, &[lone], &[c], None, Some(x))]
+        [child_list(parent, &[lone], &[c], None, Some(x), false)]
     );
 }
 
@@ -414,7 +425,32 @@ fn rejected_replacements_leave_the_tree_and_journal_unchanged() {
     let entries = document.take_mutation_entries();
     assert_eq!(
         entries,
-        [child_list(root, &[stranger], &[html], None, None)]
+        [child_list(root, &[stranger], &[html], None, None, true)]
     );
     document.check_invariants().unwrap();
+}
+
+#[test]
+fn child_list_connectivity_is_recorded_before_later_tree_edits() {
+    let mut document = document();
+    let html = element(&mut document, "html");
+    let host = element(&mut document, "div");
+    document.append_child(document.root(), html).unwrap();
+    document.append_child(html, host).unwrap();
+    let root = document
+        .attach_shadow(host, rustic_dom::ShadowRootMode::Closed)
+        .unwrap();
+    let node = element(&mut document, "x-widget");
+    document.take_mutation_entries();
+    document.append_child(root, node).unwrap();
+    document.detach(host).unwrap();
+    document.detach(node).unwrap();
+    assert_eq!(
+        document.take_mutation_entries(),
+        [
+            child_list(root, &[node], &[], None, None, true),
+            child_list(html, &[], &[host], None, None, true),
+            child_list(root, &[], &[node], None, None, false),
+        ]
+    );
 }

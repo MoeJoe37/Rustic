@@ -566,6 +566,11 @@ fn install_page(
         0,
         &[
             ("documentElement", "get documentElement", document_element),
+            (
+                "customElementRegistry",
+                "get customElementRegistry",
+                custom_elements::registry_of,
+            ),
             ("defaultView", "get defaultView", window::default_view),
             (
                 "implementation",
@@ -622,6 +627,11 @@ fn install_page(
             ("namespaceURI", "get namespaceURI", creation::namespace_uri),
             ("tagName", "get tagName", creation::tag_name),
             ("shadowRoot", "get shadowRoot", shadow::shadow_root),
+            (
+                "customElementRegistry",
+                "get customElementRegistry",
+                custom_elements::registry_of,
+            ),
             ("assignedSlot", "get assignedSlot", slots::assigned_slot),
             (
                 "children",
@@ -649,7 +659,7 @@ fn install_page(
         agent,
         "HTMLElement",
         Some("Element"),
-        custom_elements::construct_html_element,
+        custom_elements::builtins::construct::<0>,
         0,
         &[("offsetWidth", "get offsetWidth", offset_width)],
         |agent, proto| events::install_handlers(agent, proto, false),
@@ -1157,42 +1167,9 @@ fn wrap(
             _ => "XMLDocument",
         },
         NodeKind::Element(element)
-            if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
-                && matches!(
-                    element.name().local(),
-                    "input"
-                        | "textarea"
-                        | "button"
-                        | "form"
-                        | "details"
-                        | "dialog"
-                        | "img"
-                        | "iframe"
-                        | "a"
-                        | "area"
-                        | "link"
-                        | "slot"
-                ) =>
-        {
-            match element.name().local() {
-                "input" => "HTMLInputElement",
-                "textarea" => "HTMLTextAreaElement",
-                "button" => "HTMLButtonElement",
-                "details" => "HTMLDetailsElement",
-                "dialog" => "HTMLDialogElement",
-                "img" => embedded::IMAGE,
-                "iframe" => embedded::IFRAME,
-                "a" => embedded::ANCHOR,
-                "area" => embedded::AREA,
-                "link" => embedded::LINK,
-                "slot" => slots::INTERFACE,
-                _ => "HTMLFormElement",
-            }
-        }
-        NodeKind::Element(element)
             if element.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
         {
-            "HTMLElement"
+            custom_elements::builtins::wrapper(element.name().local())
         }
         NodeKind::Element(_) => "Element",
         NodeKind::Text(_) => "Text",

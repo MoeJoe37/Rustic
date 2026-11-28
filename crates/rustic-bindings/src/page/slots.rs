@@ -8,10 +8,7 @@ use rustic_js::runtime::{Agent, JsResult, Value};
 
 use super::events::{PrivateArray, define_method, with_root};
 use super::traversal::node_of;
-use super::{
-    Page, creation, dom_exception, illegal_constructor, install_interface, read_node,
-    with_mut_tree, wrap,
-};
+use super::{Page, creation, dom_exception, install_interface, read_node, with_mut_tree, wrap};
 
 pub(super) const INTERFACE: &str = "HTMLSlotElement";
 
@@ -32,7 +29,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         INTERFACE,
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor(INTERFACE),
         0,
         &[],
         |agent, proto| {

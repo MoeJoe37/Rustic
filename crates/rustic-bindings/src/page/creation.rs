@@ -71,44 +71,46 @@ fn valid_element_name(name: &str) -> bool {
     }
 }
 
-fn has_custom_element_options(agent: &mut Agent, value: Value) -> JsResult<bool> {
-    if value.is_nullish() {
-        return Ok(false);
-    }
-    if let Some(object) = value.as_object() {
-        let key = agent.heap.key("customElementRegistry")?;
-        let registry = agent.get(object, key)?;
-        if !registry.is_nullish() {
-            return agent
-                .type_error("customElementRegistry must be a supported CustomElementRegistry");
+fn custom_element_options(
+    agent: &mut Agent,
+    document: Value,
+    value: Value,
+) -> JsResult<(Option<DomString>, Option<Value>)> {
+    let Some(object) = value.as_object() else {
+        return Ok((None, None));
+    };
+    let key = agent.heap.key("customElementRegistry")?;
+    let registry = agent.get(object, key)?;
+    let registry = super::custom_elements::convert_registry(agent, registry)?;
+    let key = agent.heap.key("is")?;
+    let value = agent.get(object, key)?;
+    let custom_is = (value != Value::UNDEFINED)
+        .then(|| string(agent, value))
+        .transpose()?;
+    if let Some(registry) = registry {
+        if custom_is.is_some() {
+            return Err(unsupported(
+                agent,
+                "is and customElementRegistry are mutually exclusive",
+            ));
         }
-        let key = agent.heap.key("is")?;
-        let is = agent.get(object, key)?;
-        if is == Value::UNDEFINED {
-            return Ok(false);
-        }
-        string(agent, is)?;
-    } else {
-        string(agent, value)?;
+        super::custom_elements::check_global(agent, document, registry)?;
     }
-    Ok(true)
+    Ok((custom_is, registry))
 }
 
 fn create_element(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
     document_receiver(agent, receiver)?;
     let name = required_arg(agent, args, 0)?;
     let name = string(agent, name)?;
-    let customized =
-        has_custom_element_options(agent, args.get(1).copied().unwrap_or(Value::UNDEFINED))?;
+    let (custom_is, registry) = custom_element_options(
+        agent,
+        receiver,
+        args.get(1).copied().unwrap_or(Value::UNDEFINED),
+    )?;
     let mut name = scalar_name(&name)?
         .filter(|name| valid_element_name(name))
         .ok_or_else(|| invalid_name(agent))?;
-    if customized {
-        return Err(unsupported(
-            agent,
-            "custom element creation options are unavailable",
-        ));
-    }
     let node = create_node(agent, Some(receiver), None, |document| {
         if document.is_html() {
             name.make_ascii_lowercase();
@@ -116,12 +118,13 @@ fn create_element(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResul
         let namespace = (document.is_html()
             || document.format() == rustic_dom::DocumentFormat::XhtmlDocument)
             .then_some(HTML_NAMESPACE);
-        element(
+        element_with_is(
             document,
             QualifiedName::from_parsed(namespace, None, &name)?,
+            custom_is,
         )
     })?;
-    super::custom_elements::created(agent, node)
+    super::custom_elements::created(agent, node, registry)
 }
 
 fn create_element_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
@@ -130,19 +133,16 @@ fn create_element_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsRe
     let qualified_name = required_arg(agent, args, 1)?;
     let namespace = to_nullable_dom_string(agent, namespace)?;
     let name = string(agent, qualified_name)?;
-    let customized =
-        has_custom_element_options(agent, args.get(2).copied().unwrap_or(Value::UNDEFINED))?;
+    let (custom_is, registry) = custom_element_options(
+        agent,
+        receiver,
+        args.get(2).copied().unwrap_or(Value::UNDEFINED),
+    )?;
     let name = qualified(agent, namespace.as_ref(), &name, false)?;
-    if customized {
-        return Err(unsupported(
-            agent,
-            "custom element creation options are unavailable",
-        ));
-    }
     let node = create_node(agent, Some(receiver), None, |document| {
-        element(document, name)
+        element_with_is(document, name, custom_is)
     })?;
-    super::custom_elements::created(agent, node)
+    super::custom_elements::created(agent, node, registry)
 }
 
 pub(super) fn qualified(
@@ -191,8 +191,16 @@ pub(super) fn qualified(
 }
 
 pub(super) fn element(document: &mut Document, name: QualifiedName) -> Result<NodeId, DomError> {
+    element_with_is(document, name, None)
+}
+
+pub(super) fn element_with_is(
+    document: &mut Document,
+    name: QualifiedName,
+    custom_is: Option<DomString>,
+) -> Result<NodeId, DomError> {
     let is_template = name.namespace() == Some(HTML_NAMESPACE) && name.local() == "template";
-    let id = document.create_element(name)?;
+    let id = document.create_element_with_is(name, custom_is)?;
     if is_template {
         if let Err(error) = document.create_template_contents(id) {
             document.destroy_subtree(id).expect("new detached template");

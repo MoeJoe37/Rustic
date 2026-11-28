@@ -214,14 +214,55 @@ impl Document {
         self.arena.get(id)
     }
 
+    /// Whether the node's shadow-including root is this document.
+    pub fn is_connected(&self, id: NodeId) -> bool {
+        let mut current = Some(id);
+        while let Some(id) = current {
+            if id == self.root {
+                return true;
+            }
+            let Ok(node) = self.node(id) else {
+                return false;
+            };
+            current = node.parent().or_else(|| node.shadow_host());
+        }
+        false
+    }
+
     /// Create an unattached element without normalizing the supplied parsed name.
     pub fn create_element(&mut self, name: QualifiedName) -> Result<NodeId, DomError> {
+        self.create_element_with_is(name, None)
+    }
+
+    /// Create an unattached element with an immutable customized built-in name.
+    pub fn create_element_with_is(
+        &mut self,
+        name: QualifiedName,
+        custom_is: Option<DomString>,
+    ) -> Result<NodeId, DomError> {
         self.arena.insert(NodeKind::Element(Element {
             name,
             attributes: Vec::new(),
+            custom_is,
+            keep_registry_null: false,
+            form_associated: false,
             template_contents: None,
             shadow_root: None,
         }))
+    }
+
+    /// Record that the element was explicitly created without a registry.
+    pub fn keep_element_registry_null(&mut self, id: NodeId) -> Result<(), DomError> {
+        self.element(id)?;
+        self.element_mut(id).keep_registry_null = true;
+        Ok(())
+    }
+
+    /// Mark a successfully constructed custom element as form-associated.
+    pub fn mark_form_associated(&mut self, id: NodeId) -> Result<(), DomError> {
+        self.element(id)?;
+        self.element_mut(id).form_associated = true;
+        Ok(())
     }
 
     /// Attach an empty shadow root to `host`, as `attachShadow` does.
@@ -455,6 +496,7 @@ impl Document {
             if !removed.is_empty() || !added.is_empty() {
                 self.push_reserved(MutationEntry::ChildList {
                     target: parent,
+                    connected: self.is_connected(parent),
                     added,
                     removed,
                     previous: None,
@@ -668,6 +710,7 @@ impl Document {
             let first = match (fragment, old.parent()) {
                 (true, _) if !moved.is_empty() => Some(MutationEntry::ChildList {
                     target: node,
+                    connected: self.is_connected(node),
                     added: Vec::new(),
                     removed: journal::nodes(&moved)?,
                     previous: None,
@@ -677,6 +720,7 @@ impl Document {
                 // when `node` is `child`.
                 (false, Some(old_parent)) => Some(MutationEntry::ChildList {
                     target: old_parent,
+                    connected: self.is_connected(old_parent),
                     added: Vec::new(),
                     removed: journal::nodes(&moved)?,
                     previous: old.previous_sibling(),
@@ -729,6 +773,7 @@ impl Document {
             }
             self.push_reserved(MutationEntry::ChildList {
                 target: parent,
+                connected: self.is_connected(parent),
                 added: moved,
                 removed,
                 previous,
@@ -777,6 +822,7 @@ impl Document {
         let removal = match (fragment, node.parent()) {
             (true, _) => Some(MutationEntry::ChildList {
                 target: child,
+                connected: self.is_connected(child),
                 added: Vec::new(),
                 removed: journal::nodes(moved)?,
                 previous: None,
@@ -784,6 +830,7 @@ impl Document {
             }),
             (false, Some(old)) => Some(MutationEntry::ChildList {
                 target: old,
+                connected: self.is_connected(old),
                 added: Vec::new(),
                 removed: journal::nodes(moved)?,
                 previous: node.previous_sibling(),
@@ -801,6 +848,7 @@ impl Document {
         }
         let insertion = MutationEntry::ChildList {
             target: parent,
+            connected: self.is_connected(parent),
             added: journal::nodes(moved)?,
             removed: Vec::new(),
             previous,
@@ -891,6 +939,7 @@ impl Document {
             if self.reserve_journal(1)? {
                 let entry = MutationEntry::ChildList {
                     target: parent,
+                    connected: self.is_connected(parent),
                     added: Vec::new(),
                     removed: journal::nodes(&[node])?,
                     previous,
@@ -984,6 +1033,7 @@ impl Document {
                 target: id,
                 name: attribute.name.clone(),
                 old_value,
+                new_value: Some(journal::copy_string(&attribute.value)?),
             })
         } else {
             None
@@ -1038,6 +1088,7 @@ impl Document {
                 target: id,
                 name: attribute.name.clone(),
                 old_value: Some(journal::copy_string(&attribute.value)?),
+                new_value: None,
             })
         } else {
             None

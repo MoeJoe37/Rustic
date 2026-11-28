@@ -64,7 +64,7 @@ the `FontFace` page test. Limits: TD-212 (vertical layout) and TD-213 (web
 fonts). Guides: [layout](LAYOUT.md#writing-modes-textwriting-m9),
 [text](TEXT.md#web-fonts).
 
-## M9 DOM — Shadow parsing, slot distribution and autonomous custom elements
+## M9 DOM — Shadow parsing, slot distribution and custom elements
 
 Document parsing attaches open and closed declarative shadow roots, including
 nested roots and roots with clonable, delegates-focus and serializable metadata.
@@ -73,9 +73,17 @@ The slot APIs preserve light-tree links and share the mutation observer
 notification checkpoint. Focused fixtures exercise every input split, fallback
 and reassignment, closed-root visibility, style scope and rendered text.
 
-The global Window registry upgrades autonomous elements and delivers lifecycle
-callbacks through the DOM mutation boundary. Remaining registry and integration
-work is recorded in [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration).
+The global Window registry upgrades autonomous elements and customized built-ins.
+Both deliver lifecycle callbacks through the DOM mutation boundary. Scoped
+registries isolate definitions and follow explicit assignment through cloning
+and import. The journal preserves the attribute value and connectivity at each
+edit for lifecycle callbacks. Form-associated custom elements use
+`ElementInternals` to submit string values, validate constraints, find labels
+and receive form callbacks. Shadow events retarget through slots and hosts,
+and delegated focus is reported through tree-scoped `activeElement` getters.
+The pinned Window WPT selection covers custom-element construction and
+internals. The HTML div interface also enables two previously failing
+`getElementById` subtests. Remaining integration work is recorded in [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration).
 See [DOM](DOM.md#shadow-roots-and-slots) and
 [scripted documents](SCRIPTING.md#shadow-dom-and-custom-elements).
 

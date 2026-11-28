@@ -156,6 +156,7 @@ impl Document {
         let insertion = match (&data, parent) {
             (Some(_), Some(parent)) => Some(MutationEntry::ChildList {
                 target: parent,
+                connected: self.is_connected(parent),
                 added: Vec::new(),
                 removed: Vec::new(),
                 previous: Some(id),
@@ -201,6 +202,7 @@ impl Document {
         // DOM splitText inserts the new node before replacing the old data.
         if let Some(MutationEntry::ChildList {
             target,
+            connected,
             removed,
             previous,
             next,
@@ -210,6 +212,7 @@ impl Document {
             added.push(new);
             self.push_entry(Some(MutationEntry::ChildList {
                 target,
+                connected,
                 added,
                 removed,
                 previous,

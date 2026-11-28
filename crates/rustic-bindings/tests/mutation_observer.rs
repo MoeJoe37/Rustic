@@ -538,3 +538,241 @@ fn upgraded_elements_keep_their_wrapper_and_receive_old_and_new_documents_on_ado
         )
         .unwrap();
 }
+
+#[test]
+fn customized_built_ins_preserve_their_name_prototype_and_creation_identity() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const early = document.createElement('button', {is:'x-button'});
+        const ordinary = document.createElement('button');
+        ordinary.setAttribute('is', 'x-button');
+        early.setAttribute('is', 'something-else');
+        document.body.append(early, ordinary);
+        let connections = 0;
+        class CustomButton extends HTMLButtonElement {
+            connectedCallback() { connections++; }
+        }
+        customElements.define('x-button', CustomButton, {extends:'button'});
+        if (!(early instanceof CustomButton) || ordinary instanceof CustomButton ||
+            early !== document.body.firstChild || connections !== 1)
+            throw 'late upgrade';
+        const direct = new CustomButton();
+        const made = document.createElement('button', {is:'x-button'});
+        const namespaced = document.createElementNS(
+            'http://www.w3.org/1999/xhtml', 'button', {is:'x-button'});
+        for (const node of [direct, made, namespaced]) {
+            if (node.localName !== 'button' || !(node instanceof HTMLButtonElement) ||
+                !(node instanceof CustomButton)) throw 'constructed base';
+        }
+        if (document.createElement('span', {is:'x-button'}) instanceof CustomButton)
+            throw 'wrong local name';
+        class WrongBase extends HTMLElement {}
+        customElements.define('x-wrong', WrongBase, {extends:'button'});
+        try {
+            new WrongBase();
+            throw 'wrong native base accepted';
+        } catch (error) {
+            if (!(error instanceof TypeError)) throw error;
+        }
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
+fn scoped_registries_initialize_null_roots_and_isolate_definitions() {
+    let (mut agent, _) = page();
+    run(
+        &mut agent,
+        r#"
+        const red = new CustomElementRegistry();
+        const blue = new CustomElementRegistry();
+        const host = document.createElement('div');
+        document.body.append(host);
+        const shadow = host.attachShadow({mode:'open', customElementRegistry:null});
+        const first = document.createElement('x-scoped', {customElementRegistry:null});
+        shadow.appendChild(first);
+        const pending = red.whenDefined('x-scoped');
+        let resolved;
+        pending.then(ctor => resolved = ctor);
+        class Red extends HTMLElement {}
+        class Blue extends HTMLElement {}
+        class Global extends HTMLElement {}
+        red.define('x-scoped', Red);
+        blue.define('x-scoped', Blue);
+        customElements.define('x-scoped', Global);
+        if (shadow.customElementRegistry !== null || first instanceof Global)
+            throw 'null registry exposed the global definition';
+        red.initialize(shadow);
+        if (shadow.customElementRegistry !== red || first.customElementRegistry !== red ||
+            !(first instanceof Red) || first instanceof Blue || first instanceof Global)
+            throw 'initialization or definition isolation';
+        const second = document.createElement('x-scoped', {customElementRegistry:blue});
+        shadow.appendChild(second);
+        if (!(second instanceof Blue) || second.customElementRegistry !== blue ||
+            !(document.createElement('x-scoped') instanceof Global) ||
+            document.customElementRegistry !== customElements)
+            throw 'element creation registry';
+        document.body.appendChild(first);
+        if (first.customElementRegistry !== red || !(first instanceof Red))
+            throw 'moving changed an assigned registry';
+        try {
+            red.define('x-special', class extends HTMLButtonElement {}, {extends:'button'});
+            throw 'scoped extends was accepted';
+        } catch (error) {
+            if (error.name !== 'NotSupportedError') throw error;
+        }
+        try {
+            new Red();
+            throw 'scoped construction outside its registry was accepted';
+        } catch (error) {
+            if (!(error instanceof TypeError)) throw error;
+        }
+    "#,
+        "if (resolved !== Red || blue.get('x-scoped') !== Blue) throw 'registry promise';",
+    );
+}
+
+#[test]
+fn scoped_registry_assignments_survive_clone_and_import() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const scope = new CustomElementRegistry();
+        class Widget extends HTMLElement {}
+        scope.define('x-scoped-copy', Widget);
+        const host = document.createElement('div');
+        const root = host.attachShadow({mode:'open', clonable:true, customElementRegistry:scope});
+        const scoped = document.createElement('x-scoped-copy', {customElementRegistry:scope});
+        root.append(scoped);
+        const shadowCopy = host.cloneNode().shadowRoot;
+        if (shadowCopy.customElementRegistry !== scope ||
+            shadowCopy.firstChild.customElementRegistry !== scope ||
+            !(shadowCopy.firstChild instanceof Widget) || shadowCopy.firstChild === scoped)
+            throw 'clonable shadow assignment';
+        const other = document.implementation.createHTMLDocument();
+        const wrapper = other.createElement('div');
+        const unset = other.createElement('x-scoped-copy');
+        const explicitNull = other.createElement('x-scoped-copy', {customElementRegistry:null});
+        wrapper.append(unset, explicitNull);
+        const imported = document.importNode(wrapper, {customElementRegistry:scope});
+        if (!(imported.firstChild instanceof Widget) ||
+            imported.firstChild.customElementRegistry !== scope ||
+            imported.lastChild.customElementRegistry !== null ||
+            imported.lastChild instanceof Widget)
+            throw 'fallback registry changed an explicit null or missed an unset registry';
+        if (document.importNode(wrapper, {selfOnly:true, customElementRegistry:scope}).firstChild)
+            throw 'selfOnly';
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
+fn form_associated_custom_elements_participate_in_forms_validation_and_reset() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const form = document.createElement('form');
+        const fieldset = document.createElement('fieldset');
+        const label = document.createElement('label');
+        label.setAttribute('for', 'postal-code');
+        form.append(fieldset, label);
+        document.body.append(form);
+        const changes = [];
+        let invalid = 0;
+        class AddressField extends HTMLElement {
+            static formAssociated = true;
+            constructor() {
+                super();
+                this.internals = this.attachInternals();
+                this.internals.setFormValue('10001');
+            }
+            formAssociatedCallback(form) { changes.push(form ? 'associated' : 'disassociated'); }
+            formDisabledCallback(disabled) { changes.push(disabled ? 'disabled' : 'enabled'); }
+            formResetCallback() { changes.push('reset'); }
+        }
+        customElements.define('x-address', AddressField);
+        const field = document.createElement('x-address');
+        field.id = 'postal-code';
+        field.setAttribute('name', 'postal');
+        field.addEventListener('invalid', () => invalid++);
+        fieldset.append(field);
+        const internals = field.internals;
+        const labels = internals.labels;
+        if (internals.form !== form || form.elements[1] !== field || !internals.willValidate ||
+            labels.length !== 1 || labels[0] !== label) throw 'form or label owner';
+        label.remove();
+        if (labels.length !== 0) throw 'labels is not live';
+        const validity = internals.validity;
+        internals.setValidity({valueMissing:true, patternMismatch:true}, 'Postal code required');
+        if (validity.valid || !validity.valueMissing || !validity.patternMismatch ||
+            internals.validationMessage !== 'Postal code required' || form.checkValidity() ||
+            internals.reportValidity() || invalid !== 2) throw 'constraint validation';
+        fieldset.setAttribute('disabled', '');
+        if (internals.willValidate || !form.checkValidity()) throw 'fieldset disables validation';
+        fieldset.removeAttribute('disabled');
+        internals.setValidity({});
+        if (!validity.valid || internals.validationMessage !== '') throw 'validity reset';
+        form.requestSubmit();
+        form.reset();
+        field.remove();
+        if (internals.form !== null ||
+            changes.join() !== 'associated,disabled,enabled,reset,disassociated')
+            throw changes.join();
+    "#,
+        )
+        .unwrap();
+    let submissions = page::take_form_submissions(&agent);
+    assert_eq!(
+        submissions.submissions[0].entries,
+        [("postal".to_owned(), "10001".to_owned())]
+    );
+}
+
+#[test]
+fn registered_custom_elements_can_disable_shadow_and_internals() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        let attempted = 0;
+        class Disabled extends HTMLElement {
+            static disabledFeatures = ['shadow', 'internals'];
+            constructor() {
+                super();
+                for (const initialize of [
+                    () => this.attachShadow({mode:'open'}),
+                    () => this.attachInternals()
+                ]) {
+                    try {
+                        initialize();
+                        throw 'feature was enabled';
+                    } catch (error) {
+                        if (error.name !== 'NotSupportedError') throw error;
+                        attempted++;
+                    }
+                }
+            }
+        }
+        customElements.define('x-disabled', Disabled);
+        if (!(document.createElement('x-disabled') instanceof Disabled) || attempted !== 2)
+            throw 'definition features';
+        class Host extends HTMLElement {
+            constructor() {
+                super();
+                const shadow = this.attachShadow({mode:'closed'});
+                if (this.attachInternals().shadowRoot !== shadow || this.shadowRoot !== null)
+                    throw 'closed root internal visibility';
+            }
+        }
+        customElements.define('x-internals', Host);
+        if (!(new Host() instanceof Host)) throw 'direct constructor';
+    "#,
+        )
+        .unwrap();
+}

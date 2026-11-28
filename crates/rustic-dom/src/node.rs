@@ -33,6 +33,9 @@ impl Attribute {
 pub struct Element {
     pub(crate) name: QualifiedName,
     pub(crate) attributes: Vec<Attribute>,
+    pub(crate) custom_is: Option<DomString>,
+    pub(crate) keep_registry_null: bool,
+    pub(crate) form_associated: bool,
     pub(crate) template_contents: Option<NodeId>,
     pub(crate) shadow_root: Option<(NodeId, ShadowRootOptions)>,
 }
@@ -71,6 +74,10 @@ pub struct ShadowRootOptions {
     pub slot_assignment: SlotAssignment,
     /// Whether the parser attached the root declaratively.
     pub declarative: bool,
+    /// Whether the root starts with a null custom element registry.
+    pub keep_registry_null: bool,
+    /// Whether ElementInternals can return this root to its host.
+    pub available_to_internals: bool,
 }
 
 impl ShadowRootOptions {
@@ -83,6 +90,8 @@ impl ShadowRootOptions {
             serializable: false,
             slot_assignment: SlotAssignment::Named,
             declarative: false,
+            keep_registry_null: false,
+            available_to_internals: false,
         }
     }
 }
@@ -91,6 +100,21 @@ impl Element {
     /// Element name supplied by the parser.
     pub fn name(&self) -> &QualifiedName {
         &self.name
+    }
+
+    /// The customized built-in name captured at element creation.
+    pub fn custom_is(&self) -> Option<&DomString> {
+        self.custom_is.as_ref()
+    }
+
+    /// Whether the parser or creation options explicitly require a null registry.
+    pub fn keeps_registry_null(&self) -> bool {
+        self.keep_registry_null
+    }
+
+    /// Whether an upgraded custom element participates in HTML forms.
+    pub fn is_form_associated_custom(&self) -> bool {
+        self.form_associated
     }
 
     /// Stable insertion order; replacing an attribute preserves its position.
@@ -192,7 +216,11 @@ impl NodeKind {
         match self {
             Self::Document | Self::DocumentFragment => Ok(0),
             Self::Element(element) => element.attributes.iter().try_fold(
-                element.name.data_bytes()?,
+                element
+                    .name
+                    .data_bytes()?
+                    .checked_add(element.custom_is.as_ref().map_or(0, DomString::data_bytes))
+                    .ok_or(DomError::DataLimit)?,
                 |total, attribute| {
                     total
                         .checked_add(attribute.data_bytes()?)

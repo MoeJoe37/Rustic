@@ -229,6 +229,7 @@ impl Document {
             }
             let entry = MutationEntry::ChildList {
                 target,
+                connected: source.is_connected(target),
                 added: Vec::new(),
                 removed,
                 previous,
@@ -318,6 +319,7 @@ impl Document {
             };
             Some(MutationEntry::ChildList {
                 target: parent,
+                connected: self.is_connected(parent),
                 added: super::journal::nodes(roots)?,
                 removed: Vec::new(),
                 previous,
@@ -473,7 +475,7 @@ fn snapshot(
                 .map_err(|_| DomError::AllocationFailed)?;
             plan.push(Planned {
                 source: id,
-                kind: copy_kind(node.kind()),
+                kind: copy_kind(node.kind(), adopting),
                 link,
             });
             parents.push(index);
@@ -504,13 +506,16 @@ fn snapshot(
 }
 
 /// Copy a payload; template links are rebuilt by the materializer.
-fn copy_kind(kind: &NodeKind) -> NodeKind {
+fn copy_kind(kind: &NodeKind, adoption: bool) -> NodeKind {
     match kind {
         NodeKind::Document => NodeKind::Document,
         NodeKind::DocumentFragment => NodeKind::DocumentFragment,
         NodeKind::Element(element) => NodeKind::Element(Element {
             name: element.name.clone(),
             attributes: element.attributes.clone(),
+            custom_is: element.custom_is.clone(),
+            keep_registry_null: element.keep_registry_null,
+            form_associated: adoption && element.form_associated,
             template_contents: None,
             shadow_root: None,
         }),

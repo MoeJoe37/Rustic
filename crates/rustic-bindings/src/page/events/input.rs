@@ -5,7 +5,7 @@ use rustic_dom::{
 };
 use rustic_js::runtime::{Agent, JsResult, NativeFn, PropertyDescriptor, Value};
 
-use super::super::{illegal_constructor, with_mut_tree};
+use super::super::with_mut_tree;
 use super::{
     Event, PrivateArray, Target, fire, install_interface, read_node, state, ui, with_page,
     with_root, wrap,
@@ -443,7 +443,7 @@ pub(in crate::page) fn install_controls(agent: &mut Agent) -> JsResult<()> {
         agent,
         "HTMLInputElement",
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor("HTMLInputElement"),
         0,
         &[],
         |agent, proto| {

@@ -25,6 +25,8 @@ pub enum MutationEntry {
     ChildList {
         /// The parent whose children changed.
         target: NodeId,
+        /// Whether the parent was connected at the time of the change.
+        connected: bool,
         /// Inserted nodes, in tree order.
         added: Vec<NodeId>,
         /// Removed nodes, in their former tree order.
@@ -42,6 +44,8 @@ pub enum MutationEntry {
         name: QualifiedName,
         /// The value before the change; `None` for a new attribute.
         old_value: Option<DomString>,
+        /// The value after the change, or none for a removed attribute.
+        new_value: Option<DomString>,
     },
     /// A `characterData` record: a character-data value was replaced.
     CharacterData {

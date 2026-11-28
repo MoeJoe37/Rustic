@@ -163,6 +163,8 @@ impl TreeBuilder {
         };
         let options = ShadowRootOptions {
             declarative: true,
+            available_to_internals: true,
+            keep_registry_null: attr("shadowrootcustomelementregistry").is_some(),
             clonable: attr("shadowrootclonable").is_some(),
             delegates_focus: attr("shadowrootdelegatesfocus").is_some(),
             serializable: attr("shadowrootserializable").is_some(),
@@ -194,8 +196,24 @@ impl TreeBuilder {
             }
             Ns::MathMl => QualifiedName::from_parsed(Some(MATHML_NAMESPACE), None, tag.name())?,
         };
-        let id = self.document.create_element(name)?;
+        let custom_is = if ns == Ns::Html {
+            tag.attributes()
+                .iter()
+                .find(|attr| attr.name() == "is")
+                .map(|attr| rustic_dom::DomString::from(attr.value()))
+        } else {
+            None
+        };
+        let id = self.document.create_element_with_is(name, custom_is)?;
         let result = (|| {
+            if ns == Ns::Html
+                && tag
+                    .attributes()
+                    .iter()
+                    .any(|attr| attr.name() == "customelementregistry")
+            {
+                self.document.keep_element_registry_null(id)?;
+            }
             for attribute in tag.attributes() {
                 let name = match ns {
                     Ns::Html => QualifiedName::from_parsed(None, None, attribute.name())?,

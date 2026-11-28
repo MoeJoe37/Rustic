@@ -280,7 +280,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: text fields and checkable inputs paint their live value and checkedness (since 2026-11-28), but there is no selectedness (no `HTMLSelectElement`/`HTMLOptionElement`), no caret and no text scrolling in fields, `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
 | TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; images without a box are not requested; `decode()` settles at once (rejecting unrequested images); no `iframe.contentWindow`/`contentDocument`, URL decomposition on `a`/`area`, or token lists besides `classList`, `sandbox` and `relList` | Partly paid 2026-11-28 (image request state, rendered size, CORS settings, `a`/`area`/`link` with `relList`); open, M9 |
 | TD-215 | Deliberate | DOM | Ranges without `Selection`, `getElementsByName` or `Range` geometry; live-range nodes stay roots one collection after their object dies; six heavy range WPT pages exceed the script turn budget | Open, `dom.ranges` (M9) |
-| TD-222 | Deliberate | DOM | Shadow DOM and custom element integration | Open, `dom.shadow` and web parity |
+| TD-222 | Deliberate | DOM | Shadow DOM and custom element integration | Partly paid, web parity |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -3693,21 +3693,22 @@ MATH table.
 
 ### TD-222 — Shadow DOM and custom element integration
 
-The global registry covers autonomous elements. Customized built-ins, scoped
-registries, `ElementInternals` and form-associated lifecycle callbacks remain
-open. Reactions use the flushed DOM journal, which cannot replay intermediate
-tree connectivity or attribute values from batched edits. The parser upgrades
-at script checkpoints. Exact reaction-stack order and synchronous parser
-construction still need conformance coverage. Adoption follows document
-ownership changes for upgraded elements.
+Global and scoped registries support element creation and upgrade, including
+customized built-ins in the global registry. `ElementInternals` supports
+form association, validation, labels, string submission values and eligible
+closed shadow roots. Reactions use journal snapshots of connectivity and
+attribute values. Parser upgrades run at script checkpoints. The exact
+reaction stack and synchronous parser construction still need broader
+conformance work. Forms still need File and FormData values, state restoration,
+custom state selectors and ElementInternals accessibility defaults.
 
-Shadow initialization stores focus and serialization flags. Focus delegation,
-HTML serialization and the opt-in fragment parsing entry points remain open.
-The event path still needs shadow retargeting, closed-tree `composedPath()`
-filtering and slot-aware propagation. Slot notifications compare distributions
-across binding and parser boundaries, so intermediate changes within one batch
-can coalesce without a notification. Manual assignments survive adoption when
-both endpoints move together.
+Shadow events retarget targets and focus-related targets, with slot-aware
+propagation and closed-tree path filtering. Programmatic focus delegates into
+shadow trees and active elements are exposed per tree. Sequential focus across
+shadow scopes, HTML serialization and opt-in fragment parsing remain open.
+Slot notifications compare distributions across binding and parser boundaries.
+A batch can coalesce intermediate slot assignments. Manual assignments
+survive adoption when both endpoints move together.
 
 **Pay:** implement the remaining algorithms and verify them with pinned shadow
 DOM and custom element Web Platform Tests.

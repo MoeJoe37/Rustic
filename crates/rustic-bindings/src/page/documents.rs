@@ -16,9 +16,9 @@ use crate::webidl::to_nullable_dom_string;
 
 use super::creation::{document_receiver, element, exception, invalid_name, qualified, string};
 use super::{
-    AuxiliaryDocument, document_element_id, finish_creation, identity, illegal_constructor,
-    insert_node, install_interface, prototype, quirks_mode, read_node, required_arg, with_mut_tree,
-    with_page, wrap, wrap_using,
+    AuxiliaryDocument, custom_elements, document_element_id, finish_creation, identity,
+    illegal_constructor, insert_node, install_interface, prototype, quirks_mode, read_node,
+    required_arg, with_mut_tree, with_page, wrap, wrap_using,
 };
 
 const IMPLEMENTATION: &str = "DOMImplementation";
@@ -558,46 +558,95 @@ fn import_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<V
     document_receiver(agent, receiver)?;
     let value = required_arg(agent, args, 0)?;
     read_node(agent, value, |_, _, _, _, _| Ok(()))?;
-    let deep = import_subtree(agent, args.get(1).copied())?;
-    with_mut_tree(agent, receiver, |agent, target, wrappers, root| {
+    let (deep, requested) = import_options(agent, args.get(1).copied())?;
+    let fallback = if let Some(scope) = requested.filter(|scope| *scope != Value::NULL) {
+        custom_elements::check_global(agent, receiver, scope)?;
+        scope
+    } else {
+        custom_elements::registry_of(agent, receiver, &[])?
+    };
+    let copy = with_mut_tree(agent, receiver, |agent, target, wrappers, root| {
         let node = identity(agent, wrappers, value, WrapperKind::Node)?;
-        let copy = if node.document() == root.document() {
-            charge_clone(agent, target, node, deep)?;
-            target.clone_node(node, deep)
+        if node.document() == root.document() {
+            clone_in_document(agent, target, wrappers, node, deep, fallback)
         } else {
-            let id = with_page(agent, |agent, page| {
+            with_page(agent, |agent, page| {
                 page.read(agent, node.document(), |agent, source| {
                     charge_clone(agent, source, node, deep)?;
-                    target
+                    let copy = target
                         .import_node(source, node, deep)
-                        .map_err(|error| dom_exception::from_dom_error(agent, error))
+                        .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+                    let scopes = custom_elements::copy_scopes(
+                        agent,
+                        wrappers,
+                        (source, node),
+                        (target, copy),
+                        deep,
+                        fallback,
+                    );
+                    finish_copy(agent, target, wrappers, copy, scopes)
                 })
-            })?;
-            Ok(id)
+            })
         }
-        .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-        finish_creation(agent, target, wrappers, copy, None)
-    })
+    })?;
+    custom_elements::upgrade_copy(agent, copy)
 }
 
-fn import_subtree(agent: &mut Agent, option: Option<Value>) -> JsResult<bool> {
+fn clone_in_document(
+    agent: &mut Agent,
+    document: &mut Document,
+    wrappers: &mut crate::heap::DomHeap,
+    node: NodeId,
+    deep: bool,
+    fallback: Value,
+) -> JsResult<Value> {
+    charge_clone(agent, document, node, deep)?;
+    let copy = document
+        .clone_node(node, deep)
+        .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+    let scopes = custom_elements::copy_scopes(
+        agent,
+        wrappers,
+        (document, node),
+        (document, copy),
+        deep,
+        fallback,
+    );
+    finish_copy(agent, document, wrappers, copy, scopes)
+}
+
+fn finish_copy(
+    agent: &mut Agent,
+    document: &mut Document,
+    wrappers: &mut crate::heap::DomHeap,
+    copy: NodeId,
+    scopes: JsResult<()>,
+) -> JsResult<Value> {
+    if let Err(error) = scopes {
+        document
+            .destroy_subtree(copy)
+            .expect("detached node from clone");
+        return Err(error);
+    }
+    finish_creation(agent, document, wrappers, copy, None)
+}
+
+fn import_options(agent: &mut Agent, option: Option<Value>) -> JsResult<(bool, Option<Value>)> {
     let Some(option) = option.filter(|&value| value != Value::UNDEFINED) else {
-        return Ok(false);
+        return Ok((false, None));
     };
     if option == Value::NULL {
-        return Ok(true);
+        return Ok((true, None));
     }
     if let Some(object) = option.as_object() {
         let key = agent.heap.key("customElementRegistry")?;
-        if agent.get(object, key)? != Value::UNDEFINED {
-            return agent
-                .type_error("customElementRegistry must be a supported CustomElementRegistry");
-        }
+        let value = agent.get(object, key)?;
+        let registry = custom_elements::convert_registry(agent, value)?;
         let key = agent.heap.key("selfOnly")?;
         let value = agent.get(object, key)?;
-        return Ok(!agent.to_boolean(value));
+        return Ok((!agent.to_boolean(value), registry));
     }
-    Ok(agent.to_boolean(option))
+    Ok((agent.to_boolean(option), None))
 }
 
 fn charge_clone(agent: &mut Agent, document: &Document, node: NodeId, deep: bool) -> JsResult<()> {
@@ -628,15 +677,34 @@ pub(super) fn clone_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> 
         Ok(Some((copy, quirks)))
     })?;
     if let Some((copy, quirks)) = copy {
-        return register(agent, copy, None, quirks, None);
+        let copy = register(agent, copy, None, quirks, None)?;
+        return super::events::with_root(agent, copy, |agent| {
+            with_page(agent, |agent, page| {
+                let Ok(mut wrappers) = page.wrappers.try_borrow_mut() else {
+                    return agent.type_error("DOM bindings are busy");
+                };
+                let original = identity(agent, &wrappers, receiver, WrapperKind::Node)?;
+                let target = identity(agent, &wrappers, copy, WrapperKind::Node)?;
+                page.read(agent, original.document(), |agent, source| {
+                    page.read(agent, target.document(), |agent, document| {
+                        custom_elements::copy_scopes(
+                            agent,
+                            &mut wrappers,
+                            (source, original),
+                            (document, target),
+                            deep,
+                            Value::NULL,
+                        )
+                    })
+                })
+            })?;
+            custom_elements::upgrade_copy(agent, copy)
+        });
     }
-    with_mut_tree(agent, receiver, |agent, document, wrappers, node| {
-        charge_clone(agent, document, node, deep)?;
-        let copy = document
-            .clone_node(node, deep)
-            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-        finish_creation(agent, document, wrappers, copy, None)
-    })
+    let copy = with_mut_tree(agent, receiver, |agent, document, wrappers, node| {
+        clone_in_document(agent, document, wrappers, node, deep, Value::NULL)
+    })?;
+    custom_elements::upgrade_copy(agent, copy)
 }
 
 pub(super) fn charge_copy(

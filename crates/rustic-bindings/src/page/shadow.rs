@@ -17,7 +17,17 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         0,
         &[
             ("host", "get host", host),
+            (
+                "activeElement",
+                "get activeElement",
+                events::shadow_active_element,
+            ),
             ("mode", "get mode", mode),
+            (
+                "customElementRegistry",
+                "get customElementRegistry",
+                super::custom_elements::registry_of,
+            ),
             ("delegatesFocus", "get delegatesFocus", delegates_focus),
             ("clonable", "get clonable", clonable),
             ("serializable", "get serializable", serializable),
@@ -54,6 +64,9 @@ fn attach(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value>
     let key = agent.heap.key("clonable")?;
     let value = agent.get(object, key)?;
     let clonable = agent.to_boolean(value);
+    let key = agent.heap.key("customElementRegistry")?;
+    let scope = agent.get(object, key)?;
+    let scope = super::custom_elements::convert_registry(agent, scope)?;
     let key = agent.heap.key("delegatesFocus")?;
     let value = agent.get(object, key)?;
     let delegates_focus = agent.to_boolean(value);
@@ -78,7 +91,24 @@ fn attach(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value>
             _ => return agent.type_error("invalid slot assignment mode"),
         }
     };
+    let scope = if let Some(scope) = scope {
+        let owner = super::custom_elements::owner_document(agent, receiver)?;
+        super::custom_elements::check_global(agent, owner, scope)?;
+        scope
+    } else {
+        let id = super::traversal::node_of(agent, receiver)?;
+        super::custom_elements::owner_registry(agent, id)?
+    };
+    if !super::custom_elements::shadow_allowed(agent, receiver)? {
+        return Err(creation::exception(
+            agent,
+            "NotSupportedError",
+            "custom element definition disables shadow",
+        ));
+    }
     let options = ShadowRootOptions {
+        available_to_internals: super::custom_elements::is_constructed(agent, receiver)?,
+        keep_registry_null: scope == Value::NULL,
         clonable,
         delegates_focus,
         serializable,
@@ -102,7 +132,9 @@ fn attach(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value>
                 ),
                 _ => dom_exception::from_dom_error(agent, error),
             })?;
-        wrap(wrappers, agent, doc, root)
+        let value = wrap(wrappers, agent, doc, root)?;
+        super::custom_elements::set_registry(agent, value, scope)?;
+        Ok(value)
     })
 }
 

@@ -1010,6 +1010,46 @@ fn lazy_images_load_only_near_the_viewport() {
 }
 
 #[test]
+fn image_elements_expose_their_current_request_to_scripts() {
+    let png = |w: u32, h: u32| {
+        let surface =
+            rustic_raster::Surface::new(w, h, rustic_raster::RasterLimits::default()).unwrap();
+        rustic_raster::encode_png(&surface, usize::MAX).unwrap()
+    };
+    let base = std::env::temp_dir().join(format!("rustic-cli-imgstate-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("large.png"), png(160, 80)).unwrap();
+    fs::write(base.join("broken.png"), b"not a png").unwrap();
+    let path = base.join("page.html");
+    fs::write(
+        &path,
+        "<style>* {margin:0} img {display:block}</style>\
+         <img id=a srcset='large.png 2x'><img id=b src=broken.png><img id=c>\
+         <img id=d src=large.png style='width:20px;height:10px'>\
+         <script>\
+         const [a, b, c, d] = ['a', 'b', 'c', 'd'].map(id => document.getElementById(id));\
+         const out = [a.naturalWidth, a.naturalHeight, a.width, a.complete,\
+           a.currentSrc.endsWith('/large.png'), b.naturalWidth, b.complete, c.complete,\
+           c.currentSrc === '', d.width, d.height, d.naturalWidth];\
+         d.width = 33;\
+         out.push(d.getAttribute('width'));\
+         Promise.all([a.decode().then(() => 'ok'), b.decode().catch(e => e.name)])\
+           .then(r => document.body.setAttribute('data-out', out.concat(r).join()));\
+         </script>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-dom", "--run-scripts", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dom = String::from_utf8_lossy(&output.stdout);
+    // `a` picks its 2x candidate: 160x80 image pixels, 80x40 CSS pixels.
+    assert!(
+        dom.contains("value=\"80,40,80,true,true,0,true,true,true,20,10,160,33,ok,EncodingError\""),
+        "{dom}"
+    );
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
 fn srcset_sizes_and_picture_sources_choose_the_image_and_its_density() {
     let png = |w: u32, h: u32| {
         let surface =

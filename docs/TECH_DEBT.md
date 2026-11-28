@@ -273,11 +273,11 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-213 | Deliberate | Text | Web fonts load before the first layout (no `font-display` periods or relayout on arrival); `local()` matches family names; script-created `FontFace`s cannot fetch and do not reach layout | Open, `text.writing` (M9) |
 | TD-214 | Deliberate | CSSOM | `element.style` keeps declarations as written in the `style` attribute: shorthands are not expanded into longhands, values are not normalized, and only longhands have IDL attributes | Open, CSSOM (M9) |
 | TD-216 | Deliberate | HTML | Dialogs and popovers without `::backdrop` or real top-layer painting (a maximal `z-index`); Escape is the only close request (no close-watcher grouping or history-gesture protection); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks | Partly paid 2026-11-28 (focus steps, inertness, light dismiss, Escape, attribute change steps); rest with CSS generated content (M9) |
-| TD-217 | Deliberate | HTML | Image source selection at load only: no reselection on resize, no `currentSrc`, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Open, `html.elements` (M9) |
+| TD-217 | Deliberate | HTML | Image source selection at layout only: no reselection on resize without a new layout, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Partly paid 2026-11-28 (`currentSrc`); open, M9 CSS/layout |
 | TD-221 | Deliberate | CSS, MathML | Multi-column without `column-span`, column rules, nested multi-column containers or fragmented box decorations; ruby as paired inline flex columns (no `ruby-position`, `ruby-align`, `rtc`, overhang or line-height adjustment); MathML Core approximated with CSS boxes (no operator dictionary, stretchy operators, `math-depth`, script shifts from the MATH table or `mspace`/`mpadded` attributes) | Open, `layout.formats` (M9) |
 | TD-220 | Deliberate | SVG | Inline SVG without text, gradients and patterns (their first stop's color paints), clipping, masks, markers, filters, dashes, `fill-rule: evenodd`, author style sheets or SVG images (`<img src=x.svg>`, CSS); `use` of symbols only by id in the same document; group opacity multiplies into each shape | Open, `paint.formats` (M9) |
 | TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: controls render from content attributes (no dirty value, checkedness or selectedness from script, no caret, no text scrolling in fields), `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
-| TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; `img` and `iframe` without rendered `width`/`height`, `naturalWidth`, `complete`, `decode()`, `crossOrigin` or `contentWindow`; `relList` and other token lists besides `classList` and `sandbox` | Open, `html.elements` (M9) |
+| TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; images without a box are not requested; `decode()` settles at once (rejecting unrequested images); no `iframe.contentWindow`/`contentDocument`, URL decomposition on `a`/`area`, or token lists besides `classList`, `sandbox` and `relList` | Partly paid 2026-11-28 (image request state, rendered size, CORS settings, `a`/`area`/`link` with `relList`); open, M9 |
 | TD-215 | Deliberate | DOM | Ranges without `Selection`, `getElementsByName` or `Range` geometry; live-range nodes stay roots one collection after their object dies; six heavy range WPT pages exceed the script turn budget | Open, `dom.ranges` (M9) |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
@@ -3595,11 +3595,12 @@ generated content), close-watcher grouping, and a details slot (with
 ### TD-217 — Image source selection subset
 `img` and `picture` sources (PAINT.md) are chosen once, when the document's
 images load: a resize or a change of device pixel ratio does not select
-again, and `currentSrc` is not exposed. `sizes` accepts `px`, `em`, `rem`,
+again (`currentSrc`, exposed since 2026-11-28, names the candidate the last
+layout chose). `sizes` accepts `px`, `em`, `rem`,
 `vw` and `vh` lengths (no `calc()` or `sizes=auto`), `h` descriptors are
 ignored, and `source type` accepts the formats `rustic-codecs` decodes.
-**Pay:** reselect on viewport changes, expose `currentSrc`, and resolve
-source sizes with the full length grammar.
+**Pay:** reselect on viewport changes and resolve source sizes with the
+full length grammar.
 
 ### TD-218 — Embedded content subset
 `loading=lazy` (HTML §2.5.7) is decided per render: an image or iframe
@@ -3608,12 +3609,21 @@ scroll position is not loaded in that render (up to four layout rounds
 load images that earlier loads brought near). The live window does not yet
 resume lazy loads as it scrolls, other than by rendering again.
 `HTMLImageElement` and `HTMLIFrameElement` reflect their content
-attributes (`width` and `height` of `img` are not exposed; the rendered
-size, `naturalWidth`, `complete`, `decode()`, `crossOrigin` and
-`contentWindow` are missing). `DOMTokenList` backs `classList` and
-`iframe.sandbox` only; `relList` and the other token lists are missing.
-**Pay:** resume lazy loads from scrolling, add the image state and
-rendered-size attributes, and the remaining token lists.
+attributes. Paid 2026-11-28: an image's current request comes from the
+host's last image load through a layout read (`PageTree::image_state`):
+`currentSrc`, `naturalWidth`/`naturalHeight` (density-corrected),
+`complete` and `decode()`, with `width`/`height` reading the rendered
+size; `crossOrigin` reflects as a CORS settings attribute; and
+`HTMLAnchorElement`, `HTMLAreaElement` and `HTMLLinkElement` exist with
+`relList`. Still open: only images with a box are requested (a
+`display:none` image stays incomplete), `decode()` settles at once and
+rejects an image the load did not request (a deferred lazy image) instead
+of waiting, `load`/`error` events do not fire at images, `iframe` has no
+`contentWindow`/`contentDocument`, `a`/`area` lack URL decomposition
+(`protocol`, `host`, ...) and token lists other than `classList`,
+`sandbox` and `relList` are missing. **Pay:** resume lazy loads from
+scrolling, image request tasks with `load`/`error` events and pending
+`decode()`, frame windows, and the remaining hyperlink members.
 
 ### TD-219 — Form-control and list rendering subset
 Form controls lay out as inline-blocks from the UA sheet (HTML §15.5) and

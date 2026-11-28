@@ -408,7 +408,14 @@ same turn budget, so a single call cannot run unmetered.
   attribute's ordered token set, `[SameObject]` per element, behind
   `Element.classList` and `HTMLIFrameElement.sandbox` (whose `supports()`
   knows the sandbox keywords). `loading=lazy` images and iframes load only
-  within 1250px of the viewport (PAINT.md, lazy loading). Limits: TD-218.
+  within 1250px of the viewport (PAINT.md, lazy loading). An image's
+  `currentSrc`, `naturalWidth`/`naturalHeight`, `complete` and `decode()`
+  read the host's last image load through a layout read, `width`/`height`
+  the rendered size, and `crossOrigin` reflects as a CORS settings
+  attribute. `HTMLAnchorElement`, `HTMLAreaElement` and `HTMLLinkElement`
+  reflect their hyperlink attributes and have `relList` (`supports()`
+  knows `stylesheet`/`alternate` on `link` and `noopener`/`noreferrer`/
+  `opener` on `a`/`area`). Limits: TD-217, TD-218.
 - **Inline style** (CSSOM §6.7, `page/inline_style.rs`). `element.style`
   returns one `CSSStyleDeclaration` per element whose only store is the
   `style` attribute: reads parse it, writes serialize it back, so the cascade

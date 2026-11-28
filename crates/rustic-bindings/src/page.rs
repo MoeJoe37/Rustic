@@ -92,6 +92,18 @@ pub struct BoxSizes {
     pub padding: [f64; 2],
 }
 
+/// What the host's last image load knows about an `img` element's current
+/// request (HTML §4.8.4.1): the URL source selection chose, and the
+/// density-corrected natural size when the image decoded (`None` when it
+/// is broken).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ImageState {
+    /// The selected source's absolute URL (`currentSrc`).
+    pub current_src: String,
+    /// Natural width and height in CSS pixels, when the image decoded.
+    pub natural_size: Option<[f64; 2]>,
+}
+
 /// The serialized CSSOM values of one element.
 #[derive(Clone, Debug, Default)]
 pub struct ComputedStyleRecord {
@@ -256,6 +268,11 @@ pub trait PageTree: Debug {
     }
     /// The element's untransformed box sizes, or `None` without a layout box.
     fn box_sizes(&self, _node: NodeId) -> Result<Option<BoxSizes>, LayoutReadError> {
+        Ok(None)
+    }
+    /// The state of an `img` element's current request after the host's
+    /// last image load, or `None` when it has not requested an image.
+    fn image_state(&self, _node: NodeId) -> Result<Option<ImageState>, LayoutReadError> {
         Ok(None)
     }
     /// Whether a subtree may move out of the main document, within the turn budget.
@@ -1128,6 +1145,9 @@ fn wrap(
                         | "dialog"
                         | "img"
                         | "iframe"
+                        | "a"
+                        | "area"
+                        | "link"
                 ) =>
         {
             match element.name().local() {
@@ -1138,6 +1158,9 @@ fn wrap(
                 "dialog" => "HTMLDialogElement",
                 "img" => embedded::IMAGE,
                 "iframe" => embedded::IFRAME,
+                "a" => embedded::ANCHOR,
+                "area" => embedded::AREA,
+                "link" => embedded::LINK,
                 _ => "HTMLFormElement",
             }
         }
@@ -1239,7 +1262,7 @@ fn bounding_client_rect(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsRe
     dom_rect::new_mutable(agent, rect)
 }
 
-fn read_layout<T>(
+pub(super) fn read_layout<T>(
     agent: &mut Agent,
     receiver: Value,
     html_only: bool,

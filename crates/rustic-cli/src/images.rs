@@ -69,6 +69,9 @@ pub struct LoadedImages {
     pub images: HashMap<NodeId, Arc<Image>>,
     /// Natural sizes to apply with [`BoxTree::set_natural_sizes`].
     pub sizes: Vec<(NodeId, NaturalSize)>,
+    /// Each requested `img` element's selected absolute URL, decoded or
+    /// not (`currentSrc`).
+    pub sources: HashMap<NodeId, String>,
 }
 
 /// Read at most `max` bytes of `path` in `chunk`-sized reads; `None` if the
@@ -233,6 +236,7 @@ pub(crate) fn load_applied(
         let Ok(url) = Url::parse(&src, base.as_ref()) else {
             continue;
         };
+        loaded.sources.insert(node, url.serialize());
         // Snapshot keys use the resolved URL before filesystem inspection.
         // If a previously applied file is replaced or removed, that change
         // cannot leak into a later DOM-triggered layout recomputation.

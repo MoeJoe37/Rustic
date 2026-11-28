@@ -60,6 +60,9 @@ pub struct LayoutGeometry {
     /// it (not for fixed boxes), and the scroll containers on its
     /// containing-block chain whose positions move it.
     pub scroll_chains: HashMap<NodeId, (bool, Vec<NodeId>)>,
+    /// The current request of each `img` element the layout's image load
+    /// requested (HTML §4.8.4.1). Elements without an entry have none.
+    pub images: HashMap<NodeId, rustic_bindings::page::ImageState>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

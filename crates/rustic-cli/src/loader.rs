@@ -2609,7 +2609,7 @@ impl LocalLayout {
         mode: DocumentMode,
         animations: Option<&RefCell<rustic_style::AnimationController>>,
     ) -> Result<LayoutGeometry, LayoutReadError> {
-        let (tree, layout, viewport, _, styles, _) = block_layout(LayoutInput {
+        let (tree, layout, viewport, loaded, styles, _) = block_layout(LayoutInput {
             document,
             mode,
             encoding: self.encoding,
@@ -2697,8 +2697,34 @@ impl LocalLayout {
             viewport_scroll_range,
             viewport_size: [viewport.width().get(), viewport.height().get()],
             scroll_chains,
+            images: image_states(&loaded),
         })
     }
+}
+
+/// The current request of each `img` the layout's image load requested.
+fn image_states(
+    loaded: &crate::images::LoadedImages,
+) -> HashMap<rustic_dom::NodeId, rustic_engine::ImageState> {
+    let sizes: HashMap<_, _> = loaded.sizes.iter().copied().collect();
+    loaded
+        .sources
+        .iter()
+        .map(|(&node, url)| {
+            let natural_size = loaded.images.contains_key(&node).then(|| {
+                sizes
+                    .get(&node)
+                    .and_then(|size| Some([size.width()?.get(), size.height()?.get()]))
+            });
+            (
+                node,
+                rustic_engine::ImageState {
+                    current_src: url.clone(),
+                    natural_size: natural_size.flatten(),
+                },
+            )
+        })
+        .collect()
 }
 
 /// Scroll ranges and chains for script scrolling (ADR 0064): each scroll

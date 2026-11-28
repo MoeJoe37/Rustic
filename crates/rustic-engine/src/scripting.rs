@@ -407,6 +407,10 @@ impl PageTree for ScriptTree {
         self.read_layout(None, |geometry| Ok(geometry.box_sizes.get(&id).copied()))
     }
 
+    fn image_state(&self, id: NodeId) -> Result<Option<page::ImageState>, LayoutReadError> {
+        self.read_layout(None, |geometry| Ok(geometry.images.get(&id).cloned()))
+    }
+
     fn computed_style(&self, id: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
         if !self.layout.borrow().has_source() {
             return Err(LayoutReadError::Unavailable);

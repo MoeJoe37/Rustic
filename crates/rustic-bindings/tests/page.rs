@@ -3016,6 +3016,24 @@ fn token_lists_and_embedded_elements_reflect_their_attributes() {
         assert(sandbox.supports('ALLOW-SCRIPTS') && !sandbox.supports('allow-everything'), 'supports');
         sandbox.add('allow-scripts', 'allow-forms');
         assert(frame.getAttribute('sandbox') === 'allow-scripts allow-forms', 'sandbox updates');
+        // Hyperlinks: a, area and link interfaces with relList.
+        const a = document.createElement('a');
+        assert(a instanceof HTMLAnchorElement && a.relList === a.relList, 'anchor interface');
+        a.relList.add('noopener', 'nofollow');
+        assert(a.rel === 'noopener nofollow' && a.relList.supports('NOREFERRER'), 'a relList');
+        assert(!a.relList.supports('stylesheet') && a.href === '' && a.target === '', 'a defaults');
+        const link = document.createElement('link');
+        assert(link instanceof HTMLLinkElement && link.relList.supports('stylesheet'), 'link relList');
+        link.relList = 'stylesheet alternate';
+        assert(link.getAttribute('rel') === 'stylesheet alternate' && link.relList.length === 2, 'link rel');
+        assert(link.crossOrigin === null && img.crossOrigin === null, 'CORS settings default');
+        link.crossOrigin = 'USE-CREDENTIALS';
+        img.crossOrigin = 'bogus';
+        assert(link.crossOrigin === 'use-credentials' && img.crossOrigin === 'anonymous', 'CORS keywords');
+        img.crossOrigin = null;
+        assert(!img.hasAttribute('crossorigin'), 'null removes the CORS attribute');
+        assert(document.createElement('area') instanceof HTMLAreaElement, 'area interface');
+        assert(img.complete && img.naturalWidth === 0 && img.currentSrc === '', 'no request');
         frame.sandbox = 'allow-popups';
         assert(sandbox.value === 'allow-popups', 'sandbox PutForwards');
         frame.allowFullscreen = true;

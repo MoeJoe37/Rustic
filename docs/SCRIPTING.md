@@ -236,10 +236,11 @@ Unimplemented Web APIs are absent from the exposed interface.
 shares the mutation observer notification microtask. See
 [DOM shadow roots and slots](DOM.md#shadow-roots-and-slots).
 
-The Window's global `customElements` registry supports autonomous custom
-elements with `define`, `get`, `getName`, `whenDefined` and `upgrade`.
-Construction through `HTMLElement` preserves an upgraded node's existing
-wrapper. Registered callbacks can observe connection, disconnection, adoption
+The Window's global `customElements` registry supports autonomous elements
+and customized built-ins with `define`, `get`, `getName`, `whenDefined` and
+`upgrade`. The matching HTML constructor preserves the wrapper during
+upgrade. The parser and creation dictionaries capture the customized name
+at creation so editing the attribute later leaves upgrade eligibility intact. Registered callbacks can observe connection, disconnection, adoption
 and observed attribute changes. [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration)
 tracks the remaining lifecycle and registry work.
 

@@ -194,7 +194,15 @@ impl TreeBuilder {
             }
             Ns::MathMl => QualifiedName::from_parsed(Some(MATHML_NAMESPACE), None, tag.name())?,
         };
-        let id = self.document.create_element(name)?;
+        let custom_is = if ns == Ns::Html {
+            tag.attributes()
+                .iter()
+                .find(|attr| attr.name() == "is")
+                .map(|attr| rustic_dom::DomString::from(attr.value()))
+        } else {
+            None
+        };
+        let id = self.document.create_element_with_is(name, custom_is)?;
         let result = (|| {
             for attribute in tag.attributes() {
                 let name = match ns {

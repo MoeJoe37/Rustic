@@ -216,9 +216,19 @@ impl Document {
 
     /// Create an unattached element without normalizing the supplied parsed name.
     pub fn create_element(&mut self, name: QualifiedName) -> Result<NodeId, DomError> {
+        self.create_element_with_is(name, None)
+    }
+
+    /// Create an unattached element with an immutable customized built-in name.
+    pub fn create_element_with_is(
+        &mut self,
+        name: QualifiedName,
+        custom_is: Option<DomString>,
+    ) -> Result<NodeId, DomError> {
         self.arena.insert(NodeKind::Element(Element {
             name,
             attributes: Vec::new(),
+            custom_is,
             template_contents: None,
             shadow_root: None,
         }))

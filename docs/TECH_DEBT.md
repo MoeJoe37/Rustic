@@ -3693,9 +3693,9 @@ MATH table.
 
 ### TD-222 — Shadow DOM and custom element integration
 
-The global registry covers autonomous elements. Customized built-ins, scoped
-registries, `ElementInternals` and form-associated lifecycle callbacks remain
-open. Reactions use the flushed DOM journal, which cannot replay intermediate
+The global registry supports autonomous elements and customized built-ins.
+Scoped registries, `ElementInternals` and form-associated lifecycle callbacks
+remain open. Reactions use the flushed DOM journal, which cannot replay intermediate
 tree connectivity or attribute values from batched edits. The parser upgrades
 at script checkpoints. Exact reaction-stack order and synchronous parser
 construction still need conformance coverage. Adoption follows document

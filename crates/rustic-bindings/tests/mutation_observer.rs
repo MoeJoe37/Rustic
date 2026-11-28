@@ -538,3 +538,45 @@ fn upgraded_elements_keep_their_wrapper_and_receive_old_and_new_documents_on_ado
         )
         .unwrap();
 }
+
+#[test]
+fn customized_built_ins_preserve_their_name_prototype_and_creation_identity() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const early = document.createElement('button', {is:'x-button'});
+        const ordinary = document.createElement('button');
+        ordinary.setAttribute('is', 'x-button');
+        early.setAttribute('is', 'something-else');
+        document.body.append(early, ordinary);
+        let connections = 0;
+        class CustomButton extends HTMLButtonElement {
+            connectedCallback() { connections++; }
+        }
+        customElements.define('x-button', CustomButton, {extends:'button'});
+        if (!(early instanceof CustomButton) || ordinary instanceof CustomButton ||
+            early !== document.body.firstChild || connections !== 1)
+            throw 'late upgrade';
+        const direct = new CustomButton();
+        const made = document.createElement('button', {is:'x-button'});
+        const namespaced = document.createElementNS(
+            'http://www.w3.org/1999/xhtml', 'button', {is:'x-button'});
+        for (const node of [direct, made, namespaced]) {
+            if (node.localName !== 'button' || !(node instanceof HTMLButtonElement) ||
+                !(node instanceof CustomButton)) throw 'constructed base';
+        }
+        if (document.createElement('span', {is:'x-button'}) instanceof CustomButton)
+            throw 'wrong local name';
+        class WrongBase extends HTMLElement {}
+        customElements.define('x-wrong', WrongBase, {extends:'button'});
+        try {
+            new WrongBase();
+            throw 'wrong native base accepted';
+        } catch (error) {
+            if (!(error instanceof TypeError)) throw error;
+        }
+    "#,
+        )
+        .unwrap();
+}

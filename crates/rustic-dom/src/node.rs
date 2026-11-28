@@ -33,6 +33,7 @@ impl Attribute {
 pub struct Element {
     pub(crate) name: QualifiedName,
     pub(crate) attributes: Vec<Attribute>,
+    pub(crate) custom_is: Option<DomString>,
     pub(crate) template_contents: Option<NodeId>,
     pub(crate) shadow_root: Option<(NodeId, ShadowRootOptions)>,
 }
@@ -91,6 +92,11 @@ impl Element {
     /// Element name supplied by the parser.
     pub fn name(&self) -> &QualifiedName {
         &self.name
+    }
+
+    /// The customized built-in name captured at element creation.
+    pub fn custom_is(&self) -> Option<&DomString> {
+        self.custom_is.as_ref()
     }
 
     /// Stable insertion order; replacing an attribute preserves its position.
@@ -192,7 +198,11 @@ impl NodeKind {
         match self {
             Self::Document | Self::DocumentFragment => Ok(0),
             Self::Element(element) => element.attributes.iter().try_fold(
-                element.name.data_bytes()?,
+                element
+                    .name
+                    .data_bytes()?
+                    .checked_add(element.custom_is.as_ref().map_or(0, DomString::data_bytes))
+                    .ok_or(DomError::DataLimit)?,
                 |total, attribute| {
                     total
                         .checked_add(attribute.data_bytes()?)

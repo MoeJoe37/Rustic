@@ -22,10 +22,7 @@ use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, PropertyDe
 
 use super::events::{PrivateArray, define_method, fire_at, fire_plain, toggle_event, with_root};
 use super::traversal::{node_of, read_doc, wrap_node};
-use super::{
-    creation, dom_exception, illegal_constructor, install_interface, prototype, with_mut_tree,
-    with_page,
-};
+use super::{creation, dom_exception, install_interface, prototype, with_mut_tree, with_page};
 
 const DETAILS: &str = "HTMLDetailsElement";
 const DIALOG: &str = "HTMLDialogElement";
@@ -72,7 +69,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         DETAILS,
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor(DETAILS),
         0,
         &[],
         |agent, proto| {
@@ -84,7 +81,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         DIALOG,
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor(DIALOG),
         0,
         &[],
         |agent, proto| {

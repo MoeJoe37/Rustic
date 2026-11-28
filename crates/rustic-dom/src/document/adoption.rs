@@ -511,6 +511,7 @@ fn copy_kind(kind: &NodeKind) -> NodeKind {
         NodeKind::Element(element) => NodeKind::Element(Element {
             name: element.name.clone(),
             attributes: element.attributes.clone(),
+            custom_is: element.custom_is.clone(),
             template_contents: None,
             shadow_root: None,
         }),

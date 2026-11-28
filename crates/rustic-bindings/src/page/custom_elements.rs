@@ -17,11 +17,14 @@ use super::{
     with_page,
 };
 
+pub(super) mod builtins;
+
 const INTERFACE: &str = "CustomElementRegistry";
 
 #[derive(Debug)]
 struct Definition {
     name: String,
+    local: String,
     constructor: Value,
     connected: Value,
     disconnected: Value,
@@ -56,6 +59,7 @@ impl Registry {
 }
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
+    builtins::install(agent)?;
     install_interface(
         agent,
         INTERFACE,
@@ -136,27 +140,29 @@ fn callback(agent: &mut Agent, proto: ObjectId, name: &str) -> JsResult<Value> {
 
 fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     receiver(agent, this)?;
-    let local = name(agent, args)?
+    let name = name(agent, args)?
         .filter(|name| is_custom_element_name(name))
         .ok_or_else(|| syntax_error(agent))?;
     let constructor = required_arg(agent, args, 1)?;
     if !agent.is_constructor_value(constructor) {
         return agent.type_error("custom element definition requires a constructor");
     }
+    let mut local = name.clone();
     if let Some(options) = args.get(2).and_then(|value| value.as_object()) {
         let key = agent.heap.key("extends")?;
-        if agent.get(options, key)? != Value::UNDEFINED {
-            return Err(unsupported(
-                agent,
-                "customized built-in elements are unavailable",
-            ));
+        let value = agent.get(options, key)?;
+        if value != Value::UNDEFINED {
+            let tag = creation::string(agent, value)?;
+            local = creation::scalar_name(&tag)?
+                .filter(|tag| builtins::extends(tag).is_some())
+                .ok_or_else(|| unsupported(agent, "unknown built-in element"))?;
         }
     }
     with_page(agent, |agent, page| {
         let registry = &page.custom_elements;
         {
             let definitions = registry.definitions.borrow();
-            if definitions.contains_key(&local)
+            if definitions.contains_key(&name)
                 || definitions
                     .values()
                     .any(|def| def.constructor == constructor)
@@ -170,7 +176,7 @@ fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
                 "a custom element definition is already being read",
             ));
         }
-        let result = read_definition(agent, local.clone(), constructor);
+        let result = read_definition(agent, name.clone(), local, constructor);
         registry.defining.set(false);
         let definition = Rc::new(result?);
         super::mutation_observer::enable_journals(agent, page)?;
@@ -187,20 +193,25 @@ fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
         registry
             .definitions
             .borrow_mut()
-            .insert(local.clone(), definition);
-        let waiting = registry.waiting.borrow_mut().remove(&local);
+            .insert(name.clone(), definition);
+        let waiting = registry.waiting.borrow_mut().remove(&name);
         if let Some((promise, root)) = waiting {
             let result = agent.resolve_host_promise(promise, constructor);
             agent.unroot(root);
             result?;
         }
         let root = page.read(agent, page.main, |_, doc| Ok(doc.root()))?;
-        upgrade_tree(agent, root, Some(&local))?;
+        upgrade_tree(agent, root, Some(&name))?;
         Ok(Value::UNDEFINED)
     })
 }
 
-fn read_definition(agent: &mut Agent, name: String, constructor: Value) -> JsResult<Definition> {
+fn read_definition(
+    agent: &mut Agent,
+    name: String,
+    local: String,
+    constructor: Value,
+) -> JsResult<Definition> {
     let object = constructor.as_object().expect("constructor");
     let proto = agent.get(
         object,
@@ -234,6 +245,7 @@ fn read_definition(agent: &mut Agent, name: String, constructor: Value) -> JsRes
         }
         Ok(Definition {
             name,
+            local,
             constructor,
             connected,
             disconnected,
@@ -318,7 +330,7 @@ fn upgrade(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     Ok(Value::UNDEFINED)
 }
 
-pub(super) fn construct_html_element(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
+fn construct_element(agent: &mut Agent, interface: &'static str) -> JsResult<Value> {
     let Some(new_target) = agent.new_target() else {
         return agent.type_error("HTMLElement requires a custom element constructor");
     };
@@ -335,7 +347,10 @@ pub(super) fn construct_html_element(agent: &mut Agent, _: Value, _: &[Value]) -
             return agent
                 .type_error("HTMLElement constructor is unavailable outside a custom element");
         };
-        let proto = agent.host_prototype_from_new_target("HTMLElement", new_target)?;
+        if builtins::wrapper(&definition.local) != interface {
+            return agent.type_error("custom element uses the wrong HTML base constructor");
+        }
+        let proto = agent.host_prototype_from_new_target(interface, new_target)?;
         let existing = {
             let mut stack = registry.stack.borrow_mut();
             match stack
@@ -358,9 +373,12 @@ pub(super) fn construct_html_element(agent: &mut Agent, _: Value, _: &[Value]) -
             }
             Some(None) => agent.type_error("custom element was already constructed"),
             None => {
-                let name = QualifiedName::html(&definition.name).expect("definition name");
-                let element =
-                    create_node(agent, None, Some(proto), |doc| doc.create_element(name))?;
+                let name = QualifiedName::html(&definition.local).expect("definition local name");
+                let custom_is = (definition.local != definition.name)
+                    .then(|| DomString::from(definition.name.as_str()));
+                let element = create_node(agent, None, Some(proto), |doc| {
+                    creation::element_with_is(doc, name, custom_is)
+                })?;
                 agent.weak_map_set(registry.states, element, constructor)?;
                 if definition.adopted != Value::UNDEFINED {
                     let owner = owner_document(agent, element)?;
@@ -384,6 +402,19 @@ pub(super) fn created(agent: &mut Agent, element: Value) -> JsResult<Value> {
     })
 }
 
+fn definition_name(element: &rustic_dom::Element) -> Option<std::borrow::Cow<'_, str>> {
+    if element.name().namespace() != Some(HTML_NAMESPACE) {
+        return None;
+    }
+    let local = element.name().local();
+    if is_custom_element_name(local) {
+        return Some(std::borrow::Cow::Borrowed(local));
+    }
+    String::from_utf16(element.custom_is()?.as_units())
+        .ok()
+        .map(std::borrow::Cow::Owned)
+}
+
 fn candidates(agent: &mut Agent, root: NodeId) -> JsResult<Vec<NodeId>> {
     with_page(agent, |agent, page| {
         page.read(agent, root.document(), |agent, doc| {
@@ -403,9 +434,7 @@ fn candidates(agent: &mut Agent, root: NodeId) -> JsResult<Vec<NodeId>> {
                         pending.try_reserve(1).map_err(|_| Abrupt::OutOfMemory)?;
                         pending.push(root);
                     }
-                    if element.name().namespace() == Some(HTML_NAMESPACE)
-                        && is_custom_element_name(element.name().local())
-                    {
+                    if definition_name(element).is_some() {
                         result.try_reserve(1).map_err(|_| Abrupt::OutOfMemory)?;
                         result.push(id);
                     }
@@ -433,12 +462,14 @@ fn try_upgrade(agent: &mut Agent, page: &Page, id: NodeId, only: Option<&str>) -
             return None;
         };
         let local = element.name().local();
-        if element.name().namespace() != Some(HTML_NAMESPACE)
-            || only.is_some_and(|name| name != local)
-        {
+        let name = definition_name(element)?;
+        if only.is_some_and(|only| only != name) {
             return None;
         }
-        let def = registry.definitions.borrow().get(local)?.clone();
+        let def = registry.definitions.borrow().get(name.as_ref())?.clone();
+        if def.local != local {
+            return None;
+        }
         Some((
             def,
             element.attributes().to_vec(),

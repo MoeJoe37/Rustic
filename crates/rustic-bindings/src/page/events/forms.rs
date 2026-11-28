@@ -2312,7 +2312,7 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         "HTMLTextAreaElement",
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor("HTMLTextAreaElement"),
         0,
         &[],
         |agent, proto| {
@@ -2349,7 +2349,7 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         "HTMLButtonElement",
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor("HTMLButtonElement"),
         0,
         &[],
         |agent, proto| {
@@ -2367,7 +2367,7 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
         agent,
         "HTMLFormElement",
         Some("HTMLElement"),
-        illegal_constructor,
+        crate::page::custom_elements::builtins::constructor("HTMLFormElement"),
         0,
         &[],
         |agent, proto| {

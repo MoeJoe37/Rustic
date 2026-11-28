@@ -272,7 +272,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition; no opposite-direction parallel children, cross-mode baselines, compressed `text-combine-upright` or orthogonal relayout after stretching | Open, `text.writing` (M9) |
 | TD-213 | Deliberate | Text | Web fonts load before the first layout (no `font-display` periods or relayout on arrival); `local()` matches family names; script-created `FontFace`s cannot fetch and do not reach layout | Open, `text.writing` (M9) |
 | TD-214 | Deliberate | CSSOM | `element.style` keeps declarations as written in the `style` attribute: shorthands are not expanded into longhands, values are not normalized, and only longhands have IDL attributes | Open, CSSOM (M9) |
-| TD-216 | Deliberate | HTML | Dialogs and popovers without focus steps, inertness, light dismiss, `::backdrop`, close watchers or real top-layer painting (a maximal `z-index`); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks and `setAttribute('open')` fires no toggle | Open, `html.elements` (M9) |
+| TD-216 | Deliberate | HTML | Dialogs and popovers without `::backdrop` or real top-layer painting (a maximal `z-index`); Escape is the only close request (no close-watcher grouping or history-gesture protection); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks | Partly paid 2026-11-28 (focus steps, inertness, light dismiss, Escape, attribute change steps); rest with CSS generated content (M9) |
 | TD-217 | Deliberate | HTML | Image source selection at load only: no reselection on resize, no `currentSrc`, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Open, `html.elements` (M9) |
 | TD-221 | Deliberate | CSS, MathML | Multi-column without `column-span`, column rules, nested multi-column containers or fragmented box decorations; ruby as paired inline flex columns (no `ruby-position`, `ruby-align`, `rtc`, overhang or line-height adjustment); MathML Core approximated with CSS boxes (no operator dictionary, stretchy operators, `math-depth`, script shifts from the MATH table or `mspace`/`mpadded` attributes) | Open, `layout.formats` (M9) |
 | TD-220 | Deliberate | SVG | Inline SVG without text, gradients and patterns (their first stop's color paints), clipping, masks, markers, filters, dashes, `fill-rule: evenodd`, author style sheets or SVG images (`<img src=x.svg>`, CSS); `use` of symbols only by id in the same document; group opacity multiplies into each shape | Open, `paint.formats` (M9) |
@@ -3571,19 +3571,26 @@ geometry, and trace live ranges as host edges of their objects.
 
 ### TD-216 — Interactive elements subset
 `details`, `dialog` and popovers (SCRIPTING.md, Interactive elements) follow
-their state machines, but `showModal()` neither moves focus nor makes the
-rest of the document inert, there is no close watcher (Escape does not
-cancel), auto popovers do not light-dismiss and only hide other auto popovers
-that are not their ancestors, and `::backdrop` is not generated. The top
+their state machines. Paid 2026-11-28: the dialog and popover focusing
+steps and focus restoration, inertness (outside the topmost modal dialog
+and under `inert`: not focusable, clicks land on the dialog or the inert
+subtree's parent), Escape as a close request, light dismiss of auto
+popovers and of `closedby=any` dialogs, toggle task trackers that coalesce
+`toggle`, and the `open`/`popover` attribute change steps for the attribute
+APIs. Still open: Escape is the only close request (no close-watcher
+grouping, history-gesture protection or Android back button), a
+non-modal dialog with `closedby` is not a close watcher, a modal dialog
+without a focus delegate blurs instead of focusing itself, and `::backdrop`
+is not generated (Rustic generates no pseudo-element boxes yet). The top
 layer is approximated with `z-index: 2147483647` on `:modal` and
 `:popover-open`, so an ancestor's stacking context or transform still
 contains them. A closed `details` hides its non-`summary` element children
 through the UA sheet (text directly inside stays visible, and a second
-`summary` is hidden). `toggle` and `close` events are queued as microtasks;
-`open` changes through `setAttribute` fire no `toggle`, and `UA` colors are
-fixed light-scheme values (no `Canvas`/`CanvasText`). **Pay:** a real top
-layer in layout and paint with `::backdrop`, focus and inertness, close
-watchers, the popover stack, a details slot, and attribute-change steps.
+`summary` is hidden). `toggle` and `close` events are queued as microtasks,
+and `UA` colors are fixed light-scheme values (no `Canvas`/`CanvasText`).
+**Pay:** a real top layer in layout and paint with `::backdrop` (with CSS
+generated content), close-watcher grouping, and a details slot (with
+`dom.shadow` slot assignment).
 
 ### TD-217 — Image source selection subset
 `img` and `picture` sources (PAINT.md) are chosen once, when the document's

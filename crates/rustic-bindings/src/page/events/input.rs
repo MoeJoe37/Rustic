@@ -133,6 +133,12 @@ pub(in crate::page) fn deliver(agent: &mut Agent, id: NodeId, input: &InputEvent
         }
         _ => None,
     };
+    // Inert nodes are skipped by hit testing: a click on content blocked
+    // by a modal dialog lands on the dialog (its `::backdrop`).
+    let (id, outside) = match input {
+        InputEvent::Click { .. } => crate::page::elements::click_target(agent, id)?,
+        _ => (id, false),
+    };
     let Some(target) = live_target(agent, id)? else {
         return Ok(());
     };
@@ -142,9 +148,15 @@ pub(in crate::page) fn deliver(agent: &mut Agent, id: NodeId, input: &InputEvent
             client_y,
             modifiers,
         } => {
+            // The press light-dismisses popovers and `closedby=any` dialogs
+            // it falls outside of (HTML §6.12.6, §4.11.4).
+            crate::page::elements::light_dismiss(agent, id, outside)?;
             if !disabled_click_target(agent, target)? {
-                // A press focuses the clicked area before the click event.
-                super::forms::focus_for_click(agent, target)?;
+                // A press focuses the clicked area before the click event
+                // (a backdrop is not part of any focusable area).
+                if !outside {
+                    super::forms::focus_for_click(agent, target)?;
+                }
                 let event = ui::click_event(agent, Some((*client_x, *client_y)), *modifiers)?;
                 fire_trusted(agent, target, event)?;
             }
@@ -204,6 +216,12 @@ fn key_default(
         return Ok(());
     }
     if key.modifiers.control || key.modifiers.alt || key.modifiers.meta {
+        return Ok(());
+    }
+    // An uncanceled Escape is a close request for the topmost modal dialog
+    // or auto popover (HTML §7.3 close watchers).
+    if down && is_key(key, "Escape") {
+        crate::page::elements::close_request(agent)?;
         return Ok(());
     }
     if down && is_key(key, "Tab") {

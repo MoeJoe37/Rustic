@@ -4,9 +4,18 @@
 //! The `open` content attribute is the source of truth for details and
 //! dialogs. Modal dialogs and showing popovers are in their document's top
 //! layer ([`rustic_dom::Document::top_layer_add`]), which `:modal` and
-//! `:popover-open` read. `toggle` and `close` events are queued as
-//! microtasks rather than DOM manipulation tasks; focus, inertness, light
-//! dismiss and `::backdrop` are not implemented (TD-216).
+//! `:popover-open` read. Content outside the topmost modal dialog, and
+//! under an `inert` attribute, is inert ([`is_inert`]): it is not focusable
+//! and clicks on it land on the dialog. Opening runs the dialog and popover
+//! focusing steps and closing restores the previously focused element.
+//! Escape is a close request ([`close_request`]); a press outside auto
+//! popovers, or on the backdrop of a `closedby=any` dialog, light-dismisses
+//! them ([`light_dismiss`]). Setting or removing `open` and `popover` with
+//! the attribute APIs runs their attribute change steps
+//! ([`attribute_changed`]). `toggle` events coalesce per element through a
+//! toggle task tracker. `toggle` and `close` are queued as microtasks
+//! rather than DOM manipulation tasks, and `::backdrop` is not generated
+//! (TD-216).
 
 use rustic_dom::{DomString, Element, NodeId, NodeKind, QualifiedName, TopLayer};
 use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
@@ -21,11 +30,16 @@ use super::{
 const DETAILS: &str = "HTMLDetailsElement";
 const DIALOG: &str = "HTMLDialogElement";
 
-/// Page-lifetime state: dialog return values and the queued-event callback.
+/// Page-lifetime state: dialog return values, toggle task trackers,
+/// previously focused elements and the queued-event callback.
 #[derive(Debug)]
 pub(super) struct Elements {
     /// Dialog → its `returnValue` string.
     return_values: ObjectId,
+    /// Element → its pending toggle job (HTML "toggle task tracker").
+    toggle_tasks: ObjectId,
+    /// Dialog or popover → the element focused before it opened.
+    previous_focus: ObjectId,
     /// The native job that fires queued events.
     fire_job: Value,
 }
@@ -34,10 +48,16 @@ impl Elements {
     pub(super) fn new(agent: &mut Agent) -> JsResult<Self> {
         let return_values = agent.new_weak_map()?;
         agent.root(Value::object(return_values))?;
+        let toggle_tasks = agent.new_weak_map()?;
+        agent.root(Value::object(toggle_tasks))?;
+        let previous_focus = agent.new_weak_map()?;
+        agent.root(Value::object(previous_focus))?;
         let fire_job = Value::object(agent.new_native_function(fire_queued, "fire queued", 1)?);
         agent.root(fire_job)?;
         Ok(Self {
             return_values,
+            toggle_tasks,
+            previous_focus,
             fire_job,
         })
     }
@@ -84,6 +104,14 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
     )?;
     let html = prototype(agent, "HTMLElement")?;
     accessor(agent, html, "popover", popover, Some(set_popover))?;
+    accessor(agent, html, "inert", reflect_bool::<0>, Some(set_bool::<0>))?;
+    accessor(
+        agent,
+        html,
+        "autofocus",
+        reflect_bool::<1>,
+        Some(set_bool::<1>),
+    )?;
     define_method(agent, html, "showPopover", show_popover, 0)?;
     define_method(agent, html, "hidePopover", hide_popover, 0)?;
     define_method(agent, html, "togglePopover", toggle_popover, 0)
@@ -176,12 +204,27 @@ fn queue(agent: &mut Agent, target: Value, event: Value) -> JsResult<()> {
         .map_err(|_| Abrupt::OutOfMemory)
 }
 
+/// Toggle jobs are `[target, event, canceled, oldState]`; others are
+/// `[target, event]`.
+const TOGGLE_JOB_LEN: u32 = 4;
+
 fn fire_queued(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     let Some(job) = args.first().copied().and_then(PrivateArray::from_value) else {
         return Ok(Value::UNDEFINED);
     };
     let target = job.get(agent, 0)?;
     let event = job.get(agent, 1)?;
+    if job.len(agent)? == TOGGLE_JOB_LEN {
+        if job.get(agent, 2)? == Value::boolean(true) {
+            return Ok(Value::UNDEFINED);
+        }
+        with_page(agent, |agent, page| {
+            if agent.weak_map_get(page.elements.toggle_tasks, target) == job.value() {
+                agent.weak_map_delete(page.elements.toggle_tasks, target);
+            }
+            Ok(())
+        })?;
+    }
     match fire_at(agent, target, event) {
         Ok(_) => Ok(Value::UNDEFINED),
         Err(Abrupt::Throw(error)) => {
@@ -192,9 +235,151 @@ fn fire_queued(agent: &mut Agent, _: Value, args: &[Value]) -> JsResult<Value> {
     }
 }
 
+/// Queue a `toggle` event, coalescing with a still-pending one: the
+/// pending job is canceled and the new event keeps its `oldState`.
 fn queue_toggle(agent: &mut Agent, target: Value, old: &str, new: &str) -> JsResult<()> {
-    let event = toggle_event(agent, "toggle", false, old, new)?;
-    with_root(agent, event, |agent| queue(agent, target, event))
+    let tasks = with_page(agent, |_, page| Ok(page.elements.toggle_tasks))?;
+    let mut old = old.to_owned();
+    if let Some(pending) = PrivateArray::from_value(agent.weak_map_get(tasks, target)) {
+        pending.set(agent, 2, Value::boolean(true))?;
+        let previous = pending.get(agent, 3)?;
+        old = string_arg(agent, previous)?;
+    }
+    let event = toggle_event(agent, "toggle", false, &old, new)?;
+    with_root(agent, event, |agent| {
+        let old = agent.string(&old)?;
+        let job = PrivateArray::new(agent, &[target, event, Value::boolean(false), old])?;
+        agent.weak_map_set(tasks, target, job.value())?;
+        let fire_job = with_page(agent, |_, page| Ok(page.elements.fire_job))?;
+        agent
+            .enqueue_microtask(fire_job, job.value())
+            .map_err(|_| Abrupt::OutOfMemory)
+    })
+}
+
+// ---- reflection --------------------------------------------------------------
+
+const BOOLEANS: [&str; 2] = ["inert", "autofocus"];
+
+/// A reflected boolean content attribute of every HTML element.
+fn reflect_bool<const N: usize>(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let (id, _) = html_element(agent, this)?;
+    Ok(Value::boolean(attribute(agent, id, BOOLEANS[N])?.is_some()))
+}
+
+fn set_bool<const N: usize>(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
+    html_element(agent, this)?;
+    let on = args.first().is_some_and(|&v| agent.to_boolean(v));
+    set_attribute(agent, this, BOOLEANS[N], on.then_some(""))?;
+    Ok(Value::UNDEFINED)
+}
+
+// ---- inertness and focus -----------------------------------------------------
+
+/// Whether `id` is inert: under an HTML `inert` attribute, or blocked by
+/// the topmost modal dialog (HTML §6.3, "blocked by a modal dialog").
+pub(in crate::page) fn is_inert(document: &rustic_dom::Document, id: NodeId) -> bool {
+    let mut at = Some(id);
+    while let Some(current) = at {
+        let Ok(node) = document.node(current) else {
+            return false;
+        };
+        if let NodeKind::Element(e) = node.kind() {
+            if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && has(e, "inert") {
+                return true;
+            }
+        }
+        at = node.parent();
+    }
+    blocking_modal(document, id).is_some()
+}
+
+/// The modal dialog blocking `id`: the topmost one, unless `id` is inside
+/// it or inside a top-layer element above it.
+fn blocking_modal(document: &rustic_dom::Document, id: NodeId) -> Option<NodeId> {
+    let layer = document.top_layer();
+    let index = layer
+        .iter()
+        .rposition(|&(_, kind)| kind == TopLayer::Modal)?;
+    let inside = layer[index..]
+        .iter()
+        .any(|&(top, _)| document.is_inclusive_descendant(id, top));
+    (!inside).then_some(layer[index].0)
+}
+
+/// The focus delegate of a dialog or popover: its first focusable
+/// descendant with `autofocus`, else (unless `autofocus_only`) its first
+/// focusable descendant (HTML "focus delegate").
+fn focus_delegate(agent: &mut Agent, id: NodeId, autofocus_only: bool) -> JsResult<Option<NodeId>> {
+    let candidates = read_doc(agent, id, |d| {
+        let mut out = Vec::new();
+        if let Ok(walk) = d.walk(id) {
+            for (other, _) in walk.skip(1) {
+                if let Some(e) = element_of(d, other) {
+                    if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) {
+                        out.push((other, has(e, "autofocus")));
+                    }
+                }
+            }
+        }
+        out
+    })?;
+    let mut first = None;
+    for (candidate, autofocus) in candidates {
+        agent.check_native_work()?;
+        let focusable = with_page(agent, |agent, page| {
+            page.read(agent, candidate.document(), |agent, d| {
+                super::events::is_focusable(agent, d, candidate)
+            })
+        })?;
+        if !focusable {
+            continue;
+        }
+        if autofocus {
+            return Ok(Some(candidate));
+        }
+        first = first.or(Some(candidate));
+    }
+    Ok(if autofocus_only { None } else { first })
+}
+
+fn focus_node(agent: &mut Agent, id: NodeId) -> JsResult<bool> {
+    let wrapper = wrap_node(agent, id)?;
+    super::events::focus_element(agent, wrapper)
+}
+
+/// Remember the focused element before `this` opens.
+fn remember_focus(agent: &mut Agent, this: Value) -> JsResult<()> {
+    let focused = super::events::focused_value(agent)?.unwrap_or(Value::NULL);
+    with_page(agent, |agent, page| {
+        agent.weak_map_set(page.elements.previous_focus, this, focused)
+    })
+}
+
+/// Return focus to the element focused before `this` opened when focus is
+/// inside it (or `always`, for a modal dialog).
+fn restore_focus(agent: &mut Agent, this: Value, id: NodeId, always: bool) -> JsResult<()> {
+    let previous = with_page(agent, |agent, page| {
+        let previous = agent.weak_map_get(page.elements.previous_focus, this);
+        agent.weak_map_delete(page.elements.previous_focus, this);
+        Ok(previous)
+    })?;
+    if previous.as_object().is_none() {
+        return Ok(());
+    }
+    let focused = with_page(agent, |_, page| Ok(page.events.forms.focused()))?;
+    let inside = match focused {
+        Some(focused) if focused.document() == id.document() => {
+            read_doc(agent, id, |d| d.is_inclusive_descendant(focused, id))?
+        }
+        _ => false,
+    };
+    if always || inside {
+        with_root(agent, previous, |agent| {
+            super::events::focus_element(agent, previous).map(drop)
+        })?;
+    }
+    Ok(())
 }
 
 // ---- details ---------------------------------------------------------------
@@ -218,14 +403,20 @@ fn set_details_open(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<
     Ok(Value::UNDEFINED)
 }
 
-/// Open or close a details element, closing the others of its name group
-/// and queuing `toggle` (HTML §4.11.1 attribute change steps).
+/// Open or close a details element through its `open` attribute.
 fn set_details_state(agent: &mut Agent, this: Value, open: bool) -> JsResult<()> {
     let id = node_of(agent, this)?;
     let was_open = attribute(agent, id, "open")?.is_some();
     if was_open == open {
         return Ok(());
     }
+    set_attribute(agent, this, "open", open.then_some(""))?;
+    details_open_changed(agent, this, id, open)
+}
+
+/// The details `open` attribute change steps (HTML §4.11.1): an opened
+/// element closes the others of its name group, then `toggle` is queued.
+fn details_open_changed(agent: &mut Agent, this: Value, id: NodeId, open: bool) -> JsResult<()> {
     if open {
         // Exclusive accordions: other open details with the same name in
         // the same tree close.
@@ -254,13 +445,72 @@ fn set_details_state(agent: &mut Agent, this: Value, open: bool) -> JsResult<()>
             }
         }
     }
-    set_attribute(agent, this, "open", open.then_some(""))?;
     let (old, new) = if open {
         ("closed", "open")
     } else {
         ("open", "closed")
     };
     queue_toggle(agent, this, old, new)
+}
+
+// ---- attribute change steps ----------------------------------------------------
+
+/// An attribute the change steps watch, with its value before the change.
+pub(in crate::page) struct Watched(Option<(NodeId, &'static str, Option<String>)>);
+
+/// Call before an attribute API sets or removes `local` (no namespace) on
+/// `id`; pass the result to [`attribute_changed`] afterwards.
+pub(in crate::page) fn watch_attribute(
+    agent: &mut Agent,
+    id: NodeId,
+    namespaced: bool,
+    local: &str,
+) -> JsResult<Watched> {
+    let name = match local.to_ascii_lowercase().as_str() {
+        _ if namespaced => return Ok(Watched(None)),
+        "open" => "open",
+        "popover" => "popover",
+        _ => return Ok(Watched(None)),
+    };
+    Ok(Watched(Some((id, name, attribute(agent, id, name)?))))
+}
+
+/// Run the `open` (details, dialog) and `popover` attribute change steps
+/// after an attribute API changed a watched attribute.
+pub(in crate::page) fn attribute_changed(
+    agent: &mut Agent,
+    this: Value,
+    watched: Watched,
+) -> JsResult<()> {
+    let Some((id, name, before)) = watched.0 else {
+        return Ok(());
+    };
+    let local = read_doc(agent, id, |d| {
+        element_of(d, id)
+            .filter(|e| e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE))
+            .map(|e| e.name().local().to_owned())
+    })?;
+    let Some(local) = local else {
+        return Ok(());
+    };
+    let now = attribute(agent, id, name)?;
+    match (local.as_str(), name) {
+        ("details", "open") if before.is_some() != now.is_some() => {
+            details_open_changed(agent, this, id, now.is_some())
+        }
+        ("dialog", "open") if before.is_some() && now.is_none() => {
+            top_layer_remove(agent, id).map(drop)
+        }
+        (_, "popover")
+            if popover_state(before.as_deref()) != popover_state(now.as_deref())
+                && top_layer_state(agent, id)? == Some(TopLayer::Popover) =>
+        {
+            // Hide without events, returning focus (HTML §6.12.2).
+            top_layer_remove(agent, id)?;
+            restore_focus(agent, this, id, false)
+        }
+        _ => Ok(()),
+    }
 }
 
 fn has(element: &Element, name: &str) -> bool {
@@ -398,9 +648,20 @@ fn open_dialog(agent: &mut Agent, this: Value, modal: bool) -> JsResult<Value> {
     if attribute(agent, id, "open")?.is_some() {
         return Ok(Value::UNDEFINED);
     }
+    // Remember focus before the modal dialog makes the rest inert.
+    remember_focus(agent, this)?;
     set_attribute(agent, this, "open", Some(""))?;
     if modal {
         top_layer_add(agent, id, TopLayer::Modal)?;
+    }
+    // The dialog focusing steps: the focus delegate, else (modal) the
+    // viewport, since everything outside the dialog is now inert.
+    match focus_delegate(agent, id, false)? {
+        Some(control) => {
+            focus_node(agent, control)?;
+        }
+        None if modal => super::events::blur_focus(agent)?,
+        None => {}
     }
     queue_toggle(agent, this, "closed", "open")?;
     Ok(Value::UNDEFINED)
@@ -425,11 +686,13 @@ fn close_dialog(agent: &mut Agent, this: Value, result: Option<Value>) -> JsResu
     if attribute(agent, id, "open")?.is_none() {
         return Ok(());
     }
+    let was_modal = top_layer_state(agent, id)? == Some(TopLayer::Modal);
     set_attribute(agent, this, "open", None)?;
     top_layer_remove(agent, id)?;
     if let Some(result) = result {
         store_return_value(agent, this, result)?;
     }
+    restore_focus(agent, this, id, was_modal)?;
     queue_toggle(agent, this, "open", "closed")?;
     let close = super::events::state_event(agent, "close", false)?;
     with_root(agent, close, |agent| queue(agent, this, close))
@@ -560,10 +823,25 @@ fn show_inner(agent: &mut Agent, this: Value, id: NodeId) -> JsResult<()> {
     if !check_popover(agent, id, false)? {
         return Ok(());
     }
-    if popover_state(attribute(agent, id, "popover")?.as_deref()) == Some("auto") {
+    let state = popover_state(attribute(agent, id, "popover")?.as_deref());
+    if state == Some("auto") {
         hide_other_auto(agent, id)?;
     }
+    if state != Some("manual") {
+        remember_focus(agent, this)?;
+    }
     top_layer_add(agent, id, TopLayer::Popover)?;
+    // The popover focusing steps: only an `autofocus` delegate (or the
+    // popover itself with `autofocus`) takes focus.
+    let own = attribute(agent, id, "autofocus")?.is_some();
+    let control = if own {
+        Some(id)
+    } else {
+        focus_delegate(agent, id, true)?
+    };
+    if let Some(control) = control {
+        focus_node(agent, control)?;
+    }
     queue_toggle(agent, this, "closed", "open")
 }
 
@@ -574,6 +852,7 @@ fn hide(agent: &mut Agent, this: Value, id: NodeId) -> JsResult<()> {
     let before = toggle_event(agent, "beforetoggle", false, "open", "closed")?;
     fire_at(agent, this, before)?;
     if top_layer_remove(agent, id)? {
+        restore_focus(agent, this, id, false)?;
         queue_toggle(agent, this, "open", "closed")?;
     }
     Ok(())
@@ -620,6 +899,156 @@ fn toggle_popover(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Va
     Ok(Value::boolean(
         top_layer_state(agent, id)? == Some(TopLayer::Popover),
     ))
+}
+
+// ---- close requests and light dismiss --------------------------------------
+
+/// A dialog's `closedby` state: `any`, `closerequest` or `none`; missing
+/// and invalid values are `closerequest` for modal dialogs, else `none`.
+fn closed_by(agent: &mut Agent, id: NodeId) -> JsResult<&'static str> {
+    let value = attribute(agent, id, "closedby")?.map(|v| v.to_ascii_lowercase());
+    Ok(match value.as_deref() {
+        Some("any") => "any",
+        Some("closerequest") => "closerequest",
+        Some("none") => "none",
+        _ if top_layer_state(agent, id)? == Some(TopLayer::Modal) => "closerequest",
+        _ => "none",
+    })
+}
+
+/// Fire `cancel` at a dialog and close it unless a listener canceled it.
+fn request_close_dialog(agent: &mut Agent, id: NodeId) -> JsResult<()> {
+    let wrapper = wrap_node(agent, id)?;
+    with_root(agent, wrapper, |agent| {
+        if fire_plain(agent, wrapper, "cancel", true)? {
+            close_dialog(agent, wrapper, None)?;
+        }
+        Ok(())
+    })
+}
+
+fn main_document(agent: &mut Agent) -> JsResult<NodeId> {
+    with_page(agent, |agent, page| {
+        page.read(agent, page.main, |_, d| Ok(d.root()))
+    })
+}
+
+/// Showing auto and hint popovers of `id`'s document, bottom first.
+fn popover_stack(agent: &mut Agent, id: NodeId) -> JsResult<Vec<NodeId>> {
+    read_doc(agent, id, |d| {
+        d.top_layer()
+            .iter()
+            .filter(|&&(top, kind)| {
+                kind == TopLayer::Popover
+                    && element_of(d, top).is_some_and(|e| {
+                        popover_state(value_of(e, "popover").as_deref()) != Some("manual")
+                    })
+            })
+            .map(|&(top, _)| top)
+            .collect()
+    })
+}
+
+/// A user close request (Escape): the topmost modal dialog gets `cancel`
+/// and closes, or the topmost auto popover hides. Whether one handled it.
+pub(in crate::page) fn close_request(agent: &mut Agent) -> JsResult<bool> {
+    let root = main_document(agent)?;
+    let stack = popover_stack(agent, root)?;
+    let top = read_doc(agent, root, |d| {
+        d.top_layer()
+            .iter()
+            .rev()
+            .find(|&&(top, kind)| kind == TopLayer::Modal || stack.contains(&top))
+            .copied()
+    })?;
+    match top {
+        Some((id, TopLayer::Modal)) => {
+            if closed_by(agent, id)? == "none" {
+                return Ok(false);
+            }
+            request_close_dialog(agent, id)?;
+            Ok(true)
+        }
+        Some((id, _)) => {
+            let wrapper = wrap_node(agent, id)?;
+            with_root(agent, wrapper, |agent| hide(agent, wrapper, id))?;
+            Ok(true)
+        }
+        None => Ok(false),
+    }
+}
+
+/// Where a click on `id` lands: inert content is skipped by hit testing,
+/// so a click blocked by a modal dialog goes to the dialog (`true`: on its
+/// backdrop) and one under `inert` to the inert subtree's parent.
+pub(in crate::page) fn click_target(agent: &mut Agent, id: NodeId) -> JsResult<(NodeId, bool)> {
+    read_doc(agent, id, |d| {
+        if let Some(modal) = blocking_modal(d, id) {
+            return (modal, true);
+        }
+        let mut landing = id;
+        let mut at = Some(id);
+        while let Some(current) = at {
+            let Ok(node) = d.node(current) else {
+                break;
+            };
+            if element_of(d, current).is_some_and(|e| {
+                e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && has(e, "inert")
+            }) {
+                landing = node.parent().unwrap_or(landing);
+            }
+            at = node.parent();
+        }
+        (landing, false)
+    })
+}
+
+/// HTML "light dismiss": a press at `target` hides the auto popovers above
+/// the topmost one containing it (or invoked from it), and a press on the
+/// backdrop of a `closedby=any` modal dialog requests its close.
+pub(in crate::page) fn light_dismiss(
+    agent: &mut Agent,
+    target: NodeId,
+    outside: bool,
+) -> JsResult<()> {
+    if outside {
+        let modal = read_doc(agent, target, |d| {
+            d.top_layer()
+                .iter()
+                .rev()
+                .find(|&&(_, kind)| kind == TopLayer::Modal)
+                .map(|&(id, _)| id)
+        })?;
+        if let Some(modal) = modal {
+            if closed_by(agent, modal)? == "any" {
+                request_close_dialog(agent, modal)?;
+            }
+        }
+    }
+    let stack = popover_stack(agent, target)?;
+    if stack.is_empty() {
+        return Ok(());
+    }
+    let endpoint = read_doc(agent, target, |d| {
+        // Popovers invoked by a button the press is on count as containing it.
+        let mut invoked = Vec::new();
+        let mut at = Some(target);
+        while let Some(current) = at {
+            if let Some(Activation::Popover(popover, _)) = activation_of(d, current) {
+                invoked.push(popover);
+            }
+            at = d.node(current).ok().and_then(|n| n.parent());
+        }
+        stack.iter().rposition(|&popover| {
+            d.is_inclusive_descendant(target, popover) || invoked.contains(&popover)
+        })
+    })?;
+    let keep = endpoint.map_or(0, |index| index + 1);
+    for &popover in stack[keep..].iter().rev() {
+        let wrapper = wrap_node(agent, popover)?;
+        with_root(agent, wrapper, |agent| hide(agent, wrapper, popover))?;
+    }
+    Ok(())
 }
 
 // ---- activation ------------------------------------------------------------

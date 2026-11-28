@@ -7,7 +7,7 @@ use crate::dom_exception;
 use crate::webidl::{DomStringConversion, from_dom_string, to_dom_string, to_nullable_dom_string};
 
 use super::creation::{excluded_name_char, invalid_name, qualified, scalar_name, string};
-use super::{read_node, require_receiver, required_arg, with_mut_tree};
+use super::{elements, read_node, require_receiver, required_arg, with_mut_tree};
 
 pub(super) fn install(agent: &mut Agent, prototype: ObjectId) -> JsResult<()> {
     for (name, operation, length) in [
@@ -150,7 +150,7 @@ fn has_attribute(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult
 }
 
 fn set_attribute(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    element_receiver(agent, receiver)?;
+    let id = element_receiver(agent, receiver)?;
     let name = required_arg(agent, args, 0)?;
     let value = required_arg(agent, args, 1)?;
     let name = string(agent, name)?;
@@ -159,6 +159,7 @@ fn set_attribute(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult
         .filter(|name| !name.is_empty() && !name.chars().any(|c| c == '=' || excluded_name_char(c)))
         .ok_or_else(|| invalid_name(agent))?;
 
+    let watched = elements::watch_attribute(agent, id, false, &name)?;
     with_mut_tree(agent, receiver, |agent, document, _, id| {
         let node = document
             .node(id)
@@ -175,17 +176,20 @@ fn set_attribute(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult
         document
             .set_attribute(id, name, value)
             .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-        Ok(Value::UNDEFINED)
-    })
+        Ok(())
+    })?;
+    elements::attribute_changed(agent, receiver, watched)?;
+    Ok(Value::UNDEFINED)
 }
 
 fn remove_attribute(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    element_receiver(agent, receiver)?;
+    let id = element_receiver(agent, receiver)?;
     let name = required_arg(agent, args, 0)?;
     let name = string(agent, name)?;
     let Some(mut name) = scalar_name(&name)? else {
         return Ok(Value::UNDEFINED);
     };
+    let watched = elements::watch_attribute(agent, id, false, &name)?;
     with_mut_tree(agent, receiver, |agent, document, _, id| {
         let node = document
             .node(id)
@@ -200,8 +204,10 @@ fn remove_attribute(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsRes
                 .remove_attribute(id, qualified.namespace(), qualified.local())
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
         }
-        Ok(Value::UNDEFINED)
-    })
+        Ok(())
+    })?;
+    elements::attribute_changed(agent, receiver, watched)?;
+    Ok(Value::UNDEFINED)
 }
 
 fn expanded_arguments(
@@ -268,11 +274,12 @@ fn has_attribute_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsRes
 }
 
 fn set_attribute_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    element_receiver(agent, receiver)?;
+    let id = element_receiver(agent, receiver)?;
     let value = required_arg(agent, args, 2)?;
     let (namespace, name) = expanded_arguments(agent, args)?;
     let value = string(agent, value)?;
     let name = qualified(agent, namespace.as_ref(), &name, true)?;
+    let watched = elements::watch_attribute(agent, id, name.namespace().is_some(), name.local())?;
     with_mut_tree(agent, receiver, |agent, document, _, id| {
         let node = document
             .node(id)
@@ -292,13 +299,21 @@ fn set_attribute_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsRes
         document
             .set_attribute(id, name, value)
             .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-        Ok(Value::UNDEFINED)
-    })
+        Ok(())
+    })?;
+    elements::attribute_changed(agent, receiver, watched)?;
+    Ok(Value::UNDEFINED)
 }
 
 fn remove_attribute_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
-    element_receiver(agent, receiver)?;
+    let id = element_receiver(agent, receiver)?;
     let (namespace, local) = expanded_arguments(agent, args)?;
+    let watched = elements::watch_attribute(
+        agent,
+        id,
+        namespace.is_some(),
+        &String::from_utf16_lossy(local.as_units()),
+    )?;
     with_mut_tree(agent, receiver, |agent, document, _, id| {
         let node = document
             .node(id)
@@ -312,6 +327,8 @@ fn remove_attribute_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> Js
                 .remove_attribute(id, name.namespace(), name.local())
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
         }
-        Ok(Value::UNDEFINED)
-    })
+        Ok(())
+    })?;
+    elements::attribute_changed(agent, receiver, watched)?;
+    Ok(Value::UNDEFINED)
 }

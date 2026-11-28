@@ -35,6 +35,7 @@ pub(super) use forms::install as install_forms;
 pub use forms::{
     AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
 };
+pub(in crate::page) use forms::{blur_focus, focus_element, focused_value, is_focusable};
 pub(super) use forms::{fire_at, fire_plain, toggle_event};
 pub(super) use handlers::install as install_handlers;
 pub(in crate::page) use handlers::install_animation as install_animation_handlers;

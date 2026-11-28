@@ -387,7 +387,19 @@ same turn budget, so a single call cannot run unmetered.
   `togglePopover`, `popovertarget` invokers) and `ToggleEvent`. Modal dialogs
   and showing popovers are in the document's top layer, which `:modal` and
   `:popover-open` match; the UA sheet styles `details`, `dialog` and
-  `[popover]` (CSS.md). Limits: TD-216.
+  `[popover]` (CSS.md). Opening runs the dialog and popover focusing steps
+  (an `autofocus` descendant, else for dialogs the first focusable one) and
+  closing returns focus. Content outside the topmost modal dialog, and
+  under `inert` (`HTMLElement.inert`), is inert: not focusable, and a click
+  on it lands on the dialog or on the inert subtree's parent. An uncanceled
+  Escape is a close request (`cancel` then `close` for the topmost modal
+  dialog, unless `closedby=none`; the topmost auto popover hides). A press
+  outside auto popovers hides them (popover invokers count as inside), and a
+  press on a `closedby=any` dialog's backdrop requests its close.
+  `setAttribute`/`removeAttribute` of `open` and `popover` run the attribute
+  change steps (details toggle and name groups, dialogs leave the top
+  layer, a popover whose state changes hides). `toggle` events coalesce per
+  element. Limits: TD-216.
 - **Embedded content and token lists** (HTML §4.8.4–5, DOM §7.1,
   `page/embedded.rs`, `page/token_list.rs`). `HTMLImageElement` and
   `HTMLIFrameElement` reflect their content attributes (`src` as a URL,

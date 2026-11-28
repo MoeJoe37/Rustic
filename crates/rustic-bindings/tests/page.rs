@@ -3085,6 +3085,19 @@ fn details_dialog_and_popover_follow_their_state_machines() {
         try { button.showPopover(); } catch (e) { threw = e.name; }
         assert(threw === 'NotSupportedError', 'only popovers show');
         assert(new ToggleEvent('toggle', {newState: 'open'}).newState === 'open', 'ToggleEvent');
+        // Attribute APIs run the change steps: details toggles, dialog and popover state.
+        const three = body.appendChild(document.createElement('details'));
+        three.addEventListener('toggle', e => log.push('three ' + e.oldState + '>' + e.newState));
+        three.setAttribute('open', '');
+        three.removeAttribute('open');
+        three.setAttribute('OPEN', 'x');
+        const modal = body.appendChild(document.createElement('dialog'));
+        modal.showModal();
+        modal.removeAttribute('open');
+        assert(!modal.matches(':modal'), 'removing open leaves the top layer');
+        p1.showPopover();
+        p1.setAttribute('popover', 'manual');
+        assert(!p1.matches(':popover-open'), 'changing the popover state hides it');
         Promise.resolve().then(() => { globalThis.done = log.join(', '); });
     "#,
     );
@@ -3094,6 +3107,6 @@ fn details_dialog_and_popover_follow_their_state_machines() {
     let done = String::from_utf16_lossy(&agent.heap.string(done).units().collect::<Vec<_>>());
     assert_eq!(
         done,
-        "cancel, before open, before closed, two open, two closed, one closed>open, close done"
+        "cancel, before open, before closed, before open, two closed, one closed>open, close done, three closed>open"
     );
 }

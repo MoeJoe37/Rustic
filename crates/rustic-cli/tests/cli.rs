@@ -428,20 +428,15 @@ fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_par
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(String::from_utf8_lossy(&output.stdout).contains(" line=0\n"));
-    // Slots are not laid out yet (no shadow trees): no partial output.
+    // A slot outside a shadow tree lays out its fallback content.
     fs::write(
         &path,
-        "<style>* {margin:0}</style><main>a <slot></slot></main>",
+        "<style>* {margin:0}</style><main>a <slot>b</slot></main>",
     )
     .unwrap();
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(
-        stderr(&output).contains("SpecialElement"),
-        "{}",
-        stderr(&output)
-    );
-    assert!(output.stdout.is_empty());
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("\ntext 0 line=0 "));
     fs::remove_dir_all(base).unwrap();
 }
 

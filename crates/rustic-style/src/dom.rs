@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use rustic_base::CancellationToken;
 
 use rustic_css::{CssParser, SelectorList};
-use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind, Walk};
+use rustic_dom::{Document, DomError, Element, Node, NodeId, NodeKind};
 
 use crate::matching::{MatchCache, matches_complex_cached};
 use crate::{AnimationController, KeyframesRule};
@@ -424,29 +424,68 @@ pub fn shadow_tree_context(shadow_root: NodeId) -> TreeContext {
     TreeContext(u64::from(shadow_root.slot()) + 1)
 }
 
-/// One tree being walked by [`style_tree`].
-struct TreeWalk<'a> {
-    walk: Walk<'a>,
-    /// Depth added to the walk's depths; a shadow tree's walk starts at
-    /// its host's depth, and its root fragment is skipped.
-    base: usize,
-    shadow: bool,
-    scope: TreeScope<DomElement<'a>>,
+/// Resolve stylesheet scope through DOM ownership, independently of the
+/// inheritance path in the rendered tree.
+fn style_scope<'a>(
+    element: DomElement<'a>,
+    scopes: &mut HashMap<NodeId, TreeScope<DomElement<'a>>>,
+) -> Result<TreeScope<DomElement<'a>>, DomError> {
+    let document = element.document;
+    if !document.has_shadow_roots() {
+        return Ok(TreeScope::document());
+    }
+    let mut at = element.id;
+    let mut nearest = None;
+    let mut depth = 0;
+    let inherited = loop {
+        if let Some(&scope) = scopes.get(&at) {
+            break scope;
+        }
+        let node = document.node(at)?;
+        if let Some(parent) = node.parent() {
+            at = parent;
+            continue;
+        }
+        let Some(host) = node.shadow_host() else {
+            break TreeScope::document();
+        };
+        nearest.get_or_insert((at, host));
+        depth += 1;
+        at = host;
+    };
+    let scope = nearest.map_or(inherited, |(root, host)| TreeScope {
+        context: shadow_tree_context(root),
+        host: DomElement::new(document, host),
+        depth: inherited.depth + depth,
+    });
+    scopes
+        .try_reserve(1)
+        .map_err(|_| DomError::AllocationFailed)?;
+    scopes.insert(element.id, scope);
+    Ok(scope)
 }
 
-/// Style every element in the subtree rooted at `root`, in shadow-including
-/// tree order: run the cascade, then compute values, with each element
-/// inheriting its parent element's computed values. A shadow tree is styled
-/// right after its host, before the host's children, and its top-level
-/// elements inherit from the host; its author sheets are those pushed with
-/// [`shadow_tree_context`] (see [`crate::document_cascade`]). Template
-/// contents are not styled. Slots are not assigned yet, so the host's light
-/// children inherit from the host (TD-23).
-///
-/// `style` attributes on elements are parsed with `parser`; if one exceeds
-/// the parser's limits it is ignored (reported as an empty declaration list).
-/// When `root` is not the document's root element, the subtree is styled as
-/// if `root` had no parent and were in the document tree.
+/// Enclosing stylesheet contexts, needed only when resolving a keyframe name.
+fn outer_style_contexts(host: DomElement<'_>) -> Vec<TreeContext> {
+    let document = host.document;
+    let mut at = host.id;
+    let mut out = Vec::new();
+    loop {
+        let node = document.node(at).expect("live stylesheet scope");
+        if let Some(parent) = node.parent() {
+            at = parent;
+        } else if let Some(outer) = node.shadow_host() {
+            out.push(shadow_tree_context(at));
+            at = outer;
+        } else {
+            out.push(TreeContext::DOCUMENT);
+            return out;
+        }
+    }
+}
+
+/// Style the flat tree with inheritance from the rendered parent. Selector
+/// matching stays in each element's original DOM tree and stylesheet scope.
 pub fn style_tree<'a>(
     document: &'a Document,
     root: NodeId,
@@ -612,39 +651,16 @@ pub(crate) fn style_walk<'a>(
     // The tree and the cascade stay borrowed and unchanged for the whole
     // restyle, so match results can be shared.
     let cache = MatchCache::default();
-    // An explicit stack of tree walks, bounded by live nodes, so nested
-    // shadow trees never recurse.
-    let mut walks = vec![TreeWalk {
-        walk: document.walk(root)?,
-        base: 0,
-        shadow: false,
-        scope: TreeScope::document(),
-    }];
-    while let Some(tree) = walks.last_mut() {
-        let Some((id, depth)) = tree.walk.next() else {
-            walks.pop();
-            continue;
-        };
-        if tree.shadow && depth == 0 {
-            continue; // The shadow root itself, standing in for its host.
-        }
-        let (scope, depth) = (tree.scope, tree.base + depth);
-        // The contexts of the enclosing trees, for `@keyframes` lookup.
-        let outer: Vec<TreeContext> = if animations.is_some() {
-            walks[..walks.len() - 1]
-                .iter()
-                .rev()
-                .map(|w| w.scope.context)
-                .collect()
-        } else {
-            Vec::new()
-        };
+    let slots = document.slot_map()?;
+    let mut scopes = HashMap::new();
+    for (id, depth) in slots.flat_walk(root)? {
         while path.last().is_some_and(|e| e.depth >= depth) {
             path.pop();
         }
         let Some(element) = DomElement::new(document, id) else {
             continue;
         };
+        let scope = style_scope(element, &mut scopes)?;
         // Only a direct parent element (or host) passes its style on.
         let parent_entry = path.last().copied().filter(|e| e.depth + 1 == depth);
         let parent_id = parent_entry.map(|e| out[e.index].node);
@@ -738,8 +754,12 @@ pub(crate) fn style_walk<'a>(
                     Some(controller) => {
                         let rendered =
                             !parent_entry.is_some_and(|e| e.hidden) && !is_display_none(&computed);
+                        let outer = std::cell::OnceCell::new();
                         let keyframes = |name: &str| -> Option<Arc<KeyframesRule>> {
-                            cascade.keyframes(name, scope.context, &outer).cloned()
+                            let contexts = outer.get_or_init(|| {
+                                scope.host.map_or_else(Vec::new, outer_style_contexts)
+                            });
+                            cascade.keyframes(name, scope.context, contexts).cloned()
                         };
                         let mut recompute = |animated: &[rustic_css::PropertyDeclaration],
                                              transitioned: &[rustic_css::PropertyDeclaration]| {
@@ -813,18 +833,6 @@ pub(crate) fn style_walk<'a>(
         });
         out.push(style);
         parents.push(parent_id);
-        if let Some(shadow_root) = shadow_root {
-            walks.push(TreeWalk {
-                walk: document.walk(shadow_root)?,
-                base: depth,
-                shadow: true,
-                scope: TreeScope {
-                    context: shadow_tree_context(shadow_root),
-                    host: Some(element),
-                    depth: scope.depth.saturating_add(1),
-                },
-            });
-        }
     }
     Ok(Walked {
         styles: out,

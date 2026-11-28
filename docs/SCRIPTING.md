@@ -179,7 +179,15 @@ canceled. After each checkpoint the document queues a task that fires
 `unhandledrejection` for still-unhandled rejections and `rejectionhandled`
 for ones handled later; the loader runs it before the readiness steps.
 Event handler IDL attributes (`onclick`, `onerror`, `onload`, … on Window,
-Document and HTML elements) keep their position among listeners. `console`
+Document and HTML elements) keep their position among listeners. Content
+attributes (`onclick="…"` on HTML elements; `onload`, `onerror`, `onfocus`,
+`onblur`, `onresize` and `onscroll` on the body for Window) compile into
+the same handlers when the handler is next looked at (IDL read,
+`addEventListener` on the element, dispatch, or an attribute API change),
+as functions of `event` in the global scope; the host's
+`ScriptPolicy::allows_handler_attribute` (CSP `script-src-attr`) decides
+whether they compile, and an unparsable body reports its `SyntaxError` and
+leaves a null handler (TD-153). `console`
 methods fill a bounded buffer the host drains with
 `take_console_messages`; `rustic … --run-scripts` prints it to standard
 error. Describing a value never runs page code. `Node` also has
@@ -220,6 +228,20 @@ layout snapshot as other script reads. [ADR 0050](adr/0050-resize-observer.md)
 | Browser services | `fetch()` and Web Storage are available in the supported page host. Streams, workers and IndexedDB remain M9 work. |
 
 Unimplemented Web APIs are absent from the exposed interface.
+
+## Shadow DOM and custom elements
+
+`Element.attachShadow`, `Element.shadowRoot`, `ShadowRoot` and
+`HTMLSlotElement` expose shadow ownership and slot distribution. `slotchange`
+shares the mutation observer notification microtask. See
+[DOM shadow roots and slots](DOM.md#shadow-roots-and-slots).
+
+The Window's global `customElements` registry supports autonomous custom
+elements with `define`, `get`, `getName`, `whenDefined` and `upgrade`.
+Construction through `HTMLElement` preserves an upgraded node's existing
+wrapper. Registered callbacks can observe connection, disconnection, adoption
+and observed attribute changes. [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration)
+tracks the remaining lifecycle and registry work.
 
 ## Window encoding, URL, Fetch and WebAssembly
 
@@ -387,7 +409,19 @@ same turn budget, so a single call cannot run unmetered.
   `togglePopover`, `popovertarget` invokers) and `ToggleEvent`. Modal dialogs
   and showing popovers are in the document's top layer, which `:modal` and
   `:popover-open` match; the UA sheet styles `details`, `dialog` and
-  `[popover]` (CSS.md). Limits: TD-216.
+  `[popover]` (CSS.md). Opening runs the dialog and popover focusing steps
+  (an `autofocus` descendant, else for dialogs the first focusable one) and
+  closing returns focus. Content outside the topmost modal dialog, and
+  under `inert` (`HTMLElement.inert`), is inert: not focusable, and a click
+  on it lands on the dialog or on the inert subtree's parent. An uncanceled
+  Escape is a close request (`cancel` then `close` for the topmost modal
+  dialog, unless `closedby=none`; the topmost auto popover hides). A press
+  outside auto popovers hides them (popover invokers count as inside), and a
+  press on a `closedby=any` dialog's backdrop requests its close.
+  `setAttribute`/`removeAttribute` of `open` and `popover` run the attribute
+  change steps (details toggle and name groups, dialogs leave the top
+  layer, a popover whose state changes hides). `toggle` events coalesce per
+  element. Limits: TD-216.
 - **Embedded content and token lists** (HTML §4.8.4–5, DOM §7.1,
   `page/embedded.rs`, `page/token_list.rs`). `HTMLImageElement` and
   `HTMLIFrameElement` reflect their content attributes (`src` as a URL,
@@ -396,7 +430,14 @@ same turn budget, so a single call cannot run unmetered.
   attribute's ordered token set, `[SameObject]` per element, behind
   `Element.classList` and `HTMLIFrameElement.sandbox` (whose `supports()`
   knows the sandbox keywords). `loading=lazy` images and iframes load only
-  within 1250px of the viewport (PAINT.md, lazy loading). Limits: TD-218.
+  within 1250px of the viewport (PAINT.md, lazy loading). An image's
+  `currentSrc`, `naturalWidth`/`naturalHeight`, `complete` and `decode()`
+  read the host's last image load through a layout read, `width`/`height`
+  the rendered size, and `crossOrigin` reflects as a CORS settings
+  attribute. `HTMLAnchorElement`, `HTMLAreaElement` and `HTMLLinkElement`
+  reflect their hyperlink attributes and have `relList` (`supports()`
+  knows `stylesheet`/`alternate` on `link` and `noopener`/`noreferrer`/
+  `opener` on `a`/`area`). Limits: TD-217, TD-218.
 - **Inline style** (CSSOM §6.7, `page/inline_style.rs`). `element.style`
   returns one `CSSStyleDeclaration` per element whose only store is the
   `style` attribute: reads parse it, writes serialize it back, so the cascade

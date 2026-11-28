@@ -1,4 +1,7 @@
-use rustic_dom::{DomError, MATHML_NAMESPACE, NodeId, NodeKind, QualifiedName, SVG_NAMESPACE};
+use rustic_dom::{
+    DomError, MATHML_NAMESPACE, NodeId, NodeKind, QualifiedName, SVG_NAMESPACE, ShadowRootMode,
+    ShadowRootOptions,
+};
 
 use super::foreign::{
     adjust_mathml_attribute, adjust_svg_attribute, adjust_svg_tag, foreign_attribute,
@@ -138,6 +141,46 @@ impl TreeBuilder {
                 before: None,
             },
             _ => place,
+        }
+    }
+
+    /// In the document parser, a valid shadow template attaches directly to
+    /// the adjusted current element. Ineligible hosts keep an ordinary template.
+    pub(super) fn insert_declarative_shadow(&mut self, tag: &Tag) -> Result<bool, ParseError> {
+        let attr = |name| tag.attributes().iter().find(|attr| attr.name() == name);
+        let Some(mode) = attr("shadowrootmode").map(|attr| attr.value()) else {
+            return Ok(false);
+        };
+        if self.fragment() {
+            return Ok(false);
+        }
+        let mode = if mode.eq_ignore_ascii_case("open") {
+            ShadowRootMode::Open
+        } else if mode.eq_ignore_ascii_case("closed") {
+            ShadowRootMode::Closed
+        } else {
+            return Ok(false);
+        };
+        let options = ShadowRootOptions {
+            declarative: true,
+            clonable: attr("shadowrootclonable").is_some(),
+            delegates_focus: attr("shadowrootdelegatesfocus").is_some(),
+            serializable: attr("shadowrootserializable").is_some(),
+            ..ShadowRootOptions::new(mode)
+        };
+        self.open
+            .try_reserve(1)
+            .map_err(|_| DomError::AllocationFailed)?;
+        match self
+            .document
+            .attach_shadow_with_options(self.current(), options)
+        {
+            Ok(root) => {
+                self.open.push(root);
+                Ok(true)
+            }
+            Err(DomError::WrongNodeKind | DomError::InvalidHierarchy) => Ok(false),
+            Err(error) => Err(error.into()),
         }
     }
 

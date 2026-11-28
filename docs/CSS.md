@@ -667,11 +667,11 @@ every tree; an author sheet styles the elements of its own tree and, through
 is featureless: it matches only `:host` forms (also within `:is()` and
 `:where()`), combinators reach it from the tree's top-level elements, and
 nothing beyond it. `document_cascade` puts each `<style>` inside a shadow tree
-in that tree's context, and `style_tree` styles in shadow-including tree order:
-a shadow tree right after its host, its top-level elements inheriting from the
-host. Slots are not assigned, so the host's light children inherit from the
-host rather than from a slot (TD-23); `::slotted()`, `::part()` and
-`:host-context()` are rejected. Each tree has its own layer order.
+in that tree's context. Style follows the flat tree for inheritance. A slotted
+element inherits from its slot, and top-level shadow elements inherit from
+their host. Author selector matching still uses the original DOM tree.
+`::slotted()`, `::part()` and `:host-context()` remain open. Each tree has its
+own layer order.
 
 ### Presentational hints
 
@@ -680,16 +680,26 @@ zero specificity that lose to every author rule, in or out of a layer, as
 if at the start of the author sheets; `revert-layer` in the lowest layer
 falls back to them. `rustic-style/src/hints.rs` maps an element's
 attributes to CSS text that is parsed like a `style` attribute; every value
-is validated and re-serialized first (numbers by Rustic, colors only as
-checked names or hex digits), so attribute text never reaches the parser.
+is validated and re-serialized first (numbers by Rustic, colors by HTML's
+legacy color parser as a CSS named color or `#rrggbb`, font faces as quoted
+names of plain characters), so attribute text never reaches the parser.
 Mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object`,
 tables and cells (zero ignored on tables and cells), `height` on rows,
 `width` on columns, `bgcolor` on tables, row groups, rows and cells,
 `align`/`valign` on row groups, rows and cells, `nowrap` on cells, table
 `align` (floats or auto margins), `cellspacing`, and `cellpadding` and
-`border`, which also reach the table's cells. Changing any of these
-attributes restyles the element's subtree. Other legacy attributes are
-TD-179.
+`border`, which also reach the table's cells, and table `bordercolor`.
+Also (2026-11-28): body `text`, `bgcolor`, `link` (the color of its
+`a href` descendants; `vlink`/`alink` never apply) and `marginwidth`/
+`marginheight`/`topmargin`/`bottommargin`/`leftmargin`/`rightmargin`;
+`font` `color`, `face` and `size` (legacy font sizes 1–7, relative with
+`+`/`-`); `hr` `align`, `color`, `noshade`, `size` and `width`; list
+`type` on `ol` (`1`, `a`, `A`, `i`, `I`), `ul` and `li`; `hspace`, `vspace`
+and `align` on `img`, `iframe`, `embed`, `object` (and the spacing on
+`video`); `align` on `div`, `p`, headings and `caption`; and `pre wrap`.
+Changing any of these attributes restyles the element's subtree. Table
+`rules` and `frame`, body `background` and the remaining legacy
+attributes are TD-179.
 
 ### Cascade evidence
 
@@ -1204,7 +1214,10 @@ and greek, and the disclosure triangles), `list-style-position` (an
 shorthand (images only as `none`). Ordinals follow HTML (`ol start` and
 `reversed`, `li value`). The UA sheet gives form controls their HTML §15.5
 rendering as inline-blocks; their value text and painted parts come from
-their attributes (`rustic-layout/src/tree.rs`, `rustic-paint/src/controls.rs`).
+their attributes (`rustic-layout/src/tree.rs`, `rustic-paint/src/controls.rs`),
+except that a scripted page's text fields show their current value and
+checkboxes and radio buttons their checkedness
+(`BoxTree::build_with_controls`).
 A closed `details` renders only its first `summary`, whose marker is a
 disclosure triangle. Limits: TD-219.
 

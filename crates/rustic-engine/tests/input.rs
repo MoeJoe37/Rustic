@@ -41,7 +41,10 @@ fn source(text: &str) -> Source {
 
 fn run(page: &mut ScriptedDocument, text: &str) {
     page.queue_script(source(text)).unwrap();
-    assert_eq!(page.run_next(), Ok(Some(ScriptTurn::Completed)));
+    let turn = page.run_next();
+    if turn != Ok(Some(ScriptTurn::Completed)) {
+        panic!("{turn:?}: {:?}", page.take_console_messages());
+    }
 }
 
 fn deliver(page: &mut ScriptedDocument, target: NodeId, input: InputEvent) {
@@ -474,5 +477,143 @@ fn window_open_needs_and_spends_transient_activation() {
     run(
         &mut page,
         "if (window.error !== 'SyntaxError' || window.blocked !== null) throw 1",
+    );
+}
+
+#[test]
+fn modal_dialogs_trap_focus_and_close_on_escape_and_backdrop_clicks() {
+    let mut engine = Engine::new(1);
+    let mut page = page(
+        &mut engine,
+        "<!doctype html><button id=opener type=button>open</button><p id=outside>text</p>\
+         <dialog id=d closedby=any><input id=first><input id=auto autofocus></dialog>\
+         <div id=p popover><button id=inner type=button>in</button></div>\
+         <button id=invoker type=button popovertarget=p>toggle</button>",
+        TaskLimits::default(),
+    );
+    let opener = id(&page, "opener");
+    let outside = id(&page, "outside");
+    let inner = id(&page, "inner");
+    run(
+        &mut page,
+        r#"
+        globalThis.$ = id => document.getElementById(id);
+        globalThis.log = [];
+        const d = $("d");
+        d.addEventListener("cancel", () => log.push("cancel"));
+        d.addEventListener("close", () => log.push("close"));
+        d.addEventListener("click", e => log.push("click " + e.target.id));
+        $("opener").focus();
+        if (document.activeElement !== $("opener")) throw "opener focus";
+        d.showModal();
+        if (document.activeElement !== $("auto")) throw "autofocus delegate: " + document.activeElement;
+        $("opener").focus();
+        if (document.activeElement !== $("auto")) throw "content outside a modal dialog is inert";
+        if (!$("opener").matches("button") || $("opener").inert) throw "inert IDL is the attribute";
+    "#,
+    );
+    // Escape requests a close: cancel, then close, and focus goes back.
+    deliver(&mut page, opener, InputEvent::KeyDown(key("Escape")));
+    run(
+        &mut page,
+        r#"
+        if ($("d").open || document.activeElement !== $("opener")) throw "escape closes and restores focus";
+        $("d").showModal();
+        if (document.activeElement !== $("auto")) throw "reopen";
+    "#,
+    );
+    // A click on inert content lands on the dialog (its backdrop); with
+    // closedby=any that light-dismisses it.
+    deliver(&mut page, outside, click());
+    run(
+        &mut page,
+        r#"
+        if ($("d").open) throw "backdrop click closes a closedby=any dialog";
+        if (log.join() !== "cancel,close,cancel,click d,close") throw "events: " + log.join();
+        // Auto popovers: autofocus only, Escape hides, outside presses dismiss.
+        const p = $("p");
+        p.showPopover();
+        if (document.activeElement !== $("opener")) throw "popovers without autofocus keep focus";
+        $("inner").focus();
+    "#,
+    );
+    deliver(&mut page, inner, InputEvent::KeyDown(key("Escape")));
+    run(
+        &mut page,
+        r#"
+        if ($("p").matches(":popover-open")) throw "escape hides the auto popover";
+        if (document.activeElement !== $("opener")) throw "hiding restores focus from inside";
+        $("p").showPopover();
+    "#,
+    );
+    deliver(&mut page, inner, click());
+    run(
+        &mut page,
+        r#"if (!$("p").matches(":popover-open")) throw "a press inside keeps the popover";"#,
+    );
+    deliver(&mut page, outside, click());
+    run(
+        &mut page,
+        r#"
+        if ($("p").matches(":popover-open")) throw "a press outside light-dismisses";
+        // The `inert` attribute: not focusable, and clicks land on the parent.
+        $("outside").inert = true;
+        if (!$("outside").hasAttribute("inert")) throw "inert reflects";
+        $("outside").tabIndex = 0;
+        $("outside").focus();
+        if (document.activeElement === $("outside")) throw "inert content is not focusable";
+        document.body.addEventListener("click", e => log.push("body " + e.target.localName));
+        log.length = 0;
+    "#,
+    );
+    deliver(&mut page, outside, click());
+    run(
+        &mut page,
+        r#"if (log.join() !== "body body") throw "inert click target: " + log.join();"#,
+    );
+}
+
+#[test]
+fn event_handler_content_attributes_compile_and_run_in_listener_order() {
+    let mut engine = Engine::new(1);
+    let mut page = page(
+        &mut engine,
+        "<!doctype html><body onload=\"log.push('load ' + (this === window))\">\
+         <a id=a href=#x onclick=\"log.push('attr ' + event.type + ' ' + this.id); return false\">a</a>",
+        TaskLimits::default(),
+    );
+    let a = id(&page, "a");
+    run(
+        &mut page,
+        r#"
+        globalThis.log = [];
+        const a = document.getElementById("a");
+        a.addEventListener("click", e => log.push("listener " + e.defaultPrevented));
+        if (typeof a.onclick !== "function" || a.onclick.name !== "onclick") throw "compiled getter";
+        if (document.body.onload !== null || typeof window.onload !== "function")
+            throw "body onload sets the window handler";
+        window.dispatchEvent(new Event("load"));
+    "#,
+    );
+    deliver(&mut page, a, click());
+    run(
+        &mut page,
+        r#"
+        if (log.join() !== "load true,attr click a,listener true") throw "order: " + log.join();
+        log.length = 0;
+        a.setAttribute("onclick", "log.push('changed')");
+        a.click();
+        a.onclick = () => log.push("idl");
+        a.click();
+        a.setAttribute("onclick", "log.push('again')");
+        a.click();
+        a.removeAttribute("onclick");
+        a.click();
+        if (a.onclick !== null) throw "removing the attribute clears the handler";
+        if (log.join() !== "changed,listener false,idl,listener false,again,listener false,listener false")
+            throw "updates: " + log.join();
+        a.setAttribute("onmouseover", "this is not javascript");
+        if (a.onmouseover !== null) throw "an unparsable attribute is a null handler";
+    "#,
     );
 }

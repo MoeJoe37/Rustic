@@ -9,9 +9,23 @@
 //! callback slot holds the handler entry, whose current value is read when
 //! the event runs.
 //!
+//! Content attributes (`onclick="…"`) on HTML elements, and the
+//! Window-reflecting ones on the body element, set the same handlers: an
+//! attribute is compiled into a function of `event` (Window's `onerror`:
+//! `event, source, lineno, colno, error`) when its handler is next looked
+//! at: read through the IDL attribute, before `addEventListener` appends to
+//! the element, before an event's listeners run on it, and when an
+//! attribute API changes it. The host's policy (CSP `script-src-attr`)
+//! decides whether it compiles; a refused or unparsable attribute leaves a
+//! null handler. Bodies compile in the global scope, without the element,
+//! form owner and document scopes (TD-153).
+//!
 //! [HTML §8.1.8.1]: https://html.spec.whatwg.org/multipage/webappapis.html#event-handler-attributes
 
-use rustic_js::runtime::{Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
+use std::rc::Rc;
+
+use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
+use rustic_js::runtime::{Abrupt, Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
 
 use super::super::with_page;
 use super::state::Event;
@@ -87,9 +101,26 @@ const SETTERS: [NativeFn; 42] = [
     set::<41>,
 ];
 
-/// Handler entry slots: `[current value or null, active listener or null]`.
+/// Handler entry slots: `[current value or null, active listener or null,
+/// the content attribute's value when last looked at (string) or null]`.
 const VALUE: u32 = 0;
 const LISTENER: u32 = 1;
+const SEEN: u32 = 2;
+
+/// Body content attributes that set Window's handlers (HTML "the
+/// Window-reflecting body element event handler set"), among [`NAMES`].
+const BODY_FORWARDED: [&str; 6] = ["blur", "error", "focus", "load", "resize", "scroll"];
+
+/// The host's decision on compiling an event handler content attribute
+/// (CSP `script-src-attr`), given its source text.
+#[derive(Clone)]
+pub struct HandlerPolicy(pub Rc<dyn Fn(&str) -> bool>);
+
+impl std::fmt::Debug for HandlerPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("HandlerPolicy")
+    }
+}
 
 /// Install the attributes on an interface prototype. Window also gets the
 /// Window-only handlers.
@@ -150,8 +181,16 @@ fn entry(agent: &mut Agent, table: ObjectId, name: &str) -> JsResult<Option<Priv
     Ok(PrivateArray::from_value(value))
 }
 
+fn new_entry(agent: &mut Agent, table: ObjectId, index: usize) -> JsResult<PrivateArray> {
+    let entry = PrivateArray::new(agent, &[Value::NULL, Value::NULL, Value::NULL])?;
+    let key = agent.heap.key(NAMES[index])?;
+    agent.create_data_property_or_throw(table, key, entry.value())?;
+    Ok(entry)
+}
+
 fn get<const INDEX: usize>(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let target = receiver(agent, this)?;
+    sync(agent, target, INDEX)?;
     let Some(table) = table(agent, target.value, false)? else {
         return Ok(Value::NULL);
     };
@@ -163,6 +202,8 @@ fn get<const INDEX: usize>(agent: &mut Agent, this: Value, _: &[Value]) -> JsRes
 
 fn set<const INDEX: usize>(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     let target = receiver(agent, this)?;
+    // An attribute change not yet seen happened before this assignment.
+    sync(agent, target, INDEX)?;
     let value = args.first().copied().unwrap_or(Value::UNDEFINED);
     // [LegacyTreatNonObjectAsNull]
     let value = if value.as_object().is_some() {
@@ -178,12 +219,7 @@ fn set<const INDEX: usize>(agent: &mut Agent, this: Value, args: &[Value]) -> Js
         let entry = match existing {
             Some(entry) => entry,
             None if value == Value::NULL => return Ok(Value::UNDEFINED),
-            None => {
-                let entry = PrivateArray::new(agent, &[Value::NULL, Value::NULL])?;
-                let key = agent.heap.key(NAMES[INDEX])?;
-                agent.create_data_property_or_throw(table, key, entry.value())?;
-                entry
-            }
+            None => new_entry(agent, table, INDEX)?,
         };
         entry.set(agent, VALUE, value)?;
         let listener = Listener::from_value(entry.get(agent, LISTENER)?);
@@ -258,4 +294,196 @@ pub(super) fn call(
         event.prevent_default(agent)?;
     }
     Ok(result)
+}
+
+// ---- content attributes ------------------------------------------------------
+
+/// The element whose `on…` content attribute sets `target`'s `name`
+/// handler: the element itself (an HTML element other than body/frameset
+/// for the forwarded names), or the body for Window.
+fn attribute_owner(
+    document: &Document,
+    target: Option<NodeId>,
+    window: bool,
+    name: &str,
+) -> Option<NodeId> {
+    let html = |id: NodeId| match document.node(id).ok()?.kind() {
+        NodeKind::Element(e) if e.name().namespace() == Some(HTML_NAMESPACE) => {
+            Some(e.name().local().to_owned())
+        }
+        _ => None,
+    };
+    let forwarded = BODY_FORWARDED.contains(&name);
+    if window {
+        if !forwarded {
+            return None;
+        }
+        let root = document.root();
+        let element = document
+            .children(root)
+            .ok()?
+            .find(|&c| html(c).as_deref() == Some("html"))?;
+        return document
+            .children(element)
+            .ok()?
+            .find(|&c| matches!(html(c).as_deref(), Some("body" | "frameset")));
+    }
+    let id = target?;
+    match html(id)?.as_str() {
+        "body" | "frameset" if forwarded => None,
+        _ => Some(id),
+    }
+}
+
+/// The `on{name}` attribute of the element that sets `target`'s handler.
+fn content_source(agent: &mut Agent, target: Target, name: &str) -> JsResult<Option<String>> {
+    let local = format!("on{name}");
+    let id = if target.node {
+        match super::super::traversal::node_of(agent, target.value) {
+            Ok(id) => Some(id),
+            Err(_) => return Ok(None),
+        }
+    } else {
+        None
+    };
+    with_page(agent, |agent, page| {
+        let window = target.value == page.window;
+        if id.is_none() && !window {
+            return Ok(None);
+        }
+        let document = id.map_or(page.main, NodeId::document);
+        page.read(agent, document, |_, d| {
+            let Some(owner) = attribute_owner(d, id, window, name) else {
+                return Ok(None);
+            };
+            let Ok(NodeKind::Element(e)) = d.node(owner).map(|n| n.kind()) else {
+                return Ok(None);
+            };
+            Ok(e.attributes()
+                .iter()
+                .find(|a| a.name().namespace().is_none() && a.name().local() == local)
+                .map(|a| String::from_utf16_lossy(a.value().as_units())))
+        })
+    })
+}
+
+/// Bring `target`'s `NAMES[index]` handler up to date with its content
+/// attribute, if that changed since it was last looked at.
+pub(super) fn sync(agent: &mut Agent, target: Target, index: usize) -> JsResult<()> {
+    if index >= GLOBAL {
+        return Ok(());
+    }
+    let name = NAMES[index];
+    let source = content_source(agent, target, name)?;
+    let Some(table) = table(agent, target.value, source.is_some())? else {
+        return Ok(());
+    };
+    let entry = match entry(agent, table, name)? {
+        Some(entry) => entry,
+        None if source.is_none() => return Ok(()),
+        None => new_entry(agent, table, index)?,
+    };
+    let seen = entry.get(agent, SEEN)?;
+    let seen = match seen.as_string() {
+        Some(seen) => Some(agent.heap.string(seen).to_text()),
+        None => None,
+    };
+    if seen == source {
+        return Ok(());
+    }
+    let seen = match &source {
+        Some(text) => agent.string(text)?,
+        None => Value::NULL,
+    };
+    entry.set(agent, SEEN, seen)?;
+    let value = match source {
+        Some(text) => compile(agent, target, name, &text)?,
+        None => Value::NULL,
+    };
+    with_root(agent, value, |agent| {
+        entry.set(agent, VALUE, value)?;
+        let listener = Listener::from_value(entry.get(agent, LISTENER)?);
+        match (value == Value::NULL, listener) {
+            (true, Some(listener)) => {
+                if let Some(list) = super::listener_list(agent, target.value)? {
+                    list.remove(agent, listener)?;
+                }
+                entry.set(agent, LISTENER, Value::NULL)
+            }
+            (false, None) => activate(agent, target, entry, index),
+            _ => Ok(()),
+        }
+    })
+}
+
+/// Compile an attribute's body, or null when the policy refuses it or it
+/// does not parse (the error is reported, HTML §8.1.8.1 step 3.9).
+fn compile(agent: &mut Agent, target: Target, name: &str, body: &str) -> JsResult<Value> {
+    let (window, policy) = with_page(agent, |_, page| {
+        Ok((page.window, page.events.handler_policy.borrow().clone()))
+    })?;
+    if policy.is_some_and(|policy| !(policy.0)(body)) {
+        return Ok(Value::NULL);
+    }
+    let params = if target.value == window && name == "error" {
+        "event, source, lineno, colno, error"
+    } else {
+        "event"
+    };
+    match agent.compile_event_handler(params, body, &format!("on{name}")) {
+        Ok(function) => Ok(function),
+        Err(Abrupt::Throw(error)) => {
+            super::report_callback_error(agent, error)?;
+            Ok(Value::NULL)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+/// Sync the handler for `event_type` before `target`'s listeners run.
+pub(super) fn sync_type(agent: &mut Agent, target: Value, event_type: Value) -> JsResult<()> {
+    let Some(kind) = event_type.as_string() else {
+        return Ok(());
+    };
+    let index = NAMES[..GLOBAL]
+        .iter()
+        .position(|name| agent.heap.string(kind).units().eq(name.encode_utf16()));
+    let Some(index) = index else {
+        return Ok(());
+    };
+    let target = receiver(agent, target)?;
+    sync(agent, target, index)
+}
+
+/// Sync every handler whose content attribute `target` has (before a
+/// listener is appended, so attribute handlers keep their place).
+pub(super) fn sync_all(agent: &mut Agent, target: Target) -> JsResult<()> {
+    for index in 0..GLOBAL {
+        agent.check_native_work()?;
+        sync(agent, target, index)?;
+    }
+    Ok(())
+}
+
+/// An attribute API changed `local` on `this`: sync its handler.
+pub(in crate::page) fn attribute_changed(
+    agent: &mut Agent,
+    this: Value,
+    local: &str,
+) -> JsResult<()> {
+    let Some(name) = local.strip_prefix("on") else {
+        return Ok(());
+    };
+    let Some(index) = NAMES[..GLOBAL].iter().position(|n| *n == name) else {
+        return Ok(());
+    };
+    let target = receiver(agent, this)?;
+    sync(agent, target, index)?;
+    // A body attribute sets Window's handler.
+    if BODY_FORWARDED.contains(&name) {
+        let window = with_page(agent, |_, page| Ok(page.window))?;
+        let window = receiver(agent, window)?;
+        sync(agent, window, index)?;
+    }
+    Ok(())
 }

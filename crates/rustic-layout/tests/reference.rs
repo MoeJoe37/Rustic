@@ -1,6 +1,6 @@
 use rustic_base::CancellationToken;
 use rustic_css::{CssParser, Direction, Display, PropertyId};
-use rustic_dom::{Document, NodeKind, ShadowRootMode};
+use rustic_dom::{Document, NodeKind};
 use rustic_layout::{
     BoxKind, BoxTree, CssPoint, CssPx, CssRect, CssSize, DeviceScale, LayoutError, LayoutLimits,
     MeasureError, measure_block_width,
@@ -307,14 +307,18 @@ fn snapshot_owns_utf16_text_and_survives_source_mutations() {
 }
 
 #[test]
-fn shadow_hosts_fail_explicitly_until_a_flattened_tree_exists() {
-    let (mut doc, styles) = page("<div></div>", "");
-    doc.attach_shadow(styles.last().unwrap().node, ShadowRootMode::Open)
-        .unwrap();
-    assert_eq!(
-        build(&doc, &styles, LayoutLimits::default()),
-        Err(LayoutError::ShadowTree)
+fn shadow_hosts_render_assigned_nodes_and_omit_unassigned_light_children() {
+    let (doc, styles) = page(
+        "<div><template shadowrootmode=open><section><slot name=x>fallback</slot>shadow</section></template><b slot=x>assigned</b><i>hidden</i></div>",
+        "",
     );
+    let tree = build(&doc, &styles, LayoutLimits::default()).unwrap();
+    let text = tree
+        .boxes()
+        .iter()
+        .flat_map(|item| item.text().iter().copied())
+        .collect::<Vec<_>>();
+    assert_eq!(String::from_utf16(&text).unwrap(), "assignedshadow");
 }
 
 #[test]

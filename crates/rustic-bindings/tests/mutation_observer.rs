@@ -400,3 +400,141 @@ fn observing_many_short_lived_nodes_does_not_retain_their_registrations() {
         "if (log.length !== 0) throw 'delivered after disconnect';",
     );
 }
+
+#[test]
+fn shadow_slots_update_and_signal_after_observers_in_the_same_checkpoint() {
+    let (mut agent, _) = page();
+    run(
+        &mut agent,
+        r#"
+        let host = document.createElement('div');
+        document.body.append(host);
+        let root = host.attachShadow({mode: 'open', clonable: true});
+        let slot = document.createElement('slot');
+        let second = document.createElement('slot');
+        slot.name = second.name = 'named';
+        root.append(slot, second);
+        let fallback = document.createElement('b');
+        slot.append(fallback);
+        if (slot.assignedNodes().length || slot.assignedElements({flatten:true})[0] !== fallback)
+            throw 'fallback';
+        let light = document.createElement('i');
+        light.slot = 'named';
+        let signals = [];
+        root.addEventListener('slotchange', event => {
+            if (!event.isTrusted || event.composed || !event.bubbles || event.target !== slot)
+                throw 'slot event';
+            signals.push('slot');
+        });
+        new MutationObserver(() => signals.push('observer')).observe(host, {childList:true});
+        host.append(light);
+        if (slot.assignedElements()[0] !== light || second.assignedElements().length || light.assignedSlot !== slot)
+            throw 'named assignment';
+        if (light.parentNode !== host || !fallback.isConnected ||
+            fallback.getRootNode() !== root || fallback.getRootNode({composed:true}) !== document)
+            throw 'shadow ancestry';
+        const clone = host.cloneNode();
+        if (clone.shadowRoot === root || clone.shadowRoot.firstChild.name !== 'named' ||
+            clone.childNodes.length || root.host !== host || !root.clonable ||
+            !(root instanceof DocumentFragment) || !(slot instanceof HTMLSlotElement))
+            throw 'shadow clone or interfaces';
+        "#,
+        "if (signals.join() !== 'observer,slot') throw signals.join();",
+    );
+}
+
+#[test]
+fn manual_slot_assignment_is_ordered_unique_and_closed_roots_hide_the_slot() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const host = document.createElement('span');
+        const shadow = host.attachShadow({mode: 'closed', slotAssignment: 'manual'});
+        const slot = document.createElement('slot');
+        const other = document.createElement('slot');
+        shadow.append(slot, other);
+        const a = document.createElement('a');
+        const text = document.createTextNode('text');
+        slot.assign(text, a, text);
+        host.append(a, text);
+        if (host.shadowRoot !== null || a.assignedSlot !== null || text.assignedSlot !== null ||
+            slot.assignedNodes().length !== 2 || slot.assignedNodes()[0] !== text ||
+            slot.assignedElements()[0] !== a) throw 'manual assignment';
+        other.assign(text);
+        if (slot.assignedNodes()[0] !== a || other.assignedNodes()[0] !== text) throw 'reassign';
+        text.remove();
+        if (other.assignedNodes().length) throw 'detached';
+        host.append(text);
+        if (other.assignedNodes()[0] !== text) throw 'reinserted';
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
+fn autonomous_custom_element_definition_upgrades_and_runs_lifecycle_callbacks() {
+    let (mut agent, _) = page();
+    run(
+        &mut agent,
+        r#"
+        let events = [];
+        const node = document.createElement('rustic-widget');
+        node.setAttribute('watched', 'initial');
+        document.body.appendChild(node);
+        const pending = customElements.whenDefined('rustic-widget');
+        let resolved;
+        pending.then(value => resolved = value);
+        class Widget extends HTMLElement {
+            static get observedAttributes() { return ['watched']; }
+            constructor() { super(); events.push('construct'); }
+            connectedCallback() { events.push('connected'); }
+            disconnectedCallback() { events.push('disconnected'); }
+            attributeChangedCallback(name, oldValue, value, namespace) {
+                events.push([name, oldValue, value, namespace].join(':'));
+            }
+        }
+        customElements.define('rustic-widget', Widget);
+        if (!(node instanceof Widget) || customElements.get('rustic-widget') !== Widget ||
+            customElements.getName(Widget) !== 'rustic-widget') throw 'upgrade';
+        node.setAttribute('unwatched', 'skip');
+        node.setAttribute('watched', 'change');
+        node.remove();
+        const fresh = document.createElement('rustic-widget');
+        if (!(fresh instanceof Widget) || !(new Widget() instanceof Widget)) throw 'construction';
+        document.body.append(fresh);
+        "#,
+        r#"
+        if (resolved !== Widget || events.join() !==
+            'construct,watched::initial:,connected,watched:initial:change:,disconnected,construct,construct,connected')
+            throw events.join();
+        "#,
+    );
+}
+
+#[test]
+fn upgraded_elements_keep_their_wrapper_and_receive_old_and_new_documents_on_adoption() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const other = document.implementation.createHTMLDocument();
+        const events = [];
+        class AdoptedWidget extends HTMLElement {
+            adoptedCallback(before, after) {
+                if (this.ownerDocument !== after) throw 'wrong owner';
+                events.push([before, after]);
+            }
+        }
+        customElements.define('adopted-widget', AdoptedWidget);
+        const widget = document.createElement('adopted-widget');
+        if (other.adoptNode(widget) !== widget) throw 'wrapper replaced';
+        document.body.append(widget);
+        if (!(widget instanceof AdoptedWidget) || events.length !== 2 ||
+            events[0][0] !== document || events[0][1] !== other ||
+            events[1][0] !== other || events[1][1] !== document)
+            throw 'adopting steps';
+    "#,
+        )
+        .unwrap();
+}

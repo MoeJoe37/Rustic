@@ -243,10 +243,23 @@ fn cell_spans(colspan: Option<&[u16]>, rowspan: Option<&[u16]>) -> (u32, u32) {
     (columns, rows)
 }
 
+/// A form control's live state when it differs from what its content
+/// attributes say: the current value of a text field (its dirty value, set
+/// by script or typing) and the checkedness of a checkbox or radio button.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ControlState {
+    /// The current value, for controls that show one.
+    pub value: Option<Vec<u16>>,
+    /// The checkedness, for checkboxes and radio buttons.
+    pub checked: Option<bool>,
+}
+
 /// A flat, preorder box snapshot, distinct from the owning DOM.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoxTree {
     boxes: Vec<BoxSnapshot>,
+    /// Live checkedness of checkable inputs, for paint.
+    checked: HashMap<NodeId, bool>,
 }
 impl BoxTree {
     /// Construct principal boxes from an existing computed-style snapshot.
@@ -254,8 +267,8 @@ impl BoxTree {
     /// `display:none` suppresses a subtree, `display:contents` promotes its
     /// children, and templates are inert. Text is copied as UTF-16. Styles must
     /// be unique, live element IDs in this document; each visible element needs
-    /// one. No selectors or cascade run here. Visible shadow hosts fail until
-    /// flattened-tree/slot assignment exists (TD-37). Anonymous flow boxes are
+    /// one. The flat tree determines the children of shadow hosts and slots.
+    /// Anonymous flow boxes are
     /// derived separately by `FormattingTree`; pseudo boxes and other
     /// formatting-context fixups remain pending.
     pub fn build(
@@ -263,6 +276,26 @@ impl BoxTree {
         root: NodeId,
         styles: &[ElementStyle],
         limits: LayoutLimits,
+        cancellation: &CancellationToken,
+    ) -> Result<Self, LayoutError> {
+        Self::build_with_controls(
+            document,
+            root,
+            styles,
+            limits,
+            &HashMap::new(),
+            cancellation,
+        )
+    }
+
+    /// [`BoxTree::build`] with the live state of form controls, which takes
+    /// the place of their `value` and `checked` content attributes.
+    pub fn build_with_controls(
+        document: &Document,
+        root: NodeId,
+        styles: &[ElementStyle],
+        limits: LayoutLimits,
+        controls: &HashMap<NodeId, ControlState>,
         cancellation: &CancellationToken,
     ) -> Result<Self, LayoutError> {
         cancellation.check().map_err(|_| LayoutError::Cancelled)?;
@@ -303,7 +336,8 @@ impl BoxTree {
             }
             ancestor = node.parent();
         }
-        for (visited, (id, depth)) in document.walk(root)?.enumerate() {
+        let slots = document.slot_map()?;
+        for (visited, (id, depth)) in slots.flat_walk(root)?.enumerate() {
             cancellation.check().map_err(|_| LayoutError::Cancelled)?;
             if visited >= limits.max_nodes.saturating_sub(ancestors) {
                 return Err(LayoutError::NodeLimit);
@@ -358,7 +392,6 @@ impl BoxTree {
                             | "canvas"
                             | "br"
                             | "wbr"
-                            | "slot"
                     )
                 }
                 _ => false,
@@ -457,7 +490,7 @@ impl BoxTree {
                 _ => HtmlTag::Other,
             };
             let (kind, style, text) = match node.kind() {
-                NodeKind::Element(element) => {
+                NodeKind::Element(_) => {
                     let style = *index.get(&id).ok_or(LayoutError::MissingStyle(id))?;
                     let PropertyValue::Display(display) = style.get(PropertyId::Display) else {
                         return Err(LayoutError::InvalidStyles);
@@ -465,9 +498,6 @@ impl BoxTree {
                     if *display == Display::None {
                         hidden = Some(depth);
                         continue;
-                    }
-                    if element.shadow_root().is_some() {
-                        return Err(LayoutError::ShadowTree);
                     }
                     if *display == Display::Contents {
                         parents.push((depth, parent, Some(Arc::new(style.clone()))));
@@ -554,9 +584,12 @@ impl BoxTree {
                 BoxKind::Text => inherited,
             };
             let control = match node.kind() {
-                NodeKind::Element(element) if matches!(kind, BoxKind::Element(_)) => {
-                    control_text(document, id, element)
-                }
+                NodeKind::Element(element) if matches!(kind, BoxKind::Element(_)) => control_text(
+                    document,
+                    id,
+                    element,
+                    controls.get(&id).and_then(|c| c.value.as_deref()),
+                ),
                 _ => None,
             };
             boxes.push(BoxSnapshot {
@@ -738,7 +771,17 @@ impl BoxTree {
             }
             parents.push((depth, Some(current), shared));
         }
-        Ok(Self { boxes })
+        let checked = controls
+            .iter()
+            .filter_map(|(&node, state)| Some((node, state.checked?)))
+            .collect();
+        Ok(Self { boxes, checked })
+    }
+
+    /// The live checkedness of a checkable input, when it was supplied to
+    /// [`BoxTree::build_with_controls`].
+    pub fn checked(&self, node: NodeId) -> Option<bool> {
+        self.checked.get(&node).copied()
     }
 
     /// Supply natural sizes for replaced elements, typically decoded image
@@ -777,7 +820,10 @@ impl BoxTree {
 
     /// A tree of already ordered boxes (writing-mode layout's copies).
     pub(crate) fn from_boxes(boxes: Vec<BoxSnapshot>) -> Self {
-        Self { boxes }
+        Self {
+            boxes,
+            checked: HashMap::new(),
+        }
     }
 
     /// Principal/text boxes in preorder. Indexes are valid only in this snapshot.
@@ -828,8 +874,6 @@ pub enum LayoutError {
     InvalidStyles,
     /// A visible element has no style in the supplied snapshot.
     MissingStyle(NodeId),
-    /// Visible shadow content needs a flattened tree and slot assignment.
-    ShadowTree,
     /// Dump would exceed its byte limit.
     OutputLimit,
     /// A natural size was supplied for a node that is not a replaced box.
@@ -1117,6 +1161,7 @@ fn control_text(
     document: &Document,
     id: NodeId,
     element: &rustic_dom::Element,
+    live_value: Option<&[u16]>,
 ) -> Option<Option<(Vec<u16>, bool)>> {
     if element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE) {
         return None;
@@ -1134,7 +1179,11 @@ fn control_text(
             let kind = attribute(element, "type")
                 .map(|t| String::from_utf16_lossy(&t).to_ascii_lowercase())
                 .unwrap_or_default();
-            let value = attribute(element, "value").filter(|v| !v.is_empty());
+            let value = match live_value {
+                // A text field's live value replaces its `value` attribute.
+                Some(live) => Some(live.to_vec()).filter(|v| !v.is_empty()),
+                None => attribute(element, "value").filter(|v| !v.is_empty()),
+            };
             Some(match kind.as_str() {
                 "checkbox" | "radio" | "range" | "color" | "hidden" | "image" => None,
                 "submit" => value.map(|v| (v, false)).or_else(|| text("Submit")),

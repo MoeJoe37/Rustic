@@ -876,13 +876,55 @@
             },
             {
               "label": "Slot assignment, the flat tree and slotchange",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-dom/src/document/slots.rs",
+                  "marker": "pub fn slot_map"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-layout/src/tree.rs",
+                  "marker": "slots.flat_walk(root)"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-layout/tests/reference.rs",
+                  "marker": "fn shadow_hosts_render_assigned_nodes_and_omit_unassigned_light_children"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-style/tests/shadow.rs",
+                  "marker": "fn slotted_elements_inherit_from_the_slot_and_match_their_own_tree"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+                  "marker": "fn shadow_slots_update_and_signal_after_observers_in_the_same_checkpoint"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+                  "marker": "fn manual_slot_assignment_is_ordered_unique_and_closed_roots_hide_the_slot"
+                }
+              ]
             },
             {
               "label": "Declarative shadow DOM in the HTML parser",
-              "status": "planned",
-              "evidence": []
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-html/src/parser/tree/insert.rs",
+                  "marker": "fn insert_declarative_shadow"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-html/tests/document.rs",
+                  "marker": "fn declarative_shadow_templates_create_owned_trees_at_every_input_split"
+                }
+              ]
             },
             {
               "label": "Custom element registry, upgrades and lifecycle callbacks",

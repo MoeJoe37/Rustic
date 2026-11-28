@@ -112,7 +112,7 @@ struct Pending<C> {
     eof: bool,
     content_loaded: bool,
     load_delivered: bool,
-    script_policy: Option<Box<dyn ScriptPolicy>>,
+    script_policy: Option<std::rc::Rc<dyn ScriptPolicy>>,
 }
 
 /// The host's Content Security Policy decisions for scripts the parser
@@ -124,6 +124,13 @@ pub trait ScriptPolicy: std::fmt::Debug {
     /// source text may run. A refused script does not run and fires no
     /// event, as in HTML's "prepare the script element".
     fn allows_inline_script(&self, nonce: Option<&str>, source: &str) -> bool;
+
+    /// Whether an event handler content attribute (`onclick="…"`) with this
+    /// source text may compile (CSP `script-src-attr`). The default allows
+    /// what an inline script without a nonce would be allowed.
+    fn allows_handler_attribute(&self, source: &str) -> bool {
+        self.allows_inline_script(None, source)
+    }
 }
 
 impl Engine {
@@ -327,7 +334,14 @@ impl<C: Clock> ClassicScriptLoad<C> {
         &mut self,
         policy: Box<dyn ScriptPolicy>,
     ) -> Result<(), ScriptLoadError> {
+        let policy: std::rc::Rc<dyn ScriptPolicy> = std::rc::Rc::from(policy);
         self.inner.with_pending(|pending| {
+            let handlers = std::rc::Rc::clone(&policy);
+            pending
+                .document
+                .set_handler_policy(rustic_bindings::page::HandlerPolicy(std::rc::Rc::new(
+                    move |source: &str| handlers.allows_handler_attribute(source),
+                )))?;
             pending.script_policy = Some(policy);
             Ok(())
         })

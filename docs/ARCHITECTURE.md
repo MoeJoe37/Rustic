@@ -193,7 +193,9 @@ conversion follows its IDL type; do not silently normalize or replace code units
 Distinguish source byte offsets, UTF-16 offsets, scalar indices, and glyph clusters.
 The current [character-data storage contract](DOM.md) validates range edits and
 reserves capacity through the owning document before changing payload/accounting.
-It supplies parser text appends; web-facing observers and live ranges remain pending.
+The mutation boundary also updates live ranges and records mutations. The DOM
+supplies a borrowed flat-tree traversal to style and layout, while selectors
+and DOM traversal retain their own tree scopes.
 
 Each untrusted entry point consumes a resource budget: input bytes, tokens,
 nodes, nested structures, decoded pixels, heap, tasks, and wall/CPU time. Bound

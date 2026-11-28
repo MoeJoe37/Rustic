@@ -107,7 +107,9 @@ impl TreeBuilder {
                 "noframes" | "style" => self.insert_text_element(tag, TokenizerMode::Rawtext)?,
                 "script" => self.insert_text_element(tag, TokenizerMode::ScriptData)?,
                 "template" => {
-                    self.insert_html(tag)?;
+                    if !self.insert_declarative_shadow(tag)? {
+                        self.insert_html(tag)?;
+                    }
                     self.push_marker()?;
                     self.frameset_ok = false;
                     self.insertion_mode = InsertionMode::InTemplate;

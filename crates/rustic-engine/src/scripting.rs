@@ -407,6 +407,10 @@ impl PageTree for ScriptTree {
         self.read_layout(None, |geometry| Ok(geometry.box_sizes.get(&id).copied()))
     }
 
+    fn image_state(&self, id: NodeId) -> Result<Option<page::ImageState>, LayoutReadError> {
+        self.read_layout(None, |geometry| Ok(geometry.images.get(&id).cloned()))
+    }
+
     fn computed_style(&self, id: NodeId) -> Result<ComputedStyleSnapshot, LayoutReadError> {
         if !self.layout.borrow().has_source() {
             return Err(LayoutReadError::Unavailable);
@@ -614,6 +618,13 @@ impl<C: Clock> ScriptedDocument<C> {
     ) -> Result<(), ScriptStop> {
         let agent = self.agent.as_mut().map_err(|reason| *reason)?;
         page::set_wasm_compilation_policy(agent, verdict).map_err(|_| ScriptStop::OutOfMemory)
+    }
+
+    /// Decide which event handler content attributes compile (CSP
+    /// `script-src-attr`).
+    pub fn set_handler_policy(&mut self, policy: page::HandlerPolicy) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        page::set_handler_policy(agent, policy).map_err(|_| ScriptStop::OutOfMemory)
     }
 
     /// Give the document `fetch()`, backed by the host's network session.

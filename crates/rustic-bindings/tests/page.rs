@@ -2088,7 +2088,8 @@ fn wasm_standalone_table64_checks_full_indices_and_growth_after_reentry() {
 #[test]
 fn wasm_standalone_table_growth_respects_the_heap_budget() {
     let document = Document::new(DocumentLimits::default()).unwrap();
-    let mut agent = Agent::with_heap_limit(512 * 1024).unwrap();
+    // Leave room to install the Window interfaces and compile the test script.
+    let mut agent = Agent::with_heap_limit(640 * 1024).unwrap();
     page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
     let outcome = agent.evaluate(
         r#"
@@ -3016,6 +3017,24 @@ fn token_lists_and_embedded_elements_reflect_their_attributes() {
         assert(sandbox.supports('ALLOW-SCRIPTS') && !sandbox.supports('allow-everything'), 'supports');
         sandbox.add('allow-scripts', 'allow-forms');
         assert(frame.getAttribute('sandbox') === 'allow-scripts allow-forms', 'sandbox updates');
+        // Hyperlinks: a, area and link interfaces with relList.
+        const a = document.createElement('a');
+        assert(a instanceof HTMLAnchorElement && a.relList === a.relList, 'anchor interface');
+        a.relList.add('noopener', 'nofollow');
+        assert(a.rel === 'noopener nofollow' && a.relList.supports('NOREFERRER'), 'a relList');
+        assert(!a.relList.supports('stylesheet') && a.href === '' && a.target === '', 'a defaults');
+        const link = document.createElement('link');
+        assert(link instanceof HTMLLinkElement && link.relList.supports('stylesheet'), 'link relList');
+        link.relList = 'stylesheet alternate';
+        assert(link.getAttribute('rel') === 'stylesheet alternate' && link.relList.length === 2, 'link rel');
+        assert(link.crossOrigin === null && img.crossOrigin === null, 'CORS settings default');
+        link.crossOrigin = 'USE-CREDENTIALS';
+        img.crossOrigin = 'bogus';
+        assert(link.crossOrigin === 'use-credentials' && img.crossOrigin === 'anonymous', 'CORS keywords');
+        img.crossOrigin = null;
+        assert(!img.hasAttribute('crossorigin'), 'null removes the CORS attribute');
+        assert(document.createElement('area') instanceof HTMLAreaElement, 'area interface');
+        assert(img.complete && img.naturalWidth === 0 && img.currentSrc === '', 'no request');
         frame.sandbox = 'allow-popups';
         assert(sandbox.value === 'allow-popups', 'sandbox PutForwards');
         frame.allowFullscreen = true;
@@ -3085,6 +3104,19 @@ fn details_dialog_and_popover_follow_their_state_machines() {
         try { button.showPopover(); } catch (e) { threw = e.name; }
         assert(threw === 'NotSupportedError', 'only popovers show');
         assert(new ToggleEvent('toggle', {newState: 'open'}).newState === 'open', 'ToggleEvent');
+        // Attribute APIs run the change steps: details toggles, dialog and popover state.
+        const three = body.appendChild(document.createElement('details'));
+        three.addEventListener('toggle', e => log.push('three ' + e.oldState + '>' + e.newState));
+        three.setAttribute('open', '');
+        three.removeAttribute('open');
+        three.setAttribute('OPEN', 'x');
+        const modal = body.appendChild(document.createElement('dialog'));
+        modal.showModal();
+        modal.removeAttribute('open');
+        assert(!modal.matches(':modal'), 'removing open leaves the top layer');
+        p1.showPopover();
+        p1.setAttribute('popover', 'manual');
+        assert(!p1.matches(':popover-open'), 'changing the popover state hides it');
         Promise.resolve().then(() => { globalThis.done = log.join(', '); });
     "#,
     );
@@ -3094,6 +3126,6 @@ fn details_dialog_and_popover_follow_their_state_machines() {
     let done = String::from_utf16_lossy(&agent.heap.string(done).units().collect::<Vec<_>>());
     assert_eq!(
         done,
-        "cancel, before open, before closed, two open, two closed, one closed>open, close done"
+        "cancel, before open, before closed, before open, two closed, one closed>open, close done, three closed>open"
     );
 }

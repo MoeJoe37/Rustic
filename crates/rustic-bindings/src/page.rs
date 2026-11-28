@@ -26,6 +26,7 @@ mod collections;
 mod computed_style;
 mod creation;
 mod cssom;
+mod custom_elements;
 mod documents;
 mod dom_rect;
 mod elements;
@@ -45,6 +46,8 @@ mod ranges;
 mod resize_observer;
 mod scrolling;
 mod selectors;
+mod shadow;
+mod slots;
 mod token_list;
 mod traversal;
 mod url;
@@ -61,7 +64,7 @@ pub use events::LifecycleEvent;
 pub use events::{
     AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
 };
-pub use events::{AssistiveAction, Composition, InputEvent, KeyInput, Modifiers};
+pub use events::{AssistiveAction, Composition, HandlerPolicy, InputEvent, KeyInput, Modifiers};
 pub use events::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
@@ -90,6 +93,18 @@ pub struct BoxSizes {
     pub border: [f64; 2],
     /// Left and top padding: the content box's offset in the padding box.
     pub padding: [f64; 2],
+}
+
+/// What the host's last image load knows about an `img` element's current
+/// request (HTML §4.8.4.1): the URL source selection chose, and the
+/// density-corrected natural size when the image decoded (`None` when it
+/// is broken).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ImageState {
+    /// The selected source's absolute URL (`currentSrc`).
+    pub current_src: String,
+    /// Natural width and height in CSS pixels, when the image decoded.
+    pub natural_size: Option<[f64; 2]>,
 }
 
 /// The serialized CSSOM values of one element.
@@ -258,6 +273,11 @@ pub trait PageTree: Debug {
     fn box_sizes(&self, _node: NodeId) -> Result<Option<BoxSizes>, LayoutReadError> {
         Ok(None)
     }
+    /// The state of an `img` element's current request after the host's
+    /// last image load, or `None` when it has not requested an image.
+    fn image_state(&self, _node: NodeId) -> Result<Option<ImageState>, LayoutReadError> {
+        Ok(None)
+    }
     /// Whether a subtree may move out of the main document, within the turn budget.
     fn allows_adoption_from_main(&self, _agent: &mut Agent, _node: NodeId) -> JsResult<bool> {
         Ok(true)
@@ -293,6 +313,8 @@ struct Page {
     child_lists: RefCell<HashMap<(ObjectId, collections::ChildKind), ObjectId>>,
     child_index: RefCell<collections::ChildIndex>,
     observers: mutation_observer::Observers,
+    slot_signals: slots::Signals,
+    custom_elements: custom_elements::Registry,
     resize_observers: resize_observer::ResizeObservers,
     storage: RefCell<Option<Rc<dyn web_storage::StorageHost>>>,
     storage_objects: RefCell<[Option<(Value, rustic_js::runtime::HostRoot)>; 2]>,
@@ -599,6 +621,8 @@ fn install_page(
             ("prefix", "get prefix", creation::prefix),
             ("namespaceURI", "get namespaceURI", creation::namespace_uri),
             ("tagName", "get tagName", creation::tag_name),
+            ("shadowRoot", "get shadowRoot", shadow::shadow_root),
+            ("assignedSlot", "get assignedSlot", slots::assigned_slot),
             (
                 "children",
                 "get children",
@@ -607,6 +631,7 @@ fn install_page(
         ],
         |agent, proto| {
             attributes::install(agent, proto)?;
+            shadow::install_element(agent, proto)?;
             selectors::install_parent_node(agent, proto)?;
             selectors::install_element(agent, proto)?;
             events::define_method(
@@ -624,7 +649,7 @@ fn install_page(
         agent,
         "HTMLElement",
         Some("Element"),
-        illegal_constructor,
+        custom_elements::construct_html_element,
         0,
         &[("offsetWidth", "get offsetWidth", offset_width)],
         |agent, proto| events::install_handlers(agent, proto, false),
@@ -647,6 +672,8 @@ fn install_page(
             selectors::install_non_element_parent(agent, proto)
         },
     )?;
+    shadow::install(agent)?;
+    slots::install(agent)?;
     character_data::install(agent)?;
     install_interface(
         agent,
@@ -677,6 +704,7 @@ fn install_page(
     let main = document.id();
     drop(document);
     let window = window::install(agent, scheduler.is_some())?;
+    let custom_elements = custom_elements::install(agent)?;
     web_storage::install(agent)?;
     encoding::install(agent)?;
     blob::install(agent)?;
@@ -752,6 +780,8 @@ fn install_page(
         child_lists: RefCell::new(HashMap::new()),
         child_index: RefCell::new(collections::ChildIndex::default()),
         observers,
+        slot_signals: slots::Signals::default(),
+        custom_elements,
         resize_observers,
         storage: RefCell::new(None),
         storage_objects: RefCell::new([None, None]),
@@ -798,6 +828,15 @@ pub fn set_wasm_compilation_policy(
 ) -> JsResult<()> {
     with_page(agent, |_, page| {
         *page.wasm_compilation.borrow_mut() = verdict;
+        Ok(())
+    })
+}
+
+/// Decide which event handler content attributes compile (CSP
+/// `script-src-attr`); without a policy every attribute compiles.
+pub fn set_handler_policy(agent: &mut Agent, policy: HandlerPolicy) -> JsResult<()> {
+    with_page(agent, |_, page| {
+        *page.events.handler_policy.borrow_mut() = Some(policy);
         Ok(())
     })
 }
@@ -865,7 +904,8 @@ pub fn flush_mutation_records(agent: &mut Agent) -> JsResult<()> {
     else {
         return Ok(());
     };
-    mutation_observer::flush(agent, page)
+    mutation_observer::flush(agent, page)?;
+    slots::flush(agent, page)
 }
 
 /// HTML "report an exception" for a value thrown by a script, timer or
@@ -1128,6 +1168,10 @@ fn wrap(
                         | "dialog"
                         | "img"
                         | "iframe"
+                        | "a"
+                        | "area"
+                        | "link"
+                        | "slot"
                 ) =>
         {
             match element.name().local() {
@@ -1138,6 +1182,10 @@ fn wrap(
                 "dialog" => "HTMLDialogElement",
                 "img" => embedded::IMAGE,
                 "iframe" => embedded::IFRAME,
+                "a" => embedded::ANCHOR,
+                "area" => embedded::AREA,
+                "link" => embedded::LINK,
+                "slot" => slots::INTERFACE,
                 _ => "HTMLFormElement",
             }
         }
@@ -1151,6 +1199,7 @@ fn wrap(
         NodeKind::Comment(_) => "Comment",
         NodeKind::CdataSection(_) => "CDATASection",
         NodeKind::ProcessingInstruction(_) => "ProcessingInstruction",
+        NodeKind::DocumentFragment if node.shadow_host().is_some() => "ShadowRoot",
         NodeKind::DocumentFragment => "DocumentFragment",
         NodeKind::DocumentType(_) => "DocumentType",
     };
@@ -1189,11 +1238,12 @@ fn with_page<T>(
         return agent.type_error("no DOM document is attached");
     };
     let result = operation(agent, page);
-    if page.observers.is_active() {
+    if page.observers.is_active() || page.custom_elements.active() {
         // Records are queued as soon as the outermost operation releases the
         // page, so interested observers see the tree as it was changed.
         mutation_observer::flush(agent, page)?;
     }
+    slots::flush(agent, page)?;
     result
 }
 
@@ -1239,7 +1289,7 @@ fn bounding_client_rect(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsRe
     dom_rect::new_mutable(agent, rect)
 }
 
-fn read_layout<T>(
+pub(super) fn read_layout<T>(
     agent: &mut Agent,
     receiver: Value,
     html_only: bool,

@@ -126,21 +126,35 @@ the adopting document with renamed nodes. `live_nodes` lists every node an
 entry refers to; the binding layer treats them as roots while the owning
 objects live (TD-215).
 
-### Shadow roots
+## Shadow roots and slots
 
-`Document::attach_shadow` gives an HTML element a shadow root (open or closed)
-as `attachShadow` does: the host must be a valid custom element name or one of
-the HTML elements the DOM Standard lists (`WrongNodeKind` otherwise), and an
-element has at most one (`InvalidHierarchy`). A shadow root is a parentless
-`DocumentFragment` with `Node::shadow_host`, owned like template contents: it is
-not a child, `walk` skips it, it cannot be inserted, detached, destroyed or
-adopted on its own, the host-including ancestor check hops from it to its host,
-it is destroyed and adopted with its host, clones drop it (no shadow root is
-clonable yet), dumps print it as `#shadow-root` before the host's children, the
-tracing collector keeps host and shadow tree alive together, and
-`check_invariants` verifies the ownership links. Slot assignment, declarative
-shadow roots and the custom element registry are not implemented. The custom
-element name check approximates HTML's `PCENChar` ranges (TD-24).
+An eligible HTML element owns at most one open or closed shadow root. The root
+is a separate fragment with a host link. The ordinary DOM walk skips shadow
+roots. Destruction, adoption, diagnostic dumps and tracing follow the ownership
+link. A clonable root and its descendants are copied even when the host is
+cloned shallowly. Script can call `attachShadow`. The `shadowRoot` getter exposes
+open roots. `getRootNode({composed:true})` and `isConnected` follow host links.
+
+The document parser handles `template[shadowrootmode]` in the HTML template
+insertion modes. A supported host gets a root directly. Invalid modes, hosts
+that reject attachment and fragment parsing retain ordinary templates. The
+parser tracks the clonable, serializable and delegates-focus flags. A
+same-mode `attachShadow` call claims an existing declarative root and detaches
+its children. Focus delegation and serialization APIs remain open.
+
+Named slots take direct light children in host order. The first slot matching a
+child's UTF-16 name receives it. Manual slots use the order passed to
+`HTMLSlotElement.assign`. The flat tree walks shadow children and substitutes
+assigned or fallback content. Layout consumes that walk and style inherits from
+the flat-tree parent while selectors match in the original tree. Bindings expose
+`assignedNodes`, `assignedElements` and `assignedSlot`. Slot changes coalesce
+and fire after mutation observer callbacks in the same checkpoint.
+
+Specification basis reviewed 2026-11-28. See [DOM §4.2.2](https://dom.spec.whatwg.org/#shadow-trees),
+[DOM §4.9](https://dom.spec.whatwg.org/#interface-shadowroot), and
+[HTML tree construction](https://html.spec.whatwg.org/multipage/parsing.html#parsing-main-inhead).
+[TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration)
+covers remaining integration and conformance work.
 
 ## Garbage collection (DOC-09, JS-03)
 

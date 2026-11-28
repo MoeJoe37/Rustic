@@ -227,3 +227,59 @@ fn hosts_and_shadow_roots_keep_each_other_alive() {
     assert_eq!(doc.node_count(), 1);
     doc.check_invariants().unwrap();
 }
+
+#[test]
+fn declarative_root_reclaim_preserves_its_identity_and_detaches_children() {
+    let mut doc = document();
+    let host = html(&mut doc, "div");
+    let options = rustic_dom::ShadowRootOptions {
+        declarative: true,
+        clonable: true,
+        ..rustic_dom::ShadowRootOptions::new(ShadowRootMode::Open)
+    };
+    let root = doc.attach_shadow_with_options(host, options).unwrap();
+    let child = html(&mut doc, "span");
+    doc.append_child(root, child).unwrap();
+    assert_eq!(
+        doc.attach_shadow(host, ShadowRootMode::Closed),
+        Err(DomError::InvalidHierarchy)
+    );
+    assert_eq!(doc.node(child).unwrap().parent(), Some(root));
+    assert_eq!(doc.attach_shadow(host, ShadowRootMode::Open), Ok(root));
+    assert_eq!(doc.node(child).unwrap().parent(), None);
+    assert_eq!(
+        doc.attach_shadow(host, ShadowRootMode::Open),
+        Err(DomError::InvalidHierarchy)
+    );
+    doc.check_invariants().unwrap();
+}
+
+#[test]
+fn adoption_preserves_manual_assignments_with_both_endpoints_in_the_subtree() {
+    let mut source = document();
+    let host = html(&mut source, "div");
+    let root = source
+        .attach_shadow_with_options(
+            host,
+            rustic_dom::ShadowRootOptions {
+                slot_assignment: rustic_dom::SlotAssignment::Manual,
+                ..rustic_dom::ShadowRootOptions::new(ShadowRootMode::Open)
+            },
+        )
+        .unwrap();
+    let slot = html(&mut source, "slot");
+    let child = html(&mut source, "span");
+    source.append_child(root, slot).unwrap();
+    source.append_child(host, child).unwrap();
+    source.assign_slot(slot, &[child]).unwrap();
+    let mut dest = document();
+    let adopted = dest.adopt_node(&mut source, host).unwrap();
+    let rename = |old| adopted.ids.iter().find(|item| item.0 == old).unwrap().1;
+    assert_eq!(
+        dest.slot_map().unwrap().assigned_nodes(rename(slot)),
+        &[rename(child)]
+    );
+    assert!(!source.has_shadow_roots());
+    dest.check_invariants().unwrap();
+    source.check_invariants().unwrap();
+}

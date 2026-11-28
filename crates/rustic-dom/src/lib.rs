@@ -30,16 +30,18 @@ mod storage;
 mod string;
 mod traversal;
 
+pub use document::is_custom_element_name;
 pub use document::marking::TreeMarks;
 pub use document::{
-    Adopted, BoundaryPoint, Document, DocumentFormat, DocumentLimits, InvariantViolation,
-    IteratorState, LiveId, MAX_LIVE_ENTRIES, MutationEntry, ReadyState, TopLayer,
+    Adopted, BoundaryPoint, Document, DocumentFormat, DocumentLimits, FlatWalk, InvariantViolation,
+    IteratorState, LiveId, MAX_LIVE_ENTRIES, MutationEntry, ReadyState, SlotMap, TopLayer,
 };
 pub use dump::DumpError;
 pub use error::DomError;
 pub use name::{HTML_NAMESPACE, MATHML_NAMESPACE, QualifiedName, SVG_NAMESPACE};
 pub use node::{
     Attribute, DocumentType, Element, Node, NodeKind, ProcessingInstruction, ShadowRootMode,
+    ShadowRootOptions, SlotAssignment,
 };
 pub use rustic_base::{DocumentId, NodeId};
 pub use string::DomString;

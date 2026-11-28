@@ -57,7 +57,8 @@ Scheduled 2026-11-17; the M5 rows were rescheduled by the 2026-11-19 M5 completi
 | Due | Entries | Why then |
 | --- | --- | --- |
 | With hosted CI | TD-07, TD-12, TD-14, TD-22, TD-145 | Process and platform-evidence debt that cannot be paid from a sandbox. TD-12's desktop half is done; its Android and iOS device runs moved to M14 (ADR 0067) |
-| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-214, TD-215, TD-216, TD-217, TD-218, TD-219, TD-220, TD-221, TD-201, TD-202, TD-204, TD-190, TD-23, TD-24, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
+| M9, DOM and HTML | TD-222 | Shadow DOM and custom element conformance |
+| M9, CSS, layout and paint | TD-209, TD-210, TD-211, TD-212, TD-213, TD-214, TD-215, TD-216, TD-217, TD-218, TD-219, TD-220, TD-221, TD-201, TD-202, TD-204, TD-190, TD-23, TD-25, TD-27, TD-36, TD-37, TD-38, TD-39, TD-41, TD-45, TD-48, TD-49, TD-54, TD-55, TD-56, TD-57, TD-58, TD-70, TD-71, TD-72, TD-119, TD-147, TD-149, TD-179, TD-192, TD-195, TD-177, TD-46, TD-52, TD-53, TD-59 | Declared-scope approximations of the M2/M3 subset, paid by the M9 CSS/layout workstream and its WPT reftests |
 | M9, text and codecs | TD-47, TD-50, TD-80, TD-82, TD-84, TD-86, TD-87, TD-42, TD-85, TD-51, TD-81 | Locale resources, advanced shaping cases, rare codec modes and animation |
 | M9, language and web APIs | TD-203, TD-200, TD-187, TD-188, TD-189, TD-169, TD-167, TD-11, TD-89, TD-99, TD-105, TD-106, TD-107, TD-113, TD-115, TD-117, TD-120, TD-121, TD-122, TD-124, TD-126, TD-127, TD-129, TD-131, TD-132, TD-133, TD-141, TD-143, TD-151, TD-153, TD-154, TD-155, TD-163, TD-180, TD-108, TD-110, TD-118, TD-135, TD-137, TD-138, TD-139, TD-140, TD-194, TD-152, TD-130, TD-178, TD-173 | Test262 full-rate work (`js.conformance`), Annex B block functions, function source text, Intl data and tailorings, `blob:` URLs, workers and DOM name storage |
 | M10 (beta) | TD-197, TD-15, TD-166, TD-175, TD-191, TD-199 | Platform input methods (IBus or Fcitx, TSF, macOS text input) driving pages in CI; DevTools parse diagnostics, real-profile locking, packaging, per-frame accessibility and the AccessKit upgrade before the beta ships |
@@ -103,8 +104,8 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-20 | Watch | Style | `:nth-*` selector matching recounts siblings on every test | Paid |
 | TD-21 | Bad | Style | Nested `:is()`/`:where()`/`:not()` matching is exponential in nesting | Paid |
 | TD-22 | Watch | CI | Emulated tests run serially to dodge a rare QEMU crash | Open |
-| TD-23 | Deliberate | Style | Light children of a shadow host inherit from the host, not a slot | Open, pay with slot assignment |
-| TD-24 | Watch | DOM | Custom element names approximate HTML's `PCENChar` ranges | Open, pay with the custom element registry |
+| TD-23 | Deliberate | Style | Slotted inheritance and author styling through the slot | Flat-tree inheritance paid. The CSS selector remains open. |
+| TD-24 | Watch | DOM | Custom element names approximate HTML's `PCENChar` ranges | Paid |
 | TD-25 | Deliberate | Style | Layers declared in a non-matching `@media` still take a place in the layer order | Open, pay before media-dependent layer tests |
 | TD-26 | Deliberate | Style | `url()` values stay unresolved until stylesheets carry a base URL | Paid |
 | TD-27 | Deliberate | CSS | `white-space` is a longhand instead of a shorthand for the CSS Text 4 longhands | Open |
@@ -217,7 +218,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Paid |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
 | TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M9 |
-| TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled (their compilation must apply CSP `script-src-attr`, see TD-164), body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
+| TD-153 | Deliberate | Web bindings | Event handler content attributes compile in the global scope (no element, form owner or document scope) and a parser-set attribute joins the listener list when first looked at; body forwards only the Window handlers in the shared list; only a subset of handler names exists; cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Partly paid 2026-11-28 (content attributes with CSP `script-src-attr`, body forwarding); open, M9 HTML lifecycle |
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
 | TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
@@ -243,7 +244,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-176 | Deliberate | Isolation / network | The network process (ADR 0061) was not OS-confined | Paid 2026-11-22 (Linux 2026-11-21, macOS and Windows 2026-11-22; Windows loopback fixture runs stay unconfined, ADR 0066) |
 | TD-177 | Deliberate | Isolation / paint | Frames are composited by linear coverage (ADR 0062): exact under clips, opacity and overlays, approximate under non-`normal` blend modes and color filters, not at all under CSS transforms (they paint white); frame documents have an opaque white canvas | Open, M9 |
 | TD-178 | Deliberate | Isolation / web bindings | Only `render` in a split run loads frames; `--single-process`, `reftest`, dump commands and `hit-test` show frames white or empty. Every frame has its own renderer, so no `contentWindow`/`contentDocument`/`parent`/`postMessage` or frame `load` events, and frames render once. Popups likewise: `window.open()` returns `null`, popups have no `window.opener`, their output is not shown, and `_self`/`_parent`/`_top` targets do not navigate | Open, M9 |
-| TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints cover dimensions and table attributes only (2026-11-27): `body`/`font` colors, `bordercolor`, `rules`/`frame`, `hspace`/`vspace`, list and `hr` attributes are not mapped | Partly paid, M9 CSS/layout |
+| TD-179 | Deliberate | Style / HTML rendering | HTML presentational hints: table `rules`/`frame`, body `background`, `vlink`/`alink` and a few rarer legacy attributes are not mapped | Partly paid 2026-11-27 and 2026-11-28 (body, `font`, `hr`, lists, embedded spacing/alignment, block `align`, `bordercolor`, legacy color parser); open, M9 CSS/layout |
 | TD-180 | Deliberate | CSSOM View | Script scrolling covers positions, the scroll methods and `scroll` events only: no `scrollWidth`/`scrollHeight`/`clientWidth`/`clientHeight`, `scrollIntoView`, smooth `behavior`, `scrollend` or scroll anchoring, and `getBoundingClientRect` does not re-solve sticky boxes for script positions | Open, M9 language and web APIs |
 | TD-181 | Deliberate | Compositor | Scenes layer the viewport, fixed/viewport-sticky boxes and top-level scroll containers only: nested containers, containers in groups or with rounded clips repaint their damage, the overlay is re-rasterized every frame, pages with iframes and `dump-paint`/`hit-test` skip the scene (no device-pixel snapping there), and overlays not painted last fall back to one-pass painting | Open, M12 |
 | TD-182 | Deliberate | Desktop host | Paid 2026-11-23: `rustic view` renders through one long-lived renderer per page with clicks and keys routed to it, the UI-01 browser strip, and window tests on native Windows, macOS and Linux (ADR 0069, ADR 0074); IME composition into pages moved to TD-197 | Paid |
@@ -272,13 +273,14 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-212 | Deliberate | Layout | Vertical writing modes lay out by transposition; no opposite-direction parallel children, cross-mode baselines, compressed `text-combine-upright` or orthogonal relayout after stretching | Open, `text.writing` (M9) |
 | TD-213 | Deliberate | Text | Web fonts load before the first layout (no `font-display` periods or relayout on arrival); `local()` matches family names; script-created `FontFace`s cannot fetch and do not reach layout | Open, `text.writing` (M9) |
 | TD-214 | Deliberate | CSSOM | `element.style` keeps declarations as written in the `style` attribute: shorthands are not expanded into longhands, values are not normalized, and only longhands have IDL attributes | Open, CSSOM (M9) |
-| TD-216 | Deliberate | HTML | Dialogs and popovers without focus steps, inertness, light dismiss, `::backdrop`, close watchers or real top-layer painting (a maximal `z-index`); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks and `setAttribute('open')` fires no toggle | Open, `html.elements` (M9) |
-| TD-217 | Deliberate | HTML | Image source selection at load only: no reselection on resize, no `currentSrc`, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Open, `html.elements` (M9) |
+| TD-216 | Deliberate | HTML | Dialogs and popovers without `::backdrop` or real top-layer painting (a maximal `z-index`); Escape is the only close request (no close-watcher grouping or history-gesture protection); details content hidden by a UA rule, not a slot; `toggle`/`close` are microtasks | Partly paid 2026-11-28 (focus steps, inertness, light dismiss, Escape, attribute change steps); rest with CSS generated content (M9) |
+| TD-217 | Deliberate | HTML | Image source selection at layout only: no reselection on resize without a new layout, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Partly paid 2026-11-28 (`currentSrc`); open, M9 CSS/layout |
 | TD-221 | Deliberate | CSS, MathML | Multi-column without `column-span`, column rules, nested multi-column containers or fragmented box decorations; ruby as paired inline flex columns (no `ruby-position`, `ruby-align`, `rtc`, overhang or line-height adjustment); MathML Core approximated with CSS boxes (no operator dictionary, stretchy operators, `math-depth`, script shifts from the MATH table or `mspace`/`mpadded` attributes) | Open, `layout.formats` (M9) |
 | TD-220 | Deliberate | SVG | Inline SVG without text, gradients and patterns (their first stop's color paints), clipping, masks, markers, filters, dashes, `fill-rule: evenodd`, author style sheets or SVG images (`<img src=x.svg>`, CSS); `use` of symbols only by id in the same document; group opacity multiplies into each shape | Open, `paint.formats` (M9) |
-| TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: controls render from content attributes (no dirty value, checkedness or selectedness from script, no caret, no text scrolling in fields), `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
-| TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; `img` and `iframe` without rendered `width`/`height`, `naturalWidth`, `complete`, `decode()`, `crossOrigin` or `contentWindow`; `relList` and other token lists besides `classList` and `sandbox` | Open, `html.elements` (M9) |
+| TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: text fields and checkable inputs paint their live value and checkedness (since 2026-11-28), but there is no selectedness (no `HTMLSelectElement`/`HTMLOptionElement`), no caret and no text scrolling in fields, `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
+| TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; images without a box are not requested; `decode()` settles at once (rejecting unrequested images); no `iframe.contentWindow`/`contentDocument`, URL decomposition on `a`/`area`, or token lists besides `classList`, `sandbox` and `relList` | Partly paid 2026-11-28 (image request state, rendered size, CORS settings, `a`/`area`/`link` with `relList`); open, M9 |
 | TD-215 | Deliberate | DOM | Ranges without `Selection`, `getElementsByName` or `Range` geometry; live-range nodes stay roots one collection after their object dies; six heavy range WPT pages exceed the script turn budget | Open, `dom.ranges` (M9) |
+| TD-222 | Deliberate | DOM | Shadow DOM and custom element integration | Open, `dom.shadow` and web parity |
 
 ### TD-01 — Diagnostic count limits made error-heavy pages fail (Paid)
 
@@ -580,26 +582,17 @@ once a newer QEMU on the runner image passes repeated parallel runs, or move
 the target to native hardware. **Trigger:** any emulated-job flake, or a runner
 image QEMU upgrade.
 
-### TD-23 — Light children of a shadow host inherit from the host
+### TD-23 — Slotted inheritance and styling
 
-CSS-07b styles shadow trees, but `rustic-dom` does not assign slots, so there
-is no flat tree. `style_tree` styles a host's light children as ordinary
-children of the host: they inherit from it and match document-tree rules. In a
-browser, a slotted child inherits from its `<slot>`, and an unslotted one is not
-rendered. `::slotted()` is rejected rather than matching nothing silently.
-**Pay:** with slot assignment (`dom.shadow` step 2), inherit along the flat
-tree and add `::slotted()` with the slot's tree as its context. **Trigger:**
-slot assignment, or layout consuming styles of shadow hosts' children.
+Flat-tree inheritance is paid. Slotted children inherit from their slots, and
+layout omits unassigned light children. The CSS `::slotted()` selector and its
+encapsulation-cascade rules remain open. **Pay:** match and cascade slotted
+selectors in the slot's stylesheet context.
 
-### TD-24 — Custom element names approximate `PCENChar`
+### TD-24 — Custom element name grammar
 
-`Document::attach_shadow` accepts valid custom element names as hosts. The
-check requires a leading ASCII lowercase letter, a hyphen, no ASCII uppercase
-or whitespace and no ASCII punctuation other than `-`, `.` and `_`, and rejects
-the reserved names; it accepts every non-ASCII character, while HTML's
-`PCENChar` excludes a few ranges (such as U+037E and U+2000–U+200B). **Pay:**
-implement the exact production when the custom element registry needs it.
-**Trigger:** `dom.shadow` step 4, or a public `attachShadow` binding.
+**Paid:** `is_custom_element_name` checks the exact `PCENChar` ranges and the
+reserved names for both registry definitions and shadow host eligibility.
 
 ### TD-25 — Layers in non-matching `@media` still join the layer order
 
@@ -2578,10 +2571,19 @@ the Console Standard's formatter with side-effect-free previews.
 ### TD-153 — Event handler content attributes and remaining handler names
 
 Event handler IDL attributes exist for a subset of `GlobalEventHandlers`
-plus Window's rejection handlers. Content attributes such as
-`onclick="…"` are not compiled into handlers, `<body>` and `<frameset>` do
-not forward Window handlers such as `onload`, and handlers like
-`onmessage` and the animation, pointer and drag families are absent.
+plus Window's rejection handlers. Paid 2026-11-28: content attributes such
+as `onclick="…"` compile into handlers (`rustic_js::Agent::compile_event_handler`)
+when the handler is next looked at, under the host's
+`ScriptPolicy::allows_handler_attribute` (CSP `script-src-attr`), and the
+body forwards `onload`, `onerror`, `onfocus`, `onblur`, `onresize` and
+`onscroll` to Window. Still open: the body compiles in the global scope
+(unqualified names do not find the element's, form owner's or document's
+members), a parser-set attribute's handler joins the listener list when
+first looked at rather than when the attribute was set (equivalent unless
+a listener was added through a path that does not look first),
+`onbeforeunload`/`onunload`/`onmessage` and the other WindowEventHandlers
+are not forwarded, and handlers like `onmessage` and the pointer and drag
+families are absent.
 Separately, `replaceChild` with a node from another document records an
 insertion and a removal instead of the DOM's one combined record, and
 `normalize()` validates each merge on its own, so a document at its data
@@ -3269,12 +3271,16 @@ HTML §15 maps attributes such as `width` and `height` on `img`, `iframe`,
 presentational hints. Found while adding frames (ADR 0062). Partly paid
 2026-11-27 with `layout.tables`: the cascade has a presentational-hint
 level below author rules ([CSS guide](CSS.md#presentational-hints)), and
-dimensions and the table attributes are mapped. Not mapped yet: `body`
-`text`/`link`/`bgcolor`/`background`, `font` `color`/`size`/`face`,
-table `bordercolor`, `rules` and `frame`, `hspace`/`vspace`, `hr` and list
-attributes, `dir`-independent `align` on other elements, and the legacy
-color parser's lenient forms (only names and 3- or 6-digit hex are taken).
-**Pay:** map the rest with the WPT `html/rendering` tests.
+dimensions and the table attributes are mapped. Partly paid 2026-11-28:
+body `text`/`bgcolor`/`link` and margins, `font` `color`/`size`/`face`,
+table `bordercolor`, `hspace`/`vspace` and `align` on embedded content,
+`hr` and list attributes, `align` on `div`, `p`, headings and `caption`,
+`pre wrap`, and HTML's full legacy color parser (lenient forms such as
+`chucknorris`). Not mapped yet: table `rules` and `frame`, body
+`background` (a URL), `vlink`/`alink` (visited and active links are not
+tracked), `input type=image` spacing, `textarea` `cols`/`rows`, and
+`dir`/`menu` types. **Pay:** map the rest with the WPT `html/rendering`
+tests.
 
 ### TD-180 — Script scrolling is the position subset
 
@@ -3571,28 +3577,36 @@ geometry, and trace live ranges as host edges of their objects.
 
 ### TD-216 — Interactive elements subset
 `details`, `dialog` and popovers (SCRIPTING.md, Interactive elements) follow
-their state machines, but `showModal()` neither moves focus nor makes the
-rest of the document inert, there is no close watcher (Escape does not
-cancel), auto popovers do not light-dismiss and only hide other auto popovers
-that are not their ancestors, and `::backdrop` is not generated. The top
+their state machines. Paid 2026-11-28: the dialog and popover focusing
+steps and focus restoration, inertness (outside the topmost modal dialog
+and under `inert`: not focusable, clicks land on the dialog or the inert
+subtree's parent), Escape as a close request, light dismiss of auto
+popovers and of `closedby=any` dialogs, toggle task trackers that coalesce
+`toggle`, and the `open`/`popover` attribute change steps for the attribute
+APIs. Still open: Escape is the only close request (no close-watcher
+grouping, history-gesture protection or Android back button), a
+non-modal dialog with `closedby` is not a close watcher, a modal dialog
+without a focus delegate blurs instead of focusing itself, and `::backdrop`
+is not generated (Rustic generates no pseudo-element boxes yet). The top
 layer is approximated with `z-index: 2147483647` on `:modal` and
 `:popover-open`, so an ancestor's stacking context or transform still
 contains them. A closed `details` hides its non-`summary` element children
 through the UA sheet (text directly inside stays visible, and a second
-`summary` is hidden). `toggle` and `close` events are queued as microtasks;
-`open` changes through `setAttribute` fire no `toggle`, and `UA` colors are
-fixed light-scheme values (no `Canvas`/`CanvasText`). **Pay:** a real top
-layer in layout and paint with `::backdrop`, focus and inertness, close
-watchers, the popover stack, a details slot, and attribute-change steps.
+`summary` is hidden). `toggle` and `close` events are queued as microtasks,
+and `UA` colors are fixed light-scheme values (no `Canvas`/`CanvasText`).
+**Pay:** a real top layer in layout and paint with `::backdrop` (with CSS
+generated content), close-watcher grouping, and a details slot (with
+`dom.shadow` slot assignment).
 
 ### TD-217 — Image source selection subset
 `img` and `picture` sources (PAINT.md) are chosen once, when the document's
 images load: a resize or a change of device pixel ratio does not select
-again, and `currentSrc` is not exposed. `sizes` accepts `px`, `em`, `rem`,
+again (`currentSrc`, exposed since 2026-11-28, names the candidate the last
+layout chose). `sizes` accepts `px`, `em`, `rem`,
 `vw` and `vh` lengths (no `calc()` or `sizes=auto`), `h` descriptors are
 ignored, and `source type` accepts the formats `rustic-codecs` decodes.
-**Pay:** reselect on viewport changes, expose `currentSrc`, and resolve
-source sizes with the full length grammar.
+**Pay:** reselect on viewport changes and resolve source sizes with the
+full length grammar.
 
 ### TD-218 — Embedded content subset
 `loading=lazy` (HTML §2.5.7) is decided per render: an image or iframe
@@ -3601,12 +3615,21 @@ scroll position is not loaded in that render (up to four layout rounds
 load images that earlier loads brought near). The live window does not yet
 resume lazy loads as it scrolls, other than by rendering again.
 `HTMLImageElement` and `HTMLIFrameElement` reflect their content
-attributes (`width` and `height` of `img` are not exposed; the rendered
-size, `naturalWidth`, `complete`, `decode()`, `crossOrigin` and
-`contentWindow` are missing). `DOMTokenList` backs `classList` and
-`iframe.sandbox` only; `relList` and the other token lists are missing.
-**Pay:** resume lazy loads from scrolling, add the image state and
-rendered-size attributes, and the remaining token lists.
+attributes. Paid 2026-11-28: an image's current request comes from the
+host's last image load through a layout read (`PageTree::image_state`):
+`currentSrc`, `naturalWidth`/`naturalHeight` (density-corrected),
+`complete` and `decode()`, with `width`/`height` reading the rendered
+size; `crossOrigin` reflects as a CORS settings attribute; and
+`HTMLAnchorElement`, `HTMLAreaElement` and `HTMLLinkElement` exist with
+`relList`. Still open: only images with a box are requested (a
+`display:none` image stays incomplete), `decode()` settles at once and
+rejects an image the load did not request (a deferred lazy image) instead
+of waiting, `load`/`error` events do not fire at images, `iframe` has no
+`contentWindow`/`contentDocument`, `a`/`area` lack URL decomposition
+(`protocol`, `host`, ...) and token lists other than `classList`,
+`sandbox` and `relList` are missing. **Pay:** resume lazy loads from
+scrolling, image request tasks with `load`/`error` events and pending
+`decode()`, frame windows, and the remaining hyperlink members.
 
 ### TD-219 — Form-control and list rendering subset
 Form controls lay out as inline-blocks from the UA sheet (HTML §15.5) and
@@ -3614,8 +3637,14 @@ show what their content attributes say: an `input`'s `value` or
 `placeholder` (bullets for passwords, labels for buttons), a `select`'s
 selected option, the bars of `progress` and `meter`, the track of `range`,
 the swatch of `color` and the marks of checked boxes and radios
-(`rustic-paint/src/controls.rs`). A script's dirty value, checkedness and
-selectedness are not painted, there is no caret and no field scrolling,
+(`rustic-paint/src/controls.rs`). Paid 2026-11-28: a text field's current
+value (dirty value from script or typing) and a checkable input's
+checkedness are painted: the CLI passes the page's control state
+(`LiveState`, ADR 0073) to `BoxTree::build_with_controls`, and paint reads
+`BoxTree::checked`. Still open: selectedness (there is no
+`HTMLSelectElement`/`HTMLOptionElement`), an indeterminate checkbox paints
+unchecked, a script layout read (`LocalLayout`) still lays out attribute
+values, there is no caret and no field scrolling,
 `select multiple`/`size` show one option, and `textarea` and `button`
 render their children as ordinary content. A `fieldset`'s first-child
 `legend` sits in its top border (square corners only). List items get a
@@ -3624,7 +3653,7 @@ text marker (CSS Lists 3, HTML ordinals with `start`, `reversed` and
 `list-style-image`, `@counter-style` and CSS counters are missing.
 `groove`/`ridge` borders paint as `inset`/`outset` and
 `double`/`dashed`/`dotted` as `solid`.
-**Pay:** paint control state from the bindings, add `::marker` and
+**Pay:** select and option interfaces with selectedness, `::marker` and
 counters, and the remaining border styles.
 
 ### TD-220 — Inline SVG subset
@@ -3660,3 +3689,25 @@ other than 0).
 **Pay:** fragmentation-aware column layout with spanners and rules (with
 `layout.fragmentation`), CSS Ruby layout, and MathML Core layout with the
 MATH table.
+
+
+### TD-222 — Shadow DOM and custom element integration
+
+The global registry covers autonomous elements. Customized built-ins, scoped
+registries, `ElementInternals` and form-associated lifecycle callbacks remain
+open. Reactions use the flushed DOM journal, which cannot replay intermediate
+tree connectivity or attribute values from batched edits. The parser upgrades
+at script checkpoints. Exact reaction-stack order and synchronous parser
+construction still need conformance coverage. Adoption follows document
+ownership changes for upgraded elements.
+
+Shadow initialization stores focus and serialization flags. Focus delegation,
+HTML serialization and the opt-in fragment parsing entry points remain open.
+The event path still needs shadow retargeting, closed-tree `composedPath()`
+filtering and slot-aware propagation. Slot notifications compare distributions
+across binding and parser boundaries, so intermediate changes within one batch
+can coalesce without a notification. Manual assignments survive adoption when
+both endpoints move together.
+
+**Pay:** implement the remaining algorithms and verify them with pinned shadow
+DOM and custom element Web Platform Tests.

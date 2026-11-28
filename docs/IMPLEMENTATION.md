@@ -64,6 +64,21 @@ the `FontFace` page test. Limits: TD-212 (vertical layout) and TD-213 (web
 fonts). Guides: [layout](LAYOUT.md#writing-modes-textwriting-m9),
 [text](TEXT.md#web-fonts).
 
+## M9 DOM — Shadow parsing, slot distribution and autonomous custom elements
+
+Document parsing attaches open and closed declarative shadow roots, including
+nested roots and roots with clonable, delegates-focus and serializable metadata.
+Named and manual assignments drive flat-tree inheritance and box construction.
+The slot APIs preserve light-tree links and share the mutation observer
+notification checkpoint. Focused fixtures exercise every input split, fallback
+and reassignment, closed-root visibility, style scope and rendered text.
+
+The global Window registry upgrades autonomous elements and delivers lifecycle
+callbacks through the DOM mutation boundary. Remaining registry and integration
+work is recorded in [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration).
+See [DOM](DOM.md#shadow-roots-and-slots) and
+[scripted documents](SCRIPTING.md#shadow-dom-and-custom-elements).
+
 ## M9 DOM — Ranges, traversal and inline style (`dom.ranges`)
 
 `NodeIterator`, `TreeWalker` and `NodeFilter`, and `AbstractRange`,
@@ -94,6 +109,28 @@ details/dialog/popover page test, the UA style test in
 `rustic-style/tests/computed.rs`, `srcset` unit tests and the CLI layout
 test. Limits: TD-216, TD-217. Steps 5 (iframes and lazy loading) and 6
 (remaining form controls) are open.
+
+**HTML debt pass (2026-11-28).** After `html.elements` completed, the
+HTML-area debt it left was paid down: dialog and popover focusing steps,
+inertness (modal blocking and `inert`), Escape close requests, light
+dismiss, coalesced `toggle` events and the `open`/`popover` attribute
+change steps (TD-216); an image's current request (`currentSrc`,
+`naturalWidth`, `complete`, `decode()`, rendered `width`/`height`) through
+`PageTree::image_state`, CORS settings attributes and `HTMLAnchorElement`/
+`HTMLAreaElement`/`HTMLLinkElement` with `relList` (TD-217, TD-218);
+painted live control values and checkedness via
+`BoxTree::build_with_controls` (TD-219); event handler content attributes
+compiled under CSP `script-src-attr` with body-to-Window forwarding
+(TD-153); and the remaining common presentational hints with HTML's
+legacy color parser (TD-179). Evidence:
+`modal_dialogs_trap_focus_and_close_on_escape_and_backdrop_clicks` and
+`event_handler_content_attributes_compile_and_run_in_listener_order`
+(`rustic-engine/tests/input.rs`), `image_elements_expose_their_current_request_to_scripts`
+and `controls_render_the_values_and_checkedness_scripts_set`
+(`rustic-cli/tests/cli.rs`), and
+`legacy_presentational_hints_cover_body_font_hr_lists_and_embedded_content`
+(`rustic-style/tests/computed.rs`). The catalog's HTML subsystem was
+already 100%; these entries narrow its open debt.
 
 ## CSS-09 — Animations and modern CSS
 

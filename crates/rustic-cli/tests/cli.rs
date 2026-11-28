@@ -428,10 +428,28 @@ fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_par
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(String::from_utf8_lossy(&output.stdout).contains(" line=0\n"));
-    // Slots are not laid out yet (no shadow trees): no partial output.
+    // A slot outside a shadow tree lays out its fallback content.
     fs::write(
         &path,
-        "<style>* {margin:0}</style><main>a <slot></slot></main>",
+        "<style>* {margin:0}</style><main>a <slot>b</slot></main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("\ntext 0 line=0 "));
+    // A slot with an authored box lays out its fallback content.
+    fs::write(
+        &path,
+        "<style>* {margin:0}</style><main><template shadowrootmode=open><slot style='display:block;width:80px;height:10px'>fallback</slot></template></main>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("content=(0,0,80,10)"));
+    // A block-level forced line break remains unsupported.
+    fs::write(
+        &path,
+        "<style>* {margin:0} br {display:block}</style><main>a<br></main>",
     )
     .unwrap();
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
@@ -1006,6 +1024,80 @@ fn lazy_images_load_only_near_the_viewport() {
             "{expected}: {stdout}"
         );
     }
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
+fn controls_render_the_values_and_checkedness_scripts_set() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-controls-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    let path = base.join("page.html");
+    let markup = "<input id=t value=old><input id=c type=checkbox>";
+    fs::write(
+        &path,
+        format!(
+            "{markup}<script>document.getElementById('t').value = 'new text';\
+             document.getElementById('c').checked = true;</script>"
+        ),
+    )
+    .unwrap();
+    let path = path.to_str().unwrap();
+    let layout = rustic(&["dump-layout", "--run-scripts", path]);
+    assert!(layout.status.success(), "{}", stderr(&layout));
+    let layout = String::from_utf8_lossy(&layout.stdout);
+    // The field shows its dirty value (8 units), not the attribute's 3.
+    assert!(layout.contains("utf16=0..8 "), "{layout}");
+    let paint = rustic(&["dump-paint", "--run-scripts", path]);
+    assert!(paint.status.success(), "{}", stderr(&paint));
+    let paint = String::from_utf8_lossy(&paint.stdout);
+    // The checked mark paints in the accent color.
+    assert!(paint.contains("color=#0075ffff"), "{paint}");
+    // Without the script, the content attributes decide.
+    let plain = base.join("plain.html");
+    fs::write(&plain, markup).unwrap();
+    let paint = rustic(&["dump-paint", plain.to_str().unwrap()]);
+    let paint = String::from_utf8_lossy(&paint.stdout);
+    assert!(!paint.contains("color=#0075ffff"), "{paint}");
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
+fn image_elements_expose_their_current_request_to_scripts() {
+    let png = |w: u32, h: u32| {
+        let surface =
+            rustic_raster::Surface::new(w, h, rustic_raster::RasterLimits::default()).unwrap();
+        rustic_raster::encode_png(&surface, usize::MAX).unwrap()
+    };
+    let base = std::env::temp_dir().join(format!("rustic-cli-imgstate-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("large.png"), png(160, 80)).unwrap();
+    fs::write(base.join("broken.png"), b"not a png").unwrap();
+    let path = base.join("page.html");
+    fs::write(
+        &path,
+        "<style>* {margin:0} img {display:block}</style>\
+         <img id=a srcset='large.png 2x'><img id=b src=broken.png><img id=c>\
+         <img id=d src=large.png style='width:20px;height:10px'>\
+         <script>\
+         const [a, b, c, d] = ['a', 'b', 'c', 'd'].map(id => document.getElementById(id));\
+         const out = [a.naturalWidth, a.naturalHeight, a.width, a.complete,\
+           a.currentSrc.endsWith('/large.png'), b.naturalWidth, b.complete, c.complete,\
+           c.currentSrc === '', d.width, d.height, d.naturalWidth];\
+         d.width = 33;\
+         out.push(d.getAttribute('width'));\
+         Promise.all([a.decode().then(() => 'ok'), b.decode().catch(e => e.name)])\
+           .then(r => document.body.setAttribute('data-out', out.concat(r).join()));\
+         </script>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-dom", "--run-scripts", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let dom = String::from_utf8_lossy(&output.stdout);
+    // `a` picks its 2x candidate: 160x80 image pixels, 80x40 CSS pixels.
+    assert!(
+        dom.contains("value=\"80,40,80,true,true,0,true,true,true,20,10,160,33,ok,EncodingError\""),
+        "{dom}"
+    );
     fs::remove_dir_all(base).unwrap();
 }
 

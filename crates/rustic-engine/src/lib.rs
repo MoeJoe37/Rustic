@@ -27,9 +27,9 @@ pub use lifecycle::{DocumentLoad, DocumentStartError, Engine, EngineDocument};
 pub use rustic_bindings::page::{
     AssistiveAction, BoxSizes, Composition, ComputedStyleRecord, ComputedStyleSnapshot,
     ConsoleLevel, ConsoleLog, ConsoleMessage, FetchHost, FormSubmission, FormSubmissions,
-    InputEvent, KeyInput, LayoutReadError, Modifiers, NetworkFailure, POPUP_CAPACITY, PopupRequest,
-    QuotaExceeded, ScriptBodyReader, ScriptRequest, ScriptResponse, StorageHost, StorageKind,
-    read_script_body,
+    ImageState, InputEvent, KeyInput, LayoutReadError, Modifiers, NetworkFailure, POPUP_CAPACITY,
+    PopupRequest, QuotaExceeded, ScriptBodyReader, ScriptRequest, ScriptResponse, StorageHost,
+    StorageKind, read_script_body,
 };
 pub use scripting::{
     DocumentTurn, NodeLayout, ScriptFailure, ScriptQueueError, ScriptStop, ScriptTurn,

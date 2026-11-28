@@ -499,14 +499,23 @@ impl TreeBuilder {
     }
 
     fn ns(&self, id: NodeId) -> Ns {
-        match self.element(id).name().namespace() {
-            Some(SVG_NAMESPACE) => Ns::Svg,
-            Some(MATHML_NAMESPACE) => Ns::MathMl,
+        match self.document.node(id).expect("live parser node").kind() {
+            NodeKind::Element(element) => match element.name().namespace() {
+                Some(SVG_NAMESPACE) => Ns::Svg,
+                Some(MATHML_NAMESPACE) => Ns::MathMl,
+                _ => Ns::Html,
+            },
             _ => Ns::Html,
         }
     }
 
     fn local(&self, id: NodeId) -> &str {
+        let node = self.document.node(id).expect("live parser node");
+        // A declarative root occupies its template's stack position. The
+        // insertion target is already the root, so no template node is needed.
+        if node.shadow_host().is_some() {
+            return "template";
+        }
         self.element(id).name().local()
     }
 

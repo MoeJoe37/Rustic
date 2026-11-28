@@ -517,15 +517,18 @@ fn script_policy_refuses_inline_scripts_and_string_compilation() {
 try { eval('1'); ran.push('eval'); } catch (e) { ran.push(e.name); }
 try { Function('return 1'); ran.push('fn'); } catch (e) { ran.push(e.name); }</script>
 <script>ran.push('blocked');</script>
-<script nonce="bad">ran.push('wrong-nonce');</script>"#,
+<script nonce="bad">ran.push('wrong-nonce');</script>
+<button id=b onclick="ran.push('attribute')"></button>"#,
     )
     .unwrap();
     load.close_input().unwrap();
     while load.run_next().unwrap().is_some() {}
     let mut document = load.take_document().unwrap().unwrap();
+    // The policy refuses the handler attribute too (`script-src-attr`).
     check(
         &mut document,
-        "if (ran.join() !== 'allowed,EvalError,EvalError') throw ran.join();",
+        "const b = document.getElementById('b'); b.click();\
+         if (b.onclick !== null || ran.join() !== 'allowed,EvalError,EvalError') throw ran.join();",
     );
 }
 

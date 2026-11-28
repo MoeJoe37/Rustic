@@ -47,4 +47,4 @@ pub use scroll::{ScrollPositions, ScrollRange};
 pub use sizing::{BlockMeasure, Edges, MeasureError, measure_block_width};
 pub use sticky::StickyConstraint;
 pub use text::{GlyphRotation, InlineFragment, LineFragment, PositionedGlyph, TextFragment};
-pub use tree::{BoxKind, BoxSnapshot, BoxTree, LayoutError, LayoutLimits};
+pub use tree::{BoxKind, BoxSnapshot, BoxTree, ControlState, LayoutError, LayoutLimits};

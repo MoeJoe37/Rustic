@@ -152,6 +152,30 @@ impl Agent {
         // The function is unnamed so that `anonymous` is not bound inside it;
         // its `name` is set afterwards.
         self.ensure_can_compile_strings()?;
+        self.compile_function_text(keyword, params, body, "anonymous")
+    }
+
+    /// Compile an HTML event handler content attribute's body (HTML
+    /// §8.1.8.1 "getting the current value of the event handler") as a
+    /// function of `params` named `name`, in the global scope. Its policy
+    /// is the host's (CSP `script-src-attr`), not the string-compilation
+    /// switch that governs `eval` and `Function`.
+    pub fn compile_event_handler(
+        &mut self,
+        params: &str,
+        body: &str,
+        name: &str,
+    ) -> JsResult<Value> {
+        self.compile_function_text("function", params, body, name)
+    }
+
+    fn compile_function_text(
+        &mut self,
+        keyword: &str,
+        params: &str,
+        body: &str,
+        name: &str,
+    ) -> JsResult<Value> {
         let text = format!("({keyword} ({params}\n) {{\n{body}\n}})");
         let syntax_error = |agent: &mut Agent, message: &str| {
             Err(agent.throw(crate::runtime::ErrorKind::SyntaxError, message))
@@ -170,12 +194,12 @@ impl Agent {
         self.heap.release_transient(charged);
         let f = self.run_script(code?)?;
         if let Some(o) = f.as_object() {
-            let name = crate::runtime::PropertyKey::String(self.names.name);
-            let anonymous = self.string("anonymous")?;
+            let key = crate::runtime::PropertyKey::String(self.names.name);
+            let name = self.string(name)?;
             self.define_property_or_throw(
                 o,
-                name,
-                crate::runtime::PropertyDescriptor::data_with(anonymous, false, false, true),
+                key,
+                crate::runtime::PropertyDescriptor::data_with(name, false, false, true),
             )?;
         }
         Ok(f)

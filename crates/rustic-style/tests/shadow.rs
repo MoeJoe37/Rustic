@@ -122,7 +122,7 @@ fn shadow_sheets_and_document_sheets_style_only_their_own_tree() {
     attach(
         &mut doc,
         "host",
-        "<style>p { color: green } div { width: 1px }</style><p id=inner></p><span id=plain></span>",
+        "<style>p { color: green } div { width: 1px }</style><p id=inner></p><span id=plain></span><slot></slot>",
     );
     let got = styles(&doc);
     assert_eq!(style(&got, "light"), RED);
@@ -251,4 +251,17 @@ fn shadow_trees_without_style_inherit_from_their_host() {
         "color: rgb(0, 0, 255)\nfont-size: 20px\n"
     );
     let _ = (RED, GREEN);
+}
+
+#[test]
+fn slotted_elements_inherit_from_the_slot_and_match_their_own_tree() {
+    let doc = parse(
+        "<style>div > span { width: 5px }</style>\
+        <div style='color: red'>\
+        <template shadowrootmode=open><style>slot { color: blue } span { width: 9px }</style><slot name=x></slot></template>\
+        <span id=light slot=x></span><span id=hidden></span></div>",
+    );
+    let got = styles(&doc);
+    assert_eq!(style(&got, "light"), "color: rgb(0, 0, 255)\nwidth: 5px\n");
+    assert!(!got.iter().any(|(id, _)| id == "hidden"));
 }

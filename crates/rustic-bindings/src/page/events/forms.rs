@@ -1321,6 +1321,11 @@ fn tab_index(
     if kind(node).is_some() && disabled(agent, document, id, node)? {
         return Ok(None);
     }
+    // Inert nodes (blocked by a modal dialog or under `inert`) are not
+    // focusable areas (HTML §6.3).
+    if crate::page::elements::is_inert(document, id) {
+        return Ok(None);
+    }
     Ok(match (explicit, natural) {
         (Some(index), _) => Some(index),
         (None, true) => Some(0),
@@ -1328,7 +1333,25 @@ fn tab_index(
     })
 }
 
-fn focused_value(agent: &mut Agent) -> JsResult<Option<Value>> {
+/// Whether `id` is a focusable area now (not disabled, hidden or inert).
+pub(in crate::page) fn is_focusable(
+    agent: &mut Agent,
+    document: &Document,
+    id: NodeId,
+) -> JsResult<bool> {
+    match document.node(id) {
+        Ok(node) => Ok(tab_index(agent, document, id, node)?.is_some()),
+        Err(_) => Ok(false),
+    }
+}
+
+/// Move focus to the viewport (HTML "unfocusing steps" for the page).
+pub(in crate::page) fn blur_focus(agent: &mut Agent) -> JsResult<()> {
+    move_focus(agent, None)
+}
+
+/// The focused element's wrapper while it is connected and focusable.
+pub(in crate::page) fn focused_value(agent: &mut Agent) -> JsResult<Option<Value>> {
     let focused = with_page(agent, |_, page| Ok(page.events.forms.focused.get()))?;
     let Some(id) = focused else {
         return Ok(None);
@@ -1430,7 +1453,7 @@ pub(super) fn fire_focus(agent: &mut Agent, target: Value, event: Value) -> JsRe
 }
 
 /// Run the focusing steps for `target` if it is a focusable area.
-pub(super) fn focus_element(agent: &mut Agent, target: Value) -> JsResult<bool> {
+pub(in crate::page) fn focus_element(agent: &mut Agent, target: Value) -> JsResult<bool> {
     let focusable = read_node(agent, target, |agent, _, document, id, node| {
         if id.document() != document.id()
             || !reaches_root(document, id, || agent.check_native_work())?

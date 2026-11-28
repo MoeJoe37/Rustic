@@ -531,7 +531,7 @@ fn register(
 fn adopt_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
     document_receiver(agent, receiver)?;
     let value = required_arg(agent, args, 0)?;
-    with_mut_tree(agent, receiver, |agent, target, wrappers, root| {
+    let adopted = with_mut_tree(agent, receiver, |agent, target, wrappers, root| {
         let node = identity(agent, wrappers, value, WrapperKind::Node)?;
         if node.document() == root.document() {
             target
@@ -549,7 +549,9 @@ fn adopt_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Va
             })?;
         }
         Ok(value)
-    })
+    })?;
+    super::custom_elements::adopted(agent, adopted)?;
+    Ok(adopted)
 }
 
 fn import_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
@@ -645,8 +647,8 @@ pub(super) fn charge_copy(
     shadow: bool,
 ) -> JsResult<()> {
     let mut owned = Vec::new();
-    let mut next = Some(root);
-    while let Some(root) = next {
+    let mut next = Some((root, deep));
+    while let Some((root, deep)) = next {
         let nodes = document
             .walk(root)
             .map_err(|error| dom_exception::from_dom_error(agent, error))?;
@@ -658,17 +660,20 @@ pub(super) fn charge_copy(
             for _ in (0..node.retained_data_bytes()).step_by(64) {
                 agent.check_native_work()?;
             }
-            if deep {
-                if let NodeKind::Element(element) = node.kind() {
-                    let roots = element
-                        .template_contents()
-                        .into_iter()
-                        .chain(element.shadow_root().filter(|_| shadow));
-                    owned
-                        .try_reserve(roots.size_hint().1.unwrap_or(0))
-                        .map_err(|_| OutOfMemory)?;
-                    owned.extend(roots);
-                }
+            if let NodeKind::Element(element) = node.kind() {
+                let template = element.template_contents().filter(|_| deep);
+                let shadow_root = element.shadow_root().filter(|_| {
+                    shadow
+                        || element
+                            .shadow_root_options()
+                            .is_some_and(|options| options.clonable)
+                });
+                owned
+                    .try_reserve(
+                        usize::from(template.is_some()) + usize::from(shadow_root.is_some()),
+                    )
+                    .map_err(|_| OutOfMemory)?;
+                owned.extend(template.into_iter().chain(shadow_root).map(|id| (id, true)));
             }
         }
         next = owned.pop();

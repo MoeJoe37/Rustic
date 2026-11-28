@@ -109,7 +109,7 @@ fn create_element(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResul
             "custom element creation options are unavailable",
         ));
     }
-    create_node(agent, Some(receiver), None, |document| {
+    let node = create_node(agent, Some(receiver), None, |document| {
         if document.is_html() {
             name.make_ascii_lowercase();
         }
@@ -120,7 +120,8 @@ fn create_element(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResul
             document,
             QualifiedName::from_parsed(namespace, None, &name)?,
         )
-    })
+    })?;
+    super::custom_elements::created(agent, node)
 }
 
 fn create_element_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
@@ -138,9 +139,10 @@ fn create_element_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsRe
             "custom element creation options are unavailable",
         ));
     }
-    create_node(agent, Some(receiver), None, |document| {
+    let node = create_node(agent, Some(receiver), None, |document| {
         element(document, name)
-    })
+    })?;
+    super::custom_elements::created(agent, node)
 }
 
 pub(super) fn qualified(

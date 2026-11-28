@@ -23,7 +23,7 @@ use super::{
 const TOKEN_LIST: &str = "DOMTokenList";
 
 /// The attributes with a token list, by index into the page's weak maps.
-pub(super) const LISTED: [&str; 2] = ["class", "sandbox"];
+pub(super) const LISTED: [&str; 3] = ["class", "sandbox", "rel"];
 
 /// The tokens `iframe` `sandbox` supports (HTML §4.8.5).
 const SANDBOX_TOKENS: [&str; 13] = [
@@ -42,6 +42,13 @@ const SANDBOX_TOKENS: [&str; 13] = [
     "allow-top-navigation-to-custom-protocols",
 ];
 
+/// The `link` `rel` keywords Rustic processes (HTML §4.6.7): style sheets
+/// load, and `alternate` qualifies them.
+const LINK_REL_TOKENS: [&str; 2] = ["alternate", "stylesheet"];
+
+/// The `a`/`area` `rel` keywords that change following a hyperlink.
+const HYPERLINK_REL_TOKENS: [&str; 3] = ["noopener", "noreferrer", "opener"];
+
 /// Page-lifetime state: one weak map per entry of [`LISTED`].
 #[derive(Debug)]
 pub(super) struct TokenLists {
@@ -56,7 +63,7 @@ impl TokenLists {
             Ok(map)
         };
         Ok(Self {
-            lists: [map()?, map()?],
+            lists: [map()?, map()?, map()?],
         })
     }
 }
@@ -419,11 +426,24 @@ fn replace(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
 }
 
 fn supports(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    let (_, name) = receiver(agent, this)?;
+    let (element, name) = receiver(agent, this)?;
     let token = required_arg(agent, args, 0)?;
     let token = string(agent, token)?.to_ascii_lowercase();
     match name.as_str() {
         "sandbox" => Ok(Value::boolean(SANDBOX_TOKENS.contains(&token.as_str()))),
+        "rel" => {
+            let id = node_of(agent, element)?;
+            let link = read_doc(agent, id, |d| match d.node(id).map(|n| n.kind()) {
+                Ok(NodeKind::Element(e)) => e.name().local() == "link",
+                _ => false,
+            })?;
+            let supported: &[&str] = if link {
+                &LINK_REL_TOKENS
+            } else {
+                &HYPERLINK_REL_TOKENS
+            };
+            Ok(Value::boolean(supported.contains(&token.as_str())))
+        }
         _ => agent.type_error(&format!("the {name} attribute defines no supported tokens")),
     }
 }

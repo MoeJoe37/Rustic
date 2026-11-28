@@ -147,30 +147,42 @@ fn has_child_nodes(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<
 
 /// The root of the tree `id` is in, walking parents only (template contents
 /// and shadow roots are roots of their own trees).
-fn root_of(agent: &mut Agent, document: &Document, id: NodeId) -> JsResult<NodeId> {
+fn root_of(agent: &mut Agent, document: &Document, id: NodeId, composed: bool) -> JsResult<NodeId> {
     let mut current = id;
-    while let Some(parent) = document
-        .node(current)
-        .map_err(|error| dom_exception::from_dom_error(agent, error))?
-        .parent()
-    {
+    loop {
+        let node = document
+            .node(current)
+            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+        let parent = node
+            .parent()
+            .or_else(|| composed.then(|| node.shadow_host()).flatten());
+        let Some(parent) = parent else {
+            return Ok(current);
+        };
         agent.check_native_work()?;
         current = parent;
     }
-    Ok(current)
 }
 
 fn is_connected(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
     read_node(agent, receiver, |agent, _, document, id, _| {
         Ok(Value::boolean(
-            root_of(agent, document, id)? == document.root(),
+            root_of(agent, document, id, true)? == document.root(),
         ))
     })
 }
 
-fn get_root_node(agent: &mut Agent, receiver: Value, _: &[Value]) -> JsResult<Value> {
+fn get_root_node(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
+    let composed = match args.first().and_then(|value| value.as_object()) {
+        Some(options) => {
+            let key = agent.heap.key("composed")?;
+            let value = agent.get(options, key)?;
+            agent.to_boolean(value)
+        }
+        None => false,
+    };
     read_node(agent, receiver, |agent, wrappers, document, id, _| {
-        let root = root_of(agent, document, id)?;
+        let root = root_of(agent, document, id, composed)?;
         wrap(wrappers, agent, document, root)
     })
 }

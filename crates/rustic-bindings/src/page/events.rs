@@ -35,7 +35,10 @@ pub(super) use forms::install as install_forms;
 pub use forms::{
     AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
 };
+pub(in crate::page) use forms::{blur_focus, focus_element, focused_value, is_focusable};
 pub(super) use forms::{fire_at, fire_plain, toggle_event};
+pub use handlers::HandlerPolicy;
+pub(in crate::page) use handlers::attribute_changed as handler_attribute_changed;
 pub(super) use handlers::install as install_handlers;
 pub(in crate::page) use handlers::install_animation as install_animation_handlers;
 pub use input::{AssistiveAction, InputEvent, KeyInput, Modifiers};
@@ -59,6 +62,8 @@ pub(super) struct Events {
     pressed_space: Cell<Option<rustic_dom::NodeId>>,
     pub(super) reporting: errors::Reporting,
     pub(super) forms: forms::Forms,
+    /// The host's policy for event handler content attributes.
+    pub(super) handler_policy: std::cell::RefCell<Option<handlers::HandlerPolicy>>,
 }
 
 impl Events {
@@ -99,6 +104,7 @@ impl Events {
             pressed_space: Cell::new(None),
             reporting,
             forms,
+            handler_policy: std::cell::RefCell::new(None),
         })
     }
 
@@ -165,7 +171,7 @@ pub(super) fn define_method(
 
 /// Arrays used as native records have no prototype, so reads and writes
 /// cannot invoke page code. The records themselves are never exposed.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct PrivateArray(ObjectId);
 
 impl PrivateArray {
@@ -416,6 +422,8 @@ fn add_listener(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
             Some(passive) => passive,
             None => default_passive(agent, target, event_type)?,
         };
+        // Handler content attributes keep their place ahead of new listeners.
+        handlers::sync_all(agent, target)?;
         let key = type_key(agent, event_type)?;
         let existing = listener_list(agent, target.value)?;
         if let Some(list) = existing {
@@ -639,6 +647,18 @@ fn event_path(agent: &mut Agent, target: Target, event_type: Value) -> JsResult<
             },
         )
     })
+}
+
+pub(super) fn fire_slot_change(agent: &mut Agent, target: Value) -> JsResult<()> {
+    let event = state::trusted_event(
+        agent,
+        "Event",
+        "slotchange",
+        Event::BUBBLES,
+        Value::UNDEFINED,
+        Value::NULL,
+    )?;
+    fire_at(agent, target, event).map(|_| ())
 }
 
 fn dispatch_event(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
@@ -891,6 +911,8 @@ fn invoke(
     capture: bool,
 ) -> JsResult<()> {
     agent.check_native_work()?;
+    // A handler content attribute takes effect before the listeners run.
+    handlers::sync_type(agent, target, event_type)?;
     let Some(list) = listener_list(agent, target)? else {
         return Ok(());
     };

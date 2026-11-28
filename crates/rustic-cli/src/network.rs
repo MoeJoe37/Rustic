@@ -1367,6 +1367,15 @@ impl rustic_engine::ScriptPolicy for InlinePolicy {
         report(&verdict);
         verdict.allowed()
     }
+
+    fn allows_handler_attribute(&self, source: &str) -> bool {
+        let verdict =
+            self.0
+                .csp()
+                .check_inline(rustic_net::csp::InlineKind::ScriptAttribute, None, source);
+        report(&verdict);
+        verdict.allowed()
+    }
 }
 
 /// `fetch()` for a local file: URLs resolve against the file, and every

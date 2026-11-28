@@ -382,17 +382,10 @@ fn relative_inline_boxes_shift_their_fragments() {
 }
 
 #[test]
-fn unsupported_inline_content_fails_atomically() {
-    use rustic_layout::UnsupportedFlow;
-    // `inline-table` is laid out since `layout.tables` (tests/tables.rs).
-    for (html, reason) in [
-        ("<p>x<slot>x</slot>", UnsupportedFlow::SpecialElement),
-        ("<p>x<slot></slot>", UnsupportedFlow::SpecialElement),
-    ] {
-        match try_layout(html, "", 100.0) {
-            Err(FlowError::Unsupported { reason: got, .. }) => assert_eq!(got, reason, "{html}"),
-            other => panic!("{html}: {other:?}"),
-        }
+fn slots_are_boxless_and_the_block_reference_requires_fonts() {
+    for (html, count) in [("<p>x<slot>x</slot>", 2), ("<p>x<slot></slot>", 1)] {
+        let layout = try_layout(html, "", 100.0).unwrap();
+        assert_eq!(layout.texts().len(), count);
     }
     // Without fonts the block reference keeps refusing text.
     let (doc, styles) = common::page("<p>x", "");

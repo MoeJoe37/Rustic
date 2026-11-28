@@ -229,6 +229,7 @@ impl Document {
             }
             let entry = MutationEntry::ChildList {
                 target,
+                connected: source.is_connected(target),
                 added: Vec::new(),
                 removed,
                 previous,
@@ -318,6 +319,7 @@ impl Document {
             };
             Some(MutationEntry::ChildList {
                 target: parent,
+                connected: self.is_connected(parent),
                 added: super::journal::nodes(roots)?,
                 removed: Vec::new(),
                 previous,
@@ -512,6 +514,7 @@ fn copy_kind(kind: &NodeKind) -> NodeKind {
             name: element.name.clone(),
             attributes: element.attributes.clone(),
             custom_is: element.custom_is.clone(),
+            keep_registry_null: element.keep_registry_null,
             template_contents: None,
             shadow_root: None,
         }),

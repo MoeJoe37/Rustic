@@ -566,6 +566,11 @@ fn install_page(
         0,
         &[
             ("documentElement", "get documentElement", document_element),
+            (
+                "customElementRegistry",
+                "get customElementRegistry",
+                custom_elements::registry_of,
+            ),
             ("defaultView", "get defaultView", window::default_view),
             (
                 "implementation",
@@ -622,6 +627,11 @@ fn install_page(
             ("namespaceURI", "get namespaceURI", creation::namespace_uri),
             ("tagName", "get tagName", creation::tag_name),
             ("shadowRoot", "get shadowRoot", shadow::shadow_root),
+            (
+                "customElementRegistry",
+                "get customElementRegistry",
+                custom_elements::registry_of,
+            ),
             ("assignedSlot", "get assignedSlot", slots::assigned_slot),
             (
                 "children",

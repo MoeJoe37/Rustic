@@ -34,6 +34,7 @@ pub struct Element {
     pub(crate) name: QualifiedName,
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) custom_is: Option<DomString>,
+    pub(crate) keep_registry_null: bool,
     pub(crate) template_contents: Option<NodeId>,
     pub(crate) shadow_root: Option<(NodeId, ShadowRootOptions)>,
 }
@@ -72,6 +73,8 @@ pub struct ShadowRootOptions {
     pub slot_assignment: SlotAssignment,
     /// Whether the parser attached the root declaratively.
     pub declarative: bool,
+    /// Whether the root starts with a null custom element registry.
+    pub keep_registry_null: bool,
 }
 
 impl ShadowRootOptions {
@@ -84,6 +87,7 @@ impl ShadowRootOptions {
             serializable: false,
             slot_assignment: SlotAssignment::Named,
             declarative: false,
+            keep_registry_null: false,
         }
     }
 }
@@ -97,6 +101,11 @@ impl Element {
     /// The customized built-in name captured at element creation.
     pub fn custom_is(&self) -> Option<&DomString> {
         self.custom_is.as_ref()
+    }
+
+    /// Whether the parser or creation options explicitly require a null registry.
+    pub fn keeps_registry_null(&self) -> bool {
+        self.keep_registry_null
     }
 
     /// Stable insertion order; replacing an attribute preserves its position.

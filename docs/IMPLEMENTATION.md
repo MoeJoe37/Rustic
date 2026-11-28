@@ -74,7 +74,10 @@ notification checkpoint. Focused fixtures exercise every input split, fallback
 and reassignment, closed-root visibility, style scope and rendered text.
 
 The global Window registry upgrades autonomous elements and customized built-ins.
-Both deliver lifecycle callbacks through the DOM mutation boundary. Remaining registry and integration
+Both deliver lifecycle callbacks through the DOM mutation boundary. Scoped
+registries isolate definitions and follow explicit assignment through cloning
+and import. The journal preserves the attribute value and connectivity at each
+edit for lifecycle callbacks. Remaining registry and integration
 work is recorded in [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration).
 See [DOM](DOM.md#shadow-roots-and-slots) and
 [scripted documents](SCRIPTING.md#shadow-dom-and-custom-elements).

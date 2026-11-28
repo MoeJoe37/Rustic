@@ -8,16 +8,19 @@ use rustic_dom::{
     DomString, HTML_NAMESPACE, MutationEntry, NodeId, NodeKind, QualifiedName,
     is_custom_element_name,
 };
-use rustic_js::runtime::{Abrupt, Agent, HostRoot, JsResult, ObjectId, Value};
+use rustic_js::runtime::{Abrupt, Agent, JsResult, ObjectId, Value};
 
 use super::events::{PrivateArray, define_method, with_root};
 use super::traversal::{node_of, read_doc, wrap_node};
-use super::{
-    Page, create_node, creation, illegal_constructor, install_interface, prototype, required_arg,
-    with_page,
-};
+use super::{Page, create_node, creation, install_interface, prototype, required_arg, with_page};
 
 pub(super) mod builtins;
+mod scopes;
+
+pub(super) use scopes::{
+    check_global, convert_registry, copy_scopes, owner_registry, registry_of, set_registry,
+    upgrade_copy,
+};
 
 const INTERFACE: &str = "CustomElementRegistry";
 
@@ -37,24 +40,64 @@ struct Definition {
 struct Construction {
     constructor: Value,
     element: Option<Value>,
+    registry: Value,
+}
+
+#[derive(Debug)]
+struct Definitions {
+    definitions: RefCell<HashMap<String, Rc<Definition>>>,
+    roots: PrivateArray,
+    waiting: RefCell<HashMap<String, (ObjectId, u32)>>,
+    defining: Cell<bool>,
+}
+
+impl Definitions {
+    fn new(roots: PrivateArray) -> Self {
+        Self {
+            definitions: RefCell::new(HashMap::new()),
+            roots,
+            waiting: RefCell::new(HashMap::new()),
+            defining: Cell::new(false),
+        }
+    }
+
+    fn by_constructor(&self, constructor: Value) -> Option<Rc<Definition>> {
+        self.definitions
+            .borrow()
+            .values()
+            .find(|def| def.constructor == constructor)
+            .cloned()
+    }
 }
 
 #[derive(Debug)]
 pub(super) struct Registry {
     object: Value,
-    definitions: RefCell<HashMap<String, Rc<Definition>>>,
-    // Definition functions and pending promises are owned by this registry.
-    roots: PrivateArray,
-    waiting: RefCell<HashMap<String, (ObjectId, HostRoot)>>,
+    global: Rc<Definitions>,
+    scoped: RefCell<HashMap<ObjectId, Rc<Definitions>>>,
+    roots: ObjectId,
+    assignments: ObjectId,
     states: ObjectId,
+    definition_scopes: ObjectId,
     owners: ObjectId,
     stack: RefCell<Vec<Construction>>,
-    defining: Cell<bool>,
+    active: Cell<bool>,
 }
 
 impl Registry {
     pub(super) fn active(&self) -> bool {
-        !self.definitions.borrow().is_empty()
+        self.active.get()
+    }
+
+    fn data(&self, agent: &Agent, scope: Value) -> Option<Rc<Definitions>> {
+        if scope == self.object {
+            return Some(self.global.clone());
+        }
+        let id = scope.as_object()?;
+        if !agent.weak_map_has(self.roots, scope) {
+            return None;
+        }
+        self.scoped.borrow().get(&id).cloned()
     }
 }
 
@@ -64,7 +107,7 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
         agent,
         INTERFACE,
         None,
-        illegal_constructor,
+        scopes::construct,
         0,
         &[],
         |agent, proto| {
@@ -72,20 +115,27 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
             define_method(agent, proto, "get", get, 1)?;
             define_method(agent, proto, "getName", get_name, 1)?;
             define_method(agent, proto, "whenDefined", when_defined, 1)?;
-            define_method(agent, proto, "upgrade", upgrade, 1)
+            define_method(agent, proto, "upgrade", upgrade, 1)?;
+            define_method(agent, proto, "initialize", scopes::initialize, 1)
         },
     )?;
     let proto = prototype(agent, INTERFACE)?;
     let object = Value::object(agent.new_object_with(Some(proto))?);
-    let roots = PrivateArray::new(agent, &[])?;
+    let global_roots = PrivateArray::new(agent, &[])?;
+    let roots = agent.new_weak_map()?;
+    let assignments = agent.new_weak_map()?;
     let states = agent.new_weak_map()?;
+    let definition_scopes = agent.new_weak_map()?;
     let owners = agent.new_weak_map()?;
     let memory = PrivateArray::new(
         agent,
         &[
             object,
-            roots.value(),
+            global_roots.value(),
+            Value::object(roots),
+            Value::object(assignments),
             Value::object(states),
+            Value::object(definition_scopes),
             Value::object(owners),
         ],
     )?;
@@ -94,13 +144,15 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
     super::elements::accessor(agent, global, "customElements", registry, None)?;
     Ok(Registry {
         object,
+        global: Rc::new(Definitions::new(global_roots)),
+        scoped: RefCell::new(HashMap::new()),
         roots,
+        assignments,
         states,
+        definition_scopes,
         owners,
-        definitions: RefCell::new(HashMap::new()),
-        waiting: RefCell::new(HashMap::new()),
         stack: RefCell::new(Vec::new()),
-        defining: Cell::new(false),
+        active: Cell::new(false),
     })
 }
 
@@ -108,11 +160,15 @@ fn registry(agent: &mut Agent, _: Value, _: &[Value]) -> JsResult<Value> {
     with_page(agent, |_, page| Ok(page.custom_elements.object))
 }
 
-fn receiver(agent: &mut Agent, value: Value) -> JsResult<()> {
-    if registry(agent, Value::UNDEFINED, &[])? != value {
-        return agent.type_error("expected CustomElementRegistry");
-    }
-    Ok(())
+fn receiver(agent: &mut Agent, value: Value) -> JsResult<Rc<Definitions>> {
+    with_page(agent, |agent, page| {
+        page.custom_elements.data(agent, value).ok_or_else(|| {
+            agent.throw(
+                rustic_js::runtime::ErrorKind::TypeError,
+                "expected CustomElementRegistry",
+            )
+        })
+    })
 }
 
 fn name(agent: &mut Agent, args: &[Value]) -> JsResult<Option<String>> {
@@ -139,7 +195,7 @@ fn callback(agent: &mut Agent, proto: ObjectId, name: &str) -> JsResult<Value> {
 }
 
 fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    receiver(agent, this)?;
+    let definitions = receiver(agent, this)?;
     let name = name(agent, args)?
         .filter(|name| is_custom_element_name(name))
         .ok_or_else(|| syntax_error(agent))?;
@@ -160,8 +216,14 @@ fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     }
     with_page(agent, |agent, page| {
         let registry = &page.custom_elements;
+        if local != name && this != registry.object {
+            return Err(unsupported(
+                agent,
+                "scoped registries cannot customize built-ins",
+            ));
+        }
         {
-            let definitions = registry.definitions.borrow();
+            let definitions = definitions.definitions.borrow();
             if definitions.contains_key(&name)
                 || definitions
                     .values()
@@ -170,14 +232,14 @@ fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
                 return Err(unsupported(agent, "duplicate custom element definition"));
             }
         }
-        if registry.defining.replace(true) {
+        if definitions.defining.replace(true) {
             return Err(unsupported(
                 agent,
                 "a custom element definition is already being read",
             ));
         }
         let result = read_definition(agent, name.clone(), local, constructor);
-        registry.defining.set(false);
+        definitions.defining.set(false);
         let definition = Rc::new(result?);
         super::mutation_observer::enable_journals(agent, page)?;
         for value in [
@@ -187,21 +249,25 @@ fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             definition.adopted,
             definition.attribute_changed,
         ] {
-            let index = registry.roots.len(agent)?;
-            registry.roots.set(agent, index, value)?;
+            let index = definitions.roots.len(agent)?;
+            definitions.roots.set(agent, index, value)?;
         }
-        registry
+        definitions
             .definitions
             .borrow_mut()
             .insert(name.clone(), definition);
-        let waiting = registry.waiting.borrow_mut().remove(&name);
-        if let Some((promise, root)) = waiting {
-            let result = agent.resolve_host_promise(promise, constructor);
-            agent.unroot(root);
-            result?;
+        registry.active.set(true);
+        let waiting = definitions.waiting.borrow_mut().remove(&name);
+        if let Some((promise, index)) = waiting {
+            agent.resolve_host_promise(promise, constructor)?;
+            definitions.roots.set(agent, index, Value::UNDEFINED)?;
         }
-        let root = page.read(agent, page.main, |_, doc| Ok(doc.root()))?;
-        upgrade_tree(agent, root, Some(&name))?;
+        if this == registry.object {
+            let root = page.read(agent, page.main, |_, doc| Ok(doc.root()))?;
+            upgrade_tree(agent, root, Some(&name), this)?;
+        } else {
+            scopes::definition_added(agent, page, this, &name)?;
+        }
         Ok(Value::UNDEFINED)
     })
 }
@@ -257,37 +323,29 @@ fn read_definition(
 }
 
 fn get(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    receiver(agent, this)?;
+    let registry = receiver(agent, this)?;
     let name = name(agent, args)?;
-    with_page(agent, |_, page| {
-        let definitions = page.custom_elements.definitions.borrow();
-        Ok(name
-            .as_ref()
-            .and_then(|name| definitions.get(name))
-            .map_or(Value::UNDEFINED, |def| def.constructor))
-    })
+    let definitions = registry.definitions.borrow();
+    Ok(name
+        .as_ref()
+        .and_then(|name| definitions.get(name))
+        .map_or(Value::UNDEFINED, |def| def.constructor))
 }
 
 fn get_name(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    receiver(agent, this)?;
+    let registry = receiver(agent, this)?;
     let constructor = required_arg(agent, args, 0)?;
     if !agent.is_constructor_value(constructor) {
         return agent.type_error("expected a constructor");
     }
-    with_page(agent, |agent, page| {
-        let definitions = page.custom_elements.definitions.borrow();
-        match definitions
-            .values()
-            .find(|def| def.constructor == constructor)
-        {
-            Some(def) => agent.string(&def.name),
-            None => Ok(Value::NULL),
-        }
-    })
+    match registry.by_constructor(constructor) {
+        Some(def) => agent.string(&def.name),
+        None => Ok(Value::NULL),
+    }
 }
 
 fn when_defined(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    receiver(agent, this)?;
+    let registry = receiver(agent, this)?;
     let name = name(agent, args)?;
     let Some(name) = name.filter(|name| is_custom_element_name(name)) else {
         let error = match syntax_error(agent) {
@@ -298,35 +356,35 @@ fn when_defined(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Valu
         agent.reject_host_promise(promise, error);
         return Ok(Value::object(promise));
     };
-    with_page(agent, |agent, page| {
-        let registry = &page.custom_elements;
-        if let Some(&(promise, _)) = registry.waiting.borrow().get(&name) {
-            return Ok(Value::object(promise));
-        }
-        let promise = agent.new_host_promise()?;
-        let value = Value::object(promise);
-        let constructor = registry
-            .definitions
-            .borrow()
-            .get(&name)
-            .map(|def| def.constructor);
-        if let Some(constructor) = constructor {
-            with_root(agent, value, |agent| {
-                agent.resolve_host_promise(promise, constructor)
-            })?;
-        } else {
-            let root = agent.root(value)?;
-            registry.waiting.borrow_mut().insert(name, (promise, root));
-        }
-        Ok(value)
-    })
+    if let Some(&(promise, _)) = registry.waiting.borrow().get(&name) {
+        return Ok(Value::object(promise));
+    }
+    let promise = agent.new_host_promise()?;
+    let value = Value::object(promise);
+    let constructor = registry
+        .definitions
+        .borrow()
+        .get(&name)
+        .map(|def| def.constructor);
+    if let Some(constructor) = constructor {
+        with_root(agent, value, |agent| {
+            agent.resolve_host_promise(promise, constructor)
+        })?;
+    } else {
+        let mut waiting = registry.waiting.borrow_mut();
+        waiting.try_reserve(1).map_err(|_| Abrupt::OutOfMemory)?;
+        let index = registry.roots.len(agent)?;
+        registry.roots.set(agent, index, value)?;
+        waiting.insert(name, (promise, index));
+    }
+    Ok(value)
 }
 
 fn upgrade(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
     receiver(agent, this)?;
     let root = required_arg(agent, args, 0)?;
     let root = node_of(agent, root)?;
-    upgrade_tree(agent, root, None)?;
+    upgrade_tree(agent, root, None, this)?;
     Ok(Value::UNDEFINED)
 }
 
@@ -334,15 +392,22 @@ fn construct_element(agent: &mut Agent, interface: &'static str) -> JsResult<Val
     let Some(new_target) = agent.new_target() else {
         return agent.type_error("HTMLElement requires a custom element constructor");
     };
+    if agent.active_function() == Some(new_target) {
+        return agent.type_error("HTML interface cannot construct itself");
+    }
     let constructor = Value::object(new_target);
     with_page(agent, |agent, page| {
         let registry = &page.custom_elements;
-        let definition = registry
-            .definitions
+        let scope = registry
+            .stack
             .borrow()
-            .values()
-            .find(|def| def.constructor == constructor)
-            .cloned();
+            .iter()
+            .rev()
+            .find(|entry| entry.constructor == constructor)
+            .map_or(registry.object, |entry| entry.registry);
+        let definition = registry
+            .data(agent, scope)
+            .and_then(|registry| registry.by_constructor(constructor));
         let Some(definition) = definition else {
             return agent
                 .type_error("HTMLElement constructor is unavailable outside a custom element");
@@ -379,7 +444,8 @@ fn construct_element(agent: &mut Agent, interface: &'static str) -> JsResult<Val
                 let element = create_node(agent, None, Some(proto), |doc| {
                     creation::element_with_is(doc, name, custom_is)
                 })?;
-                agent.weak_map_set(registry.states, element, constructor)?;
+                agent.weak_map_set(registry.assignments, element, scope)?;
+                record_upgrade(agent, registry, element, scope, constructor)?;
                 if definition.adopted != Value::UNDEFINED {
                     let owner = owner_document(agent, element)?;
                     agent.weak_map_set(registry.owners, element, owner)?;
@@ -390,13 +456,21 @@ fn construct_element(agent: &mut Agent, interface: &'static str) -> JsResult<Val
     })
 }
 
-pub(super) fn created(agent: &mut Agent, element: Value) -> JsResult<Value> {
+pub(super) fn created(agent: &mut Agent, element: Value, scope: Option<Value>) -> JsResult<Value> {
     with_page(agent, |agent, page| {
+        let scope = match scope {
+            Some(scope) => Some(scope),
+            None => {
+                let scope = registry_of(agent, element, &[])?;
+                (scope != Value::NULL).then_some(scope)
+            }
+        };
+        if let Some(scope) = scope {
+            set_registry(agent, element, scope)?;
+        }
         if page.custom_elements.active() {
             let id = node_of(agent, element)?;
-            if id.document() == page.main {
-                try_upgrade(agent, page, id, None)?;
-            }
+            try_upgrade(agent, page, id, None, None)?;
         }
         Ok(element)
     })
@@ -445,18 +519,35 @@ fn candidates(agent: &mut Agent, root: NodeId) -> JsResult<Vec<NodeId>> {
     })
 }
 
-fn upgrade_tree(agent: &mut Agent, root: NodeId, name: Option<&str>) -> JsResult<()> {
+fn upgrade_tree(agent: &mut Agent, root: NodeId, name: Option<&str>, scope: Value) -> JsResult<()> {
     let candidates = candidates(agent, root)?;
     with_page(agent, |agent, page| {
         for id in candidates {
-            try_upgrade(agent, page, id, name)?;
+            try_upgrade(agent, page, id, name, Some(scope))?;
         }
         Ok(())
     })
 }
 
-fn try_upgrade(agent: &mut Agent, page: &Page, id: NodeId, only: Option<&str>) -> JsResult<bool> {
+fn try_upgrade(
+    agent: &mut Agent,
+    page: &Page,
+    id: NodeId,
+    only: Option<&str>,
+    scope_filter: Option<Value>,
+) -> JsResult<bool> {
     let registry = &page.custom_elements;
+    let target = wrap_node(agent, id)?;
+    if agent.weak_map_has(registry.states, target) {
+        return Ok(false);
+    }
+    let scope = registry_of(agent, target, &[])?;
+    if scope_filter.is_some_and(|filter| filter != scope) {
+        return Ok(false);
+    }
+    let Some(definitions) = registry.data(agent, scope) else {
+        return Ok(false);
+    };
     let data = read_doc(agent, id, |doc| {
         let NodeKind::Element(element) = doc.node(id).ok()?.kind() else {
             return None;
@@ -466,7 +557,7 @@ fn try_upgrade(agent: &mut Agent, page: &Page, id: NodeId, only: Option<&str>) -
         if only.is_some_and(|only| only != name) {
             return None;
         }
-        let def = registry.definitions.borrow().get(name.as_ref())?.clone();
+        let def = definitions.definitions.borrow().get(name.as_ref())?.clone();
         if def.local != local {
             return None;
         }
@@ -479,16 +570,19 @@ fn try_upgrade(agent: &mut Agent, page: &Page, id: NodeId, only: Option<&str>) -
     let Some((def, attributes, connected)) = data else {
         return Ok(false);
     };
-    let target = wrap_node(agent, id)?;
-    if agent.weak_map_get(registry.states, target) != Value::UNDEFINED {
-        return Ok(false);
-    }
     with_root(agent, target, |agent| {
         // A failed or currently upgrading element is never upgraded twice.
         agent.weak_map_set(registry.states, target, Value::NULL)?;
+        agent.weak_map_set(registry.assignments, target, scope)?;
+        registry
+            .stack
+            .borrow_mut()
+            .try_reserve(1)
+            .map_err(|_| Abrupt::OutOfMemory)?;
         registry.stack.borrow_mut().push(Construction {
             constructor: def.constructor,
             element: Some(target),
+            registry: scope,
         });
         let result = agent.construct(def.constructor, &[]);
         let frame = registry
@@ -511,7 +605,7 @@ fn try_upgrade(agent: &mut Agent, page: &Page, id: NodeId, only: Option<&str>) -
                 return Ok(true);
             }
         }
-        agent.weak_map_set(registry.states, target, def.constructor)?;
+        record_upgrade(agent, registry, target, scope, def.constructor)?;
         if def.adopted != Value::UNDEFINED {
             let owner = owner_document(agent, target)?;
             agent.weak_map_set(registry.owners, target, owner)?;
@@ -576,17 +670,24 @@ fn attribute_callback(
     )
 }
 
-fn upgraded(agent: &Agent, registry: &Registry, target: Value) -> Option<Rc<Definition>> {
-    let constructor = agent.weak_map_get(registry.states, target);
-    registry
-        .definitions
-        .borrow()
-        .values()
-        .find(|def| def.constructor == constructor)
-        .cloned()
+fn record_upgrade(
+    agent: &mut Agent,
+    registry: &Registry,
+    target: Value,
+    scope: Value,
+    constructor: Value,
+) -> JsResult<()> {
+    agent.weak_map_set(registry.definition_scopes, target, scope)?;
+    agent.weak_map_set(registry.states, target, constructor)
 }
 
-fn owner_document(agent: &mut Agent, target: Value) -> JsResult<Value> {
+fn upgraded(agent: &Agent, registry: &Registry, target: Value) -> Option<Rc<Definition>> {
+    let scope = agent.weak_map_get(registry.definition_scopes, target);
+    let constructor = agent.weak_map_get(registry.states, target);
+    registry.data(agent, scope)?.by_constructor(constructor)
+}
+
+pub(super) fn owner_document(agent: &mut Agent, target: Value) -> JsResult<Value> {
     let id = node_of(agent, target)?;
     let root = read_doc(agent, id, |doc| doc.root())?;
     wrap_node(agent, root)
@@ -637,13 +738,11 @@ pub(super) fn react(agent: &mut Agent, page: &Page, entries: &[MutationEntry]) -
         agent.check_native_work()?;
         match entry {
             MutationEntry::ChildList {
-                target,
+                connected,
                 added,
                 removed,
                 ..
             } => {
-                let connected =
-                    read_doc(agent, *target, |doc| super::events::connected(doc, *target))?;
                 if !connected {
                     continue;
                 }
@@ -653,7 +752,7 @@ pub(super) fn react(agent: &mut Agent, page: &Page, entries: &[MutationEntry]) -
                     .chain(added.iter().map(|id| (id, true)))
                 {
                     for id in candidates(agent, node)? {
-                        if connecting && try_upgrade(agent, page, id, None)? {
+                        if connecting && try_upgrade(agent, page, id, None, None)? {
                             continue;
                         }
                         let target = wrap_node(agent, id)?;
@@ -673,41 +772,26 @@ pub(super) fn react(agent: &mut Agent, page: &Page, entries: &[MutationEntry]) -
                 target,
                 name,
                 old_value,
+                new_value,
             } => {
-                let new = read_doc(agent, *target, |doc| {
-                    let NodeKind::Element(element) = doc.node(*target).ok()?.kind() else {
-                        return None;
-                    };
-                    if !registry
-                        .definitions
-                        .borrow()
-                        .contains_key(element.name().local())
-                    {
-                        return None;
-                    }
-                    Some(
-                        element
-                            .attributes()
-                            .iter()
-                            .find(|attr| {
-                                attr.name().local() == name.local()
-                                    && attr.name().namespace() == name.namespace()
-                            })
-                            .map(|attr| attr.value().clone()),
-                    )
-                })?;
-                if let Some(new) = new {
-                    let target = wrap_node(agent, *target)?;
-                    if let Some(def) = upgraded(agent, registry, target) {
-                        attribute_callback(
-                            agent,
-                            target,
-                            &def,
-                            name,
-                            old_value.as_ref(),
-                            new.as_ref(),
-                        )?;
-                    }
+                let Some(wrapper) = page
+                    .wrappers
+                    .try_borrow()
+                    .ok()
+                    .and_then(|wrappers| wrappers.existing_wrapper(*target))
+                else {
+                    continue;
+                };
+                let target = Value::object(wrapper);
+                if let Some(def) = upgraded(agent, registry, target) {
+                    attribute_callback(
+                        agent,
+                        target,
+                        &def,
+                        name,
+                        old_value.as_ref(),
+                        new_value.as_ref(),
+                    )?;
                 }
             }
             MutationEntry::CharacterData { .. } => {}

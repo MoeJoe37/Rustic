@@ -580,3 +580,93 @@ fn customized_built_ins_preserve_their_name_prototype_and_creation_identity() {
         )
         .unwrap();
 }
+
+#[test]
+fn scoped_registries_initialize_null_roots_and_isolate_definitions() {
+    let (mut agent, _) = page();
+    run(
+        &mut agent,
+        r#"
+        const red = new CustomElementRegistry();
+        const blue = new CustomElementRegistry();
+        const host = document.createElement('div');
+        document.body.append(host);
+        const shadow = host.attachShadow({mode:'open', customElementRegistry:null});
+        const first = document.createElement('x-scoped', {customElementRegistry:null});
+        shadow.appendChild(first);
+        const pending = red.whenDefined('x-scoped');
+        let resolved;
+        pending.then(ctor => resolved = ctor);
+        class Red extends HTMLElement {}
+        class Blue extends HTMLElement {}
+        class Global extends HTMLElement {}
+        red.define('x-scoped', Red);
+        blue.define('x-scoped', Blue);
+        customElements.define('x-scoped', Global);
+        if (shadow.customElementRegistry !== null || first instanceof Global)
+            throw 'null registry exposed the global definition';
+        red.initialize(shadow);
+        if (shadow.customElementRegistry !== red || first.customElementRegistry !== red ||
+            !(first instanceof Red) || first instanceof Blue || first instanceof Global)
+            throw 'initialization or definition isolation';
+        const second = document.createElement('x-scoped', {customElementRegistry:blue});
+        shadow.appendChild(second);
+        if (!(second instanceof Blue) || second.customElementRegistry !== blue ||
+            !(document.createElement('x-scoped') instanceof Global) ||
+            document.customElementRegistry !== customElements)
+            throw 'element creation registry';
+        document.body.appendChild(first);
+        if (first.customElementRegistry !== red || !(first instanceof Red))
+            throw 'moving changed an assigned registry';
+        try {
+            red.define('x-special', class extends HTMLButtonElement {}, {extends:'button'});
+            throw 'scoped extends was accepted';
+        } catch (error) {
+            if (error.name !== 'NotSupportedError') throw error;
+        }
+        try {
+            new Red();
+            throw 'scoped construction outside its registry was accepted';
+        } catch (error) {
+            if (!(error instanceof TypeError)) throw error;
+        }
+    "#,
+        "if (resolved !== Red || blue.get('x-scoped') !== Blue) throw 'registry promise';",
+    );
+}
+
+#[test]
+fn scoped_registry_assignments_survive_clone_and_import() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const scope = new CustomElementRegistry();
+        class Widget extends HTMLElement {}
+        scope.define('x-scoped-copy', Widget);
+        const host = document.createElement('div');
+        const root = host.attachShadow({mode:'open', clonable:true, customElementRegistry:scope});
+        const scoped = document.createElement('x-scoped-copy', {customElementRegistry:scope});
+        root.append(scoped);
+        const shadowCopy = host.cloneNode().shadowRoot;
+        if (shadowCopy.customElementRegistry !== scope ||
+            shadowCopy.firstChild.customElementRegistry !== scope ||
+            !(shadowCopy.firstChild instanceof Widget) || shadowCopy.firstChild === scoped)
+            throw 'clonable shadow assignment';
+        const other = document.implementation.createHTMLDocument();
+        const wrapper = other.createElement('div');
+        const unset = other.createElement('x-scoped-copy');
+        const explicitNull = other.createElement('x-scoped-copy', {customElementRegistry:null});
+        wrapper.append(unset, explicitNull);
+        const imported = document.importNode(wrapper, {customElementRegistry:scope});
+        if (!(imported.firstChild instanceof Widget) ||
+            imported.firstChild.customElementRegistry !== scope ||
+            imported.lastChild.customElementRegistry !== null ||
+            imported.lastChild instanceof Widget)
+            throw 'fallback registry changed an explicit null or missed an unset registry';
+        if (document.importNode(wrapper, {selfOnly:true, customElementRegistry:scope}).firstChild)
+            throw 'selfOnly';
+    "#,
+        )
+        .unwrap();
+}

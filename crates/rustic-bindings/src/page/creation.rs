@@ -71,28 +71,43 @@ fn valid_element_name(name: &str) -> bool {
     }
 }
 
-fn custom_is(agent: &mut Agent, value: Value) -> JsResult<Option<DomString>> {
+fn custom_element_options(
+    agent: &mut Agent,
+    document: Value,
+    value: Value,
+) -> JsResult<(Option<DomString>, Option<Value>)> {
     let Some(object) = value.as_object() else {
-        // The legacy string overload does not set the is value.
-        return Ok(None);
+        return Ok((None, None));
     };
     let key = agent.heap.key("customElementRegistry")?;
     let registry = agent.get(object, key)?;
-    if !registry.is_nullish() {
-        return agent.type_error("expected a CustomElementRegistry");
-    }
+    let registry = super::custom_elements::convert_registry(agent, registry)?;
     let key = agent.heap.key("is")?;
     let value = agent.get(object, key)?;
-    (value != Value::UNDEFINED)
+    let custom_is = (value != Value::UNDEFINED)
         .then(|| string(agent, value))
-        .transpose()
+        .transpose()?;
+    if let Some(registry) = registry {
+        if custom_is.is_some() {
+            return Err(unsupported(
+                agent,
+                "is and customElementRegistry are mutually exclusive",
+            ));
+        }
+        super::custom_elements::check_global(agent, document, registry)?;
+    }
+    Ok((custom_is, registry))
 }
 
 fn create_element(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
     document_receiver(agent, receiver)?;
     let name = required_arg(agent, args, 0)?;
     let name = string(agent, name)?;
-    let custom_is = custom_is(agent, args.get(1).copied().unwrap_or(Value::UNDEFINED))?;
+    let (custom_is, registry) = custom_element_options(
+        agent,
+        receiver,
+        args.get(1).copied().unwrap_or(Value::UNDEFINED),
+    )?;
     let mut name = scalar_name(&name)?
         .filter(|name| valid_element_name(name))
         .ok_or_else(|| invalid_name(agent))?;
@@ -109,7 +124,7 @@ fn create_element(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResul
             custom_is,
         )
     })?;
-    super::custom_elements::created(agent, node)
+    super::custom_elements::created(agent, node, registry)
 }
 
 fn create_element_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value> {
@@ -118,12 +133,16 @@ fn create_element_ns(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsRe
     let qualified_name = required_arg(agent, args, 1)?;
     let namespace = to_nullable_dom_string(agent, namespace)?;
     let name = string(agent, qualified_name)?;
-    let custom_is = custom_is(agent, args.get(2).copied().unwrap_or(Value::UNDEFINED))?;
+    let (custom_is, registry) = custom_element_options(
+        agent,
+        receiver,
+        args.get(2).copied().unwrap_or(Value::UNDEFINED),
+    )?;
     let name = qualified(agent, namespace.as_ref(), &name, false)?;
     let node = create_node(agent, Some(receiver), None, |document| {
         element_with_is(document, name, custom_is)
     })?;
-    super::custom_elements::created(agent, node)
+    super::custom_elements::created(agent, node, registry)
 }
 
 pub(super) fn qualified(

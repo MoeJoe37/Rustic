@@ -9,7 +9,6 @@ css/css-flexbox/flex-aspect-ratio-img-column-017.html	the harness decodes no ima
 css/css-flexbox/flex-aspect-ratio-img-row-005.html	the harness decodes no images, so img has a 0x0 natural size
 css/css-flexbox/flex-aspect-ratio-img-row-013.html	the harness decodes no images, so img has a 0x0 natural size
 css/css-flexbox/flex-base-size-ignores-min-max-width-002.html	not yet diagnosed (TD-72): <canvas> data-expected-width: expected 100, got 75
-css/css-flexbox/flex-base-size-ignores-min-max-width-003.html	form controls layout is not implemented
 css/css-flexbox/flex-basis-014.html	aspect-ratio on non-replaced boxes is not implemented
 css/css-flexbox/flex-basis-intrinsics-001.html	orthogonal or vertical-mode sizing differs (TD-212): <div> data-expected-width: expected 100, got 0
 css/css-flexbox/flex-item-compressible-002.html	form control item (unsupported SpecialElement)
@@ -36,7 +35,6 @@ css/css-flexbox/image-as-flexitem-size-006v.html	the harness decodes no images, 
 css/css-flexbox/image-as-flexitem-size-007.html	the harness decodes no images, so img has a 0x0 natural size
 css/css-flexbox/image-as-flexitem-size-007v.html	the harness decodes no images, so img has a 0x0 natural size
 css/css-flexbox/inline-flexbox-wrap-vertically-width-calculation.html	orthogonal or vertical-mode sizing differs (TD-212): <div> data-expected-width: expected 130, got 80
-css/css-flexbox/overflow-auto-002.html	display: list-item is not implemented
 css/css-flexbox/percentage-heights-001.html	percentage heights of flex items against definite flex sizes (TD-72): <div> data-expected-height: expected 25, got 50
 css/css-flexbox/percentage-heights-003.html	orthogonal or vertical-mode sizing differs (TD-212): <span> data-expected-height: expected 0, got 100
 css/css-flexbox/percentage-size-quirks-002.html	quirks-mode percentage heights are not implemented

@@ -230,6 +230,10 @@ const LONGHAND_GETTERS: [NativeFn; PropertyId::ALL.len()] = [
     get_longhand::<185> as NativeFn,
     get_longhand::<186> as NativeFn,
     get_longhand::<187> as NativeFn,
+    get_longhand::<188> as NativeFn,
+    get_longhand::<189> as NativeFn,
+    get_longhand::<190> as NativeFn,
+    get_longhand::<191> as NativeFn,
 ];
 
 const LONGHAND_SETTERS: [NativeFn; PropertyId::ALL.len()] = [
@@ -421,6 +425,10 @@ const LONGHAND_SETTERS: [NativeFn; PropertyId::ALL.len()] = [
     set_longhand::<185> as NativeFn,
     set_longhand::<186> as NativeFn,
     set_longhand::<187> as NativeFn,
+    set_longhand::<188> as NativeFn,
+    set_longhand::<189> as NativeFn,
+    set_longhand::<190> as NativeFn,
+    set_longhand::<191> as NativeFn,
 ];
 
 /// The inline declarations' setter for one longhand; computed declarations

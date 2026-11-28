@@ -2965,6 +2965,68 @@ fn expect_ok(agent: &mut Agent, source: &str) {
 }
 
 #[test]
+fn token_lists_and_embedded_elements_reflect_their_attributes() {
+    let document = Document::new(DocumentLimits::default()).unwrap();
+    let mut agent = Agent::new().unwrap();
+    dom_exception::install(&mut agent).unwrap();
+    page::install(&mut agent, Rc::new(Tree(RefCell::new(document)))).unwrap();
+    agent.heap.set_gc_stress(true);
+    expect_ok(
+        &mut agent,
+        r#"
+        function assert(condition, message) { if (!condition) throw message; }
+        function throws(name, f) { try { f(); } catch (e) { return e.name === name; } return false; }
+        const div = document.createElement('div');
+        const list = div.classList;
+        assert(list instanceof DOMTokenList && list === div.classList, 'SameObject');
+        assert(list.length === 0 && list.value === '' && !div.hasAttribute('class'), 'empty');
+        list.remove('x');
+        assert(!div.hasAttribute('class'), 'no attribute created for an empty update');
+        div.className = '  b a b\tc ';
+        assert(list.length === 3 && list[0] === 'b' && list.item(2) === 'c' && list.item(3) === null, 'live parse');
+        assert(list.contains('a') && !list.contains('d'), 'contains');
+        list.add('d', 'a');
+        assert(div.className === 'b a c d', 'add serializes the set');
+        assert(list.toggle('a') === false && list.toggle('e', false) === false, 'toggle off');
+        assert(list.toggle('a', true) === true && list.contains('a'), 'toggle forced on');
+        assert(list.replace('b', 'c') === true && div.className === 'c d a', 'replace merges duplicates');
+        assert(list.replace('zz', 'y') === false, 'replace of a missing token');
+        assert(throws('SyntaxError', () => list.add('')), 'empty token');
+        assert(throws('InvalidCharacterError', () => list.toggle('a b')), 'whitespace token');
+        assert(throws('TypeError', () => list.supports('a')), 'class has no supported tokens');
+        assert([...list].join() === 'c,d,a' && String(list) === 'c d a', 'iterable and stringifier');
+        div.classList = 'p q';
+        assert(div.className === 'p q', 'PutForwards=value');
+        // img and iframe reflect their attributes, loading among them.
+        const img = document.createElement('img');
+        assert(img instanceof HTMLImageElement && img.loading === 'eager', 'img interface');
+        img.setAttribute('loading', 'LAZY');
+        assert(img.loading === 'lazy', 'keywords are case-insensitive');
+        img.loading = 'bogus';
+        assert(img.getAttribute('loading') === 'bogus' && img.loading === 'eager', 'invalid default');
+        assert(img.decoding === 'auto' && img.alt === '' && img.src === '', 'defaults');
+        img.isMap = true;
+        assert(img.getAttribute('ismap') === '', 'boolean reflection');
+        const frame = document.createElement('iframe');
+        assert(frame instanceof HTMLIFrameElement && frame.srcdoc === '', 'iframe interface');
+        frame.srcdoc = '<p>hi';
+        assert(frame.getAttribute('srcdoc') === '<p>hi', 'srcdoc reflects');
+        const sandbox = frame.sandbox;
+        assert(sandbox === frame.sandbox && sandbox.length === 0, 'sandbox list');
+        assert(sandbox.supports('ALLOW-SCRIPTS') && !sandbox.supports('allow-everything'), 'supports');
+        sandbox.add('allow-scripts', 'allow-forms');
+        assert(frame.getAttribute('sandbox') === 'allow-scripts allow-forms', 'sandbox updates');
+        frame.sandbox = 'allow-popups';
+        assert(sandbox.value === 'allow-popups', 'sandbox PutForwards');
+        frame.allowFullscreen = true;
+        assert(frame.hasAttribute('allowfullscreen') && frame.loading === 'eager', 'iframe booleans');
+        assert(throws('TypeError', () => Object.getOwnPropertyDescriptor(
+            HTMLImageElement.prototype, 'alt').get.call(frame)), 'brand checks');
+        "#,
+    );
+}
+
+#[test]
 fn details_dialog_and_popover_follow_their_state_machines() {
     let document = Document::new(DocumentLimits::default()).unwrap();
     let mut agent = Agent::new().unwrap();

@@ -1,11 +1,11 @@
 {
   "schema_version": 2,
   "catalog_version": "engine-v4",
-  "source_fingerprint": "41a8c7b9f572ed9165b636f1c906c8ea97e21b50f03535caba40d543b09f410a",
-  "percent": "53.83",
-  "verified_percent": "51.78",
-  "partial_percent": "2.05",
-  "completed": 121,
+  "source_fingerprint": "46e088cec0a8ceb1ae8bb7ea57937eb614f7bd08234d6826b0ab81bc4524d1dd",
+  "percent": "55.08",
+  "verified_percent": "53.45",
+  "partial_percent": "1.63",
+  "completed": 123,
   "in_progress": 12,
   "total": 228,
   "fully_complete": false,
@@ -95,11 +95,11 @@
       "id": "M9",
       "label": "Compatibility expansion",
       "share": "22.35",
-      "completed": 8,
+      "completed": 10,
       "total": 54,
-      "percent": "20.00",
-      "verified_percent": "14.89",
-      "partial_percent": "5.11"
+      "percent": "25.57",
+      "verified_percent": "22.36",
+      "partial_percent": "3.21"
     },
     {
       "id": "M10",
@@ -1453,111 +1453,126 @@
           "label": "Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading",
           "size": 8,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "details and summary: rendering, open and name, summary activation, toggle events and exclusive groups",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/elements.rs",
-                  "marker": "fn set_details_state"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html.rs",
-                  "marker": "details:not([open])"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn details_dialog_and_popover_follow_their_state_machines"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/elements.rs",
+              "marker": "fn set_details_state"
             },
             {
-              "label": "dialog: show, showModal, close, requestClose, returnValue, the top layer and :modal",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/elements.rs",
-                  "marker": "fn open_dialog"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-dom/src/document/top_layer.rs",
-                  "marker": "pub fn top_layer_add"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/computed.rs",
-                  "marker": "fn details_dialogs_and_popovers_style_from_their_state"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-style/src/html.rs",
+              "marker": "details:not([open])"
             },
             {
-              "label": "Popover API: the popover attribute, show/hide/toggle, invokers, :popover-open and the top layer",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-bindings/src/page/elements.rs",
-                  "marker": "fn show_inner"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-style/src/html_state.rs",
-                  "marker": "FormState::PopoverOpen"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/page.rs",
-                  "marker": "fn details_dialog_and_popover_follow_their_state_machines"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn details_dialog_and_popover_follow_their_state_machines"
             },
             {
-              "label": "picture, srcset and sizes: image source selection for layout and paint",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-cli/src/srcset.rs",
-                  "marker": "pub(crate) fn img_source"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-cli/tests/cli.rs",
-                  "marker": "fn srcset_sizes_and_picture_sources_choose_the_image_and_its_density"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/elements.rs",
+              "marker": "fn open_dialog"
             },
             {
-              "label": "iframes: srcdoc and sandbox, and lazy loading of images and iframes",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/top_layer.rs",
+              "marker": "pub fn top_layer_add"
             },
             {
-              "label": "Form-control semantics and layout: select and option, fieldset and legend, meter, progress and the remaining input types",
-              "status": "planned",
-              "evidence": []
+              "kind": "test",
+              "path": "crates/rustic-style/tests/computed.rs",
+              "marker": "fn details_dialogs_and_popovers_style_from_their_state"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/elements.rs",
+              "marker": "fn show_inner"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/html_state.rs",
+              "marker": "FormState::PopoverOpen"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/srcset.rs",
+              "marker": "pub(crate) fn img_source"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn srcset_sizes_and_picture_sources_choose_the_image_and_its_density"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-cli/src/images.rs",
+              "marker": "pub(crate) const LAZY_LOAD_MARGIN"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/token_list.rs",
+              "marker": "const SANDBOX_TOKENS"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/cli.rs",
+              "marker": "fn lazy_images_load_only_near_the_viewport"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/frames.rs",
+              "marker": "fn lazy_frames_open_when_the_scroll_position_brings_them_near"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/page.rs",
+              "marker": "fn token_lists_and_embedded_elements_reflect_their_attributes"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-paint/src/controls.rs",
+              "marker": "pub(crate) fn parts"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tree.rs",
+              "marker": "fn control_text"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tree.rs",
+              "marker": "fn marker_text"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn form_controls_lay_out_as_inline_blocks_with_their_value"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn outside_list_markers_hang_before_the_first_line"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-paint/src/controls.rs",
+              "marker": "fn meter_regions_follow_low_high_and_optimum"
             }
           ],
-          "credit": "66.66",
+          "credit": "100.00",
           "engine_share": "1.08"
         }
       ],
       "points": 37,
-      "completed": 10,
-      "in_progress": 1,
+      "completed": 11,
+      "in_progress": 0,
       "total": 11,
-      "contribution": "4.63",
-      "percent": "92.79",
-      "verified_percent": "78.37",
-      "partial_percent": "14.42"
+      "contribution": "5.00",
+      "percent": "100.00",
+      "verified_percent": "100.00",
+      "partial_percent": "0.00"
     },
     {
       "id": "css",
@@ -3322,19 +3337,60 @@
           "label": "SVG, MathML, ruby and multi-column layout",
           "size": 5,
           "milestone": "M9",
-          "status": "planned",
-          "evidence": [],
-          "credit": "0.00",
+          "status": "complete",
+          "evidence": [
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tree.rs",
+              "marker": "fn svg_natural_size"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-raster/tests/paint.rs",
+              "marker": "fn inline_svg_paints_shapes_strokes_and_transforms_in_its_viewport"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/flow/multicol.rs",
+              "marker": "fn balance"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn multicol_containers_balance_their_lines_into_columns"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tree.rs",
+              "marker": "struct Ruby"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn ruby_annotations_sit_above_their_bases_on_the_line_baseline"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-style/src/html.rs",
+              "marker": "m|mfrac"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/inline.rs",
+              "marker": "fn mathml_lays_out_fractions_scripts_and_radicals_as_css_boxes"
+            }
+          ],
+          "credit": "100.00",
           "engine_share": "0.58"
         }
       ],
       "points": 51,
-      "completed": 8,
+      "completed": 9,
       "in_progress": 0,
       "total": 11,
-      "contribution": "4.23",
-      "percent": "70.58",
-      "verified_percent": "70.58",
+      "contribution": "4.82",
+      "percent": "80.39",
+      "verified_percent": "80.39",
       "partial_percent": "0.00"
     },
     {
@@ -3529,7 +3585,7 @@
             {
               "kind": "source",
               "path": "crates/rustic-cli/src/images.rs",
-              "marker": "pub fn load"
+              "marker": "pub(crate) fn load_applied"
             },
             {
               "kind": "test",
@@ -3752,9 +3808,47 @@
           "label": "SVG and MathML painting integration",
           "size": 8,
           "milestone": "M9",
-          "status": "planned",
+          "status": "in_progress",
           "evidence": [],
-          "credit": "0.00",
+          "steps": [
+            {
+              "label": "SVG shapes and paths: fills, strokes, transforms, viewBox and presentation attributes",
+              "status": "complete",
+              "evidence": [
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/svg.rs",
+                  "marker": "fn parse_path"
+                },
+                {
+                  "kind": "source",
+                  "path": "crates/rustic-paint/src/svg.rs",
+                  "marker": "fn stroke"
+                },
+                {
+                  "kind": "test",
+                  "path": "crates/rustic-raster/tests/paint.rs",
+                  "marker": "fn inline_svg_paints_shapes_strokes_and_transforms_in_its_viewport"
+                }
+              ]
+            },
+            {
+              "label": "SVG paint servers, clipping, masks, markers, dashes and fill rules",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "SVG text, author style sheets for SVG content and SVG images",
+              "status": "planned",
+              "evidence": []
+            },
+            {
+              "label": "MathML painting",
+              "status": "planned",
+              "evidence": []
+            }
+          ],
+          "credit": "25.00",
           "engine_share": "1.18"
         },
         {
@@ -3821,12 +3915,12 @@
       ],
       "points": 27,
       "completed": 6,
-      "in_progress": 0,
+      "in_progress": 1,
       "total": 7,
-      "contribution": "2.81",
-      "percent": "70.37",
+      "contribution": "3.11",
+      "percent": "77.77",
       "verified_percent": "70.37",
-      "partial_percent": "0.00"
+      "partial_percent": "7.40"
     },
     {
       "id": "js",

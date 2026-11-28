@@ -239,6 +239,9 @@ pub(crate) struct Ifc<'a> {
     pub hyphens: Vec<Option<crate::tailoring::Discretionary>>,
     /// Whether any piece needs a line (content, edges or preserved spaces).
     pub has_content: bool,
+    /// The width of a leading `outside` list marker, which hangs before
+    /// the start edge of the first line (CSS Lists 3 §3.3).
+    pub hang: f64,
 }
 
 fn white_space(style: &ComputedStyle) -> Result<WhiteSpace, FlowError> {
@@ -639,6 +642,7 @@ pub(crate) fn build<'a>(
             emergency: Vec::new(),
             hyphens: Vec::new(),
             has_content: false,
+            hang: 0.0,
         },
         kinds: Vec::new(),
         events: Vec::new(),
@@ -760,6 +764,18 @@ pub(crate) fn build<'a>(
         Piece::Edge { width, .. } => *width != 0.0,
         Piece::Atomic { .. } => true,
     });
+    ifc.hang = ifc
+        .pieces
+        .iter()
+        .map_while(|piece| match piece {
+            Piece::Cluster { text, width, .. }
+                if tree.boxes()[ifc.texts[*text].source].is_outside_marker() =>
+            {
+                Some(*width)
+            }
+            _ => None,
+        })
+        .sum();
     Ok(ifc)
 }
 

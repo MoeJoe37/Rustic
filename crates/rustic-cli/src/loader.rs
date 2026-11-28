@@ -11,7 +11,7 @@
 //! file bytes, parser token/document/diagnostic limits and dump output bytes.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fmt;
@@ -2782,34 +2782,40 @@ fn block_layout(input: LayoutInput<'_>) -> Result<Laidout, LoadError> {
         height: viewport.height().get(),
         ratio: view.scale().get(),
     };
-    let images = if let Some(applied) = applied_files {
-        crate::images::load_applied(
-            document,
-            &tree,
-            &canonical,
-            limits.images,
-            crate::images::ImageRead {
-                chunk_bytes: limits.read_chunk_bytes,
-                view: view_info,
-            },
-            cancellation,
-            Some((applied, network.map(|session| &**session))),
-        )
-    } else {
-        crate::images::load(
-            document,
-            &tree,
-            &canonical,
-            limits.images,
-            limits.read_chunk_bytes,
-            cancellation,
-            view_info,
-        )
-    };
-    if !images.sizes.is_empty() {
-        tree.set_natural_sizes(&images.sizes)
-            .map_err(LoadError::Layout)?;
-    }
+    let load =
+        |tree: &rustic_layout::BoxTree, deferred: &HashSet<rustic_dom::NodeId>| match applied_files
+        {
+            Some(applied) => crate::images::load_applied(
+                document,
+                tree,
+                &canonical,
+                limits.images,
+                crate::images::ImageRead {
+                    chunk_bytes: limits.read_chunk_bytes,
+                    view: view_info,
+                    deferred,
+                },
+                cancellation,
+                Some((applied, network.map(|session| &**session))),
+            ),
+            None => crate::images::load_applied(
+                document,
+                tree,
+                &canonical,
+                limits.images,
+                crate::images::ImageRead {
+                    chunk_bytes: limits.read_chunk_bytes,
+                    view: view_info,
+                    deferred,
+                },
+                cancellation,
+                None,
+            ),
+        };
+    // Lazy images (HTML §2.5.7) wait until layout puts them near the
+    // viewport; each round that loads some can bring more into view.
+    let mut deferred = crate::images::lazy_images(document, &tree);
+    let mut images = load(&tree, &deferred);
     let fonts = document_fonts(
         &font_faces,
         &canonical,
@@ -2817,16 +2823,85 @@ fn block_layout(input: LayoutInput<'_>) -> Result<Laidout, LoadError> {
         cancellation,
         applied_files.map(|applied| (applied, network.map(|session| &**session))),
     );
-    let viewport = view.viewport();
-    let layout = rustic_layout::BlockLayout::compute_with_fonts(
-        &tree,
-        viewport,
-        layout_limits(limits),
-        &fonts,
-        cancellation,
-    )
-    .map_err(LoadError::Flow)?;
+    let compute = |tree: &rustic_layout::BoxTree| {
+        rustic_layout::BlockLayout::compute_with_fonts(
+            tree,
+            viewport,
+            layout_limits(limits),
+            &fonts,
+            cancellation,
+        )
+        .map_err(LoadError::Flow)
+    };
+    let mut layout = None;
+    for _ in 0..=MAX_LAZY_ROUNDS {
+        if !images.sizes.is_empty() {
+            tree.set_natural_sizes(&images.sizes)
+                .map_err(LoadError::Layout)?;
+        }
+        let laid = compute(&tree)?;
+        let near = if deferred.is_empty() {
+            HashSet::new()
+        } else {
+            near_viewport(&laid, viewport, limits, input.scroll, &deferred)?
+        };
+        layout = Some(laid);
+        if near.is_empty() {
+            break;
+        }
+        deferred.retain(|node| !near.contains(node));
+        images = load(&tree, &deferred);
+    }
+    let layout = layout.expect("at least one round");
     Ok((tree, layout, viewport, images, styles, fonts))
+}
+
+/// Layout rounds that may load more lazy images; the rest stay unloaded.
+const MAX_LAZY_ROUNDS: usize = 4;
+
+/// The `candidates` whose border box, at the page's scroll positions, is
+/// within [`crate::images::LAZY_LOAD_MARGIN`] of the viewport.
+fn near_viewport(
+    layout: &rustic_layout::BlockLayout,
+    viewport: rustic_layout::CssSize,
+    limits: LoaderLimits,
+    script: Option<&rustic_engine::ScrollState>,
+    candidates: &HashSet<rustic_dom::NodeId>,
+) -> Result<HashSet<rustic_dom::NodeId>, LoadError> {
+    let scrolled;
+    let layout = match scroll_positions(layout, limits, script) {
+        Some(positions) => {
+            scrolled = layout
+                .scrolled(viewport, &positions)
+                .map_err(LoadError::Flow)?;
+            &scrolled
+        }
+        None => layout,
+    };
+    let margin = crate::images::LAZY_LOAD_MARGIN;
+    Ok(layout
+        .fragments()
+        .iter()
+        .filter(|fragment| candidates.contains(&fragment.node()))
+        .filter(|fragment| {
+            let border = fragment.border();
+            near_rect(
+                border.origin().x.get(),
+                border.origin().y.get(),
+                border.size().width().get(),
+                border.size().height().get(),
+                (viewport.width().get(), viewport.height().get()),
+                margin,
+            )
+        })
+        .map(|fragment| fragment.node())
+        .collect())
+}
+
+/// Whether the rectangle at (`x`, `y`) of `width`×`height` comes within
+/// `margin` of a viewport of size `view` at the origin.
+fn near_rect(x: f64, y: f64, width: f64, height: f64, view: (f64, f64), margin: f64) -> bool {
+    x + width >= -margin && y + height >= -margin && x <= view.0 + margin && y <= view.1 + margin
 }
 
 /// The layout with the command's `--scroll` and `--scroll-box` positions
@@ -3407,6 +3482,8 @@ struct FrameSite {
     url: String,
     srcdoc: Option<String>,
     sandbox: Option<Vec<String>>,
+    /// `loading=lazy`: opened only near the viewport (HTML §2.5.7).
+    lazy: bool,
 }
 
 /// The document's `iframe` elements in tree order, with `src` resolved
@@ -3434,11 +3511,12 @@ fn frame_sites(document: &Document, document_url: Option<&rustic_url::Url>) -> V
                 attribute(element, "src"),
                 attribute(element, "srcdoc"),
                 attribute(element, "sandbox"),
+                crate::images::is_lazy(element),
             ));
         }
     }
     let base = base.flatten().or_else(|| document_url.cloned());
-    for (node, src, srcdoc, sandbox) in found {
+    for (node, src, srcdoc, sandbox, lazy) in found {
         let url = if srcdoc.is_some() {
             "about:srcdoc".to_owned()
         } else {
@@ -3458,6 +3536,7 @@ fn frame_sites(document: &Document, document_url: Option<&rustic_url::Url>) -> V
             url,
             srcdoc,
             sandbox,
+            lazy,
         });
     }
     sites
@@ -3668,6 +3747,21 @@ fn render_unmarked_layers(
         if width == 0 || height == 0 {
             continue;
         }
+        let viewport_size = (viewport.width().get(), viewport.height().get());
+        if site.lazy
+            && !near_rect(
+                rect.origin().x.get(),
+                rect.origin().y.get(),
+                rect.size().width().get(),
+                rect.size().height().get(),
+                viewport_size,
+                crate::images::LAZY_LOAD_MARGIN,
+            )
+        {
+            // A lazy frame far from the viewport is not loaded yet; it
+            // paints as an empty (white) frame.
+            continue;
+        }
         let request = FrameRequest {
             url: site.url.clone(),
             srcdoc: site.srcdoc.clone(),
@@ -3798,6 +3892,15 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
+
+    #[test]
+    fn lazy_loads_start_within_the_margin_of_the_viewport() {
+        let view = (800.0, 600.0);
+        assert!(near_rect(0.0, 1850.0, 10.0, 10.0, view, 1250.0));
+        assert!(!near_rect(0.0, 1851.0, 10.0, 10.0, view, 1250.0));
+        assert!(near_rect(-1260.0, 0.0, 10.0, 10.0, view, 1250.0));
+        assert!(!near_rect(-1261.0, 0.0, 10.0, 10.0, view, 1250.0));
+    }
 
     fn test_url(path: &Path) -> rustic_url::Url {
         file_url(&fs::canonicalize(path).unwrap()).unwrap()

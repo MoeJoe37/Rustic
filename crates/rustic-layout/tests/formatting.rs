@@ -426,11 +426,9 @@ fn sibling_text_runs_share_one_parent_and_one_anonymous_style() {
 fn unsupported_formatting_fails_without_mutating_the_snapshot() {
     for html in [
         "<img>",
-        "<input>",
         "<br>",
         "<svg></svg>",
         "<table><tr><td></td></tr></table>",
-        "<li></li>",
     ] {
         let p = principal(html, "");
         let before = p.clone();

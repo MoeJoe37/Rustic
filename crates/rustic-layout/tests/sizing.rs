@@ -276,10 +276,10 @@ fn embedders_supply_decoded_image_sizes() {
 }
 
 #[test]
-fn inline_replaced_elements_and_controls_stay_unsupported() {
-    for html in ["<img>", "<input>"] {
+fn inline_replaced_elements_and_foreign_content_stay_unsupported() {
+    for html in ["<img>", "<slot></slot>"] {
         let err = BlockLayout::compute(
-            &tree(html, "input {display:block}"),
+            &tree(html, "slot {display:block}"),
             CssSize::new(300.0, 200.0).unwrap(),
             LayoutLimits::default(),
             &CancellationToken::default(),

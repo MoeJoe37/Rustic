@@ -304,6 +304,14 @@ pixel is one CSS pixel of natural size, passed to layout through
 an image that is blocked, missing, over budget or not a decodable image is broken
 and keeps a zero natural size, and the load continues.
 
+**Lazy loading** (HTML §2.5.7). An `img` or `iframe` with `loading=lazy`
+loads only when its border box, at the page's scroll positions, comes
+within 1250 CSS pixels of the viewport. Layout runs first without the lazy
+images; those found near load, and layout runs again, for up to four
+rounds, since loaded images move what follows them. A lazy image that
+stays far keeps a zero natural size, and a far lazy iframe is not opened
+(it paints white). Limits: TD-218.
+
 ## Atomic inlines
 
 A non-positioned `inline-block`, `inline-flex` or inline replaced element
@@ -510,3 +518,16 @@ joins, PNG compression, reference chains in reftests and a broad imported
 reftest suite. See TD-41, TD-52, TD-53, TD-54, TD-55, TD-56, TD-57, TD-58, TD-59, TD-80 to TD-84 and docs/ROADMAP.md (REN-04 to
 REN-07). The implemented viewport and container scroll paths are described
 in [ADR 0064](adr/0064-scrolling-and-compositor-scenes.md).
+
+## Inline SVG
+
+An outermost `<svg>` element (one whose parent is not SVG) is a replaced
+element: its `width` and `height` attributes give its natural size and its
+`viewBox` (or those dimensions) its natural ratio; its children make no
+CSS boxes. Paint turns the subtree into filled polygons in the content box,
+clipped to it, after the box's background (`rustic-paint/src/svg.rs`):
+curves and arcs are flattened in user space, and strokes are built there
+from positively wound quads, joins (miter with the miter limit, round,
+bevel) and caps, so that the rasterizer's clamped nonzero coverage unions
+them without seams and transforms scale them as SVG requires. Limits:
+TD-220.

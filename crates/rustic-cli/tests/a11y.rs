@@ -71,7 +71,7 @@ fn reflects_focus_values_and_selection_scripts_left() {
     // Without scripts the DOM's own state shows.
     let plain = dump(&[&path]);
     assert!(
-        plain.contains("textbox \"Name\" value=\"\" focusable editable\n"),
+        plain.contains("textbox \"Name\" value=\"\" focusable editable @"),
         "{plain}"
     );
     let _ = std::fs::remove_dir_all(&dir);
@@ -102,21 +102,21 @@ fn live_pages_answer_assistive_technology_and_ime_input() {
         String::from_utf8_lossy(&output.stderr)
     );
     let text = String::from_utf8(output.stdout).unwrap();
-    let trees: Vec<&str> = text.split("document \"Form\"\n").skip(1).collect();
+    let trees: Vec<&str> = text.split("document \"Form\" @").skip(1).collect();
     assert_eq!(trees.len(), 2, "{text}");
     assert!(
-        trees[0].contains("  textbox \"Name\" value=\"\" focusable editable\n"),
+        trees[0].contains("  textbox \"Name\" value=\"\" focusable editable @"),
         "{text}"
     );
     // "Joe", then "oe" selected and replaced by the composition.
     assert!(
         trees[1].contains(
-            "  textbox \"Name\" value=\"JY\" focusable focused editable selection=2..2\n"
+            "  textbox \"Name\" value=\"JY\" focusable focused editable selection=2..2 @"
         ),
         "{text}"
     );
     assert!(
-        trees[1].contains("  checkbox \"Agree\" focusable checked=true\n"),
+        trees[1].contains("  checkbox \"Agree\" focusable checked=true @"),
         "{text}"
     );
     let missing = Command::new(env!("CARGO_BIN_EXE_rustic"))

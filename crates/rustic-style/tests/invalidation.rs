@@ -429,7 +429,8 @@ fn radio_groups_and_default_buttons_restyle_their_controls() {
     page.set("r2", "checked", "");
     // Checking r2 unchecks r1.
     targeted(page.restyle());
-    assert_eq!(page.width("r1"), "auto");
+    // Unchecked, r1 has the UA sheet's radio width.
+    assert_eq!(page.width("r1"), "13px");
     assert_eq!(page.width("r2"), "7px");
     page.set("r1", "name", "h");
     targeted(page.restyle());

@@ -1,8 +1,8 @@
 # Engine progress snapshot
 
-**Overall completion: 53.83%** = 51.78% verified complete + 2.05% partial credit. 121/228 capabilities complete, 12 in progress.
+**Overall completion: 55.08%** = 53.45% verified complete + 1.63% partial credit. 123/228 capabilities complete, 12 in progress.
 
-Catalog: `engine-v4`. Source fingerprint: `41a8c7b9f572ed9165b636f1c906c8ea97e21b50f03535caba40d543b09f410a`.
+Catalog: `engine-v4`. Source fingerprint: `46e088cec0a8ceb1ae8bb7ea57937eb614f7bd08234d6826b0ab81bc4524d1dd`.
 
 100% requires all capabilities and final five-platform engine acceptance. Weights and sizes measure planned engine scope; they are not compatibility results or time estimates. See [PROGRESS.md](../PROGRESS.md).
 
@@ -18,7 +18,7 @@ Catalog: `engine-v4`. Source fingerprint: `41a8c7b9f572ed9165b636f1c906c8ea97e21
 | M6 Networking & services | 12/12 | 100.00% | 100.00% | 4.38% |
 | M7 Isolation & security | 7/7 | 100.00% | 100.00% | 3.13% |
 | M8 Desktop alpha | 16/16 | 100.00% | 100.00% | 7.00% |
-| M9 Compatibility expansion | 8/54 | 20.00% | 14.89% | 22.35% |
+| M9 Compatibility expansion | 10/54 | 25.57% | 22.36% | 22.35% |
 | M10 Embedding & beta release | 0/9 | 18.40% | 0.00% | 3.67% |
 | M11 Web platform parity | 1/30 | 4.15% | 4.15% | 14.74% |
 | M12 Performance leadership | 0/13 | 0.00% | 0.00% | 7.64% |
@@ -32,11 +32,11 @@ Catalog: `engine-v4`. Source fingerprint: `41a8c7b9f572ed9165b636f1c906c8ea97e21
 | Foundation | 8/8 | 0 | 100.00% | 100.00% | 1% | 1.00 |
 | URLs & encoding | 10/12 | 0 | 83.33% | 83.33% | 2% | 1.66 |
 | DOM | 9/10 | 1 | 88.97% | 85.29% | 4% | 3.55 |
-| HTML | 10/11 | 1 | 92.79% | 78.37% | 5% | 4.63 |
+| HTML | 11/11 | 0 | 100.00% | 100.00% | 5% | 5.00 |
 | CSS & style | 10/10 | 0 | 100.00% | 100.00% | 6% | 6.00 |
 | Text & fonts | 5/7 | 0 | 76.00% | 76.00% | 3% | 2.28 |
-| Layout | 8/11 | 0 | 70.58% | 70.58% | 6% | 4.23 |
-| Paint & raster | 6/7 | 0 | 70.37% | 70.37% | 4% | 2.81 |
+| Layout | 9/11 | 0 | 80.39% | 80.39% | 6% | 4.82 |
+| Paint & raster | 6/7 | 1 | 77.77% | 70.37% | 4% | 3.11 |
 | JavaScript & GC | 13/15 | 1 | 91.78% | 89.04% | 10% | 9.17 |
 | WebAssembly | 0/8 | 6 | 0.00% | 0.00% | 3% | 0.00 |
 | Bindings & web APIs | 9/12 | 0 | 70.45% | 70.45% | 5% | 3.52 |
@@ -114,13 +114,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `html.scripts` — Parser/script reentry and encoding restart · size 3 · M5 · 0.40% of engine ([source](../../crates/rustic-html/src/parser.rs), [source](../../crates/rustic-html/src/local_encoding.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs), [test](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-html/tests/document.rs), [test](../../crates/rustic-html/tests/tree_construction.rs), [source](../../crates/rustic-engine/src/scripting.rs), [test](../../crates/rustic-engine/tests/inline_scripts.rs))
 - **complete** `html.loader` — Bounded local loader and dump-dom command · size 2 · M1 · 0.27% of engine ([source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-cli/tests/cli.rs))
 - **complete** `html.conformance` — Parser corpora, chunk invariance and fuzz gate · size 3 · M1 · 0.40% of engine ([source](../../tools/import_html_tests.py), [test](../../crates/rustic-html/tests/corpus.rs), [source](../../crates/rustic-html/src/parser/fragment.rs), [test](../../crates/rustic-html/tests/tree_construction.rs), [test](../../crates/rustic-html/tests/fragment.rs), [source](../../crates/rustic-fuzz/src/targets.rs), [test](../../crates/rustic-fuzz/tests/harness.rs))
-- **in progress 66.66%** `html.elements` — Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading · size 8 · M9 · 1.08% of engine
-  - [x] details and summary: rendering, open and name, summary activation, toggle events and exclusive groups ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-bindings/tests/page.rs))
-  - [x] dialog: show, showModal, close, requestClose, returnValue, the top layer and :modal ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-dom/src/document/top_layer.rs), [test](../../crates/rustic-style/tests/computed.rs))
-  - [x] Popover API: the popover attribute, show/hide/toggle, invokers, :popover-open and the top layer ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html_state.rs), [test](../../crates/rustic-bindings/tests/page.rs))
-  - [x] picture, srcset and sizes: image source selection for layout and paint ([source](../../crates/rustic-cli/src/srcset.rs), [test](../../crates/rustic-cli/tests/cli.rs))
-  - [ ] iframes: srcdoc and sandbox, and lazy loading of images and iframes
-  - [ ] Form-control semantics and layout: select and option, fieldset and legend, meter, progress and the remaining input types
+- **complete** `html.elements` — Complete element and form-control semantics: dialog, popover, details, picture/srcset, iframes and lazy loading · size 8 · M9 · 1.08% of engine ([source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-bindings/tests/page.rs), [source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-dom/src/document/top_layer.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-bindings/src/page/elements.rs), [source](../../crates/rustic-style/src/html_state.rs), [source](../../crates/rustic-cli/src/srcset.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-cli/src/images.rs), [source](../../crates/rustic-bindings/src/page/token_list.rs), [test](../../crates/rustic-cli/tests/cli.rs), [test](../../crates/rustic-cli/tests/frames.rs), [test](../../crates/rustic-bindings/tests/page.rs), [source](../../crates/rustic-paint/src/controls.rs), [source](../../crates/rustic-layout/src/tree.rs), [source](../../crates/rustic-layout/src/tree.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-layout/tests/inline.rs), [test](../../crates/rustic-paint/src/controls.rs))
 
 ### CSS & style
 
@@ -157,7 +151,7 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `layout.tables` — Tables · size 5 · M9 · 0.58% of engine ([source](../../crates/rustic-css/src/properties.rs), [test](../../crates/rustic-css/tests/tables.rs), [test](../../crates/rustic-style/tests/computed.rs), [source](../../crates/rustic-layout/src/flow/table.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/tables.rs), [source](../../crates/rustic-layout/src/flow/table.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/tables.rs), [source](../../crates/rustic-layout/src/flow/table.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-style/src/hints.rs), [test](../../crates/rustic-style/tests/computed.rs), [test](../../crates/rustic-layout/tests/tables.rs), [test](../../crates/rustic-layout/tests/wpt_tables.rs), [source](../../tools/import_wpt_tables_tests.py))
 - **planned** `layout.fragmentation` — Fragmentation, printing and advanced formatting · size 5 · M9 · 0.58% of engine
 - **planned** `layout.incremental` — Incremental/full-layout parity and conformance · size 5 · M9 · 0.58% of engine
-- **planned** `layout.formats` — SVG, MathML, ruby and multi-column layout · size 5 · M9 · 0.58% of engine
+- **complete** `layout.formats` — SVG, MathML, ruby and multi-column layout · size 5 · M9 · 0.58% of engine ([source](../../crates/rustic-layout/src/tree.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-layout/src/flow/multicol.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-layout/src/tree.rs), [test](../../crates/rustic-layout/tests/inline.rs), [source](../../crates/rustic-style/src/html.rs), [test](../../crates/rustic-layout/tests/inline.rs))
 
 ### Paint & raster
 
@@ -166,7 +160,11 @@ Each line shows status, scope size (1, 2, 3, 5 or 8 points within its subsystem)
 - **complete** `paint.raster` — Deterministic CPU reference rasterizer · size 5 · M3 · 0.74% of engine ([source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/raster.rs), [source](../../crates/rustic-paint/src/display.rs), [test](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/raster.rs), [source](../../crates/rustic-cli/src/images.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/raster.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-raster/src/damage.rs), [source](../../crates/rustic-raster/examples/frame_budget.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-raster/tests/paint.rs))
 - **complete** `paint.images` — Bounded images, color/alpha and resource lifecycle · size 3 · M3 · 0.44% of engine ([source](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-paint/src/color.rs), [test](../../crates/rustic-raster/tests/paint.rs), [source](../../crates/rustic-codecs/src/png.rs), [source](../../crates/rustic-codecs/src/inflate.rs), [test](../../crates/rustic-codecs/tests/pngsuite.rs), [test](../../crates/rustic-codecs/src/inflate.rs), [source](../../crates/rustic-codecs/src/jpeg.rs), [source](../../crates/rustic-codecs/src/gif.rs), [source](../../crates/rustic-codecs/src/webp.rs), [test](../../crates/rustic-codecs/tests/images.rs), [test](../../crates/rustic-codecs/tests/images.rs), [test](../../crates/rustic-codecs/tests/images.rs), [test](../../crates/rustic-codecs/tests/images.rs), [source](../../crates/rustic-codecs/src/store.rs), [source](../../crates/rustic-cli/src/images.rs), [test](../../crates/rustic-codecs/src/store.rs), [test](../../crates/rustic-codecs/src/store.rs), [test](../../crates/rustic-codecs/tests/images.rs))
 - **complete** `paint.hit` — Hit testing and resize/zoom geometry · size 2 · M3 · 0.29% of engine ([source](../../crates/rustic-paint/src/display.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-layout/src/geometry.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs), [test](../../crates/rustic-cli/tests/cli.rs))
-- **planned** `paint.formats` — SVG and MathML painting integration · size 8 · M9 · 1.18% of engine
+- **in progress 25.00%** `paint.formats` — SVG and MathML painting integration · size 8 · M9 · 1.18% of engine
+  - [x] SVG shapes and paths: fills, strokes, transforms, viewBox and presentation attributes ([source](../../crates/rustic-paint/src/svg.rs), [source](../../crates/rustic-paint/src/svg.rs), [test](../../crates/rustic-raster/tests/paint.rs))
+  - [ ] SVG paint servers, clipping, masks, markers, dashes and fill rules
+  - [ ] SVG text, author style sheets for SVG content and SVG images
+  - [ ] MathML painting
 - **complete** `paint.conformance` — Reftest output, damage and paint conformance · size 3 · M3 · 0.44% of engine ([source](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-raster/src/png.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-cli/src/reftest.rs), [source](../../crates/rustic-raster/src/compare.rs), [test](../../crates/rustic-cli/tests/reftests.rs), [test](../../crates/rustic-cli/tests/cli.rs), [source](../../crates/rustic-raster/src/damage.rs), [source](../../crates/rustic-cli/src/loader.rs), [test](../../crates/rustic-raster/tests/paint.rs))
 
 ### JavaScript & GC

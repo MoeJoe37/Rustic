@@ -23,6 +23,29 @@ use crate::{
 /// specification's flow-relative properties (`margin-block`,
 /// `padding-inline-start`).
 pub const HTML_USER_AGENT_STYLESHEET: &str = r#"@namespace "http://www.w3.org/1999/xhtml";
+@namespace m "http://www.w3.org/1998/Math/MathML";
+
+m|math { display: inline; font-family: math, serif; font-style: normal;
+  font-weight: normal; line-height: normal; text-indent: 0; direction: ltr }
+m|math[display=block i] { display: block; text-align: center; margin-block: 1em }
+m|annotation, m|annotation-xml, m|none, m|mprescripts { display: none }
+m|mi { font-style: italic }
+m|mo { padding-inline: 0.2em }
+m|mfrac { display: inline-flex; flex-direction: column; align-items: center;
+  vertical-align: 0.55em; padding-inline: 0.1em }
+m|mfrac > * { display: block; font-size: 90%; text-align: center }
+m|munder, m|mover, m|munderover { display: inline-flex; align-items: center }
+m|munder, m|munderover { flex-direction: column }
+m|mover { flex-direction: column-reverse }
+m|msqrt, m|mroot { display: inline-block; border-top: 0.06em solid;
+  margin-inline-start: 0.7em; padding-inline: 0.1em; padding-top: 0.1em }
+m|mtable { display: inline-table; vertical-align: middle }
+m|mtr { display: table-row }
+m|mtd { display: table-cell; padding: 0.2em 0.4em; text-align: center }
+m|mspace { display: inline-block }
+m|menclose { display: inline-block; border: 0.06em solid; padding: 0.1em }
+m|merror { border: 1px solid red; background-color: lightyellow }
+m|mphantom { visibility: hidden }
 
 [hidden], area, base, basefont, datalist, head, link, meta, noembed,
 noframes, param, rp, script, style, template, title { display: none }
@@ -38,7 +61,9 @@ address { font-style: italic }
 listing, plaintext, pre, xmp { font-family: monospace; white-space: pre }
 dialog:not([open]) { display: none }
 
-details, summary { display: block }
+details { display: block }
+summary { display: list-item; list-style: disclosure-closed inside }
+details[open] > summary { list-style-type: disclosure-open }
 details:not([open]) > :not(summary) { display: none }
 dialog { position: absolute; inset-inline-start: 0; inset-inline-end: 0;
   width: fit-content; height: fit-content; margin: auto; border: solid;
@@ -66,6 +91,9 @@ dir, dl, menu, ol, ul { margin-block: 1em }
 :is(dir, dl, menu, ol, ul) :is(dir, dl, menu, ol, ul) { margin-block: 0 }
 dd { margin-inline-start: 40px }
 dir, menu, ol, ul { padding-inline-start: 40px }
+ol { list-style-type: decimal }
+:is(dir, menu, ol, ul) :is(dir, menu, ul) { list-style-type: circle }
+:is(dir, menu, ol, ul) :is(dir, menu, ol, ul) :is(dir, menu, ul) { list-style-type: square }
 
 table { display: table; box-sizing: border-box; border-spacing: 2px; border-collapse: separate; text-indent: initial }
 caption { display: table-caption; text-align: center }
@@ -100,7 +128,42 @@ bdi:not([dir]) { unicode-bidi:plaintext }
 bdo, bdo[dir] { unicode-bidi:bidi-override }
 
 hr { color: gray; border-style: inset; border-width: 1px; margin: 0.5em auto }
-fieldset { display: block; margin-left: 2px; margin-right: 2px; border: 2px groove gray }
+fieldset { display: block; margin-inline: 2px; border: 2px groove gray;
+  padding-block: 0.35em 0.625em; padding-inline: 0.75em; min-inline-size: min-content }
+legend { padding-inline: 2px }
+
+rp { display: none }
+rt { display: block; font-size: 50%; line-height: 1; text-align: center; text-indent: 0 }
+
+input, select, textarea, button, meter, progress { display: inline-block }
+input, select, textarea, button { font-size: 13.333px; font-family: sans-serif;
+  font-weight: normal; font-style: normal; line-height: normal; color: black;
+  letter-spacing: normal; word-spacing: normal; text-transform: none;
+  text-indent: 0; text-align: start; margin: 0 }
+input { padding: 1px 2px; border: 1px solid #767676; border-radius: 2px;
+  background-color: white; white-space: pre; inline-size: 20ch }
+input[type=hidden i] { display: none }
+input:is([type=checkbox i], [type=radio i]) { box-sizing: border-box;
+  inline-size: 13px; block-size: 13px; padding: 0; margin: 3px 3px 3px 4px }
+input[type=radio i] { border-radius: 50%; margin-inline: 5px 3px }
+input:is([type=submit i], [type=reset i], [type=button i], [type=file i]),
+button { padding: 1px 6px; border: 1px solid #767676; border-radius: 2px;
+  background-color: #efefef; text-align: center; inline-size: auto;
+  white-space: pre }
+input[type=file i] { border: none; background-color: transparent; padding: 0 }
+input[type=range i] { inline-size: 129px; block-size: 16px; padding: 0;
+  margin: 2px; border: none; background-color: transparent }
+input[type=color i] { box-sizing: border-box; inline-size: 50px; block-size: 27px;
+  padding: 4px 6px; background-color: #efefef }
+select { padding: 1px 4px; border: 1px solid #767676; border-radius: 2px;
+  background-color: white; white-space: pre }
+textarea { font-family: monospace; padding: 2px; border: 1px solid #767676;
+  background-color: white; white-space: pre-wrap; overflow-wrap: break-word;
+  inline-size: 20ch; block-size: 2.4em; overflow: auto; vertical-align: text-bottom }
+meter { inline-size: 5em; block-size: 1em; vertical-align: -0.2em;
+  background-color: #efefef; border-radius: 2px }
+progress { inline-size: 10em; block-size: 1em; vertical-align: -0.2em;
+  background-color: #efefef; border-radius: 2px }
 "#;
 
 /// The parsed [`HTML_USER_AGENT_STYLESHEET`].

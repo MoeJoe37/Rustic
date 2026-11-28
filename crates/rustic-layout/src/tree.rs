@@ -97,6 +97,12 @@ pub struct BoxSnapshot {
     /// rest of the row group), or `span` of a `col`/`colgroup` as the first
     /// value; (1, 1) for every other box.
     span: (u32, u32),
+    /// A generated `outside` list marker (CSS Lists 3 §3.3): hangs before
+    /// the first line of its list item.
+    outside_marker: bool,
+    /// The anonymous block holding a multi-column container's content
+    /// (`flow::multicol`).
+    column_wrapper: bool,
 }
 
 /// HTML elements whose `overflow` can propagate to the viewport.
@@ -180,8 +186,21 @@ impl BoxSnapshot {
             copy.html_tag = HtmlTag::Other;
             copy.natural = None;
             copy.span = (1, 1);
+            copy.outside_marker = false;
+            copy.column_wrapper = false;
         }
         copy
+    }
+
+    /// Whether this is the anonymous block holding a multi-column
+    /// container's content.
+    pub(crate) const fn is_column_wrapper(&self) -> bool {
+        self.column_wrapper
+    }
+
+    /// Whether this text box is a generated `outside` list marker.
+    pub(crate) const fn is_outside_marker(&self) -> bool {
+        self.outside_marker
     }
 
     /// The shared style, for copies that keep it.
@@ -266,6 +285,8 @@ impl BoxTree {
         let mut hidden = None;
         let mut text_units = 0usize;
         let mut languages: Vec<(usize, Option<Arc<str>>)> = Vec::new();
+        let mut ordinals = Ordinals::default();
+        let mut rubies: Vec<Ruby> = Vec::new();
         let mut initial_language = None;
         let mut ancestors = 0usize;
         let mut ancestor = document.node(root)?.parent();
@@ -297,9 +318,18 @@ impl BoxTree {
             while parents.last().is_some_and(|&(d, _, _)| d >= depth) {
                 parents.pop();
             }
-            let parent = parents.last().and_then(|&(_, parent, _)| parent);
+            let mut parent = parents.last().and_then(|&(_, parent, _)| parent);
             let inherited = parents.last().and_then(|(_, _, style)| style.clone());
+            while rubies.last().is_some_and(|r| r.depth >= depth) {
+                rubies.pop();
+            }
             let node = document.node(id)?;
+            // A closed `details` renders only its first `summary` (HTML
+            // §15.5.3: the rest is in a slot that is not rendered).
+            if id != root && hidden_in_closed_details(document, id, node) {
+                hidden = Some(depth);
+                continue;
+            }
             while languages.last().is_some_and(|(d, _)| *d >= depth) {
                 languages.pop();
             }
@@ -313,31 +343,23 @@ impl BoxTree {
             // native control or foreign content into a generic CSS block.
             let special_layout = match node.kind() {
                 NodeKind::Element(element) => {
-                    element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE)
-                        || matches!(
-                            element.name().local().to_ascii_lowercase().as_str(),
-                            "img"
-                                | "video"
-                                | "audio"
-                                | "iframe"
-                                | "embed"
-                                | "object"
-                                | "canvas"
-                                | "input"
-                                | "textarea"
-                                | "select"
-                                | "button"
-                                | "meter"
-                                | "progress"
-                                | "br"
-                                | "wbr"
-                                | "fieldset"
-                                | "legend"
-                                | "details"
-                                | "summary"
-                                | "dialog"
-                                | "slot"
-                        )
+                    // MathML lays out as CSS boxes from the UA sheet.
+                    !matches!(
+                        element.name().namespace(),
+                        Some(rustic_dom::HTML_NAMESPACE | rustic_dom::MATHML_NAMESPACE)
+                    ) || matches!(
+                        element.name().local().to_ascii_lowercase().as_str(),
+                        "img"
+                            | "video"
+                            | "audio"
+                            | "iframe"
+                            | "embed"
+                            | "object"
+                            | "canvas"
+                            | "br"
+                            | "wbr"
+                            | "slot"
+                    )
                 }
                 _ => false,
             };
@@ -361,6 +383,17 @@ impl BoxTree {
                         "video" | "iframe" | "embed" | "object" => Some(NaturalSize::NONE),
                         _ => None,
                     }
+                }
+                // An outermost `svg` is a replaced element (SVG 2 §5.1.2).
+                NodeKind::Element(element)
+                    if element.name().namespace() == Some(rustic_dom::SVG_NAMESPACE)
+                        && element.name().local() == "svg"
+                        && !node.parent().is_some_and(|p| {
+                            matches!(document.node(p).map(|n| n.kind()),
+                                Ok(NodeKind::Element(e)) if e.name().namespace() == Some(rustic_dom::SVG_NAMESPACE))
+                        }) =>
+                {
+                    Some(svg_natural_size(element))
                 }
                 _ => None,
             };
@@ -443,8 +476,13 @@ impl BoxTree {
                     if boxes.len() >= limits.max_boxes {
                         return Err(LayoutError::BoxLimit);
                     }
+                    // A list item is a block box with a marker (CSS Lists 3).
+                    let display = match display {
+                        Display::ListItem => Display::Block,
+                        other => *other,
+                    };
                     (
-                        BoxKind::Element(*display),
+                        BoxKind::Element(display),
                         Arc::new(style.clone()),
                         Vec::new(),
                     )
@@ -467,6 +505,47 @@ impl BoxTree {
                 }
                 _ => continue,
             };
+            // A ruby's children are grouped into base–annotation pairs,
+            // each an anonymous inline flex column with the annotation on
+            // top (CSS Ruby 1 §2, approximated).
+            if let Some(ruby) = rubies
+                .last_mut()
+                .filter(|r| r.depth + 1 == depth && parent == Some(r.index))
+            {
+                let annotation = matches!(node.kind(), NodeKind::Element(e)
+                    if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && e.name().local() == "rt");
+                // Whitespace between pairs is discarded.
+                if kind == BoxKind::Text
+                    && text
+                        .iter()
+                        .all(|&u| matches!(u, 0x09 | 0x0A | 0x0C | 0x0D | 0x20))
+                {
+                    continue;
+                }
+                if ruby.pair.is_none() || (!annotation && ruby.after_annotation) {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    ruby.pair = Some(boxes.len());
+                    ruby.after_annotation = false;
+                    boxes.push(BoxSnapshot {
+                        node: ruby.node,
+                        language: language.clone(),
+                        parent: Some(ruby.index),
+                        kind: BoxKind::Element(Display::InlineFlex),
+                        style: Some(Arc::clone(&ruby.pair_style)),
+                        text: Vec::new(),
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: false,
+                        column_wrapper: false,
+                    });
+                }
+                ruby.after_annotation |= annotation;
+                parent = ruby.pair;
+            }
             let current = boxes.len();
             // Descendant text inherits an element's own style; a text node has
             // no children, so its entry only closes the stack level.
@@ -474,18 +553,189 @@ impl BoxTree {
                 BoxKind::Element(_) => Some(Arc::clone(&style)),
                 BoxKind::Text => inherited,
             };
+            let control = match node.kind() {
+                NodeKind::Element(element) if matches!(kind, BoxKind::Element(_)) => {
+                    control_text(document, id, element)
+                }
+                _ => None,
+            };
             boxes.push(BoxSnapshot {
                 node: id,
-                language,
+                language: language.clone(),
                 parent,
                 kind,
-                style: Some(style),
+                style: Some(Arc::clone(&style)),
                 text,
                 special_layout,
                 html_tag,
                 natural: natural.filter(|_| matches!(kind, BoxKind::Element(_))),
                 span,
+                outside_marker: false,
+                column_wrapper: false,
             });
+            if matches!(node.kind(), NodeKind::Element(e)
+                if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && e.name().local() == "ruby")
+                && kind == BoxKind::Element(Display::Inline)
+            {
+                let mut pair_style = (*style).clone();
+                pair_style.set(
+                    PropertyId::Display,
+                    PropertyValue::Display(Display::InlineFlex),
+                );
+                pair_style.set(
+                    PropertyId::FlexDirection,
+                    PropertyValue::FlexDirection(rustic_css::FlexDirection::ColumnReverse),
+                );
+                pair_style.set(
+                    PropertyId::AlignItems,
+                    PropertyValue::Alignment(rustic_css::Alignment::new(
+                        rustic_css::AlignKeyword::Center,
+                    )),
+                );
+                rubies.push(Ruby {
+                    depth,
+                    index: current,
+                    node: id,
+                    pair: None,
+                    after_annotation: false,
+                    pair_style: Arc::new(pair_style),
+                });
+            }
+            let item = matches!(
+                (node.kind(), style.get(PropertyId::Display)),
+                (
+                    NodeKind::Element(_),
+                    PropertyValue::Display(Display::ListItem)
+                )
+            );
+            if item {
+                let ordinal = ordinals.next(document, id);
+                if let Some((units, outside)) = marker_text(&style, ordinal) {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    text_units = text_units
+                        .checked_add(units.len())
+                        .filter(|&n| n <= limits.max_text_units)
+                        .ok_or(LayoutError::TextLimit)?;
+                    // The marker keeps its trailing space.
+                    let mut marker = (*style).clone();
+                    marker.set(
+                        PropertyId::WhiteSpace,
+                        PropertyValue::WhiteSpace(rustic_css::WhiteSpace::Pre),
+                    );
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language: language.clone(),
+                        parent: Some(current),
+                        kind: BoxKind::Text,
+                        style: Some(Arc::new(marker)),
+                        text: units,
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: outside,
+                        column_wrapper: false,
+                    });
+                }
+            }
+            if natural.is_some()
+                && matches!(node.kind(), NodeKind::Element(e) if e.name().namespace() == Some(rustic_dom::SVG_NAMESPACE))
+            {
+                // Paint draws the SVG content; it makes no CSS boxes.
+                hidden = Some(depth);
+                continue;
+            }
+            if let (NodeKind::Element(e), BoxKind::Element(_)) = (node.kind(), kind) {
+                if e.name().namespace() == Some(rustic_dom::MATHML_NAMESPACE)
+                    && matches!(e.name().local(), "msqrt" | "mroot")
+                {
+                    // The radical sign hangs before the radicand.
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language: language.clone(),
+                        parent: Some(current),
+                        kind: BoxKind::Text,
+                        style: Some(Arc::clone(&style)),
+                        text: vec![0x221A],
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: true,
+                        column_wrapper: false,
+                    });
+                }
+            }
+            if let Some(control) = control {
+                // A control's rendering replaces its children: the value,
+                // label or selected option becomes one text run of its own.
+                hidden = Some(depth);
+                if let Some((units, placeholder)) = control {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    text_units = text_units
+                        .checked_add(units.len())
+                        .filter(|&n| n <= limits.max_text_units)
+                        .ok_or(LayoutError::TextLimit)?;
+                    let text_style = if placeholder {
+                        let mut muted = (*style).clone();
+                        muted.set(
+                            PropertyId::Color,
+                            PropertyValue::Color(rustic_css::Color::rgb(117, 117, 117)),
+                        );
+                        Arc::new(muted)
+                    } else {
+                        Arc::clone(&style)
+                    };
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language,
+                        parent: Some(current),
+                        kind: BoxKind::Text,
+                        style: Some(text_style),
+                        text: units,
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: false,
+                        column_wrapper: false,
+                    });
+                }
+                continue;
+            }
+            if let BoxKind::Element(Display::Block | Display::FlowRoot | Display::InlineBlock) =
+                kind
+            {
+                if is_multicol(&style) {
+                    if boxes.len() >= limits.max_boxes {
+                        return Err(LayoutError::BoxLimit);
+                    }
+                    let wrapper = boxes.len();
+                    boxes.push(BoxSnapshot {
+                        node: id,
+                        language,
+                        parent: Some(current),
+                        kind: BoxKind::Element(Display::Block),
+                        style: Some(Arc::new(style.anonymous_flow(Display::Block))),
+                        text: Vec::new(),
+                        special_layout: false,
+                        html_tag: HtmlTag::Other,
+                        natural: None,
+                        span: (1, 1),
+                        outside_marker: false,
+                        column_wrapper: true,
+                    });
+                    parents.push((depth, Some(wrapper), shared));
+                    continue;
+                }
+            }
             parents.push((depth, Some(current), shared));
         }
         Ok(Self { boxes })
@@ -600,6 +850,377 @@ impl fmt::Display for LayoutError {
 }
 impl Error for LayoutError {}
 
+/// Whether `node` is a child of a closed HTML `details` other than its
+/// first `summary` child.
+fn hidden_in_closed_details(document: &Document, id: NodeId, node: &rustic_dom::Node) -> bool {
+    let html = |n: &rustic_dom::Node, local: &str| {
+        matches!(n.kind(), NodeKind::Element(e)
+            if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) && e.name().local() == local)
+    };
+    let Some(parent) = node.parent() else {
+        return false;
+    };
+    let Ok(details) = document.node(parent) else {
+        return false;
+    };
+    let closed = matches!(details.kind(), NodeKind::Element(e)
+        if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
+            && e.name().local() == "details"
+            && !e.attributes().iter().any(|a| a.name().namespace().is_none() && a.name().local() == "open"));
+    if !closed {
+        return false;
+    }
+    let first_summary = document.children(parent).ok().and_then(|mut children| {
+        children.find(|&child| document.node(child).is_ok_and(|n| html(n, "summary")))
+    });
+    first_summary != Some(id)
+}
+
+/// Whether `style` makes a block container a multi-column container.
+fn is_multicol(style: &ComputedStyle) -> bool {
+    let count = !matches!(
+        style.get(PropertyId::ColumnCount),
+        PropertyValue::ZIndex(rustic_css::ZIndex::Auto)
+    );
+    let width = !matches!(
+        style.get(PropertyId::ColumnWidth),
+        PropertyValue::LengthPercentageOrAuto(rustic_css::LengthPercentageOrAuto::Auto)
+    );
+    count || width
+}
+
+/// An open HTML `ruby` element whose children are being paired.
+struct Ruby {
+    depth: usize,
+    index: usize,
+    node: NodeId,
+    /// The current pair's box.
+    pair: Option<usize>,
+    /// Whether the current pair has its annotation already.
+    after_annotation: bool,
+    pair_style: Arc<ComputedStyle>,
+}
+
+/// The ordinal values of list items (HTML §4.4.8, `ol` `start`,
+/// `reversed` and `li` `value`), counted per parent in tree order.
+#[derive(Default)]
+struct Ordinals {
+    /// Parent → (its next ordinal, the step).
+    next: HashMap<NodeId, (i64, i64)>,
+}
+
+impl Ordinals {
+    fn next(&mut self, document: &Document, item: NodeId) -> i64 {
+        let Some(parent) = document.node(item).ok().and_then(|n| n.parent()) else {
+            return 1;
+        };
+        let html_attribute = |id: NodeId, name: &str| match document.node(id).map(|n| n.kind()) {
+            Ok(NodeKind::Element(e))
+                if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE) =>
+            {
+                e.attributes()
+                    .iter()
+                    .find(|a| a.name().namespace().is_none() && a.name().local() == name)
+                    .map(|a| String::from_utf16_lossy(a.value().as_units()))
+            }
+            _ => None,
+        };
+        let is_ol = matches!(document.node(parent).map(|n| n.kind()),
+            Ok(NodeKind::Element(e)) if e.name().namespace() == Some(rustic_dom::HTML_NAMESPACE)
+                && e.name().local() == "ol");
+        let (next, step) = *self.next.entry(parent).or_insert_with(|| {
+            let reversed = is_ol && html_attribute(parent, "reversed").is_some();
+            let start = if is_ol {
+                html_attribute(parent, "start").as_deref().and_then(integer)
+            } else {
+                None
+            };
+            if reversed {
+                let items = document.children(parent).map_or(0, |children| {
+                    children
+                        .filter(|&child| {
+                            matches!(document.node(child).map(|n| n.kind()),
+                            Ok(NodeKind::Element(e)) if e.name().local() == "li")
+                        })
+                        .count()
+                });
+                (start.unwrap_or(items as i64), -1)
+            } else {
+                (start.unwrap_or(1), 1)
+            }
+        });
+        let value = html_attribute(item, "value")
+            .as_deref()
+            .and_then(integer)
+            .unwrap_or(next);
+        self.next.insert(parent, (value.saturating_add(step), step));
+        value
+    }
+}
+
+/// The HTML rules for parsing integers (leading whitespace, a sign, digits).
+fn integer(value: &str) -> Option<i64> {
+    let rest = value.trim_start_matches(['\t', '\n', '\x0c', '\r', ' ']);
+    let (negative, rest) = match rest.as_bytes().first() {
+        Some(b'-') => (true, &rest[1..]),
+        Some(b'+') => (false, &rest[1..]),
+        _ => (false, rest),
+    };
+    let digits: String = rest.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() {
+        return None;
+    }
+    let n = digits
+        .parse::<i64>()
+        .unwrap_or(i64::from(i32::MAX))
+        .min(i64::from(i32::MAX));
+    Some(if negative { -n } else { n })
+}
+
+/// A list item's marker text and whether it hangs outside: the counter
+/// in the item's `list-style-type`, with its suffix (CSS Counter Styles 3
+/// §6). `None` for `list-style-type: none`.
+fn marker_text(style: &ComputedStyle, ordinal: i64) -> Option<(Vec<u16>, bool)> {
+    use rustic_css::{ListStylePosition, ListStyleType as T};
+    let PropertyValue::ListStyleType(kind) = style.get(PropertyId::ListStyleType) else {
+        return None;
+    };
+    let outside = matches!(
+        style.get(PropertyId::ListStylePosition),
+        PropertyValue::ListStylePosition(ListStylePosition::Outside)
+    );
+    let text = match kind {
+        T::None => return None,
+        T::Disc => "\u{2022} ".to_owned(),
+        T::Circle => "\u{25E6} ".to_owned(),
+        T::Square => "\u{25AA} ".to_owned(),
+        T::DisclosureOpen => "\u{25BE} ".to_owned(),
+        T::DisclosureClosed => "\u{25B8} ".to_owned(),
+        numeric => format!("{}. ", counter(*numeric, ordinal)),
+    };
+    Some((text.encode_utf16().collect(), outside))
+}
+
+/// `ordinal` in a numeric or alphabetic counter style, falling back to
+/// `decimal` outside the style's range.
+fn counter(kind: rustic_css::ListStyleType, ordinal: i64) -> String {
+    use rustic_css::ListStyleType as T;
+    let alphabetic = |letters: &[char]| {
+        if ordinal < 1 {
+            return ordinal.to_string();
+        }
+        let mut n = ordinal;
+        let mut out = Vec::new();
+        while n > 0 {
+            n -= 1;
+            out.push(letters[(n % letters.len() as i64) as usize]);
+            n /= letters.len() as i64;
+        }
+        out.iter().rev().collect()
+    };
+    let roman = |upper: bool| {
+        if !(1..=3999).contains(&ordinal) {
+            return ordinal.to_string();
+        }
+        const DIGITS: [(i64, &str); 13] = [
+            (1000, "m"),
+            (900, "cm"),
+            (500, "d"),
+            (400, "cd"),
+            (100, "c"),
+            (90, "xc"),
+            (50, "l"),
+            (40, "xl"),
+            (10, "x"),
+            (9, "ix"),
+            (5, "v"),
+            (4, "iv"),
+            (1, "i"),
+        ];
+        let mut n = ordinal;
+        let mut out = String::new();
+        for (value, digits) in DIGITS {
+            while n >= value {
+                out.push_str(digits);
+                n -= value;
+            }
+        }
+        if upper { out.to_ascii_uppercase() } else { out }
+    };
+    let latin: Vec<char> = ('a'..='z').collect();
+    match kind {
+        T::DecimalLeadingZero if (0..10).contains(&ordinal) => format!("0{ordinal}"),
+        T::DecimalLeadingZero if (-9..0).contains(&ordinal) => format!("-0{}", -ordinal),
+        T::LowerRoman => roman(false),
+        T::UpperRoman => roman(true),
+        T::LowerAlpha | T::LowerLatin => alphabetic(&latin),
+        T::UpperAlpha | T::UpperLatin => alphabetic(&latin).to_uppercase(),
+        T::LowerGreek => alphabetic(&[
+            'α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ',
+            'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω',
+        ]),
+        _ => ordinal.to_string(),
+    }
+}
+
+/// An outermost `svg`'s natural size: its `width` and `height` attributes
+/// when they are absolute lengths, and the ratio of its `viewBox` (or of
+/// those dimensions).
+fn svg_natural_size(element: &rustic_dom::Element) -> NaturalSize {
+    let attribute = |name: &str| {
+        element
+            .attributes()
+            .iter()
+            .find(|a| a.name().namespace().is_none() && a.name().local() == name)
+            .map(|a| String::from_utf16_lossy(a.value().as_units()))
+    };
+    let length = |name: &str| {
+        let value = attribute(name)?;
+        let value = value.trim();
+        let number = value.strip_suffix("px").unwrap_or(value).trim();
+        number
+            .parse::<f64>()
+            .ok()
+            .filter(|n| n.is_finite() && *n >= 0.0)
+            .and_then(|n| CssPx::new(n).ok())
+    };
+    let view_box = attribute("viewBox").and_then(|v| {
+        let n: Vec<f64> = v
+            .split(|c: char| c.is_ascii_whitespace() || c == ',')
+            .filter(|t| !t.is_empty())
+            .map(str::parse::<f64>)
+            .collect::<Result<_, _>>()
+            .ok()?;
+        (n.len() == 4 && n[2] > 0.0 && n[3] > 0.0 && n.iter().all(|x| x.is_finite()))
+            .then(|| n[2] / n[3])
+    });
+    let (width, height) = (length("width"), length("height"));
+    let ratio = view_box.or_else(|| match (width, height) {
+        (Some(w), Some(h)) if w.get() > 0.0 && h.get() > 0.0 => Some(w.get() / h.get()),
+        _ => None,
+    });
+    NaturalSize::new(width, height, ratio).unwrap_or(NaturalSize::NONE)
+}
+
+/// A zero-width space: the text of an empty field, which keeps one line's
+/// height.
+const STRUT: [u16; 1] = [0x200B];
+
+/// For an HTML control whose rendering replaces its children (`input`,
+/// `select`, `meter`, `progress`), the text it shows, if any, and whether
+/// that text is a placeholder; `None` for every other element.
+#[allow(
+    clippy::option_option,
+    reason = "outer: a control at all; inner: whether it shows text"
+)]
+fn control_text(
+    document: &Document,
+    id: NodeId,
+    element: &rustic_dom::Element,
+) -> Option<Option<(Vec<u16>, bool)>> {
+    if element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE) {
+        return None;
+    }
+    let attribute = |e: &rustic_dom::Element, name: &str| {
+        e.attributes()
+            .iter()
+            .find(|a| a.name().namespace().is_none() && a.name().local() == name)
+            .map(|a| a.value().as_units().to_vec())
+    };
+    let text = |s: &str| Some((s.encode_utf16().collect::<Vec<u16>>(), false));
+    match element.name().local() {
+        "meter" | "progress" => Some(None),
+        "input" => {
+            let kind = attribute(element, "type")
+                .map(|t| String::from_utf16_lossy(&t).to_ascii_lowercase())
+                .unwrap_or_default();
+            let value = attribute(element, "value").filter(|v| !v.is_empty());
+            Some(match kind.as_str() {
+                "checkbox" | "radio" | "range" | "color" | "hidden" | "image" => None,
+                "submit" => value.map(|v| (v, false)).or_else(|| text("Submit")),
+                "reset" => value.map(|v| (v, false)).or_else(|| text("Reset")),
+                "button" => value.map(|v| (v, false)),
+                "file" => text("Choose File  No file chosen"),
+                "password" => match value {
+                    Some(v) => Some((vec![0x2022; v.len()], false)),
+                    None => attribute(element, "placeholder").map(|p| (p, true)),
+                },
+                _ => match value {
+                    // Line breaks are stripped from single-line values.
+                    Some(v) => Some((
+                        v.into_iter().filter(|&u| u != 0x0A && u != 0x0D).collect(),
+                        false,
+                    )),
+                    None => attribute(element, "placeholder")
+                        .filter(|p| !p.is_empty())
+                        .map(|p| (p, true))
+                        .or(Some((STRUT.to_vec(), false))),
+                },
+            })
+        }
+        "select" => {
+            // The first selected option, else the first option (a list box
+            // with `multiple` or `size` shows the same, TD-219).
+            let mut first = None;
+            let mut selected = None;
+            if let Ok(walk) = document.walk(id) {
+                for (option, _) in walk {
+                    let Ok(NodeKind::Element(e)) = document.node(option).map(|n| n.kind()) else {
+                        continue;
+                    };
+                    if e.name().namespace() != Some(rustic_dom::HTML_NAMESPACE)
+                        || e.name().local() != "option"
+                    {
+                        continue;
+                    }
+                    first.get_or_insert(option);
+                    if attribute(e, "selected").is_some() {
+                        selected = Some(option);
+                        break;
+                    }
+                }
+            }
+            let Some(option) = selected.or(first) else {
+                return Some(Some((STRUT.to_vec(), false)));
+            };
+            let label = match document.node(option).map(|n| n.kind()) {
+                Ok(NodeKind::Element(e)) => attribute(e, "label").filter(|l| !l.is_empty()),
+                _ => None,
+            };
+            let label = label.unwrap_or_else(|| option_text(document, option));
+            Some(Some((
+                if label.is_empty() {
+                    STRUT.to_vec()
+                } else {
+                    label
+                },
+                false,
+            )))
+        }
+        _ => None,
+    }
+}
+
+/// An `option`'s text: its descendant text with ASCII whitespace stripped
+/// and collapsed (HTML §4.10.10).
+fn option_text(document: &Document, option: NodeId) -> Vec<u16> {
+    let mut units = Vec::new();
+    if let Ok(walk) = document.walk(option) {
+        for (node, _) in walk {
+            if let Ok(NodeKind::Text(data)) = document.node(node).map(|n| n.kind()) {
+                units.extend_from_slice(data.as_units());
+            }
+        }
+    }
+    let text = String::from_utf16_lossy(&units);
+    text.split(['\t', '\n', '\x0c', '\r', ' '])
+        .filter(|word| !word.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .encode_utf16()
+        .collect()
+}
+
 fn explicit_language(kind: &NodeKind) -> Option<Option<Arc<str>>> {
     let NodeKind::Element(element) = kind else {
         return None;
@@ -623,4 +1244,30 @@ fn explicit_language(kind: &NodeKind) -> Option<Option<Arc<str>>> {
         return Some(None);
     }
     Some(Some(Arc::from(s.to_ascii_lowercase())))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{counter, integer};
+    use rustic_css::ListStyleType as T;
+
+    #[test]
+    fn counter_styles_render_ordinals_with_decimal_fallbacks() {
+        assert_eq!(counter(T::Decimal, -3), "-3");
+        assert_eq!(counter(T::DecimalLeadingZero, 7), "07");
+        assert_eq!(counter(T::DecimalLeadingZero, 12), "12");
+        assert_eq!(counter(T::LowerRoman, 1994), "mcmxciv");
+        assert_eq!(counter(T::UpperRoman, 4000), "4000");
+        assert_eq!(counter(T::LowerAlpha, 1), "a");
+        assert_eq!(counter(T::UpperLatin, 28), "AB");
+        assert_eq!(counter(T::LowerAlpha, 0), "0");
+        assert_eq!(counter(T::LowerGreek, 25), "αα");
+    }
+
+    #[test]
+    fn list_values_parse_as_html_integers() {
+        assert_eq!(integer(" +12abc"), Some(12));
+        assert_eq!(integer("-4"), Some(-4));
+        assert_eq!(integer("x1"), None);
+    }
 }

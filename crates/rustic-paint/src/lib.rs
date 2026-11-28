@@ -14,9 +14,11 @@
 mod client_rects;
 mod clip;
 mod color;
+mod controls;
 mod display;
 mod matrix;
 mod rounded;
+mod svg;
 
 pub use client_rects::{ClientRects, client_rects};
 pub use color::{Srgba, srgba};

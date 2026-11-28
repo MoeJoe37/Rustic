@@ -593,6 +593,38 @@ fn element_is(document: &Document, node: NodeId, local: &str) -> bool {
     )
 }
 
+/// Whether `node` is an outermost SVG `svg` element.
+fn element_is_svg_root(document: &Document, node: NodeId) -> bool {
+    let Ok(n) = document.node(node) else {
+        return false;
+    };
+    let svg = |kind: &NodeKind| matches!(kind, NodeKind::Element(e) if e.name().namespace() == Some(rustic_dom::SVG_NAMESPACE));
+    matches!(n.kind(), NodeKind::Element(e) if e.name().local() == "svg")
+        && svg(n.kind())
+        && !n
+            .parent()
+            .and_then(|p| document.node(p).ok())
+            .is_some_and(|p| svg(p.kind()))
+}
+
+/// A fieldset's rendered legend: its first child that is an HTML
+/// `legend` (HTML §15.3.13; floated and positioned legends are not told
+/// apart yet, TD-219).
+fn rendered_legend(document: &Document, fieldset: NodeId) -> Option<NodeId> {
+    if !element_is(document, fieldset, "fieldset") {
+        return None;
+    }
+    let mut children = document.children(fieldset).ok()?;
+    children
+        .find(|&child| {
+            matches!(
+                document.node(child).map(|n| n.kind()),
+                Ok(NodeKind::Element(_))
+            )
+        })
+        .filter(|&child| element_is(document, child, "legend"))
+}
+
 fn edges(r: CssRect) -> (f64, f64, f64, f64) {
     let o = r.origin();
     (
@@ -621,6 +653,9 @@ struct Geometry {
     /// The rounded border box, when any corner is rounded.
     rounded: Option<RoundedRect>,
     rounded_clip: Option<usize>,
+    /// A horizontal span of the top border left unpainted: a fieldset's
+    /// rendered legend (HTML §15.3.13).
+    gap: Option<(f64, f64)>,
 }
 
 impl Geometry {
@@ -638,6 +673,7 @@ impl Geometry {
             clip,
             rounded,
             rounded_clip,
+            gap: None,
         }
     }
 
@@ -655,7 +691,44 @@ impl Geometry {
             clip,
             rounded,
             rounded_clip,
+            gap: None,
         }
+    }
+
+    /// A fieldset's geometry around its rendered legend, whose border box
+    /// is `legend`: the top border runs through the legend's middle with a
+    /// gap behind it, and nothing of the fieldset paints above that line.
+    /// Square-cornered fieldsets only; others keep their geometry.
+    fn around_legend(mut self, legend: CssRect) -> Self {
+        let (x0, y0, x1, y1) = edges(self.border);
+        let (_, py0, _, _) = edges(self.padding);
+        let (lx0, ly0, lx1, ly1) = edges(legend);
+        let width = py0 - y0;
+        let top = (ly0 + ly1) / 2.0 - width / 2.0;
+        if self.rounded.is_some() || top <= y0 || top + width > y1 {
+            return self;
+        }
+        let rect = |top: f64, bottom: f64, left: f64, right: f64| {
+            CssRect::new(
+                CssPoint {
+                    x: CssPx::new(left).ok()?,
+                    y: CssPx::new(top).ok()?,
+                },
+                CssSize::new(right - left, bottom - top).ok()?,
+            )
+            .ok()
+        };
+        let (px0, _, px1, py1) = edges(self.padding);
+        let (Some(border), Some(padding)) = (
+            rect(top, y1, x0, x1),
+            rect((top + width).min(py1), py1, px0, px1),
+        ) else {
+            return self;
+        };
+        self.border = border;
+        self.padding = padding;
+        self.gap = Some((lx0, lx1));
+        self
     }
 
     /// `area` (one of this fragment's boxes) with the matching curve.
@@ -1010,6 +1083,88 @@ impl Builder<'_> {
         })
     }
 
+    /// Paint the native parts of a form control (`crate::controls`) in
+    /// `fragment`'s content box.
+    fn control(
+        &mut self,
+        document: &Document,
+        fragment: Geometry,
+        source: usize,
+    ) -> Result<(), PaintError> {
+        for (rect, color, radius) in
+            crate::controls::parts(document, fragment.node, fragment.content)
+        {
+            let shape = if radius > 0.0 {
+                let corner = crate::rounded::Corner {
+                    x: radius,
+                    y: radius,
+                };
+                Shape::Rounded(self.rounded(RoundedRect {
+                    rect,
+                    corners: [corner; 4],
+                }))
+            } else {
+                Shape::Rect(rect)
+            };
+            self.push(DisplayItem {
+                source_box: source,
+                node: fragment.node,
+                role: ItemRole::Background,
+                shape,
+                color,
+                clip: fragment.clip,
+                rounded_clip: fragment.rounded_clip,
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Paint an outermost `svg` element's content (`crate::svg`) in
+    /// `fragment`'s content box, clipped to it.
+    fn svg(
+        &mut self,
+        document: &Document,
+        fragment: Geometry,
+        source: usize,
+        style: &ComputedStyle,
+    ) -> Result<(), PaintError> {
+        if !element_is_svg_root(document, fragment.node) {
+            return Ok(());
+        }
+        let current = color(style, P::Color)?;
+        let content = fragment.content;
+        // The viewport clips (`overflow: hidden` is the UA default).
+        let (x0, y0, x1, y1) = edges(content);
+        let narrow = |outer: Option<rustic_layout::AxisRange>, start: f64, end: f64| {
+            let (mut start, mut end) = (start, end);
+            if let Some(o) = outer {
+                start = start.max(o.start.get());
+                end = end.min(o.end.get());
+            }
+            Some(rustic_layout::AxisRange {
+                start: CssPx::new(start).ok()?,
+                end: CssPx::new(end.max(start)).ok()?,
+            })
+        };
+        let clip = rustic_layout::Clip {
+            x: narrow(fragment.clip.x, x0, x1),
+            y: narrow(fragment.clip.y, y0, y1),
+        };
+        for shape in crate::svg::paint(document, fragment.node, content, current) {
+            let index = self.polygon_path(shape.contours)?;
+            self.push(DisplayItem {
+                source_box: source,
+                node: fragment.node,
+                role: ItemRole::Background,
+                shape: Shape::Path(index),
+                color: shape.color,
+                clip,
+                rounded_clip: fragment.rounded_clip,
+            })?;
+        }
+        Ok(())
+    }
+
     /// Paint `style`'s border on `fragment`. For a cell of a table with
     /// collapsing borders, `collapsed` gives per side the style and side
     /// whose border wins that grid line (`None`: no border there).
@@ -1050,12 +1205,28 @@ impl Builder<'_> {
             // `inset` and `outset` are solid with the top and left sides
             // darker (inset) or the bottom and right ones (outset); CSS
             // Backgrounds 3 §4.2 leaves the shades to the implementation.
+            // `groove` and `ridge` paint as `inset` and `outset`, and
+            // `double`, `dashed` and `dotted` as `solid` (TD-219).
             let top_left = i == 0 || i == 3;
             match style.get(style_property) {
-                V::BorderStyle(BorderStyle::Solid) => {}
-                V::BorderStyle(BorderStyle::Inset) if top_left => colors[i] = darker(colors[i]),
-                V::BorderStyle(BorderStyle::Outset) if !top_left => colors[i] = darker(colors[i]),
-                V::BorderStyle(BorderStyle::Inset | BorderStyle::Outset) => {}
+                V::BorderStyle(
+                    BorderStyle::Solid
+                    | BorderStyle::Double
+                    | BorderStyle::Dashed
+                    | BorderStyle::Dotted,
+                ) => {}
+                V::BorderStyle(BorderStyle::Inset | BorderStyle::Groove) if top_left => {
+                    colors[i] = darker(colors[i]);
+                }
+                V::BorderStyle(BorderStyle::Outset | BorderStyle::Ridge) if !top_left => {
+                    colors[i] = darker(colors[i]);
+                }
+                V::BorderStyle(
+                    BorderStyle::Inset
+                    | BorderStyle::Outset
+                    | BorderStyle::Groove
+                    | BorderStyle::Ridge,
+                ) => {}
                 _ if widths[i] <= 0.0 => {}
                 _ => {
                     return Err(PaintError::Unsupported {
@@ -1122,7 +1293,7 @@ impl Builder<'_> {
         }
         // Matching sides are one ring, so no antialiased seam appears at
         // the corner diagonals where separately composited quads would meet.
-        if colors.iter().all(|&c| c == colors[0]) {
+        if fragment.gap.is_none() && colors.iter().all(|&c| c == colors[0]) {
             return self.push(item(
                 ItemRole::Border,
                 Shape::Ring {
@@ -1140,6 +1311,22 @@ impl Builder<'_> {
         ];
         for (i, quad) in quads.iter().enumerate() {
             if widths[i] <= 0.0 {
+                continue;
+            }
+            if let (0, Some((g0, g1))) = (i, fragment.gap) {
+                // The top side in two pieces around the legend.
+                let (g0, g1) = (g0.clamp(ix0, ix1), g1.clamp(ix0, ix1));
+                let pieces = [
+                    [(x0, y0), (g0, y0), (g0, iy0), (ix0, iy0)],
+                    [(g1, y0), (x1, y0), (ix1, iy0), (g1, iy0)],
+                ];
+                for piece in pieces {
+                    let mut points = [CssPoint::default(); 4];
+                    for (p, &(x, y)) in points.iter_mut().zip(&piece) {
+                        *p = point(x, y)?;
+                    }
+                    self.push(item(ItemRole::Border, Shape::Quad(points), colors[i]))?;
+                }
                 continue;
             }
             let mut points = [CssPoint::default(); 4];
@@ -1648,6 +1835,13 @@ impl DisplayList {
         };
         let mut image_index: HashMap<NodeId, usize> = HashMap::new();
         let fragments = layout.fragments();
+        // Rendered legends, by node, for their fieldsets' borders.
+        let legend_boxes: HashMap<NodeId, usize> = fragments
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| element_is(document, f.node(), "legend"))
+            .map(|(i, f)| (f.node(), i))
+            .collect();
         let style_of = |fragment: &BlockFragment| -> Result<&ComputedStyle, PaintError> {
             let b = tree
                 .boxes()
@@ -2130,8 +2324,13 @@ impl DisplayList {
                         if muted {
                             continue;
                         }
-                        let geometry =
+                        let mut geometry =
                             Geometry::block(fragment, local_clip[i], rounded[i], outer_clip[i]);
+                        if let Some(legend) = rendered_legend(document, fragment.node())
+                            .and_then(|legend| legend_boxes.get(&legend))
+                        {
+                            geometry = geometry.around_legend(fragments[*legend].border());
+                        }
                         let source = fragment.source_box();
                         if fragment.hides_background_and_border() {
                             continue;
@@ -2139,6 +2338,10 @@ impl DisplayList {
                         builder.shadows(geometry, source, style, false)?;
                         if canvas_source != Some(i) {
                             builder.background(geometry, source, style)?;
+                        }
+                        if visible(style) {
+                            builder.control(document, geometry, source)?;
+                            builder.svg(document, geometry, source, style)?;
                         }
                         builder.shadows(geometry, source, style, true)?;
                         let collapsed = match fragment.collapsed_borders() {

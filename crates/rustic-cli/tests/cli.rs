@@ -428,10 +428,10 @@ fn dump_layout_loads_local_css_lays_out_text_and_rejects_unsupported_without_par
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(String::from_utf8_lossy(&output.stdout).contains(" line=0\n"));
-    // Form controls are not laid out yet: no partial output.
+    // Slots are not laid out yet (no shadow trees): no partial output.
     fs::write(
         &path,
-        "<style>* {margin:0}</style><main>a <select></select></main>",
+        "<style>* {margin:0}</style><main>a <slot></slot></main>",
     )
     .unwrap();
     let output = rustic(&["dump-layout", path.to_str().unwrap()]);
@@ -631,7 +631,7 @@ fn render_writes_a_deterministic_png_at_the_requested_scale() {
     ]);
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(painted.exists());
-    fs::write(&text, "<p style='border: 1px dashed'>hello</p>").unwrap();
+    fs::write(&text, "<p style='clip-path: url(#clip)'>hello</p>").unwrap();
     let missing = base.join("missing.png");
     let output = rustic(&[
         "render",
@@ -970,6 +970,42 @@ fn font_face_rules_load_local_fonts_for_their_family_and_unicode_range() {
     assert_ne!(field(texts[3], "face="), field(texts[1], "face="));
     // A source outside the document's directory is not read.
     assert_eq!(field(texts[4], "face="), field(texts[1], "face="));
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
+fn lazy_images_load_only_near_the_viewport() {
+    let surface =
+        rustic_raster::Surface::new(40, 20, rustic_raster::RasterLimits::default()).unwrap();
+    let png = rustic_raster::encode_png(&surface, usize::MAX).unwrap();
+    let base = std::env::temp_dir().join(format!("rustic-cli-lazy-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    fs::write(base.join("a.png"), png).unwrap();
+    let path = base.join("page.html");
+    // The viewport is 800×600 and the lazy margin 1250px: the first lazy
+    // image is in view, the second starts 2020px down and stays unloaded
+    // (no natural size), while the eager image beside it loads.
+    fs::write(
+        &path,
+        "<style>* {margin:0} img {display:block}</style>\
+         <img loading=lazy src=a.png><div style='height:2000px'></div>\
+         <img loading=LAZY src=a.png><img src=a.png>",
+    )
+    .unwrap();
+    let output = rustic(&["dump-layout", path.to_str().unwrap()]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let rects: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.starts_with("fragment ") && l.contains("content=("))
+        .filter_map(|l| l.split("content=(").nth(1))
+        .collect();
+    for expected in ["0,0,40,20)", "0,2020,0,0)", "0,2020,40,20)"] {
+        assert!(
+            rects.iter().any(|r| r.starts_with(expected)),
+            "{expected}: {stdout}"
+        );
+    }
     fs::remove_dir_all(base).unwrap();
 }
 

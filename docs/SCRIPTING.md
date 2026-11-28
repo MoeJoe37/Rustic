@@ -241,11 +241,16 @@ and customized built-ins with `define`, `get`, `getName`, `whenDefined` and
 `upgrade`. The matching HTML constructor preserves the wrapper during
 upgrade. The parser and creation dictionaries capture the customized name
 at creation so editing the attribute later leaves upgrade eligibility intact.
-A scoped `CustomElementRegistry` has its own definitions and `whenDefined` promises.
-Document creation and shadow attachment accept a registry. `initialize` assigns
+A scoped `CustomElementRegistry` has its own definitions and `whenDefined`
+promises. Document creation and shadow attachment accept a registry. `initialize` assigns
 null registries within a tree. Cloning preserves scoped assignments, and
-`importNode` accepts a fallback registry. Registered callbacks can observe connection, disconnection, adoption
-and observed attribute changes. [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration)
+`importNode` accepts a fallback registry. Registered callbacks can observe
+connection, disconnection, adoption and observed attribute changes. Form-associated elements can use
+`attachInternals()` to set a string submission value, manage their validity
+and access the owning form and live labels. Form association, disabling and
+reset invoke the corresponding callbacks. Eligible custom elements can read
+their own closed shadow root through `ElementInternals.shadowRoot`.
+[TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration)
 tracks the remaining lifecycle and registry work.
 
 ## Window encoding, URL, Fetch and WebAssembly

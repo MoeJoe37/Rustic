@@ -475,7 +475,7 @@ fn snapshot(
                 .map_err(|_| DomError::AllocationFailed)?;
             plan.push(Planned {
                 source: id,
-                kind: copy_kind(node.kind()),
+                kind: copy_kind(node.kind(), adopting),
                 link,
             });
             parents.push(index);
@@ -506,7 +506,7 @@ fn snapshot(
 }
 
 /// Copy a payload; template links are rebuilt by the materializer.
-fn copy_kind(kind: &NodeKind) -> NodeKind {
+fn copy_kind(kind: &NodeKind, adoption: bool) -> NodeKind {
     match kind {
         NodeKind::Document => NodeKind::Document,
         NodeKind::DocumentFragment => NodeKind::DocumentFragment,
@@ -515,6 +515,7 @@ fn copy_kind(kind: &NodeKind) -> NodeKind {
             attributes: element.attributes.clone(),
             custom_is: element.custom_is.clone(),
             keep_registry_null: element.keep_registry_null,
+            form_associated: adoption && element.form_associated,
             template_contents: None,
             shadow_root: None,
         }),

@@ -15,6 +15,7 @@ use super::traversal::{node_of, read_doc, wrap_node};
 use super::{Page, create_node, creation, install_interface, prototype, required_arg, with_page};
 
 pub(super) mod builtins;
+pub(super) mod internals;
 mod scopes;
 
 pub(super) use scopes::{
@@ -34,11 +35,15 @@ struct Definition {
     adopted: Value,
     attribute_changed: Value,
     observed: Vec<DomString>,
+    disable_internals: bool,
+    disable_shadow: bool,
+    forms: Option<internals::Forms>,
 }
 
 #[derive(Debug)]
 struct Construction {
     constructor: Value,
+    target: Value,
     element: Option<Value>,
     registry: Value,
 }
@@ -82,6 +87,10 @@ pub(super) struct Registry {
     owners: ObjectId,
     stack: RefCell<Vec<Construction>>,
     active: Cell<bool>,
+    has_form_callbacks: Cell<bool>,
+    internals_targets: ObjectId,
+    attached: ObjectId,
+    form_data: ObjectId,
 }
 
 impl Registry {
@@ -103,6 +112,7 @@ impl Registry {
 
 pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
     builtins::install(agent)?;
+    internals::install(agent)?;
     install_interface(
         agent,
         INTERFACE,
@@ -127,6 +137,9 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
     let states = agent.new_weak_map()?;
     let definition_scopes = agent.new_weak_map()?;
     let owners = agent.new_weak_map()?;
+    let internals_targets = agent.new_weak_map()?;
+    let attached = agent.new_weak_map()?;
+    let form_data = agent.new_weak_map()?;
     let memory = PrivateArray::new(
         agent,
         &[
@@ -137,6 +150,9 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
             Value::object(states),
             Value::object(definition_scopes),
             Value::object(owners),
+            Value::object(internals_targets),
+            Value::object(attached),
+            Value::object(form_data),
         ],
     )?;
     agent.root(memory.value())?;
@@ -153,6 +169,10 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<Registry> {
         owners,
         stack: RefCell::new(Vec::new()),
         active: Cell::new(false),
+        has_form_callbacks: Cell::new(false),
+        internals_targets,
+        attached,
+        form_data,
     })
 }
 
@@ -252,6 +272,15 @@ fn define(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
             let index = definitions.roots.len(agent)?;
             definitions.roots.set(agent, index, value)?;
         }
+        if let Some(forms) = &definition.forms {
+            for value in [forms.associated, forms.disabled, forms.reset, forms.restore] {
+                let index = definitions.roots.len(agent)?;
+                definitions.roots.set(agent, index, value)?;
+            }
+            if forms.associated != Value::UNDEFINED || forms.disabled != Value::UNDEFINED {
+                registry.has_form_callbacks.set(true);
+            }
+        }
         definitions
             .definitions
             .borrow_mut()
@@ -309,6 +338,42 @@ fn read_definition(
                 })?;
             }
         }
+        let key = agent.heap.key("disabledFeatures")?;
+        let features = agent.get(object, key)?;
+        let mut disable_shadow = false;
+        let mut disable_internals = false;
+        if features != Value::UNDEFINED {
+            agent.iterate_values(features, |agent, feature| {
+                agent.check_native_work()?;
+                let feature = creation::string(agent, feature)?;
+                if feature == DomString::from("internals") {
+                    disable_internals = true;
+                } else if feature == DomString::from("shadow") {
+                    disable_shadow = true;
+                }
+                Ok(true)
+            })?;
+        }
+        let key = agent.heap.key("formAssociated")?;
+        let form_associated = agent.get(object, key)?;
+        let forms = if local == name && agent.to_boolean(form_associated) {
+            let associated = callback(agent, proto, "formAssociatedCallback")?;
+            roots.set(agent, 5, associated)?;
+            let disabled = callback(agent, proto, "formDisabledCallback")?;
+            roots.set(agent, 6, disabled)?;
+            let reset = callback(agent, proto, "formResetCallback")?;
+            roots.set(agent, 7, reset)?;
+            let restore = callback(agent, proto, "formStateRestoreCallback")?;
+            roots.set(agent, 8, restore)?;
+            Some(internals::Forms {
+                associated,
+                disabled,
+                reset,
+                restore,
+            })
+        } else {
+            None
+        };
         Ok(Definition {
             name,
             local,
@@ -318,6 +383,9 @@ fn read_definition(
             adopted,
             attribute_changed,
             observed,
+            disable_internals,
+            disable_shadow,
+            forms,
         })
     })
 }
@@ -446,6 +514,9 @@ fn construct_element(agent: &mut Agent, interface: &'static str) -> JsResult<Val
                 })?;
                 agent.weak_map_set(registry.assignments, element, scope)?;
                 record_upgrade(agent, registry, element, scope, constructor)?;
+                if definition.forms.is_some() {
+                    internals::mark_associated(agent, element)?;
+                }
                 if definition.adopted != Value::UNDEFINED {
                     let owner = owner_document(agent, element)?;
                     agent.weak_map_set(registry.owners, element, owner)?;
@@ -573,6 +644,17 @@ fn try_upgrade(
     with_root(agent, target, |agent| {
         // A failed or currently upgrading element is never upgraded twice.
         agent.weak_map_set(registry.states, target, Value::NULL)?;
+        if def.disable_shadow
+            && read_doc(
+                agent,
+                id,
+                |document| matches!(document.node(id).expect("live element").kind(), NodeKind::Element(element) if element.shadow_root().is_some()),
+            )?
+        {
+            let error = unsupported(agent, "custom element definition disables shadow");
+            report(agent, Err(error))?;
+            return Ok(true);
+        }
         agent.weak_map_set(registry.assignments, target, scope)?;
         registry
             .stack
@@ -581,6 +663,7 @@ fn try_upgrade(
             .map_err(|_| Abrupt::OutOfMemory)?;
         registry.stack.borrow_mut().push(Construction {
             constructor: def.constructor,
+            target,
             element: Some(target),
             registry: scope,
         });
@@ -606,6 +689,9 @@ fn try_upgrade(
             }
         }
         record_upgrade(agent, registry, target, scope, def.constructor)?;
+        if def.forms.is_some() {
+            internals::mark_associated(agent, target)?;
+        }
         if def.adopted != Value::UNDEFINED {
             let owner = owner_document(agent, target)?;
             agent.weak_map_set(registry.owners, target, owner)?;
@@ -616,6 +702,7 @@ fn try_upgrade(
         if connected {
             call(agent, def.connected, target, &[])?;
         }
+        internals::refresh(agent, target, &def)?;
         Ok(true)
     })
 }
@@ -687,6 +774,52 @@ fn upgraded(agent: &Agent, registry: &Registry, target: Value) -> Option<Rc<Defi
     registry.data(agent, scope)?.by_constructor(constructor)
 }
 
+fn current_definition(agent: &Agent, registry: &Registry, target: Value) -> Option<Rc<Definition>> {
+    upgraded(agent, registry, target).or_else(|| {
+        let stack = registry.stack.borrow();
+        let entry = stack
+            .iter()
+            .rev()
+            .find(|entry| entry.target == target && entry.element.is_none())?;
+        registry
+            .data(agent, entry.registry)?
+            .by_constructor(entry.constructor)
+    })
+}
+
+pub(super) fn shadow_allowed(agent: &mut Agent, target: Value) -> JsResult<bool> {
+    with_page(agent, |agent, page| {
+        let registry = &page.custom_elements;
+        if let Some(def) = current_definition(agent, registry, target) {
+            return Ok(!def.disable_shadow);
+        }
+        let id = node_of(agent, target)?;
+        let scope = registry_of(agent, target, &[])?;
+        let Some(definitions) = registry.data(agent, scope) else {
+            return Ok(true);
+        };
+        read_doc(agent, id, |doc| {
+            let NodeKind::Element(element) = doc.node(id).expect("live target").kind() else {
+                return true;
+            };
+            let Some(name) = definition_name(element) else {
+                return true;
+            };
+            !definitions
+                .definitions
+                .borrow()
+                .get(name.as_ref())
+                .is_some_and(|def| def.local == element.name().local() && def.disable_shadow)
+        })
+    })
+}
+
+pub(super) fn is_constructed(agent: &mut Agent, target: Value) -> JsResult<bool> {
+    with_page(agent, |agent, page| {
+        Ok(current_definition(agent, &page.custom_elements, target).is_some())
+    })
+}
+
 pub(super) fn owner_document(agent: &mut Agent, target: Value) -> JsResult<Value> {
     let id = node_of(agent, target)?;
     let root = read_doc(agent, id, |doc| doc.root())?;
@@ -722,6 +855,7 @@ pub(super) fn adopted(agent: &mut Agent, value: Value) -> JsResult<()> {
                 let target = wrap_node(agent, id)?;
                 if let Some(def) = upgraded(agent, registry, target) {
                     run_adopted(agent, registry, target, &def)?;
+                    internals::refresh(agent, target, &def)?;
                 }
             }
         }
@@ -764,6 +898,7 @@ pub(super) fn react(agent: &mut Agent, page: &Page, entries: &[MutationEntry]) -
                                 call(agent, def.disconnected, target, &[])?;
                                 run_adopted(agent, registry, target, &def)?;
                             }
+                            internals::refresh(agent, target, &def)?;
                         }
                     }
                 }
@@ -795,6 +930,27 @@ pub(super) fn react(agent: &mut Agent, page: &Page, entries: &[MutationEntry]) -
                 }
             }
             MutationEntry::CharacterData { .. } => {}
+        }
+    }
+    if registry.has_form_callbacks.get() && !entries.is_empty() {
+        // External form owners and disabled fieldsets can affect elements
+        // outside the immediate mutation target.
+        let mut documents = Vec::new();
+        for entry in entries {
+            let id = entry.target().document();
+            if !documents.contains(&id) {
+                documents.try_reserve(1).map_err(|_| Abrupt::OutOfMemory)?;
+                documents.push(id);
+            }
+        }
+        for document in documents {
+            let root = page.read(agent, document, |_, doc| Ok(doc.root()))?;
+            for id in candidates(agent, root)? {
+                let target = wrap_node(agent, id)?;
+                if let Some(def) = upgraded(agent, registry, target) {
+                    internals::refresh(agent, target, &def)?;
+                }
+            }
         }
     }
     Ok(())

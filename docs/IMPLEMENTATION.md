@@ -77,8 +77,13 @@ The global Window registry upgrades autonomous elements and customized built-ins
 Both deliver lifecycle callbacks through the DOM mutation boundary. Scoped
 registries isolate definitions and follow explicit assignment through cloning
 and import. The journal preserves the attribute value and connectivity at each
-edit for lifecycle callbacks. Remaining registry and integration
-work is recorded in [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration).
+edit for lifecycle callbacks. Form-associated custom elements use
+`ElementInternals` to submit string values, validate constraints, find labels
+and receive form callbacks. Shadow events retarget through slots and hosts,
+and delegated focus is reported through tree-scoped `activeElement` getters.
+The pinned Window WPT selection covers custom-element construction and
+internals. The HTML div interface also enables two previously failing
+`getElementById` subtests. Remaining integration work is recorded in [TD-222](TECH_DEBT.md#td-222--shadow-dom-and-custom-element-integration).
 See [DOM](DOM.md#shadow-roots-and-slots) and
 [scripted documents](SCRIPTING.md#shadow-dom-and-custom-elements).
 

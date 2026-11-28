@@ -163,6 +163,7 @@ impl TreeBuilder {
         };
         let options = ShadowRootOptions {
             declarative: true,
+            available_to_internals: true,
             keep_registry_null: attr("shadowrootcustomelementregistry").is_some(),
             clonable: attr("shadowrootclonable").is_some(),
             delegates_focus: attr("shadowrootdelegatesfocus").is_some(),

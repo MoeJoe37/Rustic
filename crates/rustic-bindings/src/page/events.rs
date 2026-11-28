@@ -20,6 +20,7 @@ mod errors;
 mod forms;
 mod handlers;
 mod input;
+mod path;
 mod state;
 mod ui;
 pub(in crate::page) use animation::{
@@ -30,12 +31,15 @@ pub use errors::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
 pub(in crate::page) use errors::{report_exception, report_rejections};
-pub(super) use forms::accessible_controls;
 pub(super) use forms::install as install_forms;
 pub use forms::{
     AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
 };
+pub(super) use forms::{accessible_controls, shadow_active_element};
 pub(in crate::page) use forms::{blur_focus, focus_element, focused_value, is_focusable};
+pub(super) use forms::{
+    check_control, custom_form_status, custom_labels, form_will_validate, validity_state,
+};
 pub(super) use forms::{fire_at, fire_plain, toggle_event};
 pub use handlers::HandlerPolicy;
 pub(in crate::page) use handlers::attribute_changed as handler_attribute_changed;
@@ -610,45 +614,6 @@ impl Listener {
     }
 }
 
-fn event_path(agent: &mut Agent, target: Target, event_type: Value) -> JsResult<PrivateArray> {
-    if !target.node {
-        return PrivateArray::new(agent, &[target.value]);
-    }
-    let load = agent
-        .heap
-        .string(event_type.as_string().expect("event type"))
-        .units()
-        .eq("load".encode_utf16());
-    with_page(agent, |agent, page| {
-        read_node(
-            agent,
-            target.value,
-            |agent, wrappers, document, id, node| {
-                let mut path = Vec::new();
-                path.try_reserve(1).map_err(|_| OutOfMemory)?;
-                path.push(target.value);
-                let mut current = node.parent();
-                let mut reached_document = id == document.root();
-                while let Some(id) = current {
-                    agent.check_native_work()?;
-                    path.try_reserve(1).map_err(|_| OutOfMemory)?;
-                    path.push(wrap(wrappers, agent, document, id)?);
-                    reached_document = id == document.root();
-                    current = document
-                        .node(id)
-                        .map_err(|error| crate::dom_exception::from_dom_error(agent, error))?
-                        .parent();
-                }
-                if reached_document && document.id() == page.main && !load {
-                    path.try_reserve(1).map_err(|_| OutOfMemory)?;
-                    path.push(page.window);
-                }
-                PrivateArray::new(agent, &path)
-            },
-        )
-    })
-}
-
 pub(super) fn fire_slot_change(agent: &mut Agent, target: Value) -> JsResult<()> {
     let event = state::trusted_event(
         agent,
@@ -709,8 +674,25 @@ fn fire_with_target(
     event_target: Value,
 ) -> JsResult<bool> {
     let event_type = event.event_type(agent)?;
-    let path = event_path(agent, target, event_type)?;
+    let load = agent
+        .heap
+        .string(event_type.as_string().expect("event type"))
+        .units()
+        .eq("load".encode_utf16());
+    let related = event.related(agent)?;
+    let composed = event.has(agent, Event::COMPOSED)?;
+    let path = path::Path::build(
+        agent,
+        target,
+        path::Init {
+            exposed: event_target,
+            related,
+            composed,
+            load,
+        },
+    )?;
     with_root(agent, path.value(), |agent| {
+        let targets = path.targets(agent)?;
         let key = type_key(agent, event_type)?;
         with_root(agent, key, |agent| {
             let click = target.node
@@ -722,7 +704,7 @@ fn fire_with_target(
                     .eq("click".encode_utf16());
             let checkbox = if click {
                 let bubbles = event.bubbles(agent)?;
-                input::activation_target(agent, path, bubbles)?
+                input::activation_target(agent, targets, bubbles)?
             } else {
                 None
             };
@@ -732,6 +714,8 @@ fn fire_with_target(
             event.begin(agent, event_target, path)?;
             let result = dispatch(agent, event, value, key, path);
             event.finish(agent)?;
+            let (adjusted, related) = path.final_targets(agent, related)?;
+            event.retarget(agent, adjusted, related)?;
             let canceled = event.canceled(agent)?;
             let checkbox_activated = checkbox.is_some();
             if let Some((activation, previous)) = checkbox.zip(previous) {
@@ -742,8 +726,8 @@ fn fire_with_target(
             // uncanceled click.
             if click && !canceled && !checkbox_activated {
                 let bubbles = event.bubbles(agent)?;
-                forms::activate_button(agent, path, bubbles)?;
-                super::elements::activate(agent, path, bubbles)?;
+                forms::activate_button(agent, targets, bubbles)?;
+                super::elements::activate(agent, targets, bubbles)?;
             }
             Ok(!canceled)
         })
@@ -870,33 +854,29 @@ fn dispatch(
     event: Event,
     value: Value,
     event_type: Value,
-    path: PrivateArray,
+    path: path::Path,
 ) -> JsResult<()> {
     let len = path.len(agent)?;
     let bubbles = event.bubbles(agent)?;
-    for index in (0..len).rev() {
-        if event.stopped(agent)? {
-            break;
+    for (capture, indices) in [(true, 0..len), (false, 0..len)] {
+        for i in indices {
+            if event.stopped(agent)? {
+                break;
+            }
+            let index = if capture { len - 1 - i } else { i };
+            let step = path.step(agent, index)?;
+            let phase = if step.at_target() {
+                Phase::AtTarget
+            } else if capture {
+                Phase::Capturing
+            } else if bubbles {
+                Phase::Bubbling
+            } else {
+                continue;
+            };
+            event.retarget(agent, step.adjusted, step.related)?;
+            invoke(agent, event, value, event_type, step.target, phase, capture)?;
         }
-        let target = path.get(agent, index)?;
-        let phase = if index == 0 {
-            Phase::AtTarget
-        } else {
-            Phase::Capturing
-        };
-        invoke(agent, event, value, event_type, target, phase, true)?;
-    }
-    for index in 0..if bubbles { len } else { 1 } {
-        if event.stopped(agent)? {
-            break;
-        }
-        let target = path.get(agent, index)?;
-        let phase = if index == 0 {
-            Phase::AtTarget
-        } else {
-            Phase::Bubbling
-        };
-        invoke(agent, event, value, event_type, target, phase, false)?;
     }
     Ok(())
 }

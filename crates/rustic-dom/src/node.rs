@@ -35,6 +35,7 @@ pub struct Element {
     pub(crate) attributes: Vec<Attribute>,
     pub(crate) custom_is: Option<DomString>,
     pub(crate) keep_registry_null: bool,
+    pub(crate) form_associated: bool,
     pub(crate) template_contents: Option<NodeId>,
     pub(crate) shadow_root: Option<(NodeId, ShadowRootOptions)>,
 }
@@ -75,6 +76,8 @@ pub struct ShadowRootOptions {
     pub declarative: bool,
     /// Whether the root starts with a null custom element registry.
     pub keep_registry_null: bool,
+    /// Whether ElementInternals can return this root to its host.
+    pub available_to_internals: bool,
 }
 
 impl ShadowRootOptions {
@@ -88,6 +91,7 @@ impl ShadowRootOptions {
             slot_assignment: SlotAssignment::Named,
             declarative: false,
             keep_registry_null: false,
+            available_to_internals: false,
         }
     }
 }
@@ -106,6 +110,11 @@ impl Element {
     /// Whether the parser or creation options explicitly require a null registry.
     pub fn keeps_registry_null(&self) -> bool {
         self.keep_registry_null
+    }
+
+    /// Whether an upgraded custom element participates in HTML forms.
+    pub fn is_form_associated_custom(&self) -> bool {
+        self.form_associated
     }
 
     /// Stable insertion order; replacing an attribute preserves its position.

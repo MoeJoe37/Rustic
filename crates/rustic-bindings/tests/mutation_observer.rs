@@ -670,3 +670,109 @@ fn scoped_registry_assignments_survive_clone_and_import() {
         )
         .unwrap();
 }
+
+#[test]
+fn form_associated_custom_elements_participate_in_forms_validation_and_reset() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        const form = document.createElement('form');
+        const fieldset = document.createElement('fieldset');
+        const label = document.createElement('label');
+        label.setAttribute('for', 'postal-code');
+        form.append(fieldset, label);
+        document.body.append(form);
+        const changes = [];
+        let invalid = 0;
+        class AddressField extends HTMLElement {
+            static formAssociated = true;
+            constructor() {
+                super();
+                this.internals = this.attachInternals();
+                this.internals.setFormValue('10001');
+            }
+            formAssociatedCallback(form) { changes.push(form ? 'associated' : 'disassociated'); }
+            formDisabledCallback(disabled) { changes.push(disabled ? 'disabled' : 'enabled'); }
+            formResetCallback() { changes.push('reset'); }
+        }
+        customElements.define('x-address', AddressField);
+        const field = document.createElement('x-address');
+        field.id = 'postal-code';
+        field.setAttribute('name', 'postal');
+        field.addEventListener('invalid', () => invalid++);
+        fieldset.append(field);
+        const internals = field.internals;
+        const labels = internals.labels;
+        if (internals.form !== form || form.elements[1] !== field || !internals.willValidate ||
+            labels.length !== 1 || labels[0] !== label) throw 'form or label owner';
+        label.remove();
+        if (labels.length !== 0) throw 'labels is not live';
+        const validity = internals.validity;
+        internals.setValidity({valueMissing:true, patternMismatch:true}, 'Postal code required');
+        if (validity.valid || !validity.valueMissing || !validity.patternMismatch ||
+            internals.validationMessage !== 'Postal code required' || form.checkValidity() ||
+            internals.reportValidity() || invalid !== 2) throw 'constraint validation';
+        fieldset.setAttribute('disabled', '');
+        if (internals.willValidate || !form.checkValidity()) throw 'fieldset disables validation';
+        fieldset.removeAttribute('disabled');
+        internals.setValidity({});
+        if (!validity.valid || internals.validationMessage !== '') throw 'validity reset';
+        form.requestSubmit();
+        form.reset();
+        field.remove();
+        if (internals.form !== null ||
+            changes.join() !== 'associated,disabled,enabled,reset,disassociated')
+            throw changes.join();
+    "#,
+        )
+        .unwrap();
+    let submissions = page::take_form_submissions(&agent);
+    assert_eq!(
+        submissions.submissions[0].entries,
+        [("postal".to_owned(), "10001".to_owned())]
+    );
+}
+
+#[test]
+fn registered_custom_elements_can_disable_shadow_and_internals() {
+    let (mut agent, _) = page();
+    agent
+        .evaluate(
+            r#"
+        let attempted = 0;
+        class Disabled extends HTMLElement {
+            static disabledFeatures = ['shadow', 'internals'];
+            constructor() {
+                super();
+                for (const initialize of [
+                    () => this.attachShadow({mode:'open'}),
+                    () => this.attachInternals()
+                ]) {
+                    try {
+                        initialize();
+                        throw 'feature was enabled';
+                    } catch (error) {
+                        if (error.name !== 'NotSupportedError') throw error;
+                        attempted++;
+                    }
+                }
+            }
+        }
+        customElements.define('x-disabled', Disabled);
+        if (!(document.createElement('x-disabled') instanceof Disabled) || attempted !== 2)
+            throw 'definition features';
+        class Host extends HTMLElement {
+            constructor() {
+                super();
+                const shadow = this.attachShadow({mode:'closed'});
+                if (this.attachInternals().shadowRoot !== shadow || this.shadowRoot !== null)
+                    throw 'closed root internal visibility';
+            }
+        }
+        customElements.define('x-internals', Host);
+        if (!(new Host() instanceof Host)) throw 'direct constructor';
+    "#,
+        )
+        .unwrap();
+}

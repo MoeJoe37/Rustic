@@ -1,8 +1,6 @@
 //! Event and CustomEvent slots and their script interfaces.
 
-use rustic_js::runtime::{
-    Agent, JsResult, NativeFn, ObjectId, OutOfMemory, PropertyDescriptor, Value,
-};
+use rustic_js::runtime::{Agent, JsResult, NativeFn, ObjectId, PropertyDescriptor, Value};
 
 use crate::webidl::coerce_string;
 
@@ -36,6 +34,7 @@ impl Event {
     const TIMESTAMP: u32 = 6;
     const DETAIL: u32 = 7;
     const EXTRA: u32 = 8;
+    const RELATED: u32 = 9;
 
     pub(super) const BUBBLES: u16 = 1 << 0;
     pub(super) const CANCELABLE: u16 = 1 << 1;
@@ -52,6 +51,7 @@ impl Event {
     pub(super) const KEYBOARD: u16 = 1 << 12;
     pub(super) const POINTER: u16 = 1 << 13;
     pub(super) const UNINITIALIZED: u16 = 1 << 14;
+    pub(super) const FOCUS: u16 = 1 << 15;
 
     pub(super) fn receiver(agent: &mut Agent, value: Value) -> JsResult<Self> {
         with_page(agent, |agent, page| {
@@ -130,12 +130,33 @@ impl Event {
         self,
         agent: &mut Agent,
         target: Value,
-        path: PrivateArray,
+        path: super::path::Path,
     ) -> JsResult<()> {
         let flags = self.flags(agent)?;
         self.0.set(agent, Self::TARGET, target)?;
         self.0.set(agent, Self::PATH, path.value())?;
         self.set_flags(agent, flags | Self::DISPATCHING)
+    }
+
+    pub(super) fn related(self, agent: &mut Agent) -> JsResult<Value> {
+        let value = self.0.get(agent, Self::RELATED)?;
+        Ok(if value == Value::UNDEFINED {
+            Value::NULL
+        } else {
+            value
+        })
+    }
+
+    pub(super) fn set_related(self, agent: &mut Agent, related: Value) -> JsResult<()> {
+        self.0.set(agent, Self::RELATED, related)
+    }
+
+    pub(super) fn retarget(self, agent: &mut Agent, target: Value, related: Value) -> JsResult<()> {
+        self.0.set(agent, Self::TARGET, target)?;
+        if self.has(agent, Self::FOCUS)? {
+            self.set_related(agent, related)?;
+        }
+        Ok(())
     }
 
     pub(super) fn current(self, agent: &mut Agent, target: Value, phase: Phase) -> JsResult<()> {
@@ -179,7 +200,8 @@ impl Event {
                 | Self::UI
                 | Self::MOUSE
                 | Self::POINTER
-                | Self::KEYBOARD);
+                | Self::KEYBOARD
+                | Self::FOCUS);
         let flags = flags
             | (u16::from(bubbles) * Self::BUBBLES)
             | (u16::from(cancelable) * Self::CANCELABLE);
@@ -485,17 +507,12 @@ fn set_return_value(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<
 fn composed_path(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     let event = Event::receiver(agent, this)?;
     let path = event.0.get(agent, Event::PATH)?;
-    let mut values = Vec::new();
-    if let Some(path) = PrivateArray::from_value(path) {
-        let len = path.len(agent)?;
-        values
-            .try_reserve_exact(len as usize)
-            .map_err(|_| OutOfMemory)?;
-        for index in 0..len {
-            agent.check_native_work()?;
-            values.push(path.get(agent, index)?);
-        }
-    }
+    let values = if let Some(path) = super::path::Path::from_value(path) {
+        let current = event.0.get(agent, Event::CURRENT_TARGET)?;
+        path.visible(agent, current)?
+    } else {
+        Vec::new()
+    };
     agent.create_array_from_list(&values).map(Value::object)
 }
 

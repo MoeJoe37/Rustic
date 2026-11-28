@@ -342,3 +342,131 @@ fn synthetic_mouse_click_preactivation_rolls_back_and_traces_control_state() {
     );
     assert_eq!(page::take_listener_error_count(&agent), 0);
 }
+
+#[test]
+fn composed_events_retarget_at_hosts_and_hide_closed_shadow_paths() {
+    let (mut agent, _) = scripted_page();
+    agent
+        .evaluate(
+            r#"
+        const host = document.createElement('div');
+        document.append(host);
+        const root = host.attachShadow({mode:'closed'});
+        const child = document.createElement('button');
+        root.append(child);
+        const seen = [];
+        root.addEventListener('local', e => {
+            const path = e.composedPath();
+            if (e.target !== child || path.length !== 2 || path[0] !== child || path[1] !== root)
+                throw 'non-composed path';
+            seen.push('root');
+        });
+        host.addEventListener('local', () => seen.push('escaped'));
+        const local = new Event('local', {bubbles:true});
+        child.dispatchEvent(local);
+        host.addEventListener('cross', e => {
+            if (e.target !== host || e.eventPhase !== Event.AT_TARGET ||
+                e.composedPath()[0] !== host || e.composedPath().includes(child) ||
+                e.composedPath().includes(root))
+                throw 'closed path at host';
+            seen.push('host');
+        });
+        root.addEventListener('cross', e => {
+            if (e.target !== child || e.eventPhase !== Event.CAPTURING_PHASE ||
+                e.composedPath()[0] !== child || !e.composedPath().includes(root))
+                throw 'closed path inside shadow';
+            seen.push('capture');
+        }, true);
+        const cross = new Event('cross', {composed:true});
+        child.dispatchEvent(cross);
+        if (seen.join() !== 'root,capture,host' || local.target !== null ||
+            cross.target !== host || cross.composedPath().length !== 0)
+            throw seen.join();
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
+fn slotted_light_targets_propagate_through_closed_shadow_trees() {
+    let (mut agent, _) = scripted_page();
+    agent
+        .evaluate(
+            r#"
+        const host = document.createElement('div');
+        document.append(host);
+        const root = host.attachShadow({mode:'closed'});
+        const slot = document.createElement('slot');
+        const light = document.createElement('span');
+        root.append(slot);
+        host.append(light);
+        const seen = [];
+        slot.addEventListener('slotted', e => {
+            const path = e.composedPath();
+            if (e.target !== light || path[0] !== light || path[1] !== slot || path[2] !== root)
+                throw 'slotted path inside shadow';
+            seen.push('slot');
+        });
+        host.addEventListener('slotted', e => {
+            const path = e.composedPath();
+            if (e.target !== light || path[0] !== light || path[1] !== host || path.includes(root))
+                throw 'slotted path outside shadow';
+            seen.push('host');
+        });
+        light.dispatchEvent(new Event('slotted', {bubbles:true}));
+        if (seen.join() !== 'slot,host') throw seen.join();
+    "#,
+        )
+        .unwrap();
+}
+
+#[test]
+fn shadow_focus_events_stop_when_their_targets_retarget_to_the_same_host() {
+    let (mut agent, _) = scripted_page();
+    agent.evaluate(r#"
+        const host = document.createElement('div');
+        document.append(host);
+        const root = host.attachShadow({mode:'open'});
+        const left = document.createElement('input');
+        const right = document.createElement('input');
+        root.append(left, right);
+        let seenInside = 0;
+        let seenOutside = 0;
+        root.addEventListener('focusin', e => {
+            if (e.target !== right || e.relatedTarget !== left) throw 'wrong focus endpoints';
+            seenInside++;
+        });
+        host.addEventListener('focusin', () => seenOutside++);
+        const event = new FocusEvent('focusin', {bubbles:true, composed:true, relatedTarget:left});
+        right.dispatchEvent(event);
+        if (seenInside !== 1 || seenOutside !== 0 || event.target !== null || event.relatedTarget !== null)
+            throw 'focus path escaped shadow';
+    "#).unwrap();
+}
+
+#[test]
+fn shadow_hosts_delegate_focus_and_active_elements_are_tree_scoped() {
+    let (mut agent, _) = scripted_page();
+    agent
+        .evaluate(
+            r#"
+        const host = document.createElement('div');
+        document.append(host);
+        const outer = host.attachShadow({mode:'open', delegatesFocus:true});
+        const innerHost = document.createElement('span');
+        outer.append(innerHost);
+        const inner = innerHost.attachShadow({mode:'closed'});
+        const hidden = document.createElement('input');
+        hidden.setAttribute('disabled', '');
+        const input = document.createElement('input');
+        inner.append(hidden, input);
+        host.focus();
+        if (document.activeElement !== host || outer.activeElement !== innerHost ||
+            inner.activeElement !== input) throw 'delegated focus or retargeted activeElement';
+        input.blur();
+        if (outer.activeElement !== null || inner.activeElement !== null)
+            throw 'blur did not clear shadow focus';
+    "#,
+        )
+        .unwrap();
+}

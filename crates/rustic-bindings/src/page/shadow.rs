@@ -17,6 +17,11 @@ pub(super) fn install(agent: &mut Agent) -> JsResult<()> {
         0,
         &[
             ("host", "get host", host),
+            (
+                "activeElement",
+                "get activeElement",
+                events::shadow_active_element,
+            ),
             ("mode", "get mode", mode),
             (
                 "customElementRegistry",
@@ -94,7 +99,15 @@ fn attach(agent: &mut Agent, receiver: Value, args: &[Value]) -> JsResult<Value>
         let id = super::traversal::node_of(agent, receiver)?;
         super::custom_elements::owner_registry(agent, id)?
     };
+    if !super::custom_elements::shadow_allowed(agent, receiver)? {
+        return Err(creation::exception(
+            agent,
+            "NotSupportedError",
+            "custom element definition disables shadow",
+        ));
+    }
     let options = ShadowRootOptions {
+        available_to_internals: super::custom_elements::is_constructed(agent, receiver)?,
         keep_registry_null: scope == Value::NULL,
         clonable,
         delegates_focus,

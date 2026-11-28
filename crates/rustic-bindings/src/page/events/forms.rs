@@ -20,6 +20,7 @@ use rustic_js::runtime::{
 use crate::dom_exception;
 use crate::webidl::{DomStringConversion, from_dom_string, to_dom_string};
 
+use super::super::custom_elements::internals;
 use super::super::{
     illegal_constructor, install_interface, prototype, read_node, required_arg, with_mut_tree,
     with_page, wrap,
@@ -282,6 +283,7 @@ pub(super) enum Kind {
     Fieldset,
     Output,
     Object,
+    Custom,
 }
 
 fn kind(node: &Node) -> Option<Kind> {
@@ -302,6 +304,7 @@ fn kind(node: &Node) -> Option<Kind> {
         "fieldset" => Kind::Fieldset,
         "output" => Kind::Output,
         "object" => Kind::Object,
+        _ if element.is_form_associated_custom() => Kind::Custom,
         _ => return None,
     })
 }
@@ -382,8 +385,9 @@ fn form_owner(agent: &mut Agent, document: &Document, id: NodeId) -> JsResult<Op
         if !reaches_root(document, id, || agent.check_native_work())? {
             return Ok(None);
         }
+        let root = root_of(agent, document, id)?;
         for (candidate, _) in document
-            .walk(document.root())
+            .walk(root)
             .map_err(|error| dom_exception::from_dom_error(agent, error))?
         {
             agent.check_native_work()?;
@@ -645,7 +649,7 @@ fn will_validate(snapshot: &Snapshot) -> bool {
             matches!(input, "hidden" | "reset" | "button" | "image")
                 || (snapshot.readonly && input != "checkbox" && input != "radio")
         }
-        Kind::TextArea => snapshot.readonly,
+        Kind::TextArea | Kind::Custom => snapshot.readonly,
         Kind::Button(kind) => kind != "submit",
         Kind::Select => false,
         Kind::Fieldset | Kind::Output | Kind::Object => true,
@@ -826,6 +830,9 @@ fn satisfies(agent: &mut Agent, control: Value) -> JsResult<bool> {
     if !will_validate(&snapshot) {
         return Ok(true);
     }
+    if snapshot.kind == Kind::Custom {
+        return Ok(internals::validity_bits(agent, control)? == 0);
+    }
     flags(agent, control, &snapshot).map(Flags::valid)
 }
 
@@ -846,7 +853,7 @@ fn fire_simple(agent: &mut Agent, target: Value, kind: &str, flags: u16) -> JsRe
 }
 
 /// HTML "check validity": fire `invalid` at a failing candidate.
-fn check_control(agent: &mut Agent, control: Value) -> JsResult<bool> {
+pub(in crate::page) fn check_control(agent: &mut Agent, control: Value) -> JsResult<bool> {
     if satisfies(agent, control)? {
         return Ok(true);
     }
@@ -998,8 +1005,18 @@ fn entry_list(
             let Some(name) = snapshot.name.filter(|name| !name.as_units().is_empty()) else {
                 continue;
             };
+            let custom_value;
+            let value = if snapshot.kind == Kind::Custom {
+                let Some(value) = internals::submission(agent, control)? else {
+                    continue;
+                };
+                custom_value = value;
+                custom_value.as_slice()
+            } else {
+                snapshot.value.as_slice()
+            };
             entries.try_reserve(1).map_err(|_| OutOfMemory)?;
-            entries.push((text(name.as_units()), text(&snapshot.value)));
+            entries.push((text(name.as_units()), text(value)));
         }
         Ok(entries)
     })
@@ -1019,6 +1036,7 @@ fn reset(agent: &mut Agent, form: Value) -> JsResult<()> {
                 record.set(agent, EDITED, Value::FALSE)?;
             }
             super::input::reset_checkedness(agent, control)?;
+            internals::reset(agent, control)?;
         }
         Ok(())
     })
@@ -1103,6 +1121,9 @@ pub(super) fn new_event(
             with_page(agent, |agent, page| {
                 agent.weak_map_set(page.events.forms.events, event, holder.value())
             })?;
+            if flags & Event::FOCUS != 0 {
+                Event::receiver(agent, event)?.set_related(agent, fields[0])?;
+            }
             Ok(event)
         })
     })
@@ -1175,7 +1196,7 @@ fn focus_event(agent: &mut Agent, kind: &str, related: Value) -> JsResult<Value>
         agent,
         "FocusEvent",
         kind,
-        Event::COMPOSED | if bubbles { Event::BUBBLES } else { 0 },
+        Event::FOCUS | Event::COMPOSED | if bubbles { Event::BUBBLES } else { 0 },
         &[related],
     )
 }
@@ -1279,7 +1300,9 @@ fn construct<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) -> JsR
                     agent,
                     prototype,
                     event_type,
-                    flags | if ui { Event::UI } else { 0 },
+                    flags
+                        | if ui { Event::UI } else { 0 }
+                        | if KIND == 0 { Event::FOCUS } else { 0 },
                     Value::number(0.0),
                     extra,
                 )
@@ -1287,9 +1310,20 @@ fn construct<const KIND: u8>(agent: &mut Agent, _: Value, args: &[Value]) -> JsR
             with_page(agent, |agent, page| {
                 agent.weak_map_set(page.events.forms.events, event, holder.value())
             })?;
+            if KIND == 0 {
+                Event::receiver(agent, event)?.set_related(agent, fields[0])?;
+            }
             Ok(event)
         })
     })
+}
+
+fn focus_related(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
+    let event = Event::receiver(agent, this)?;
+    if !event.has(agent, Event::FOCUS)? {
+        return agent.type_error("expected a FocusEvent receiver");
+    }
+    event.related(agent)
 }
 
 // ---- focus ------------------------------------------------------------------
@@ -1452,24 +1486,53 @@ pub(super) fn fire_focus(agent: &mut Agent, target: Value, event: Value) -> JsRe
     })
 }
 
-/// Run the focusing steps for `target` if it is a focusable area.
+fn focus_area(
+    agent: &mut Agent,
+    document: &Document,
+    id: NodeId,
+    node: &Node,
+) -> JsResult<Option<NodeId>> {
+    let root = html_element(node).and_then(|element| {
+        element.shadow_root().filter(|_| {
+            element
+                .shadow_root_options()
+                .is_some_and(|options| options.delegates_focus)
+        })
+    });
+    if let Some(root) = root {
+        let slots = document
+            .slot_map()
+            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+        let flattened = slots
+            .flat_walk(root)
+            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+        for (candidate, _) in flattened.skip(1) {
+            agent.check_native_work()?;
+            if is_focusable(agent, document, candidate)? {
+                return Ok(Some(candidate));
+            }
+        }
+        return Ok(None);
+    }
+    Ok(tab_index(agent, document, id, node)?.map(|_| id))
+}
+
+/// Run the focusing steps for the target or its delegated focus area.
 pub(in crate::page) fn focus_element(agent: &mut Agent, target: Value) -> JsResult<bool> {
-    let focusable = read_node(agent, target, |agent, _, document, id, node| {
-        if id.document() != document.id()
-            || !reaches_root(document, id, || agent.check_native_work())?
-        {
+    let main = with_page(agent, |_, page| Ok(page.main))?;
+    let focusable = read_node(agent, target, |agent, wrappers, document, id, node| {
+        if id.document() != main || !reaches_root(document, id, || agent.check_native_work())? {
             return Ok(None);
         }
-        Ok(tab_index(agent, document, id, node)?.map(|_| id))
+        focus_area(agent, document, id, node)?
+            .map(|id| wrap(wrappers, agent, document, id).map(|value| (id, value)))
+            .transpose()
     })?;
-    let main = with_page(agent, |_, page| Ok(page.main))?;
-    match focusable {
-        Some(id) if id.document() == main => {
-            move_focus(agent, Some((id, target)))?;
-            Ok(true)
-        }
-        _ => Ok(false),
+    if let Some(area) = focusable {
+        move_focus(agent, Some(area))?;
+        return Ok(true);
     }
+    Ok(false)
 }
 
 /// Focus the nearest focusable inclusive ancestor of a clicked node, or
@@ -1482,13 +1545,10 @@ pub(super) fn focus_for_click(agent: &mut Agent, target: Value) -> JsResult<()> 
             let node = document
                 .node(candidate)
                 .map_err(|error| dom_exception::from_dom_error(agent, error))?;
-            if tab_index(agent, document, candidate, node)?.is_some() {
-                return Ok(Some((
-                    candidate,
-                    wrap(wrappers, agent, document, candidate)?,
-                )));
+            if let Some(area) = focus_area(agent, document, candidate, node)? {
+                return Ok(Some((area, wrap(wrappers, agent, document, area)?)));
             }
-            current = node.parent();
+            current = node.parent().or_else(|| node.shadow_host());
         }
         Ok(None)
     })?;
@@ -1767,7 +1827,7 @@ fn input_type_getter(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Va
         Kind::Select => agent.string("select-one"),
         Kind::Fieldset => agent.string("fieldset"),
         Kind::Output => agent.string("output"),
-        Kind::Object => agent.string(""),
+        Kind::Object | Kind::Custom => agent.string(""),
     }
 }
 
@@ -1883,8 +1943,26 @@ fn form_getter(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
 
 fn will_validate_getter(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     control_receiver(agent, this)?;
-    let snapshot = snapshot(agent, this)?;
+    form_will_validate(agent, this)
+}
+
+pub(in crate::page) fn form_will_validate(agent: &mut Agent, control: Value) -> JsResult<Value> {
+    let snapshot = snapshot(agent, control)?;
     Ok(Value::boolean(snapshot.as_ref().is_some_and(will_validate)))
+}
+
+pub(in crate::page) fn custom_form_status(
+    agent: &mut Agent,
+    control: Value,
+) -> JsResult<(Value, bool)> {
+    read_node(agent, control, |agent, wrappers, document, id, node| {
+        let enabled = !disabled(agent, document, id, node)?;
+        let form = match form_owner(agent, document, id)? {
+            Some(form) => wrap(wrappers, agent, document, form)?,
+            None => Value::NULL,
+        };
+        Ok((form, !enabled))
+    })
 }
 
 fn validation_message(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
@@ -1939,6 +2017,10 @@ fn set_custom_validity(agent: &mut Agent, this: Value, args: &[Value]) -> JsResu
 
 fn validity_getter(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     control_receiver(agent, this)?;
+    validity_state(agent, this)
+}
+
+pub(in crate::page) fn validity_state(agent: &mut Agent, this: Value) -> JsResult<Value> {
     let record = ensure_record(agent, this)?;
     let cached = record.get(agent, VALIDITY)?;
     if cached != Value::UNDEFINED {
@@ -1963,29 +2045,32 @@ fn validity_flag<const FLAG: u8>(agent: &mut Agent, this: Value, _: &[Value]) ->
         return agent.type_error("expected a ValidityState receiver");
     }
     let Some(snapshot) = snapshot(agent, control)? else {
-        return Ok(Value::boolean(FLAG == 7));
+        return Ok(Value::boolean(FLAG == 10));
     };
+    if snapshot.kind == Kind::Custom {
+        let bits = internals::validity_bits(agent, control)?;
+        return Ok(Value::boolean(if FLAG == 10 {
+            bits == 0
+        } else {
+            bits & (1 << FLAG) != 0
+        }));
+    }
     let flags = if will_validate(&snapshot) {
         flags(agent, control, &snapshot)?
     } else {
         Flags::default()
     };
     Ok(Value::boolean(match FLAG {
-        0 => flags.value_missing,
-        1 => flags.type_mismatch,
-        2 => flags.too_long,
-        3 => flags.too_short,
+        1 => flags.custom_error,
+        3 => flags.range_overflow,
         4 => flags.range_underflow,
-        5 => flags.range_overflow,
-        6 => flags.custom_error,
-        _ => flags.valid(),
+        6 => flags.too_long,
+        7 => flags.too_short,
+        8 => flags.type_mismatch,
+        9 => flags.value_missing,
+        10 => flags.valid(),
+        _ => false,
     }))
-}
-
-fn always_false(agent: &mut Agent, this: Value, args: &[Value]) -> JsResult<Value> {
-    // patternMismatch, stepMismatch and badInput are not computed (TD-154).
-    validity_flag::<6>(agent, this, args)?;
-    Ok(Value::FALSE)
 }
 
 fn is_form_element(agent: &mut Agent, this: Value) -> JsResult<bool> {
@@ -2106,6 +2191,100 @@ fn form_length(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     Ok(Value::number(f64::from(elements_length(agent, this)?)))
 }
 
+static CUSTOM_LABELS: LiveIndexAccess = LiveIndexAccess {
+    length: custom_labels_length,
+    item: custom_labels_item,
+    named: None,
+};
+
+pub(in crate::page) fn custom_labels(agent: &mut Agent, target: Value) -> JsResult<Value> {
+    let proto = prototype(agent, "NodeList")?;
+    agent
+        .new_indexed_view("NodeList", proto, target, &CUSTOM_LABELS)
+        .map(Value::object)
+}
+
+fn custom_labels_length(agent: &mut Agent, target: Value) -> JsResult<u32> {
+    custom_labels_values(agent, target)?.len(agent)
+}
+
+fn custom_labels_item(agent: &mut Agent, target: Value, index: u32) -> JsResult<Option<Value>> {
+    let values = custom_labels_values(agent, target)?;
+    if index < values.len(agent)? {
+        return values.get(agent, index).map(Some);
+    }
+    Ok(None)
+}
+
+fn custom_labels_values(agent: &mut Agent, target: Value) -> JsResult<PrivateArray> {
+    read_node(agent, target, |agent, wrappers, document, id, node| {
+        let root = root_of(agent, document, id)?;
+        let wanted = attribute(element_of(node), "id").filter(|value| !value.as_units().is_empty());
+        let mut first = None;
+        let mut values = Vec::new();
+        let walk = document
+            .walk(root)
+            .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+        for (candidate, _) in walk {
+            agent.check_native_work()?;
+            let node = document.node(candidate).expect("live label candidate");
+            let NodeKind::Element(element) = node.kind() else {
+                continue;
+            };
+            if first.is_none() && wanted.is_some_and(|id| attribute(element, "id") == Some(id)) {
+                first = Some(candidate);
+            }
+            if element.name().namespace() != Some(rustic_dom::HTML_NAMESPACE)
+                || element.name().local() != "label"
+            {
+                continue;
+            }
+            let matches = if let Some(name) = attribute(element, "for") {
+                wanted == Some(name)
+            } else {
+                let descendants = document
+                    .walk(candidate)
+                    .map_err(|error| dom_exception::from_dom_error(agent, error))?;
+                let mut labelable = None;
+                for (child, _) in descendants.skip(1) {
+                    agent.check_native_work()?;
+                    let child_kind = document.node(child).ok().and_then(kind);
+                    if matches!(
+                        child_kind,
+                        Some(
+                            Kind::Custom
+                                | Kind::Input(_)
+                                | Kind::Button(_)
+                                | Kind::TextArea
+                                | Kind::Select
+                                | Kind::Output
+                        )
+                    ) && child_kind != Some(Kind::Input("hidden"))
+                    {
+                        labelable = Some(child);
+                        break;
+                    }
+                }
+                labelable == Some(id)
+            };
+            if matches {
+                values.try_reserve(1).map_err(|_| OutOfMemory)?;
+                values.push((candidate, attribute(element, "for").is_some()));
+            }
+        }
+        let mut wrappers_list = Vec::new();
+        wrappers_list
+            .try_reserve_exact(values.len())
+            .map_err(|_| OutOfMemory)?;
+        for (candidate, explicit) in values {
+            if !explicit || first == Some(id) {
+                wrappers_list.push(wrap(wrappers, agent, document, candidate)?);
+            }
+        }
+        PrivateArray::new(agent, &wrappers_list)
+    })
+}
+
 fn focus_method(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
     focus_element(agent, this)?;
     Ok(Value::UNDEFINED)
@@ -2163,7 +2342,8 @@ fn active_element(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value
         })?;
         return Ok(Value::NULL);
     }
-    if let Some(focused) = focused_value(agent)? {
+    let focused = active_in_tree(agent, this, false)?;
+    if focused != Value::NULL {
         return Ok(focused);
     }
     // No focused area: the body element, else the document element.
@@ -2174,6 +2354,35 @@ fn active_element(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value
     }
     let key = agent.heap.key("documentElement")?;
     agent.get(this.as_object().expect("document wrapper"), key)
+}
+
+pub(in crate::page) fn shadow_active_element(
+    agent: &mut Agent,
+    root: Value,
+    _: &[Value],
+) -> JsResult<Value> {
+    active_in_tree(agent, root, true)
+}
+
+fn active_in_tree(agent: &mut Agent, root: Value, shadow: bool) -> JsResult<Value> {
+    let focused = with_page(agent, |_, page| Ok(page.events.forms.focused.get()))?;
+    read_node(agent, root, |agent, wrappers, document, scope, node| {
+        if shadow && node.shadow_host().is_none() {
+            return agent.type_error("expected a ShadowRoot receiver");
+        }
+        let Some(focused) =
+            focused.filter(|id| id.document() == document.id() && document.is_connected(*id))
+        else {
+            return Ok(Value::NULL);
+        };
+        let focused_root = super::path::tree_root(agent, document, focused)?;
+        let (target, root) =
+            super::path::retarget(agent, document, focused, focused_root, Some(scope))?;
+        if scope != root {
+            return Ok(Value::NULL);
+        }
+        wrap(wrappers, agent, document, target)
+    })
 }
 
 fn has_focus(agent: &mut Agent, this: Value, _: &[Value]) -> JsResult<Value> {
@@ -2210,7 +2419,7 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
                 0 => (
                     "UIEvent",
                     construct::<0>,
-                    &[("relatedTarget", "get relatedTarget", event_field::<0>)],
+                    &[("relatedTarget", "get relatedTarget", focus_related)],
                 ),
                 1 => (
                     "UIEvent",
@@ -2258,17 +2467,17 @@ pub(in crate::page) fn install(agent: &mut Agent) -> JsResult<()> {
         illegal_constructor,
         0,
         &[
-            ("valueMissing", "get valueMissing", validity_flag::<0>),
-            ("typeMismatch", "get typeMismatch", validity_flag::<1>),
-            ("patternMismatch", "get patternMismatch", always_false),
-            ("tooLong", "get tooLong", validity_flag::<2>),
-            ("tooShort", "get tooShort", validity_flag::<3>),
+            ("valueMissing", "get valueMissing", validity_flag::<9>),
+            ("typeMismatch", "get typeMismatch", validity_flag::<8>),
+            ("patternMismatch", "get patternMismatch", validity_flag::<2>),
+            ("tooLong", "get tooLong", validity_flag::<6>),
+            ("tooShort", "get tooShort", validity_flag::<7>),
             ("rangeUnderflow", "get rangeUnderflow", validity_flag::<4>),
-            ("rangeOverflow", "get rangeOverflow", validity_flag::<5>),
-            ("stepMismatch", "get stepMismatch", always_false),
-            ("badInput", "get badInput", always_false),
-            ("customError", "get customError", validity_flag::<6>),
-            ("valid", "get valid", validity_flag::<7>),
+            ("rangeOverflow", "get rangeOverflow", validity_flag::<3>),
+            ("stepMismatch", "get stepMismatch", validity_flag::<5>),
+            ("badInput", "get badInput", validity_flag::<0>),
+            ("customError", "get customError", validity_flag::<1>),
+            ("valid", "get valid", validity_flag::<10>),
         ],
         |_, _| Ok(()),
     )?;

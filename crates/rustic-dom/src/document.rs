@@ -245,6 +245,7 @@ impl Document {
             attributes: Vec::new(),
             custom_is,
             keep_registry_null: false,
+            form_associated: false,
             template_contents: None,
             shadow_root: None,
         }))
@@ -254,6 +255,13 @@ impl Document {
     pub fn keep_element_registry_null(&mut self, id: NodeId) -> Result<(), DomError> {
         self.element(id)?;
         self.element_mut(id).keep_registry_null = true;
+        Ok(())
+    }
+
+    /// Mark a successfully constructed custom element as form-associated.
+    pub fn mark_form_associated(&mut self, id: NodeId) -> Result<(), DomError> {
+        self.element(id)?;
+        self.element_mut(id).form_associated = true;
         Ok(())
     }
 

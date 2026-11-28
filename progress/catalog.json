@@ -855,81 +855,117 @@
           "label": "Shadow DOM and custom element lifecycle",
           "size": 5,
           "milestone": "M9",
-          "status": "in_progress",
-          "evidence": [],
-          "steps": [
+          "status": "complete",
+          "evidence": [
             {
-              "label": "Shadow roots: attachment, ownership, destruction, dumps, adoption and tracing",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-dom/src/document.rs",
-                  "marker": "pub fn attach_shadow"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-dom/tests/shadow.rs",
-                  "marker": "fn a_shadow_root_is_a_separate_owned_tree"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document.rs",
+              "marker": "pub fn attach_shadow"
             },
             {
-              "label": "Slot assignment, the flat tree and slotchange",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-dom/src/document/slots.rs",
-                  "marker": "pub fn slot_map"
-                },
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-layout/src/tree.rs",
-                  "marker": "slots.flat_walk(root)"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-layout/tests/reference.rs",
-                  "marker": "fn shadow_hosts_render_assigned_nodes_and_omit_unassigned_light_children"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-style/tests/shadow.rs",
-                  "marker": "fn slotted_elements_inherit_from_the_slot_and_match_their_own_tree"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/mutation_observer.rs",
-                  "marker": "fn shadow_slots_update_and_signal_after_observers_in_the_same_checkpoint"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-bindings/tests/mutation_observer.rs",
-                  "marker": "fn manual_slot_assignment_is_ordered_unique_and_closed_roots_hide_the_slot"
-                }
-              ]
+              "kind": "test",
+              "path": "crates/rustic-dom/tests/shadow.rs",
+              "marker": "fn a_shadow_root_is_a_separate_owned_tree"
             },
             {
-              "label": "Declarative shadow DOM in the HTML parser",
-              "status": "complete",
-              "evidence": [
-                {
-                  "kind": "source",
-                  "path": "crates/rustic-html/src/parser/tree/insert.rs",
-                  "marker": "fn insert_declarative_shadow"
-                },
-                {
-                  "kind": "test",
-                  "path": "crates/rustic-html/tests/document.rs",
-                  "marker": "fn declarative_shadow_templates_create_owned_trees_at_every_input_split"
-                }
-              ]
+              "kind": "source",
+              "path": "crates/rustic-dom/src/document/slots.rs",
+              "marker": "pub fn slot_map"
             },
             {
-              "label": "Custom element registry, upgrades and lifecycle callbacks",
-              "status": "planned",
-              "evidence": []
+              "kind": "source",
+              "path": "crates/rustic-layout/src/tree.rs",
+              "marker": "slots.flat_walk(root)"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-layout/tests/reference.rs",
+              "marker": "fn shadow_hosts_render_assigned_nodes_and_omit_unassigned_light_children"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-style/tests/shadow.rs",
+              "marker": "fn slotted_elements_inherit_from_the_slot_and_match_their_own_tree"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn shadow_slots_update_and_signal_after_observers_in_the_same_checkpoint"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn manual_slot_assignment_is_ordered_unique_and_closed_roots_hide_the_slot"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-html/src/parser/tree/insert.rs",
+              "marker": "fn insert_declarative_shadow"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-html/tests/document.rs",
+              "marker": "fn declarative_shadow_templates_create_owned_trees_at_every_input_split"
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/custom_elements.rs",
+              "marker": "fn try_upgrade("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/custom_elements/scopes.rs",
+              "marker": "fn copy_scopes("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/custom_elements/internals.rs",
+              "marker": "fn set_form_value("
+            },
+            {
+              "kind": "source",
+              "path": "crates/rustic-bindings/src/page/events/path.rs",
+              "marker": "struct Path("
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn autonomous_custom_element_definition_upgrades_and_runs_lifecycle_callbacks"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn customized_built_ins_preserve_their_name_prototype_and_creation_identity"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn scoped_registries_initialize_null_roots_and_isolate_definitions"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn scoped_registry_assignments_survive_clone_and_import"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/mutation_observer.rs",
+              "marker": "fn form_associated_custom_elements_participate_in_forms_validation_and_reset"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn composed_events_retarget_at_hosts_and_hide_closed_shadow_paths"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-bindings/tests/events.rs",
+              "marker": "fn shadow_hosts_delegate_focus_and_active_elements_are_tree_scoped"
+            },
+            {
+              "kind": "test",
+              "path": "crates/rustic-cli/tests/fixtures/wpt-web/expectations.json",
+              "marker": "custom-elements/element-internals-shadowroot.html"
             }
           ]
         },

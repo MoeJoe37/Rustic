@@ -140,7 +140,9 @@ insertion modes. A supported host gets a root directly. Invalid modes, hosts
 that reject attachment and fragment parsing retain ordinary templates. The
 parser tracks the clonable, serializable and delegates-focus flags. A
 same-mode `attachShadow` call claims an existing declarative root and detaches
-its children. Focus delegation and serialization APIs remain open.
+its children. Hosts with `delegatesFocus` focus the first eligible area in
+the flattened shadow tree. `Document.activeElement` exposes the shadow host,
+and `ShadowRoot.activeElement` exposes the focus in its own tree.
 
 Named slots take direct light children in host order. The first slot matching a
 child's UTF-16 name receives it. Manual slots use the order passed to
@@ -149,6 +151,16 @@ assigned or fallback content. Layout consumes that walk and style inherits from
 the flat-tree parent while selectors match in the original tree. Bindings expose
 `assignedNodes`, `assignedElements` and `assignedSlot`. Slot changes coalesce
 and fire after mutation observer callbacks in the same checkpoint.
+
+Event dispatch freezes the propagation path, including assigned slots.
+Composed events cross a shadow boundary and retarget at hosts. Each listener's
+`composedPath()` omits closed-tree entries hidden from that listener.
+`FocusEvent.relatedTarget` retargets alongside the target.
+
+The DOM arena stores custom-element creation names and flags. The binding
+layer owns registry definitions, callback references and `ElementInternals`
+records. Weak maps tie their JavaScript reachability to live registry
+objects or node wrappers. See [scripted documents](SCRIPTING.md#shadow-dom-and-custom-elements).
 
 Specification basis reviewed 2026-11-28. See [DOM §4.2.2](https://dom.spec.whatwg.org/#shadow-trees),
 [DOM §4.9](https://dom.spec.whatwg.org/#interface-shadowroot), and

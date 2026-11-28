@@ -276,7 +276,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-217 | Deliberate | HTML | Image source selection at layout only: no reselection on resize without a new layout, `sizes` lengths limited to `px`, `em`, `rem`, `vw`, `vh` (no `calc()` or `auto`), and `h` descriptors ignored | Partly paid 2026-11-28 (`currentSrc`); open, M9 CSS/layout |
 | TD-221 | Deliberate | CSS, MathML | Multi-column without `column-span`, column rules, nested multi-column containers or fragmented box decorations; ruby as paired inline flex columns (no `ruby-position`, `ruby-align`, `rtc`, overhang or line-height adjustment); MathML Core approximated with CSS boxes (no operator dictionary, stretchy operators, `math-depth`, script shifts from the MATH table or `mspace`/`mpadded` attributes) | Open, `layout.formats` (M9) |
 | TD-220 | Deliberate | SVG | Inline SVG without text, gradients and patterns (their first stop's color paints), clipping, masks, markers, filters, dashes, `fill-rule: evenodd`, author style sheets or SVG images (`<img src=x.svg>`, CSS); `use` of symbols only by id in the same document; group opacity multiplies into each shape | Open, `paint.formats` (M9) |
-| TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: controls render from content attributes (no dirty value, checkedness or selectedness from script, no caret, no text scrolling in fields), `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
+| TD-219 | Deliberate | HTML, CSS | Form controls and lists by approximation: text fields and checkable inputs paint their live value and checkedness (since 2026-11-28), but there is no selectedness (no `HTMLSelectElement`/`HTMLOptionElement`), no caret and no text scrolling in fields, `select` shows one option even with `multiple`/`size`, `textarea` and `button` lay out their children as ordinary content; markers are text runs with no `::marker` styling, `list-style-image`, `@counter-style` or CSS counters; `groove`/`ridge` paint as `inset`/`outset` and `double`/`dashed`/`dotted` as `solid`; every first-child `legend` is rendered | Open, `html.elements` (M9) |
 | TD-218 | Deliberate | HTML | Embedded content subset: lazy images and iframes load once per render, near a fixed 1250px margin, with no intersection observer resuming them as the page scrolls in a live view; images without a box are not requested; `decode()` settles at once (rejecting unrequested images); no `iframe.contentWindow`/`contentDocument`, URL decomposition on `a`/`area`, or token lists besides `classList`, `sandbox` and `relList` | Partly paid 2026-11-28 (image request state, rendered size, CORS settings, `a`/`area`/`link` with `relList`); open, M9 |
 | TD-215 | Deliberate | DOM | Ranges without `Selection`, `getElementsByName` or `Range` geometry; live-range nodes stay roots one collection after their object dies; six heavy range WPT pages exceed the script turn budget | Open, `dom.ranges` (M9) |
 
@@ -3631,8 +3631,14 @@ show what their content attributes say: an `input`'s `value` or
 `placeholder` (bullets for passwords, labels for buttons), a `select`'s
 selected option, the bars of `progress` and `meter`, the track of `range`,
 the swatch of `color` and the marks of checked boxes and radios
-(`rustic-paint/src/controls.rs`). A script's dirty value, checkedness and
-selectedness are not painted, there is no caret and no field scrolling,
+(`rustic-paint/src/controls.rs`). Paid 2026-11-28: a text field's current
+value (dirty value from script or typing) and a checkable input's
+checkedness are painted: the CLI passes the page's control state
+(`LiveState`, ADR 0073) to `BoxTree::build_with_controls`, and paint reads
+`BoxTree::checked`. Still open: selectedness (there is no
+`HTMLSelectElement`/`HTMLOptionElement`), an indeterminate checkbox paints
+unchecked, a script layout read (`LocalLayout`) still lays out attribute
+values, there is no caret and no field scrolling,
 `select multiple`/`size` show one option, and `textarea` and `button`
 render their children as ordinary content. A `fieldset`'s first-child
 `legend` sits in its top border (square corners only). List items get a
@@ -3641,7 +3647,7 @@ text marker (CSS Lists 3, HTML ordinals with `start`, `reversed` and
 `list-style-image`, `@counter-style` and CSS counters are missing.
 `groove`/`ridge` borders paint as `inset`/`outset` and
 `double`/`dashed`/`dotted` as `solid`.
-**Pay:** paint control state from the bindings, add `::marker` and
+**Pay:** select and option interfaces with selectedness, `::marker` and
 counters, and the remaining border styles.
 
 ### TD-220 — Inline SVG subset

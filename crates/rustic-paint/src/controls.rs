@@ -5,8 +5,9 @@
 //!
 //! Each part is a rounded rectangle in the control's content box, painted
 //! after its background and before its border. The state comes from
-//! content attributes (`value`, `checked`): a script's dirty value or
-//! checkedness is not visible to paint yet (TD-219).
+//! content attributes (`value`, `checked`), except that a checkbox's or
+//! radio button's live checkedness, when the host supplied it to the box
+//! tree ([`rustic_layout::BoxTree::checked`]), wins over `checked`.
 
 use rustic_dom::{Document, HTML_NAMESPACE, NodeId, NodeKind};
 use rustic_layout::{CssPoint, CssPx, CssRect, CssSize};
@@ -27,7 +28,14 @@ const fn rgb(r: u8, g: u8, b: u8) -> Srgba {
 }
 
 /// The parts of the control `node`, whose content box is `content`.
-pub(crate) fn parts(document: &Document, node: NodeId, content: CssRect) -> Vec<Part> {
+/// `checked` is the input's live checkedness when the host knows it (else
+/// its `checked` attribute decides).
+pub(crate) fn parts(
+    document: &Document,
+    node: NodeId,
+    content: CssRect,
+    checked: Option<bool>,
+) -> Vec<Part> {
     let Ok(NodeKind::Element(element)) = document.node(node).map(|n| n.kind()) else {
         return Vec::new();
     };
@@ -79,7 +87,7 @@ pub(crate) fn parts(document: &Document, node: NodeId, content: CssRect) -> Vec<
         }
         "input" => {
             let kind = attribute("type").unwrap_or_default().to_ascii_lowercase();
-            let checked = attribute("checked").is_some();
+            let checked = checked.unwrap_or_else(|| attribute("checked").is_some());
             match kind.as_str() {
                 "range" => {
                     let min = number("min").unwrap_or(0.0);

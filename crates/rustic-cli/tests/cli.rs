@@ -1010,6 +1010,40 @@ fn lazy_images_load_only_near_the_viewport() {
 }
 
 #[test]
+fn controls_render_the_values_and_checkedness_scripts_set() {
+    let base = std::env::temp_dir().join(format!("rustic-cli-controls-{}", std::process::id()));
+    fs::create_dir_all(&base).unwrap();
+    let path = base.join("page.html");
+    let markup = "<input id=t value=old><input id=c type=checkbox>";
+    fs::write(
+        &path,
+        format!(
+            "{markup}<script>document.getElementById('t').value = 'new text';\
+             document.getElementById('c').checked = true;</script>"
+        ),
+    )
+    .unwrap();
+    let path = path.to_str().unwrap();
+    let layout = rustic(&["dump-layout", "--run-scripts", path]);
+    assert!(layout.status.success(), "{}", stderr(&layout));
+    let layout = String::from_utf8_lossy(&layout.stdout);
+    // The field shows its dirty value (8 units), not the attribute's 3.
+    assert!(layout.contains("utf16=0..8 "), "{layout}");
+    let paint = rustic(&["dump-paint", "--run-scripts", path]);
+    assert!(paint.status.success(), "{}", stderr(&paint));
+    let paint = String::from_utf8_lossy(&paint.stdout);
+    // The checked mark paints in the accent color.
+    assert!(paint.contains("color=#0075ffff"), "{paint}");
+    // Without the script, the content attributes decide.
+    let plain = base.join("plain.html");
+    fs::write(&plain, markup).unwrap();
+    let paint = rustic(&["dump-paint", plain.to_str().unwrap()]);
+    let paint = String::from_utf8_lossy(&paint.stdout);
+    assert!(!paint.contains("color=#0075ffff"), "{paint}");
+    fs::remove_dir_all(base).unwrap();
+}
+
+#[test]
 fn image_elements_expose_their_current_request_to_scripts() {
     let png = |w: u32, h: u32| {
         let surface =

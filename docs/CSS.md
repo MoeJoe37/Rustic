@@ -1204,7 +1204,10 @@ and greek, and the disclosure triangles), `list-style-position` (an
 shorthand (images only as `none`). Ordinals follow HTML (`ol start` and
 `reversed`, `li value`). The UA sheet gives form controls their HTML §15.5
 rendering as inline-blocks; their value text and painted parts come from
-their attributes (`rustic-layout/src/tree.rs`, `rustic-paint/src/controls.rs`).
+their attributes (`rustic-layout/src/tree.rs`, `rustic-paint/src/controls.rs`),
+except that a scripted page's text fields show their current value and
+checkboxes and radio buttons their checkedness
+(`BoxTree::build_with_controls`).
 A closed `details` renders only its first `summary`, whose marker is a
 disclosure triangle. Limits: TD-219.
 

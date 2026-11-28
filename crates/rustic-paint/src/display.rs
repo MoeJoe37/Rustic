@@ -1090,9 +1090,10 @@ impl Builder<'_> {
         document: &Document,
         fragment: Geometry,
         source: usize,
+        checked: Option<bool>,
     ) -> Result<(), PaintError> {
         for (rect, color, radius) in
-            crate::controls::parts(document, fragment.node, fragment.content)
+            crate::controls::parts(document, fragment.node, fragment.content, checked)
         {
             let shape = if radius > 0.0 {
                 let corner = crate::rounded::Corner {
@@ -2340,7 +2341,8 @@ impl DisplayList {
                             builder.background(geometry, source, style)?;
                         }
                         if visible(style) {
-                            builder.control(document, geometry, source)?;
+                            let checked = tree.checked(fragment.node());
+                            builder.control(document, geometry, source, checked)?;
                             builder.svg(document, geometry, source, style)?;
                         }
                         builder.shadows(geometry, source, style, true)?;

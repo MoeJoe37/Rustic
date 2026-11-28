@@ -302,6 +302,8 @@ pub struct LoadedDocument {
     frames: Vec<(rustic_raster::Surface, FrameReport)>,
     /// Focus and form control state the page's scripts left (ADR 0073).
     live: rustic_a11y::LiveState,
+    /// The same control state, for painting.
+    controls: ControlStates,
 }
 
 /// How one `--frames` frame was painted.
@@ -335,6 +337,7 @@ impl LoadedDocument {
     ) -> LayoutInput<'a> {
         LayoutInput {
             scroll: Some(&self.scroll),
+            controls: Some(&self.controls),
             ..LayoutInput::new(
                 &self.document,
                 path,
@@ -391,6 +394,7 @@ pub fn load_document(
         network: None,
         scroll: rustic_engine::ScrollState::default(),
         live: rustic_a11y::LiveState::default(),
+        controls: ControlStates::new(),
         frames: Vec::new(),
     })
 }
@@ -534,6 +538,7 @@ fn load_unscripted_network_document(
         network: Some(Rc::clone(&network.session)),
         scroll: rustic_engine::ScrollState::default(),
         live: rustic_a11y::LiveState::default(),
+        controls: ControlStates::new(),
         frames: Vec::new(),
     };
     Ok((document, selected))
@@ -962,10 +967,12 @@ fn run_scripted_load(
             document.run_next_with_render(|_, _| ())?;
             let state = document.scroll_state();
             let animations = document.animations();
+            let controls = control_states(&document.accessibility_state());
             let engine_document = document.document();
             let input = LayoutInput {
                 scroll: Some(&state),
                 animations: Some(&*animations),
+                controls: Some(&controls),
                 ..LayoutInput::new(
                     &engine_document,
                     &source.path,
@@ -1015,6 +1022,7 @@ fn run_scripted_load(
         network: source.network,
         scroll,
         frames,
+        controls: control_states(&live),
         live,
     })
 }
@@ -1284,10 +1292,12 @@ fn live_page(
                     let state = document.scroll_state();
                     let animations = document.animations();
                     let live = document.accessibility_state();
+                    let controls = control_states(&live);
                     let engine_document = document.document();
                     let input = LayoutInput {
                         scroll: Some(&state),
                         animations: Some(&*animations),
+                        controls: Some(&controls),
                         ..LayoutInput::new(
                             &engine_document,
                             &source.path,
@@ -2250,11 +2260,12 @@ type StyledTree = (
 
 fn box_tree_with_styles(input: LayoutInput<'_>) -> Result<StyledTree, LoadError> {
     let (styles, _, font_faces) = compute_styles(input)?;
-    let tree = rustic_layout::BoxTree::build(
+    let tree = rustic_layout::BoxTree::build_with_controls(
         input.document,
         input.document.root(),
         &styles,
         layout_limits(input.limits),
+        input.controls.unwrap_or(&ControlStates::new()),
         input.cancellation,
     )
     .map_err(LoadError::Layout)?;
@@ -2471,6 +2482,30 @@ struct LayoutInput<'a> {
     scroll: Option<&'a rustic_engine::ScrollState>,
     /// The document's running animations, for a scripted page's frames.
     animations: Option<&'a RefCell<rustic_style::AnimationController>>,
+    /// Form controls' live values and checkedness, for a scripted page.
+    controls: Option<&'a ControlStates>,
+}
+
+/// Form controls' live state by element (TD-219).
+type ControlStates = HashMap<rustic_dom::NodeId, rustic_layout::ControlState>;
+
+/// The live control state scripts and input left, for box construction:
+/// text fields' current values and checkable inputs' checkedness.
+fn control_states(live: &rustic_a11y::LiveState) -> ControlStates {
+    live.controls
+        .iter()
+        .map(|(&node, control)| {
+            (
+                node,
+                rustic_layout::ControlState {
+                    value: control.value.as_ref().map(|v| v.encode_utf16().collect()),
+                    checked: control
+                        .checked
+                        .map(|checked| checked == rustic_a11y::Checked::True),
+                },
+            )
+        })
+        .collect()
 }
 
 impl<'a> LayoutInput<'a> {
@@ -2494,6 +2529,7 @@ impl<'a> LayoutInput<'a> {
             network,
             scroll: None,
             animations: None,
+            controls: None,
         }
     }
 }
@@ -2621,6 +2657,7 @@ impl LocalLayout {
             network: self.network.as_ref(),
             scroll: None,
             animations,
+            controls: None,
         })
         .map_err(|_| LayoutReadError::Unavailable)?;
         // Public block fragments omit anonymous wrappers and include atomic

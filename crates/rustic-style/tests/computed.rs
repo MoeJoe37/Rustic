@@ -463,7 +463,9 @@ fn table_presentational_hints_map_to_css_below_author_rules() {
     let value = |id, property| computed(html, none, id, property);
     assert_eq!(value("t", "border-spacing"), "5px");
     assert_eq!(value("t", "width"), "50%");
-    assert_eq!(value("t", "background-color"), "rgb(255, 204, 0)");
+    // HTML's legacy color parser: three digits without `#` are three
+    // one-digit components (0f, 0c, 00), as in every browser.
+    assert_eq!(value("t", "background-color"), "rgb(15, 12, 0)");
     assert_eq!(value("t", "margin-left"), "auto");
     assert_eq!(value("t", "border-top-width"), "2px");
     assert_eq!(value("t", "border-top-style"), "outset");
@@ -475,8 +477,9 @@ fn table_presentational_hints_map_to_css_below_author_rules() {
     assert_eq!(value("c", "white-space"), "nowrap");
     assert_eq!(value("c", "text-align"), "right");
     assert_eq!(value("r", "vertical-align"), "top");
-    // Attribute text is validated, never passed to the CSS parser.
-    assert_eq!(value("r", "background-color"), "rgba(0, 0, 0, 0)");
+    // Attribute text never reaches the CSS parser: the legacy color
+    // parser turns it into hex digits (`0ed00d0000a0000000e` → #ed0000).
+    assert_eq!(value("r", "background-color"), "rgb(237, 0, 0)");
     // (No user-agent sheet here, so `display` keeps its initial value.)
     assert_eq!(value("r", "display"), "inline");
     assert_eq!(value("i", "width"), "40px");
@@ -486,6 +489,40 @@ fn table_presentational_hints_map_to_css_below_author_rules() {
         computed(html, "* { padding: 9px }", "c", "padding-top"),
         "9px"
     );
+}
+
+#[test]
+fn legacy_presentational_hints_cover_body_font_hr_lists_and_embedded_content() {
+    let html = "<body id=b text=navy bgcolor=#ffffff link=green marginwidth=4 topmargin=6>\
+                <a id=a href=x>l</a><a id=n>n</a>\
+                <font id=f color=red size=+1 face='Georgia, x;y'>f</font>\
+                <hr id=h align=left noshade size=5 width=50%>\
+                <ol id=o type=A><li id=l type=i>x</li></ol><ul id=u type=SQUARE></ul>\
+                <img id=i hspace=3 vspace=2 align=right><div id=d align=center></div>\
+                <pre id=p wrap></pre><table id=t border=1 bordercolor=blue></table></body>";
+    let value = |id, property| computed(html, "", id, property);
+    assert_eq!(value("b", "color"), "rgb(0, 0, 128)");
+    assert_eq!(value("b", "background-color"), "rgb(255, 255, 255)");
+    assert_eq!(value("b", "margin-left"), "4px");
+    assert_eq!(value("b", "margin-top"), "6px");
+    assert_eq!(value("a", "color"), "rgb(0, 128, 0)");
+    assert_eq!(value("n", "color"), "rgb(0, 0, 128)", "only links");
+    assert_eq!(value("f", "color"), "rgb(255, 0, 0)");
+    assert_eq!(value("f", "font-size"), "18px");
+    assert_eq!(value("f", "font-family"), "\"Georgia\"");
+    assert_eq!(value("h", "margin-right"), "auto");
+    assert_eq!(value("h", "border-top-style"), "solid");
+    assert_eq!(value("h", "height"), "3px");
+    assert_eq!(value("h", "width"), "50%");
+    assert_eq!(value("o", "list-style-type"), "upper-alpha");
+    assert_eq!(value("l", "list-style-type"), "lower-roman");
+    assert_eq!(value("u", "list-style-type"), "square");
+    assert_eq!(value("i", "margin-left"), "3px");
+    assert_eq!(value("i", "margin-bottom"), "2px");
+    assert_eq!(value("i", "float"), "right");
+    assert_eq!(value("d", "text-align"), "center");
+    assert_eq!(value("p", "white-space"), "pre-wrap");
+    assert_eq!(value("t", "border-top-color"), "rgb(0, 0, 255)");
 }
 
 #[test]

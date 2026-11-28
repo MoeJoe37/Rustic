@@ -680,16 +680,26 @@ zero specificity that lose to every author rule, in or out of a layer, as
 if at the start of the author sheets; `revert-layer` in the lowest layer
 falls back to them. `rustic-style/src/hints.rs` maps an element's
 attributes to CSS text that is parsed like a `style` attribute; every value
-is validated and re-serialized first (numbers by Rustic, colors only as
-checked names or hex digits), so attribute text never reaches the parser.
+is validated and re-serialized first (numbers by Rustic, colors by HTML's
+legacy color parser as a CSS named color or `#rrggbb`, font faces as quoted
+names of plain characters), so attribute text never reaches the parser.
 Mapped: `width`/`height` on `img`, `iframe`, `video`, `embed`, `object`,
 tables and cells (zero ignored on tables and cells), `height` on rows,
 `width` on columns, `bgcolor` on tables, row groups, rows and cells,
 `align`/`valign` on row groups, rows and cells, `nowrap` on cells, table
 `align` (floats or auto margins), `cellspacing`, and `cellpadding` and
-`border`, which also reach the table's cells. Changing any of these
-attributes restyles the element's subtree. Other legacy attributes are
-TD-179.
+`border`, which also reach the table's cells, and table `bordercolor`.
+Also (2026-11-28): body `text`, `bgcolor`, `link` (the color of its
+`a href` descendants; `vlink`/`alink` never apply) and `marginwidth`/
+`marginheight`/`topmargin`/`bottommargin`/`leftmargin`/`rightmargin`;
+`font` `color`, `face` and `size` (legacy font sizes 1–7, relative with
+`+`/`-`); `hr` `align`, `color`, `noshade`, `size` and `width`; list
+`type` on `ol` (`1`, `a`, `A`, `i`, `I`), `ul` and `li`; `hspace`, `vspace`
+and `align` on `img`, `iframe`, `embed`, `object` (and the spacing on
+`video`); `align` on `div`, `p`, headings and `caption`; and `pre wrap`.
+Changing any of these attributes restyles the element's subtree. Table
+`rules` and `frame`, body `background` and the remaining legacy
+attributes are TD-179.
 
 ### Cascade evidence
 

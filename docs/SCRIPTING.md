@@ -179,7 +179,15 @@ canceled. After each checkpoint the document queues a task that fires
 `unhandledrejection` for still-unhandled rejections and `rejectionhandled`
 for ones handled later; the loader runs it before the readiness steps.
 Event handler IDL attributes (`onclick`, `onerror`, `onload`, … on Window,
-Document and HTML elements) keep their position among listeners. `console`
+Document and HTML elements) keep their position among listeners. Content
+attributes (`onclick="…"` on HTML elements; `onload`, `onerror`, `onfocus`,
+`onblur`, `onresize` and `onscroll` on the body for Window) compile into
+the same handlers when the handler is next looked at (IDL read,
+`addEventListener` on the element, dispatch, or an attribute API change),
+as functions of `event` in the global scope; the host's
+`ScriptPolicy::allows_handler_attribute` (CSP `script-src-attr`) decides
+whether they compile, and an unparsable body reports its `SyntaxError` and
+leaves a null handler (TD-153). `console`
 methods fill a bounded buffer the host drains with
 `take_console_messages`; `rustic … --run-scripts` prints it to standard
 error. Describing a value never runs page code. `Node` also has

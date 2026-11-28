@@ -217,7 +217,7 @@ progress), **Paid** (kept for history, with the change that paid it).
 | TD-150 | Watch | Web bindings | Disconnected and expired mutation-observer registrations stay on their node until a later mutation inspects it, and in a live observer's list until `disconnect` | Paid |
 | TD-151 | Deliberate | Web bindings | Records for parser and host edits find interested observers when the journal is drained at the next binding call or checkpoint, not at the instant of the edit | Open, M9 HTML lifecycle |
 | TD-152 | Deliberate | Web bindings | Error reports carry no script URL or line and column, `location` is absent, and the console does not interpret format specifiers | Open, M9 |
-| TD-153 | Deliberate | Web bindings | Event handler content attributes are not compiled (their compilation must apply CSP `script-src-attr`, see TD-164), body and frameset do not forward Window handlers, only a subset of handler names exists, cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Open, M9 HTML lifecycle |
+| TD-153 | Deliberate | Web bindings | Event handler content attributes compile in the global scope (no element, form owner or document scope) and a parser-set attribute joins the listener list when first looked at; body forwards only the Window handlers in the shared list; only a subset of handler names exists; cross-document `replaceChild` queues two records and `normalize()` can stop part-way at the data budget | Partly paid 2026-11-28 (content attributes with CSP `script-src-attr`, body forwarding); open, M9 HTML lifecycle |
 | TD-154 | Deliberate | Web bindings / style | Focus and validity are not style states, control values are not painted, and `select`, labels, selection, caret, `pattern`, `step` and `badInput` are missing | Open, M9 HTML lifecycle |
 | TD-155 | Deliberate | Web bindings | ResizeObserver keeps observers and targets alive while observing, uses one device pixel per CSS pixel and horizontal sizes, and IntersectionObserver is absent | Open, M9 |
 | TD-156 | Deliberate | Network | One thread and one connection per exchange, `Connection: close`, no pooling, HTTP/2 or HTTP/3, and a connect in progress cannot be cancelled | Open, M12 |
@@ -2578,10 +2578,19 @@ the Console Standard's formatter with side-effect-free previews.
 ### TD-153 — Event handler content attributes and remaining handler names
 
 Event handler IDL attributes exist for a subset of `GlobalEventHandlers`
-plus Window's rejection handlers. Content attributes such as
-`onclick="…"` are not compiled into handlers, `<body>` and `<frameset>` do
-not forward Window handlers such as `onload`, and handlers like
-`onmessage` and the animation, pointer and drag families are absent.
+plus Window's rejection handlers. Paid 2026-11-28: content attributes such
+as `onclick="…"` compile into handlers (`rustic_js::Agent::compile_event_handler`)
+when the handler is next looked at, under the host's
+`ScriptPolicy::allows_handler_attribute` (CSP `script-src-attr`), and the
+body forwards `onload`, `onerror`, `onfocus`, `onblur`, `onresize` and
+`onscroll` to Window. Still open: the body compiles in the global scope
+(unqualified names do not find the element's, form owner's or document's
+members), a parser-set attribute's handler joins the listener list when
+first looked at rather than when the attribute was set (equivalent unless
+a listener was added through a path that does not look first),
+`onbeforeunload`/`onunload`/`onmessage` and the other WindowEventHandlers
+are not forwarded, and handlers like `onmessage` and the pointer and drag
+families are absent.
 Separately, `replaceChild` with a node from another document records an
 insertion and a removal instead of the DOM's one combined record, and
 `normalize()` validates each merge on its own, so a document at its data

@@ -455,8 +455,12 @@ fn details_open_changed(agent: &mut Agent, this: Value, id: NodeId, open: bool) 
 
 // ---- attribute change steps ----------------------------------------------------
 
-/// An attribute the change steps watch, with its value before the change.
-pub(in crate::page) struct Watched(Option<(NodeId, &'static str, Option<String>)>);
+/// An attribute the change steps watch, with its value before the change,
+/// or an event handler attribute (`on…`) by name.
+pub(in crate::page) struct Watched(
+    Option<(NodeId, &'static str, Option<String>)>,
+    Option<String>,
+);
 
 /// Call before an attribute API sets or removes `local` (no namespace) on
 /// `id`; pass the result to [`attribute_changed`] afterwards.
@@ -466,13 +470,15 @@ pub(in crate::page) fn watch_attribute(
     namespaced: bool,
     local: &str,
 ) -> JsResult<Watched> {
-    let name = match local.to_ascii_lowercase().as_str() {
-        _ if namespaced => return Ok(Watched(None)),
+    let lower = local.to_ascii_lowercase();
+    let name = match lower.as_str() {
+        _ if namespaced => return Ok(Watched(None, None)),
         "open" => "open",
         "popover" => "popover",
-        _ => return Ok(Watched(None)),
+        handler if handler.starts_with("on") => return Ok(Watched(None, Some(lower))),
+        _ => return Ok(Watched(None, None)),
     };
-    Ok(Watched(Some((id, name, attribute(agent, id, name)?))))
+    Ok(Watched(Some((id, name, attribute(agent, id, name)?)), None))
 }
 
 /// Run the `open` (details, dialog) and `popover` attribute change steps
@@ -482,6 +488,9 @@ pub(in crate::page) fn attribute_changed(
     this: Value,
     watched: Watched,
 ) -> JsResult<()> {
+    if let Some(handler) = watched.1 {
+        return super::events::handler_attribute_changed(agent, this, &handler);
+    }
     let Some((id, name, before)) = watched.0 else {
         return Ok(());
     };

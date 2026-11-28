@@ -61,7 +61,7 @@ pub use events::LifecycleEvent;
 pub use events::{
     AccessibleControls, ControlSnapshot, FormSubmission, FormSubmissions, SUBMISSION_CAPACITY,
 };
-pub use events::{AssistiveAction, Composition, InputEvent, KeyInput, Modifiers};
+pub use events::{AssistiveAction, Composition, HandlerPolicy, InputEvent, KeyInput, Modifiers};
 pub use events::{
     CONSOLE_CAPACITY, CONSOLE_MESSAGE_BYTES, ConsoleLevel, ConsoleLog, ConsoleMessage,
 };
@@ -815,6 +815,15 @@ pub fn set_wasm_compilation_policy(
 ) -> JsResult<()> {
     with_page(agent, |_, page| {
         *page.wasm_compilation.borrow_mut() = verdict;
+        Ok(())
+    })
+}
+
+/// Decide which event handler content attributes compile (CSP
+/// `script-src-attr`); without a policy every attribute compiles.
+pub fn set_handler_policy(agent: &mut Agent, policy: HandlerPolicy) -> JsResult<()> {
+    with_page(agent, |_, page| {
+        *page.events.handler_policy.borrow_mut() = Some(policy);
         Ok(())
     })
 }

@@ -572,3 +572,48 @@ fn modal_dialogs_trap_focus_and_close_on_escape_and_backdrop_clicks() {
         r#"if (log.join() !== "body body") throw "inert click target: " + log.join();"#,
     );
 }
+
+#[test]
+fn event_handler_content_attributes_compile_and_run_in_listener_order() {
+    let mut engine = Engine::new(1);
+    let mut page = page(
+        &mut engine,
+        "<!doctype html><body onload=\"log.push('load ' + (this === window))\">\
+         <a id=a href=#x onclick=\"log.push('attr ' + event.type + ' ' + this.id); return false\">a</a>",
+        TaskLimits::default(),
+    );
+    let a = id(&page, "a");
+    run(
+        &mut page,
+        r#"
+        globalThis.log = [];
+        const a = document.getElementById("a");
+        a.addEventListener("click", e => log.push("listener " + e.defaultPrevented));
+        if (typeof a.onclick !== "function" || a.onclick.name !== "onclick") throw "compiled getter";
+        if (document.body.onload !== null || typeof window.onload !== "function")
+            throw "body onload sets the window handler";
+        window.dispatchEvent(new Event("load"));
+    "#,
+    );
+    deliver(&mut page, a, click());
+    run(
+        &mut page,
+        r#"
+        if (log.join() !== "load true,attr click a,listener true") throw "order: " + log.join();
+        log.length = 0;
+        a.setAttribute("onclick", "log.push('changed')");
+        a.click();
+        a.onclick = () => log.push("idl");
+        a.click();
+        a.setAttribute("onclick", "log.push('again')");
+        a.click();
+        a.removeAttribute("onclick");
+        a.click();
+        if (a.onclick !== null) throw "removing the attribute clears the handler";
+        if (log.join() !== "changed,listener false,idl,listener false,again,listener false,listener false")
+            throw "updates: " + log.join();
+        a.setAttribute("onmouseover", "this is not javascript");
+        if (a.onmouseover !== null) throw "an unparsable attribute is a null handler";
+    "#,
+    );
+}

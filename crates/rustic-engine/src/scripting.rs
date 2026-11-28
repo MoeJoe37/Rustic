@@ -620,6 +620,13 @@ impl<C: Clock> ScriptedDocument<C> {
         page::set_wasm_compilation_policy(agent, verdict).map_err(|_| ScriptStop::OutOfMemory)
     }
 
+    /// Decide which event handler content attributes compile (CSP
+    /// `script-src-attr`).
+    pub fn set_handler_policy(&mut self, policy: page::HandlerPolicy) -> Result<(), ScriptStop> {
+        let agent = self.agent.as_mut().map_err(|reason| *reason)?;
+        page::set_handler_policy(agent, policy).map_err(|_| ScriptStop::OutOfMemory)
+    }
+
     /// Give the document `fetch()`, backed by the host's network session.
     pub fn set_fetch_host(
         &mut self,
